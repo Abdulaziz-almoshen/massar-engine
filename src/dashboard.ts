@@ -695,6 +695,13 @@ window.entClear = () => { entSel.clear(); render(false); };
 window.campMsgSet = (el) => { campMsg = el.value; };
 window.campNameSet = (el) => { campName = el.value; };
 window.pick = (i) => { selProd = i; render(false); };
+window.launchWithProduct = (name) => {
+  const reg = wizProducts();
+  const i = reg.findIndex((x) => x.name === name);
+  if (i >= 0) selProd = i;
+  retargetCohort = null;
+  location.hash = "aimkt";
+};
 window.startRetarget = () => {
   if (!lastDetailCohort || !lastDetailCohort.targets.length) return;
   retargetCohort = lastDetailCohort;
@@ -932,6 +939,21 @@ function vKbProduct(name) {
     (r.sc !== null ? '<span class="chip c-teal">معرفة مدمجة ' + r.sc + "%</span>" : "") +
     (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#98A2B3;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div></div>";
+  // Hub interconnection: this product's campaigns + its win/loss verdict + a launch CTA.
+  const prodCamps = campaigns.filter((c) => (c.product || "") === name);
+  const wlProd = ((winloss && winloss.by_product) || []).find((x) => x.product === name);
+  const prodCauses = ((winloss && winloss.loss_causes) || []).filter((c) => (c.products || []).includes(name));
+  h += '<div class="card rise" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;align-items:center;">' +
+    '<div><div style="font-size:11px;color:#667085;font-weight:600;">حملات هذا المنتج</div>' +
+    '<div style="font-size:24px;font-weight:700;color:#101828;margin-top:5px;">' + prodCamps.length + "</div>" +
+    (prodCamps.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + prodCamps.slice(0, 3).map((c) => '<a href="#kmon/' + c.id + '" class="chip c-blue" style="text-decoration:none;">' + esc(c.name.slice(0, 22)) + "</a>").join("") + "</div>" : "") + "</div>" +
+    '<div><div style="font-size:11px;color:#667085;font-weight:600;">حكم السوق على المنتج</div>' +
+    '<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">' +
+    '<span class="chip c-ok">رابحة ' + ((wlProd && wlProd.won) || 0) + "</span>" +
+    '<span class="chip c-bad">خاسرة ' + ((wlProd && wlProd.lost) || 0) + "</span>" +
+    '<span class="chip c-blue">نشطة ' + ((wlProd && wlProd.active) || 0) + "</span></div>" +
+    (prodCauses.length ? '<div style="font-size:11.5px;color:#B42318;margin-top:8px;font-weight:600;">أبرز سبب خسارة: ' + esc(prodCauses[0].cause) + "</div>" : "") + "</div>" +
+    '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-teal" onclick="launchWithProduct(\\'' + esc(name) + '\\')">أطلق حملة بهذا المنتج ←</button></div></div>';
   const pa = prodAssets.find((a) => a.product === name);
   h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
     (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
@@ -1252,7 +1274,15 @@ function vCustomer(ph) {
       ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>" : "") +
       '<div style="font-size:11.5px;color:#667085;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
-    h += '<div style="font-size:13.5px;font-weight:700;color:#101828;line-height:2;margin-top:12px;">' + esc(ins.summary || "") + "</div>";
+    h += '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
+      '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#101828;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
+    const dmx = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
+    const mcards = [["نية الشراء", im[0], im[1]], ["حكم الصفقة", dmx[0], dmx[1]], ["القناة المفضّلة", "واتساب", "#1F7A73"], ["أفضل وقت", (ins.best_time || "—").slice(0, 30), "#2F5F94"]];
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">' +
+      mcards.map((m) => '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:13px 14px;">' +
+        '<div style="font-size:10.5px;color:#667085;font-weight:600;">' + m[0] + "</div>" +
+        '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';margin-top:6px;line-height:1.6;">' + esc(m[1]) + "</div></div>").join("") + "</div>";
     if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>";
     if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#344054;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
     if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
@@ -1274,10 +1304,11 @@ function vCustomer(ph) {
     '<div style="font-size:11px;color:#98A2B3;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
     '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
     ((d.timeline || []).length ? d.timeline.map((ev) =>
-      '<div style="display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid #F2F4F7;">' +
-      '<span style="width:9px;height:9px;flex:none;margin-top:6px;border-radius:999px;background:' + tlDot(ev.kind) + ';"></span>' +
-      '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:#101828;line-height:1.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div>" +
-      '<div style="font-size:10.5px;color:#98A2B3;margin-top:2px;">' + esc(ev.meta || "") + " · " + fmtD(ev.ts) + " " + fmtT(ev.ts) + "</div></div></div>").join("")
+      '<div style="display:flex;gap:13px;padding:11px 2px;position:relative;">' +
+      '<span style="position:absolute;inset-inline-start:5px;top:24px;bottom:-11px;width:2px;background:#EAECF0;"></span>' +
+      '<span style="width:12px;height:12px;flex:none;margin-top:5px;border-radius:999px;background:#fff;border:2.5px solid ' + tlDot(ev.kind) + ';position:relative;z-index:1;"></span>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:10.5px;font-weight:700;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
+      '<div style="font-size:12.5px;color:#101828;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
       : '<div style="padding:20px;text-align:center;color:#98A2B3;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
   h += "</div>";
   return h;
