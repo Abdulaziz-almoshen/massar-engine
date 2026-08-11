@@ -403,7 +403,7 @@ function vAimkt() {
 }
 
 function mdRender(md) {
-  return md.split("\n").map((raw) => {
+  return md.split("\\n").map((raw) => {
     const l = raw.trim();
     if (!l) return "";
     if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#13294b;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
