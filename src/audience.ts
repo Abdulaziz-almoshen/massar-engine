@@ -37,6 +37,21 @@ export function normalizePhone(raw: unknown): string {
   return d;
 }
 
+/** The fill-in template users download from the portal (headers + example rows). */
+export function buildTemplateXlsx(): Buffer {
+  const rows = [
+    ["الاسم", "الجوال", "المدينة", "الحجم", "القطاع"],
+    ["مجمع النور الطبي (مثال — امسح هذا الصف)", "0512345678", "الرياض", "كبيرة", "مجمعات طبية"],
+    ["عيادات الشفاء (مثال)", "0598765432", "جدة", "متوسطة", "عيادات"],
+    ["صيدلية الدواء (مثال)", "966501112233", "الدمام", "صغيرة", "صيدليات"],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 34 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 16 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "المستهدفون");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
 export type ImportRow = { name: string; phone: string; attrs: Record<string, string> };
 export type ImportParse = {
   rows: ImportRow[];

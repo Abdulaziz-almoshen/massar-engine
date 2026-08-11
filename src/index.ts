@@ -180,6 +180,13 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   return { campaignId, name: campName, requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
 });
 
+// Fill-in audience template (public — static example content, no data).
+app.get("/assets/audience-template.xlsx", async (_req, reply) => {
+  reply.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  reply.header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent("قالب-المستهدفين.xlsx")}`);
+  return audience.buildTemplateXlsx();
+});
+
 // Public intro-file serving (Gupshup fetches media by URL — unguessable id, no auth).
 app.get("/assets/:pid", async (req, reply) => {
   const pid = String((req.params as any).pid || "").replace(/\.pdf$/i, "");

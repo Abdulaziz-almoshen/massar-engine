@@ -182,7 +182,8 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
-let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
+let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = ""; let custQ = "";
+const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
@@ -552,15 +553,23 @@ function vAimkt() {
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
       (selN ? '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
+    const shown = m.slice(0, LIST_CAP);
+    if (m.length > LIST_CAP) {
+      h += '<div style="display:flex;align-items:center;gap:12px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:12px;padding:12px 16px;margin-bottom:10px;">' +
+        '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + m.length.toLocaleString("ar-SA") + '</span>' +
+        '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + LIST_CAP + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
+    }
     h += '<div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
-      m.map((e) => {
+      shown.map((e) => {
         const on = entSel.has(e.id);
         return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f4f6f9;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
           '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #cdd4de;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
           '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
           attrChips(e, 3) +
           '<span style="font-size:11px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span></div>";
-      }).join("") + (m.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+      }).join("") +
+      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7b8597;font-size:12px;background:#fafbfc;">+ ' + (m.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   h += "</div>";
 
@@ -577,13 +586,14 @@ function vAimkt() {
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(PRODUCTS[selProd].n) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#13294b;border:1.5px solid #e9edf3;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   h += '<div class="step" style="text-align:center;">' +
-    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:15px;padding:16px 34px;" onclick="openLaunch()">🚀 إطلاق الحملة إلى ' + selN + " مستهدف</button>" +
+    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:15px;padding:16px 34px;" onclick="openLaunch()">🚀 إطلاق الحملة إلى ' + selN.toLocaleString("ar-SA") + " مستهدف</button>" +
     '<div style="font-size:11.5px;color:#9aa4b4;margin-top:12px;">قناة الساندبوكس: يستلم فعليًا من انضم للرقم التجريبي فقط — البقية تظهر حالتهم «فشل الإرسال» بشفافية. الإطلاق بالقوالب الرسمية يأتي مع رقم الأعمال الإنتاجي.</div></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:17px;font-weight:700;color:#13294b;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:13px;color:#5b6678;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    '<div style="font-size:13px;color:#5b6678;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN.toLocaleString("ar-SA") + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#5b6678;background:#f0f2f6;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
@@ -776,28 +786,38 @@ function vCustomers() {
     '<div style="font-size:13.5px;font-weight:700;color:#13294b;">ارفع ملف Excel أو CSV — قائمتك كما هي</div>' +
     '<div style="font-size:11.5px;color:#7b8597;margin-top:7px;line-height:1.9;">صف العناوين مطلوب: عمود للاسم وعمود للجوال — وكل عمود إضافي (المدينة، الحجم، القطاع…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> تلقائيًا عند إطلاق الحملة<br>التكرار يُحدَّث ولا يُنسخ · أرقام 05 تُحوَّل تلقائيًا إلى صيغة 966</div></div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
+    '<a href="/assets/audience-template.xlsx" download onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#1F4470;background:#E3ECF8;border-radius:10px;padding:9px 15px;text-decoration:none;">⬇ حمّل القالب الجاهز (Excel)</a>' +
+    '<span style="font-size:11px;color:#9aa4b4;">املأه بقائمتك ثم ارفعه هنا كما هو</span></div>' +
     '<div id="entfstat" style="margin-top:12px;">' + entImportSummary + "</div>" +
     '<details style="margin-top:14px;"><summary style="font-size:11.5px;color:#7b8597;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
     '<div style="font-size:11.5px;color:#7b8597;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b></div>' +
     '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><button class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></details></div>';
   const groups = segGroups();
-  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length + " جهة" +
+  const cq = custQ.trim();
+  const cm = cq ? entities.filter((e) => e.name.includes(cq) || e.phone.includes(cq)) : entities;
+  const cshown = cm.slice(0, LIST_CAP);
+  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length.toLocaleString("ar-SA") + " جهة" +
     (groups.length ? " · شرائح: " + groups.map((g) => esc(g.key)).join("، ") : "") + "</span></div>";
   if (!entities.length) {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
   } else {
-    h += '<div class="tblwrap">' + entities.map((e) =>
+    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
+    h += '<div class="tblwrap">' + cshown.map((e) =>
       '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;">' +
       '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
       '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
       '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
       '<span style="font-size:11.5px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span>" +
       '<button onclick="entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>'
-    ).join("") + "</div>";
+    ).join("") +
+    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7b8597;font-size:12px;background:#fafbfc;">+ ' + (cm.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
+    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   return h;
 }
+window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
 
 function vPlaceholder(cur) {
   const t = TITLES[cur] || ["", ""];
