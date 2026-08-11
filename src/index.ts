@@ -245,6 +245,12 @@ app.post("/admin/contact/human", async (req, reply) => {
   return { status: "ok" };
 });
 
+// «لماذا نكسب ولماذا نخسر» — aggregated over cached reads (no LLM cost per view).
+app.get("/admin/intel/winloss", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return insights.winLossBoard();
+});
+
 // Cached reads only (no LLM) — lets list rows show next actions cheaply.
 app.get("/admin/insights", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });

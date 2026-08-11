@@ -24,7 +24,15 @@ export type Insights = {
   why: string;
   best_time: string;
   learning?: boolean;          // < 2 customer messages — mirror the reference's "Learning…"
+  // Win/Loss attribution («لماذا بعنا ولماذا لم نبع») — evidence-quoted, never invented.
+  deal_state?: "won" | "lost" | "stalled" | "active";
+  loss_cause?: string;         // from LOSS_TAXONOMY (empty unless lost/stalled)
+  win_drivers?: string[];      // what moved this deal forward (verbatim-anchored)
+  evidence?: string;           // the customer quote that proves the call
+  fix_suggestion?: string;     // what would likely have won/revived it
 };
+
+export const LOSS_TAXONOMY = ["السعر", "التوقيت", "منتج غير مناسب", "تواصل غير واضح", "الملف غير واضح", "لا استجابة", "جهة غير مناسبة", "طلب تدخلًا بشريًا"] as const;
 
 const SYSTEM = [
   "أنت محلل مبيعات في لِين للصحة الرقمية. ستقرأ محادثة واتساب واحدة بين مساعد بيع آلي وعميل منشأة صحية، مع وسوم الاهتمام وحالة التسليم وبيانات الجهة إن وجدت.",
@@ -32,7 +40,10 @@ const SYSTEM = [
   "intent: high = طلب سعرًا/بدء اشتراك/موعدًا صراحة؛ medium = أسئلة جدية عن التفاصيل؛ low = ردود مجاملة أو فتور؛ none = لا إشارة.",
   "next_action: خطوة عملية واحدة يقوم بها مدير المبيعات البشري الآن (مثال: «اتصل اليوم واعرض باقة المنشآت» أو «أرسل عرض الأسعار المفصل»). why: سطر يشرح السبب من كلام العميل.",
   "best_time: اقترح نافذة تواصل واقعية (أيام عمل السعودية، ٩ص–٥م) مبنية على أوقات رسائل العميل إن ظهرت، وإلا فاقترح صباح يوم العمل التالي.",
-  'أعد JSON فقط: {"summary":"سطر واحد يلخص وضع هذا العميل","intent":"high|medium|low|none","signals":["إشارة شراء حرفية قصيرة"],"objections":["اعتراض ظهر نصًا"],"product_interest":[{"product":"اسم المنتج","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"..."}',
+  "حكم الصفقة deal_state: won = التزم صراحة بالاشتراك/الاجتماع النهائي؛ lost = رفض نهائيًا أو انسحب؛ stalled = توقف التفاعل بعد اهتمام (صمت > يومين بعد آخر رسالة منا)؛ active = الحوار مستمر طبيعيًا.",
+  "إن كانت lost أو stalled: اختر loss_cause حصريًا من: السعر، التوقيت، منتج غير مناسب، تواصل غير واضح، الملف غير واضح، لا استجابة، جهة غير مناسبة، طلب تدخلًا بشريًا — والدليل evidence اقتباس حرفي من كلام العميل (أو صف الصمت)، وfix_suggestion خطوة كانت سترجّح الكسب.",
+  "إن كانت won أو active مع تقدم: win_drivers نقاط حرفية حرّكت الصفقة (سرعة الرد، الملف، السعر المناسب، الحاجة الملحّة…).",
+  'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
 /** Deterministic completeness of what the platform knows about this person (0–100). */
@@ -68,6 +79,48 @@ export function buildTimeline(c: Contact): { ts: number; kind: string; title: st
   }
   for (const tg of c.tags || []) ev.push({ ts: tg.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "فاتر" });
   return ev.sort((a, b) => b.ts - a.ts).slice(0, 60);
+}
+
+export type WinLoss = {
+  totals: { won: number; lost: number; stalled: number; active: number; learning: number };
+  loss_causes: { cause: string; count: number; example: string; products: string[] }[];
+  win_drivers: { driver: string; count: number }[];
+  by_product: { product: string; won: number; lost: number; stalled: number; active: number }[];
+};
+
+/** Aggregate «لماذا نكسب ولماذا نخسر» over CACHED reads only (no LLM calls here). */
+export async function winLossBoard(): Promise<WinLoss> {
+  const rows = await db.listInsights();
+  const totals = { won: 0, lost: 0, stalled: 0, active: 0, learning: 0 };
+  const causes = new Map<string, { count: number; example: string; products: Set<string> }>();
+  const drivers = new Map<string, number>();
+  const prod = new Map<string, { won: number; lost: number; stalled: number; active: number }>();
+  for (const r of rows) {
+    const d = r.data as Insights;
+    if (!d || d.learning) { totals.learning++; continue; }
+    const ds = d.deal_state ?? "active";
+    totals[ds] = (totals[ds] ?? 0) + 1;
+    const products = (d.product_interest ?? []).map((p) => p.product);
+    for (const p of products) {
+      const row = prod.get(p) ?? { won: 0, lost: 0, stalled: 0, active: 0 };
+      row[ds] = (row[ds] ?? 0) + 1;
+      prod.set(p, row);
+    }
+    if ((ds === "lost" || ds === "stalled") && d.loss_cause) {
+      const c = causes.get(d.loss_cause) ?? { count: 0, example: "", products: new Set<string>() };
+      c.count++;
+      if (!c.example && d.evidence) c.example = d.evidence;
+      products.forEach((p) => c.products.add(p));
+      causes.set(d.loss_cause, c);
+    }
+    for (const w of d.win_drivers ?? []) drivers.set(w, (drivers.get(w) ?? 0) + 1);
+  }
+  return {
+    totals,
+    loss_causes: [...causes.entries()].map(([cause, c]) => ({ cause, count: c.count, example: c.example, products: [...c.products].slice(0, 3) })).sort((a, b) => b.count - a.count).slice(0, 8),
+    win_drivers: [...drivers.entries()].map(([driver, count]) => ({ driver, count })).sort((a, b) => b.count - a.count).slice(0, 8),
+    by_product: [...prod.entries()].map(([product, r]) => ({ product, ...r })).sort((a, b) => (b.won + b.lost) - (a.won + a.lost)),
+  };
 }
 
 export async function getInsights(c: Contact, entity: EntityRow | null, force = false): Promise<Insights> {
@@ -108,6 +161,8 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   let parsed: Partial<Insights> = {};
   try { parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}"); } catch { /* fall through to safe shape */ }
   const lvl = (x: unknown): "high" | "medium" | "low" => x === "high" ? "high" : x === "low" ? "low" : "medium";
+  const ds = ["won", "lost", "stalled", "active"].includes(String(parsed.deal_state)) ? parsed.deal_state as Insights["deal_state"] : "active";
+  const lc = (LOSS_TAXONOMY as readonly string[]).includes(String(parsed.loss_cause)) ? String(parsed.loss_cause) : "";
   const out: Insights = {
     summary: String(parsed.summary || "").slice(0, 200) || "لا يوجد ملخص.",
     intent: ["high", "medium", "low", "none"].includes(String(parsed.intent)) ? parsed.intent as Insights["intent"] : "none",
@@ -118,6 +173,11 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     next_action: String(parsed.next_action || "").slice(0, 160) || "راجع المحادثة يدويًا.",
     why: String(parsed.why || "").slice(0, 200),
     best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (٩–١١ص)",
+    deal_state: ds,
+    loss_cause: (ds === "lost" || ds === "stalled") ? lc : "",
+    win_drivers: (Array.isArray(parsed.win_drivers) ? parsed.win_drivers : []).slice(0, 4).map((x) => String(x).slice(0, 100)),
+    evidence: String(parsed.evidence || "").slice(0, 200),
+    fix_suggestion: String(parsed.fix_suggestion || "").slice(0, 180),
   };
   db.saveInsights(c.phone, out, turns);
   console.log(JSON.stringify({ at: "insights", msg: "computed", phone: c.phone, turns, intent: out.intent }));
