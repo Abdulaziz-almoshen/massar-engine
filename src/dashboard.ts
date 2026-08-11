@@ -492,7 +492,7 @@ function vHome(d) {
     '<div class="kpi"><div class="k">مهتمون وجادّون</div><div class="v" style="color:#1f8a52">' + interestedList.length + "</div></div></div>";
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
     '<a href="#aimkt" style="text-decoration:none;" class="btn btn-teal">+ إنشاء حملة</a>' +
-    '<a href="#customers" style="text-decoration:none;" class="btn" style="color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
+    '<a href="#customers" class="btn" style="text-decoration:none;color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
     '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">📚 معرفة المنتج</a></div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">عملاء جادّون الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
