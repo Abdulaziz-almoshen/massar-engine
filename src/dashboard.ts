@@ -568,11 +568,33 @@ function vKmonDetail(id, d) {
     '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + c[1] + "</div>" +
     '<div class="p">' + (i === 0 ? "&nbsp;" : pct(c[1]) + "% من المستهدفين") + "</div>" +
     '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
+  // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
+  const seenSilent = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied);
+  const notDelivered = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered);
+  const hotHere = rows.filter((r) => r.contact && ((r.contact.tags || []).some((t) => t.level === "hot") || (insCache[r.phone] || {}).intent === "high"));
+  const lostHere = rows.map((r) => insCache[r.phone]).filter((i) => i && i.deal_state === "lost" && i.loss_cause);
+  const causeTally = {};
+  lostHere.forEach((i) => { causeTally[i.loss_cause] = (causeTally[i.loss_cause] || 0) + 1; });
+  const topCause = Object.keys(causeTally).sort((a, b) => causeTally[b] - causeTally[a])[0];
+  const moves = [];
+  if (hotHere.length) moves.push(["اتصل أولًا بـ" + hotHere.length + " عميلًا جادًا", "هم أعلى احتمال إغلاق في هذه الحملة — ابدأ بهم قبل أن يبردوا", "#027A48", "#ECFDF3"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + seenSilent.length + " جهة شاهدت ولم تردّ", "الاهتمام موجود والرسالة لم تُقنع — غيّر الزاوية" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
+  if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام أو أعد المحاولة في وقت آخر", "#B42318", "#FEF3F2"]);
+  if (topCause) moves.push(["أبرز سبب خسارة: " + topCause, "عالجه في رسالة الحملة القادمة لهذا المنتج", "#2F5F94", "#EFF4FB"]);
+  if (moves.length) {
+    h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "الخطوة التالية لهذه الحملة</h3>" +
+      '<span class="cntpill">' + moves.length + " توصية</span></div>" +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px;">' +
+      moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #EAECF0;border-radius:13px;padding:14px 16px;">' +
+        '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';">' + esc(m[0]) + "</div>" +
+        '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">' + esc(m[1]) + "</div></div>").join("") + "</div></div>";
+  }
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
     ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
     ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
     ["interested", "مهتمون", st.interested, (r) => interestedOf(r.contact)],
+    ["silent", "شوهدت بلا ردّ", seenSilent.length, (r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied],
     ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
