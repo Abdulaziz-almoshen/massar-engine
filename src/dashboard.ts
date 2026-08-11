@@ -977,7 +977,7 @@ function funnelSvg(rows) {
       '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + r[1].toLocaleString("ar-SA") + "</text>";
   });
   return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
-    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="قمع الحملات"></svg-fix>' + shapes + "</svg></div>" +
+    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="قمع الحملات">' + shapes + "</svg></div>" +
     '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
     rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#3b4657;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
 }
