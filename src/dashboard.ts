@@ -155,7 +155,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .ct { font-size: 11.5px; color: #b6bfcc; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border: 1px solid #e3e7ee; border-radius: 16px; padding: 28px; text-align: center; }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #d8dee8; border-radius: 10px; padding: 11px 13px; margin: 14px 0; direction: ltr; }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } }
+  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 </style>
 </head>
 <body>
@@ -182,7 +182,7 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
-let entities = []; const entSel = new Set(); let entQ = ""; let entSize = ""; let entCity = "";
+let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
@@ -317,8 +317,11 @@ function contactRowsHtml(rows) {
   return h;
 }
 window.setHuman = async (phone, val) => {
-  await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
-  alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
+  try {
+    const r = await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
+    if (!r.ok) { alertBar("تعذّر تبديل حالة المساعد (" + r.status + ")", true); return; }
+    alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
+  } catch (e) { alertBar("تعذّر الاتصال بالخادم — أعد المحاولة", true); return; }
   await refresh();
 };
 let convoPhone = null;
@@ -331,7 +334,8 @@ function renderConvo() {
   if (!convoPhone || !cache) { el.innerHTML = ""; convoSig = ""; return; }
   const c = (cache.contacts || []).find((x) => x.phone === convoPhone);
   if (!c) { el.innerHTML = ""; convoPhone = null; convoSig = ""; return; }
-  const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + (c.outcome || "");
+  const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + (c.outcome || "") +
+    "|" + Object.keys(c.statusTimes || {}).join(",") + "|" + (c.tags || []).map((t) => t.product + ":" + t.level).join(",");
   if (sig === convoSig && el.innerHTML) return;   // nothing changed — don't rebuild (keeps scroll)
   const prevMsgs = document.getElementById("convoMsgs");
   const wasAtBottom = !prevMsgs || (prevMsgs.scrollHeight - prevMsgs.scrollTop - prevMsgs.clientHeight < 60);
@@ -451,20 +455,43 @@ function vHome(d) {
     'بقية الوحدات (العملاء، الفرص، لوحة المتابعة…) ضمن المراحل القادمة حسب خارطة الطريق.</div></div>';
 }
 
+// Segment groups derive from whatever columns the imported file carried:
+// one group per attribute key (by coverage, max 6), values ordered by count (max 12).
+function segGroups() {
+  const keyCount = new Map();
+  entities.forEach((e) => Object.keys(e.attrs || {}).forEach((k) => keyCount.set(k, (keyCount.get(k) || 0) + 1)));
+  return [...keyCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([key]) => {
+    const valCount = new Map();
+    entities.forEach((e) => { const v = (e.attrs || {})[key]; if (v) valCount.set(v, (valCount.get(v) || 0) + 1); });
+    return { key, values: [...valCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12) };
+  });
+}
 function entMatches() {
   const q = entQ.trim();
   return entities.filter((e) =>
-    (!entSize || (e.size || "") === entSize) &&
-    (!entCity || (e.city || "") === entCity) &&
+    Object.keys(entFilters).every((k) => !entFilters[k] || ((e.attrs || {})[k] || "") === entFilters[k]) &&
     (!q || e.name.includes(q) || e.phone.includes(q)));
+}
+function attrChips(e, max) {
+  const a = e.attrs || {}; const keys = Object.keys(a).slice(0, max);
+  return keys.map((k) => {
+    const v = a[k];
+    const cls = v === "كبيرة" || v === "كبير" ? "c-blue" : v === "متوسطة" || v === "متوسط" ? "c-teal" : "c-grey";
+    return '<span class="chip ' + cls + '" title="' + esc(k) + '">' + esc(v) + "</span>";
+  }).join("");
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
     (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
-window.entSetSize = (i) => { const vals = ["", ...new Set(entities.map(e => e.size).filter(Boolean))]; entSize = vals[i] || ""; render(false); };
-window.entSetCity = (i) => { const vals = ["", ...new Set(entities.map(e => e.city).filter(Boolean))]; entCity = vals[i] || ""; render(false); };
+// Indexes only in onclick (Arabic keys/values stay out of attribute strings);
+// both sides re-derive the same ordering from segGroups().
+window.entSetAttr = (ki, vi) => {
+  const g = segGroups()[ki]; if (!g) return;
+  entFilters[g.key] = vi < 0 ? "" : (g.values[vi] ? g.values[vi][0] : "");
+  render(false);
+};
 window.entSearch = (el) => { entQ = el.value; clearTimeout(window.__eq); window.__eq = setTimeout(() => render(false), 250); };
 window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); render(false); };
 window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
@@ -504,8 +531,7 @@ function vAimkt() {
   const m = entMatches();
   const selN = entSel.size;
   const firstSel = entities.find(e => entSel.has(e.id));
-  const sizes = ["", ...new Set(entities.map(e => e.size).filter(Boolean))];
-  const cities = ["", ...new Set(entities.map(e => e.city).filter(Boolean))];
+  const groups = segGroups();
   const allOn = m.length && m.every(e => entSel.has(e.id));
 
   let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">يعتمد المساعد على معرفة المنتج المسجّلة + ملفات Product Hub.</div></div></div><div class="prods">' +
@@ -514,12 +540,14 @@ function vAimkt() {
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يتحدّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">مختار من ' + entities.length + "</span></span></div>";
   if (!entities.length) {
-    h += '<div style="border:1.5px dashed #c9d2df;border-radius:12px;padding:26px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا مستهدفين بعد — أضفهم من شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a> (لصق: الاسم، الرقم، الحجم، المدينة).</div>';
+    h += '<div style="border:1.5px dashed #c9d2df;border-radius:12px;padding:26px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
-    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
-      '<span style="font-size:11.5px;font-weight:700;color:#7b8597;">الحجم:</span>' +
-      sizes.map((v, i) => chipBtn(v || "الكل", entSize === v, "entSetSize(" + i + ")")).join("") +
-      (cities.length > 1 ? '<span style="font-size:11.5px;font-weight:700;color:#7b8597;margin-inline-start:8px;">المدينة:</span>' + cities.map((v, i) => chipBtn(v || "الكل", entCity === v, "entSetCity(" + i + ")")).join("") : "") + "</div>";
+    h += groups.map((g, ki) =>
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<span style="font-size:11.5px;font-weight:700;color:#7b8597;min-width:52px;">' + esc(g.key) + ":</span>" +
+      chipBtn("الكل", !entFilters[g.key], "entSetAttr(" + ki + ",-1)") +
+      g.values.map(([v, n], vi) => chipBtn(v + " (" + n + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
+      "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
@@ -530,8 +558,7 @@ function vAimkt() {
         return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f4f6f9;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
           '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #cdd4de;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
           '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
-          (e.size ? '<span class="chip ' + (e.size === "كبيرة" ? "c-blue" : e.size === "متوسطة" ? "c-teal" : "c-grey") + '">' + esc(e.size) + "</span>" : "") +
-          (e.city ? '<span style="font-size:11px;color:#9aa4b4;">' + esc(e.city) + "</span>" : "") +
+          attrChips(e, 3) +
           '<span style="font-size:11px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") + (m.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
@@ -703,32 +730,68 @@ window.entImport = async () => {
     const r = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
     const d = await r.json();
     if (!r.ok) { st.innerHTML = '<span class="chip c-bad">' + esc(d.error || r.status) + "</span>"; return; }
-    st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.skipped ? '<span class="chip c-grey">مكرر ' + d.skipped + "</span> " : "") + (d.invalid ? '<span class="chip c-bad">غير صالح ' + d.invalid + "</span>" : "");
+    st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span> " : "") + (d.invalid ? '<span class="chip c-bad">غير صالح ' + d.invalid + "</span>" : "");
     ta.value = "";
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
     render(false);
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ</span>'; }
 };
+window.entFilePick = () => document.getElementById("entfile").click();
+window.entFileUpload = async (input) => {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const st = document.getElementById("entfstat");
+  st.innerHTML = '<span class="chip c-warn">جارٍ قراءة الملف واستيراد الصفوف…</span>';
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    const r = await fetch("/admin/entities/import", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
+    const d = await r.json();
+    if (!r.ok) { st.innerHTML = '<span class="chip c-bad">تعذّر: ' + esc(d.error || r.status) + "</span>"; return; }
+    let msg = '<span class="chip c-ok">أُضيف ' + d.added + "</span> ";
+    if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + d.updated + "</span> ";
+    if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + d.skippedCount + "</span> ";
+    msg += '<div style="font-size:11px;color:#7b8597;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
+      (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
+    if (d.skippedRows && d.skippedRows.length) {
+      msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
+        d.skippedRows.map((s) => "صف " + s.row + ": " + esc(s.reason)).join(" · ") + "</div>";
+    }
+    entImportSummary = msg;   // survives the re-render (the status div is rebuilt by vCustomers)
+    const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
+    if (er.ok) entities = await er.json();
+    render(false);
+    alertBar("استُورد الملف — " + d.added + " جديد، " + d.updated + " محدّث", false);
+  } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الاستيراد</span>'; }
+  input.value = "";
+};
 window.entDel = async (id) => {
   await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
   entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
 };
 function vCustomers() {
-  let h = '<div class="card"><h3>استيراد مستهدفين</h3>' +
-    '<div style="font-size:12px;color:#7b8597;margin-bottom:10px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b> — الحجم والمدينة اختياريان (مثال: مجمع النور الطبي، 9665xxxxxxxx، كبيرة، الرياض)</div>' +
-    '<textarea id="entpaste" rows="5" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض&#10;صيدلية الدواء، 966598765432، صغيرة، جدة" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;"><button class="btn btn-teal" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></div>';
-  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length + ' جهة</span></div>';
+  let h = '<div class="card"><h3>استيراد المستهدفين من ملف</h3>' +
+    '<div onclick="entFilePick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;margin-top:4px;">' +
+    '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
+    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">ارفع ملف Excel أو CSV — قائمتك كما هي</div>' +
+    '<div style="font-size:11.5px;color:#7b8597;margin-top:7px;line-height:1.9;">صف العناوين مطلوب: عمود للاسم وعمود للجوال — وكل عمود إضافي (المدينة، الحجم، القطاع…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> تلقائيًا عند إطلاق الحملة<br>التكرار يُحدَّث ولا يُنسخ · أرقام 05 تُحوَّل تلقائيًا إلى صيغة 966</div></div>' +
+    '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
+    '<div id="entfstat" style="margin-top:12px;">' + entImportSummary + "</div>" +
+    '<details style="margin-top:14px;"><summary style="font-size:11.5px;color:#7b8597;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
+    '<div style="font-size:11.5px;color:#7b8597;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b></div>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><button class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></details></div>';
+  const groups = segGroups();
+  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length + " جهة" +
+    (groups.length ? " · شرائح: " + groups.map((g) => esc(g.key)).join("، ") : "") + "</span></div>";
   if (!entities.length) {
-    h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">الصق القائمة أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
+    h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
   } else {
     h += '<div class="tblwrap">' + entities.map((e) =>
       '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;">' +
       '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
       '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
-      (e.size ? '<span class="chip ' + (e.size === "كبيرة" ? "c-blue" : e.size === "متوسطة" ? "c-teal" : "c-grey") + '">' + esc(e.size) + "</span>" : "") +
-      (e.city ? '<span style="font-size:11.5px;color:#9aa4b4;">' + esc(e.city) + "</span>" : "") +
+      '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
       '<span style="font-size:11.5px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span>" +
       '<button onclick="entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>'
     ).join("") + "</div>";
@@ -740,9 +803,6 @@ function vPlaceholder(cur) {
   const t = TITLES[cur] || ["", ""];
   return '<div class="empty"><div class="ic"><span></span></div><div class="t">' + t[0] + '</div><div class="s">هذه الوحدة ضمن المرحلة القادمة من «مسار» وفق خارطة الطريق — وحدة التسويق هي النشطة حاليًا.</div></div>';
 }
-
-
-window.pick = (i) => { selProd = i; render(false); };
 
 function gate(msg) {
   document.getElementById("body").innerHTML = '<div class="gate"><div style="font-size:16px;font-weight:700;">دخول مَسار</div>' +

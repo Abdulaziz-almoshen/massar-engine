@@ -7,6 +7,7 @@ import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
 import * as kb from "./kb.js";
+import * as audience from "./audience.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -103,6 +104,29 @@ app.post("/admin/entities", async (req, reply) => {
   }
   const res = await db.addEntities(rows);
   return { ...res, invalid: bad.length, invalidLines: bad.slice(0, 5) };
+});
+
+// File import (primary onboarding): Excel/CSV upload → header auto-map → upsert by phone.
+// Extra columns become segment attributes the launch picker filters on.
+app.post("/admin/entities/import", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const file = await (req as any).file();
+  if (!file) return reply.code(400).send({ error: "multipart file required (.xlsx / .xls / .csv)" });
+  const buf = await file.toBuffer();
+  try {
+    const parsed = audience.parseAudienceFile(buf, file.filename || "audience.xlsx");
+    const res = await db.addEntities(parsed.rows);
+    log({ at: "audience", msg: "import done", filename: file.filename, ...res, skipped_rows: parsed.skipped.length });
+    return {
+      ...res,
+      totalRows: parsed.totalRows,
+      columns: parsed.columns,
+      skippedRows: parsed.skipped.slice(0, 10),
+      skippedCount: parsed.skipped.length,
+    };
+  } catch (e) {
+    return reply.code(422).send({ error: String(e instanceof Error ? e.message : e).slice(0, 300) });
+  }
 });
 
 app.post("/admin/entities/delete", async (req, reply) => {

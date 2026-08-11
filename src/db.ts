@@ -58,8 +58,10 @@ CREATE TABLE IF NOT EXISTS entities (
   phone      TEXT NOT NULL UNIQUE,
   size       TEXT,
   city       TEXT,
+  attrs      JSONB NOT NULL DEFAULT '{}',
   created_at BIGINT NOT NULL
 );
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS campaigns (
   id         BIGSERIAL PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -192,28 +194,44 @@ export async function counts(): Promise<{ contacts: number; messages: number; ev
 
 // ------------------------------ entities (campaign targets) ------------------------------
 
-export type EntityRow = { id: number; name: string; phone: string; size: string | null; city: string | null };
+export type EntityRow = {
+  id: number; name: string; phone: string; size: string | null; city: string | null;
+  attrs: Record<string, string>;
+};
 
 export async function listEntities(): Promise<EntityRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, phone, size, city FROM entities ORDER BY name`);
-  return r.rows.map((x) => ({ ...x, id: Number(x.id) }));
+  const r = await pool.query(`SELECT id, name, phone, size, city, attrs FROM entities ORDER BY name`);
+  // Legacy size/city columns fold into attrs so the UI reads one uniform attribute map.
+  return r.rows.map((x) => ({
+    ...x, id: Number(x.id),
+    attrs: {
+      ...(x.size ? { "الحجم": x.size } : {}),
+      ...(x.city ? { "المدينة": x.city } : {}),
+      ...(x.attrs ?? {}),
+    },
+  }));
 }
 
-export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string }[]):
-  Promise<{ added: number; skipped: number }> {
-  if (!pool || !connected) return { added: 0, skipped: rows.length };
-  let added = 0, skipped = 0;
+export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string; attrs?: Record<string, string> }[]):
+  Promise<{ added: number; updated: number; skipped: number }> {
+  if (!pool || !connected) return { added: 0, updated: 0, skipped: rows.length };
+  let added = 0, updated = 0, skipped = 0;
   for (const r of rows) {
     try {
       const res = await pool.query(
-        `INSERT INTO entities (name, phone, size, city, created_at) VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (phone) DO NOTHING`,
-        [r.name, r.phone, r.size ?? null, r.city ?? null, Date.now()]);
-      res.rowCount ? added++ : skipped++;
+        `INSERT INTO entities (name, phone, size, city, attrs, created_at) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (phone) DO UPDATE SET
+           name = EXCLUDED.name,
+           size = COALESCE(EXCLUDED.size, entities.size),
+           city = COALESCE(EXCLUDED.city, entities.city),
+           attrs = entities.attrs || EXCLUDED.attrs
+         RETURNING (xmax = 0) AS inserted`,
+        [r.name, r.phone, r.size ?? null, r.city ?? null, JSON.stringify(r.attrs ?? {}), Date.now()]);
+      res.rows[0]?.inserted ? added++ : updated++;
     } catch { skipped++; }
   }
-  return { added, skipped };
+  return { added, updated, skipped };
 }
 
 export async function deleteEntity(id: number): Promise<void> {

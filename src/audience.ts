@@ -1,0 +1,93 @@
+import * as XLSX from "xlsx";
+
+// ---------------------------------------------------------------------------
+// Audience file import: Excel/CSV → entities with schemaless attributes.
+// Header auto-map (Arabic/English), KSA phone normalization, upsert by phone.
+// The wizard derives segment chips from whatever columns the file carried.
+// ---------------------------------------------------------------------------
+
+const NAME_HEADERS = ["الاسم", "اسم", "الجهة", "جهة", "العميل", "الشركة", "المنشأة", "name", "company", "entity", "client"];
+const PHONE_HEADERS = ["الجوال", "جوال", "الهاتف", "هاتف", "رقم الجوال", "رقم", "واتساب", "phone", "mobile", "whatsapp", "tel", "number"];
+
+const MAX_ROWS = 5000;
+
+function norm(h: string): string {
+  return h.trim().toLowerCase().replace(/[أإآ]/g, "ا").replace(/\s+/g, " ");
+}
+
+function matchHeader(headers: string[], candidates: string[]): number {
+  const normed = headers.map(norm);
+  for (const c of candidates) {
+    const i = normed.findIndex((h) => h === norm(c));
+    if (i !== -1) return i;
+  }
+  for (const c of candidates) {
+    const i = normed.findIndex((h) => h.includes(norm(c)));
+    if (i !== -1) return i;
+  }
+  return -1;
+}
+
+/** KSA-aware: 05XXXXXXXX → 966XXXXXXXXX; bare 5XXXXXXXX → 966…; otherwise digits as-is. */
+export function normalizePhone(raw: unknown): string {
+  let d = String(raw ?? "").replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c))).replace(/\D/g, "");
+  if (d.length === 10 && d.startsWith("05")) d = "966" + d.slice(1);
+  else if (d.length === 9 && d.startsWith("5")) d = "966" + d;
+  else if (d.startsWith("00")) d = d.slice(2);
+  return d;
+}
+
+export type ImportRow = { name: string; phone: string; attrs: Record<string, string> };
+export type ImportParse = {
+  rows: ImportRow[];
+  columns: { name: string; phone: string; attrs: string[] };
+  skipped: { row: number; reason: string }[];
+  totalRows: number;
+};
+
+export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse {
+  const wb = XLSX.read(buffer, { type: "buffer", codepage: 65001 });
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) throw new Error("الملف لا يحتوي على أي ورقة بيانات");
+  const grid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: false });
+  if (grid.length < 2) throw new Error("الملف يحتاج صف عناوين وصفًا واحدًا على الأقل من البيانات");
+
+  const headers = (grid[0] ?? []).map((h) => String(h ?? "").trim());
+  const nameIdx = matchHeader(headers, NAME_HEADERS);
+  const phoneIdx = matchHeader(headers, PHONE_HEADERS);
+  if (nameIdx === -1 || phoneIdx === -1) {
+    throw new Error(`تعذر التعرف على أعمدة الاسم/الجوال — العناوين الموجودة: ${headers.filter(Boolean).join("، ") || "(لا شيء)"}`);
+  }
+  const attrIdx = headers
+    .map((h, i) => ({ h, i }))
+    .filter(({ h, i }) => h && i !== nameIdx && i !== phoneIdx);
+
+  const rows: ImportRow[] = [];
+  const skipped: { row: number; reason: string }[] = [];
+  const dataRows = grid.slice(1, 1 + MAX_ROWS);
+  for (let r = 0; r < dataRows.length; r++) {
+    const line = dataRows[r] ?? [];
+    const rowNo = r + 2; // 1-based + header row
+    const name = String(line[nameIdx] ?? "").trim();
+    const phone = normalizePhone(line[phoneIdx]);
+    if (!name && !phone) continue; // fully empty line — not an error
+    if (!name) { skipped.push({ row: rowNo, reason: "بدون اسم" }); continue; }
+    if (phone.length < 8) { skipped.push({ row: rowNo, reason: `جوال غير صالح: ${String(line[phoneIdx] ?? "").trim() || "(فارغ)"}` }); continue; }
+    const attrs: Record<string, string> = {};
+    for (const { h, i } of attrIdx) {
+      const v = String(line[i] ?? "").trim();
+      if (v) attrs[h] = v;
+    }
+    rows.push({ name, phone, attrs });
+  }
+  if (grid.length - 1 > MAX_ROWS) {
+    skipped.push({ row: MAX_ROWS + 2, reason: `تجاوز الحد (${MAX_ROWS} صف) — تم تجاهل الباقي` });
+  }
+  console.log(JSON.stringify({ at: "audience", msg: "file parsed", filename, sheet: sheetName, rows: rows.length, skipped: skipped.length }));
+  return {
+    rows,
+    columns: { name: headers[nameIdx], phone: headers[phoneIdx], attrs: attrIdx.map((a) => a.h) },
+    skipped,
+    totalRows: grid.length - 1,
+  };
+}
