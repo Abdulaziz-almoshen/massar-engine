@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { cfg } from "./config.js";
 import * as gupshup from "./gupshup.js";
 import * as tracker from "./tracker.js";
+import * as db from "./db.js";
 import type { Contact } from "./tracker.js";
 
 // ---------------------------------------------------------------------------
@@ -157,6 +158,15 @@ function productBlock(): string {
   ].join("\n")).join("\n\n");
 }
 
+let hubKb: { product: string; md: string }[] = [];
+export async function refreshKb(): Promise<number> {
+  try {
+    hubKb = (await db.listKb()).map((r) => ({ product: r.product, md: r.md }));
+    console.log(JSON.stringify({ at: "agent", msg: "hub kb refreshed", products: hubKb.map((h) => h.product) }));
+  } catch (e) { console.error(JSON.stringify({ at: "agent", msg: "hub kb refresh failed", err: String(e).slice(0, 200) })); }
+  return hubKb.length;
+}
+
 function systemPrompt(contact: Contact): string {
   const availableAssets = assets();
   return [
@@ -192,6 +202,11 @@ function systemPrompt(contact: Contact): string {
     "",
     "# مصفوفة البدائل",
     ...PIVOTS,
+    ...(hubKb.length ? [
+      "",
+      "# معرفة معتمدة من Product Hub (ملفات رسمية مرفوعة — قدّمها على المعرفة الافتراضية عند التعارض)",
+      ...hubKb.map((h) => h.md.slice(0, 6000)),
+    ] : []),
   ].filter(Boolean).join("\n");
 }
 

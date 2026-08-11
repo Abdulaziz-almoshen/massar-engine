@@ -170,6 +170,9 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const openSet = new Set(); let cache = null; let selProd = 0;
+let entities = []; const entSel = new Set(); let entQ = ""; let entSize = ""; let entCity = "";
+let kbDocs = []; let launching = false;
+let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
 const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
@@ -184,7 +187,7 @@ const TITLES = {
   aimkt: ["إنشاء حملة", "أنشئ حملة موجّهة للمنشآت الصحية في خطوات قليلة"],
   kb: ["معرفة المنتج للمساعد الذكي", "ما يعرفه مساعد المبيعات ويبيع به في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
-  customers: ["قائمة العملاء", "ضمن المرحلة القادمة"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
+  customers: ["قائمة المستهدفين", "استيراد وإدارة جهات الاستهداف للحملات"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
   pipeline: ["لوحة متابعة الفرص", "ضمن المرحلة القادمة"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["المستهدفات", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
@@ -293,30 +296,208 @@ function vHome(d) {
     'بقية الوحدات (العملاء، الفرص، لوحة المتابعة…) ضمن المراحل القادمة حسب خارطة الطريق.</div></div>';
 }
 
+function entMatches() {
+  const q = entQ.trim();
+  return entities.filter((e) =>
+    (!entSize || (e.size || "") === entSize) &&
+    (!entCity || (e.city || "") === entCity) &&
+    (!q || e.name.includes(q) || e.phone.includes(q)));
+}
+function chipBtn(label, on, fn) {
+  return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
+    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
+    '" onclick="' + fn + '">' + esc(label) + "</button>";
+}
+window.entSetSize = (i) => { const vals = ["", ...new Set(entities.map(e => e.size).filter(Boolean))]; entSize = vals[i] || ""; render(false); };
+window.entSetCity = (i) => { const vals = ["", ...new Set(entities.map(e => e.city).filter(Boolean))]; entCity = vals[i] || ""; render(false); };
+window.entSearch = (el) => { entQ = el.value; clearTimeout(window.__eq); window.__eq = setTimeout(() => render(false), 250); };
+window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); render(false); };
+window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
+window.entClear = () => { entSel.clear(); render(false); };
+window.campMsgSet = (el) => { campMsg = el.value; };
+window.pick = (i) => { selProd = i; render(false); };
+window.openLaunch = () => { if (!entSel.size || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
+window.closeLaunch = () => { const m = document.getElementById("lmodal"); if (m) m.style.display = "none"; };
+window.confirmLaunch = async () => {
+  if (launching) return; launching = true;
+  const btn = document.getElementById("lgo"); if (btn) { btn.textContent = "جارٍ الإرسال…"; }
+  const targets = entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
+  try {
+    const r = await fetch("/admin/campaign/launch", { method: "POST",
+      headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ targets, message: campMsg }) });
+    const d = await r.json();
+    launching = false; closeLaunch();
+    if (!r.ok) { alertBar("فشل الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
+    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — تابع الحالة الآن في متابعة الحملات", false);
+    entSel.clear();
+    setTimeout(() => { location.hash = "kmon"; refresh(); }, 1200);
+  } catch (e) { launching = false; closeLaunch(); alertBar("خطأ في الإطلاق", true); }
+};
+window.alertBar = (txt, bad) => {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;bottom:22px;right:290px;z-index:99;background:" + (bad ? "#FBE9E9" : "#E6F4EC") +
+    ";color:" + (bad ? "#c43d3d" : "#1f8a52") + ";font-weight:700;font-size:13px;border-radius:11px;padding:13px 18px;box-shadow:0 8px 24px rgba(16,38,68,.14);";
+  el.textContent = txt;
+  document.body.appendChild(el); setTimeout(() => el.remove(), 3800);
+};
+
 function vAimkt() {
   const p = PRODUCTS[selProd];
   const tone = (sc) => sc >= 80 ? ["#1f8a52", "جاهز للبيع", "c-ok"] : sc >= 60 ? ["#b5810f", "جاهز بتحفّظ", "c-warn"] : ["#c43d3d", "غير جاهز", "c-bad"];
-  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">يعتمد المساعد على معرفة المنتج المسجّلة — لن تعيد إدخال شيء.</div></div></div><div class="prods">' +
-    PRODUCTS.map((x, i) => { const t = tone(x.sc); return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + x.n + '</div><span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span></button>"; }).join("") + "</div>" +
-    (p.gaps.length ? '<div class="note">معرفة ناقصة قد يتعثر معها المساعد: ' + p.gaps.join(" · ") + ' — أكملها من «معرفة المنتج».</div>' : "") + "</div>";
-  h += '<div class="step"><div class="hd"><span class="num">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">قاعدة جهات الاتصال قيد البناء (استيراد العملاء + حقول الموافقة — المرحلة القادمة). حاليًا: المنضمون للساندبوكس فقط.</div></div></div>' +
-    '<div style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;" id="audN">—</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">منشأة متاحة (ساندبوكس)</span></div></div>';
-  h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">كتبها المساعد من معرفة «' + p.n + '» — القوالب الرسمية تُعتمد مع رقم الأعمال الإنتاجي.</div></div></div>' +
-    '<div class="wa-prev"><div class="b">مساء الخير أ. فهد،\\nمعك مساعد لِين الرقمي. نعمل مع المنشآت الصحية على رفع كفاءة الإجراءات عبر «' + p.n + '».\\nهل يناسبكم عرض تعريفي قصير هذا الأسبوع؟</div><div class="t">10:14 ص ✓✓</div></div></div>';
-  h += '<div class="step" style="text-align:center;"><button class="btn btn-dis" title="يتطلب محرك الحملات (المرحلة القادمة)">ابدأ تواصل المساعد</button>' +
-    '<div style="font-size:11.5px;color:#9aa4b4;margin-top:12px;">الإطلاق الجماعي يتفعّل مع محرك الحملات (outbox + pacer) والقوالب المعتمدة — وفق خارطة الطريق.</div></div>';
+  const m = entMatches();
+  const selN = entSel.size;
+  const firstSel = entities.find(e => entSel.has(e.id));
+  const sizes = ["", ...new Set(entities.map(e => e.size).filter(Boolean))];
+  const cities = ["", ...new Set(entities.map(e => e.city).filter(Boolean))];
+  const allOn = m.length && m.every(e => entSel.has(e.id));
+
+  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">يعتمد المساعد على معرفة المنتج المسجّلة + ملفات Product Hub.</div></div></div><div class="prods">' +
+    PRODUCTS.map((x, i) => { const t = tone(x.sc); return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + x.n + '</div><span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span></button>"; }).join("") + "</div></div>";
+
+  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يتحدّث فورًا.</div></div>' +
+    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">مختار من ' + entities.length + "</span></span></div>";
+  if (!entities.length) {
+    h += '<div style="border:1.5px dashed #c9d2df;border-radius:12px;padding:26px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا مستهدفين بعد — أضفهم من شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a> (لصق: الاسم، الرقم، الحجم، المدينة).</div>';
+  } else {
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
+      '<span style="font-size:11.5px;font-weight:700;color:#7b8597;">الحجم:</span>' +
+      sizes.map((v, i) => chipBtn(v || "الكل", entSize === v, "entSetSize(" + i + ")")).join("") +
+      (cities.length > 1 ? '<span style="font-size:11.5px;font-weight:700;color:#7b8597;margin-inline-start:8px;">المدينة:</span>' + cities.map((v, i) => chipBtn(v || "الكل", entCity === v, "entSetCity(" + i + ")")).join("") : "") + "</div>";
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
+      '<input value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
+      '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
+      (selN ? '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
+    h += '<div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
+      m.map((e) => {
+        const on = entSel.has(e.id);
+        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f4f6f9;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
+          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #cdd4de;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
+          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
+          (e.size ? '<span class="chip ' + (e.size === "كبيرة" ? "c-blue" : e.size === "متوسطة" ? "c-teal" : "c-grey") + '">' + esc(e.size) + "</span>" : "") +
+          (e.city ? '<span style="font-size:11px;color:#9aa4b4;">' + esc(e.city) + "</span>" : "") +
+          '<span style="font-size:11px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span></div>";
+      }).join("") + (m.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+  }
+  h += "</div>";
+
+  h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
+    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">نص الرسالة</div>' +
+    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#13294b;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
+    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">معاينة واتساب</div>' +
+    '<div class="wa-prev"><div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div></div></div></div></div>';
+
+  const can = selN > 0 && campMsg.trim();
+  h += '<div class="step" style="text-align:center;">' +
+    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:15px;padding:16px 34px;" onclick="openLaunch()">🚀 إطلاق الحملة إلى ' + selN + " مستهدف</button>" +
+    '<div style="font-size:11.5px;color:#9aa4b4;margin-top:12px;">قناة الساندبوكس: يستلم فعليًا من انضم للرقم التجريبي فقط — البقية تظهر حالتهم «فشل الإرسال» بشفافية. الإطلاق بالقوالب الرسمية يأتي مع رقم الأعمال الإنتاجي.</div></div>';
+
+  h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
+    '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
+    '<div style="font-size:17px;font-weight:700;color:#13294b;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
+    '<div style="font-size:13px;color:#5b6678;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
+    '<button class="btn" style="color:#5b6678;background:#f0f2f6;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
 }
 
+function mdRender(md) {
+  return md.split("\n").map((raw) => {
+    const l = raw.trim();
+    if (!l) return "";
+    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#13294b;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
+    if (l.startsWith("## ")) return '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;margin:14px 0 6px;">' + esc(l.slice(3)) + "</div>";
+    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#5b6678;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
+    return '<div style="font-size:12.5px;color:#5b6678;line-height:1.9;">' + esc(l) + "</div>";
+  }).join("");
+}
+window.kbPick = () => document.getElementById("kbfile").click();
+window.kbUpload = async (input) => {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const st = document.getElementById("kbstat");
+  st.innerHTML = '<span class="chip c-warn">جارٍ التحليل والاستخراج… قد يستغرق دقيقة</span>';
+  const fd = new FormData(); fd.append("file", f);
+  try {
+    const r = await fetch("/admin/kb/upload", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
+    const d = await r.json();
+    if (!r.ok) { st.innerHTML = '<span class="chip c-bad">تعذّر: ' + esc(d.error || r.status) + "</span>"; return; }
+    st.innerHTML = '<span class="chip c-ok">تم — «' + esc(d.product) + '» أصبح ضمن معرفة المساعد ✓</span>';
+    const kr = await fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } });
+    if (kr.ok) kbDocs = await kr.json();
+    render(false);
+  } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الرفع</span>'; }
+  input.value = "";
+};
 function vKb() {
+  let h = '<div class="card"><h3>ارفع عرض المبيعات (Pitch Deck) — يتحوّل لمعرفة يقرأها المساعد</h3>' +
+    '<div onclick="kbPick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;">' +
+    '<div style="width:44px;height:44px;margin:0 auto 14px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
+    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">اضغط لاختيار ملف PDF</div>' +
+    '<div style="font-size:11.5px;color:#7b8597;margin-top:8px;line-height:1.9;">عرض تقديمي بيعي من مهارة Claude أو أي مصدر — يُحلَّل ويُحفظ Markdown في Product Hub<br>يُعرض هنا للبشر ويقرأه المساعد في كل محادثة</div></div>' +
+    '<input id="kbfile" type="file" accept="application/pdf" style="display:none" onchange="kbUpload(this)">' +
+    '<div id="kbstat" style="margin-top:12px;"></div></div>';
+
+  if (kbDocs.length) {
+    h += '<div class="sec">Product Hub — ملفات معتمدة <span class="meta">' + kbDocs.length + ' منتج · يقرأها المساعد الآن</span></div>';
+    kbDocs.forEach((d) => {
+      h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
+        '<div style="font-size:14.5px;font-weight:700;color:#13294b;">' + esc(d.product) + '</div>' +
+        '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">يقرأه المساعد الآن ✓</span>' +
+        (d.source_filename ? '<span style="font-size:10.5px;color:#9aa4b4;direction:ltr;">' + esc(d.source_filename) + "</span>" : "") + "</div></div>" +
+        '<div style="border-top:1px solid #f0f2f6;padding-top:10px;">' + mdRender(d.md) + "</div></div>";
+    });
+  }
+
   const dot = { ok: "#2e9e6b", warn: "#d6a01f", bad: "#d85151" };
-  const chip = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
-  return '<div class="card" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">' +
-    '<div style="font-size:34px;font-weight:700;color:#2E7D77;">92%</div>' +
-    '<div><div style="font-size:11px;color:#9aa4b4;margin-bottom:5px;">جاهزية المساعد — الإجازات المرضية</div><span class="chip c-ok" style="padding:5px 12px;">جاهز للعمل</span></div>' +
-    '<div style="flex:1;min-width:200px;font-size:12px;color:#7b8597;line-height:1.9;">هذه المعرفة الحقيقية التي يبيع بها المساعد الآن على واتساب. التحرير والاعتماد من هذه الشاشة ضمن المرحلة القادمة.</div></div>' +
+  const chipm = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
+  h += '<div class="sec">المعرفة الأساسية المدمجة <span class="meta">الإجازات المرضية — جاهزية 92%</span></div>' +
     '<div style="background:#fff;border:1px solid #e9edf3;border-radius:14px;overflow:hidden;">' +
-    KB_SECTIONS.map((s) => '<div class="kbrow"><span class="dt" style="background:' + dot[s[2]] + ';"></span><div class="ti"><div class="t1">' + s[0] + '</div><div class="t2">' + s[1] + '</div></div><span class="chip ' + chip[s[2]][0] + '">' + chip[s[2]][1] + '</span><span class="ct">' + s[3] + "</span></div>").join("") + "</div>";
+    KB_SECTIONS.map((x) => '<div class="kbrow"><span class="dt" style="background:' + dot[x[2]] + ';"></span><div class="ti"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div><span class="chip ' + chipm[x[2]][0] + '">' + chipm[x[2]][1] + '</span><span class="ct">' + x[3] + "</span></div>").join("") + "</div>";
+  return h;
+}
+
+window.entImport = async () => {
+  const ta = document.getElementById("entpaste");
+  if (!ta.value.trim()) return;
+  const st = document.getElementById("entstat");
+  st.innerHTML = '<span class="chip c-warn">جارٍ الاستيراد…</span>';
+  try {
+    const r = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
+    const d = await r.json();
+    if (!r.ok) { st.innerHTML = '<span class="chip c-bad">' + esc(d.error || r.status) + "</span>"; return; }
+    st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.skipped ? '<span class="chip c-grey">مكرر ' + d.skipped + "</span> " : "") + (d.invalid ? '<span class="chip c-bad">غير صالح ' + d.invalid + "</span>" : "");
+    ta.value = "";
+    const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
+    if (er.ok) entities = await er.json();
+    render(false);
+  } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ</span>'; }
+};
+window.entDel = async (id) => {
+  await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+  entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
+};
+function vCustomers() {
+  let h = '<div class="card"><h3>استيراد مستهدفين</h3>' +
+    '<div style="font-size:12px;color:#7b8597;margin-bottom:10px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b> — الحجم والمدينة اختياريان (مثال: مجمع النور الطبي، 9665xxxxxxxx، كبيرة، الرياض)</div>' +
+    '<textarea id="entpaste" rows="5" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض&#10;صيدلية الدواء، 966598765432، صغيرة، جدة" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;"><button class="btn btn-teal" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></div>';
+  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length + ' جهة</span></div>';
+  if (!entities.length) {
+    h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">الصق القائمة أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
+  } else {
+    h += '<div class="tblwrap">' + entities.map((e) =>
+      '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;">' +
+      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
+      (e.size ? '<span class="chip ' + (e.size === "كبيرة" ? "c-blue" : e.size === "متوسطة" ? "c-teal" : "c-grey") + '">' + esc(e.size) + "</span>" : "") +
+      (e.city ? '<span style="font-size:11.5px;color:#9aa4b4;">' + esc(e.city) + "</span>" : "") +
+      '<span style="font-size:11.5px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span>" +
+      '<button onclick="entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>'
+    ).join("") + "</div>";
+  }
+  return h;
 }
 
 function vPlaceholder(cur) {
@@ -342,11 +523,9 @@ function render(fetchNew) {
     if (!TOKEN) return gate();
     if (!cache) return; // first fetch pending
     b.innerHTML = cur === "kmon" ? vKmon(cache) : vHome(cache);
-  } else if (cur === "aimkt") {
-    b.innerHTML = vAimkt();
-    const n = document.getElementById("audN"); if (n && cache) n.textContent = (cache.contacts || []).length;
-  } else if (cur === "kb") {
-    b.innerHTML = vKb();
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
+    if (!TOKEN) return gate();
+    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? vKb() : vCustomers();
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
@@ -359,6 +538,12 @@ async function refresh(force) {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
       else { cache = await r.json(); document.getElementById("upd").textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+      const [er, kr] = await Promise.all([
+        fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
+      ]);
+      if (er.ok) entities = await er.json();
+      if (kr.ok) kbDocs = await kr.json();
     } catch (e) { /* keep last view */ }
   }
   render(true);
@@ -366,7 +551,11 @@ async function refresh(force) {
 window.addEventListener("hashchange", () => render(false));
 if (!location.hash) location.hash = "kmon";
 refresh();
-setInterval(refresh, 5000);
+setInterval(async () => {
+  const cur = (location.hash || "#kmon").slice(1);
+  if (cur === "kmon" || cur === "home") { refresh(); }
+  else if (TOKEN) { try { const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } }); if (r.ok) cache = await r.json(); } catch (e) {} }
+}, 5000);
 </script>
 </body>
 </html>`;

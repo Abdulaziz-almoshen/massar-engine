@@ -52,6 +52,20 @@ CREATE TABLE IF NOT EXISTS events (
   ts    BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
+CREATE TABLE IF NOT EXISTS entities (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  phone      TEXT NOT NULL UNIQUE,
+  size       TEXT,
+  city       TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS product_kb (
+  product         TEXT PRIMARY KEY,
+  md              TEXT NOT NULL,
+  source_filename TEXT,
+  updated_at      BIGINT NOT NULL
+);
 `;
 
 export async function init(): Promise<void> {
@@ -153,4 +167,50 @@ export async function counts(): Promise<{ contacts: number; messages: number; ev
       `SELECT (SELECT COUNT(*) FROM contacts) c, (SELECT COUNT(*) FROM messages) m, (SELECT COUNT(*) FROM events) e`);
     return { contacts: Number(r.rows[0].c), messages: Number(r.rows[0].m), events: Number(r.rows[0].e) };
   } catch { return null; }
+}
+
+// ------------------------------ entities (campaign targets) ------------------------------
+
+export type EntityRow = { id: number; name: string; phone: string; size: string | null; city: string | null };
+
+export async function listEntities(): Promise<EntityRow[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(`SELECT id, name, phone, size, city FROM entities ORDER BY name`);
+  return r.rows.map((x) => ({ ...x, id: Number(x.id) }));
+}
+
+export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string }[]):
+  Promise<{ added: number; skipped: number }> {
+  if (!pool || !connected) return { added: 0, skipped: rows.length };
+  let added = 0, skipped = 0;
+  for (const r of rows) {
+    try {
+      const res = await pool.query(
+        `INSERT INTO entities (name, phone, size, city, created_at) VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (phone) DO NOTHING`,
+        [r.name, r.phone, r.size ?? null, r.city ?? null, Date.now()]);
+      res.rowCount ? added++ : skipped++;
+    } catch { skipped++; }
+  }
+  return { added, skipped };
+}
+
+export async function deleteEntity(id: number): Promise<void> {
+  if (!pool || !connected) return;
+  await pool.query(`DELETE FROM entities WHERE id = $1`, [id]);
+}
+
+// ------------------------------ product hub (agent-readable KB) ------------------------------
+
+export async function listKb(): Promise<{ product: string; md: string; source_filename: string | null; updated_at: string }[]> {
+  if (!pool || !connected) return [];
+  return (await pool.query(`SELECT product, md, source_filename, updated_at FROM product_kb ORDER BY product`)).rows;
+}
+
+export async function saveKb(product: string, md: string, sourceFilename: string): Promise<void> {
+  if (!pool || !connected) throw new Error("db not connected — product hub requires Postgres");
+  await pool.query(
+    `INSERT INTO product_kb (product, md, source_filename, updated_at) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (product) DO UPDATE SET md = EXCLUDED.md, source_filename = EXCLUDED.source_filename, updated_at = EXCLUDED.updated_at`,
+    [product, md, sourceFilename, Date.now()]);
 }

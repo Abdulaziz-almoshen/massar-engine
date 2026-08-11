@@ -6,8 +6,11 @@ import * as gupshup from "./gupshup.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
+import * as kb from "./kb.js";
+import multipart from "@fastify/multipart";
 
-const app = Fastify({ logger: false });
+const app = Fastify({ logger: false, bodyLimit: 26214400 });
+await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
 const startedAt = Date.now();
 
 function log(obj: Record<string, unknown>) {
@@ -74,6 +77,92 @@ app.get("/admin/state", async (req, reply) => {
   return tracker.snapshot();
 });
 
+// ------------------------------ audiences (entities) ------------------------------
+
+app.get("/admin/entities", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listEntities();
+});
+
+// Paste import: one line per entity — "name, phone[, size[, city]]" (Arabic or Latin commas/tabs).
+app.post("/admin/entities", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { text } = (req.body ?? {}) as { text?: string };
+  if (!text?.trim()) return reply.code(400).send({ error: "body: { text }" });
+  const rows: { name: string; phone: string; size?: string; city?: string }[] = [];
+  const bad: string[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split(/[,\t،؛;]/).map((x) => x.trim()).filter(Boolean);
+    const name = parts[0] ?? "";
+    const phone = (parts[1] ?? "").replace(/\D/g, "");
+    if (!name || phone.length < 8) { bad.push(line.slice(0, 60)); continue; }
+    rows.push({ name, phone, size: parts[2] || undefined, city: parts[3] || undefined });
+  }
+  const res = await db.addEntities(rows);
+  return { ...res, invalid: bad.length, invalidLines: bad.slice(0, 5) };
+});
+
+app.post("/admin/entities/delete", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { id } = (req.body ?? {}) as { id?: number };
+  if (!id) return reply.code(400).send({ error: "body: { id }" });
+  await db.deleteEntity(Number(id));
+  return { status: "ok" };
+});
+
+// ------------------------------ campaign launch (human-confirmed in the UI) ------------------------------
+
+app.post("/admin/campaign/launch", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { targets, message } = (req.body ?? {}) as { targets?: { phone: string; name?: string }[]; message?: string };
+  if (!Array.isArray(targets) || !targets.length || !message?.trim())
+    return reply.code(400).send({ error: "body: { targets: [{phone,name}], message }" });
+  if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
+  const results: { phone: string; ok: boolean; error?: string }[] = [];
+  for (const t of targets) {
+    const phone = String(t.phone || "").replace(/\D/g, "");
+    if (!phone) { results.push({ phone: String(t.phone), ok: false, error: "invalid phone" }); continue; }
+    const contact = tracker.getContact(phone, t.name);
+    if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); continue; }
+    const personalized = message.replaceAll("{name}", t.name || "").replaceAll("{الاسم}", t.name || "").replace(/\s+([،.!؟])/g, "$1");
+    try {
+      await gupshup.sendText(phone, personalized);
+      tracker.recordAgentReply(phone, personalized);
+      results.push({ phone, ok: true });
+    } catch (e) {
+      tracker.recordSystem(phone, `campaign send failed: ${String(e).slice(0, 150)}`);
+      results.push({ phone, ok: false, error: String(e).slice(0, 150) });
+    }
+    await new Promise((r) => setTimeout(r, 350));
+  }
+  const sent = results.filter((r) => r.ok).length;
+  log({ at: "campaign", msg: "launch done", requested: targets.length, sent });
+  return { requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
+});
+
+// ------------------------------ product hub (KB uploads) ------------------------------
+
+app.get("/admin/kb", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listKb();
+});
+
+app.post("/admin/kb/upload", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const file = await (req as any).file();
+  if (!file) return reply.code(400).send({ error: "multipart file required" });
+  const buf = await file.toBuffer();
+  try {
+    const out = await kb.processDeck(buf, file.filename || "deck.pdf");
+    await agent.refreshKb();
+    return out;
+  } catch (e) {
+    return reply.code(422).send({ error: String(e).slice(0, 300) });
+  }
+});
+
 // Outbound smoke tests — e.g. verify the source number once it's configured.
 app.post("/admin/send-test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
@@ -97,6 +186,7 @@ const main = async () => {
   log({ at: "boot", config: configReport() });
   await db.init();                            // memory-only if DATABASE_URL unset/down
   if (db.isConnected()) await tracker.hydrate();
+  if (db.isConnected()) await agent.refreshKb();
   agent.initModel().catch(() => { /* retried lazily on first turn */ });
   await app.listen({ port: cfg.port, host: "0.0.0.0" });
   log({ at: "boot", msg: `listening on :${cfg.port}` });
