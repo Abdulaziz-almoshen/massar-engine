@@ -470,7 +470,6 @@ function vKb() {
       '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح ←</span></div>';
     return '<a href="#kb/' + encodeURIComponent(r.name) + '" style="text-decoration:none;"><div class="prod" style="cursor:pointer;">' + inner + "</div></a>";
   }).join("") + "</div>";
-  h += '<div class="card"><h3>منتج جديد من ملف</h3>' + uploadZone("") + "</div>";
   return h;
 }
 function vKbProduct(name) {
