@@ -155,7 +155,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .ct { font-size: 11.5px; color: #b6bfcc; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border: 1px solid #e3e7ee; border-radius: 16px; padding: 28px; text-align: center; }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #d8dee8; border-radius: 10px; padding: 11px 13px; margin: 14px 0; direction: ltr; }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.3fr; } .thead div:nth-child(n+4), .trow > div:nth-child(n+4) { display: none; } }
+  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } }
 </style>
 </head>
 <body>
@@ -181,7 +181,7 @@ const qs = new URLSearchParams(location.search);
 if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token")); history.replaceState({}, "", "/dashboard" + location.hash); }
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const openSet = new Set(); let cache = null; let selProd = 0;
+let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; let entSize = ""; let entCity = "";
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
@@ -316,15 +316,27 @@ function contactRowsHtml(rows) {
   });
   return h;
 }
+window.setHuman = async (phone, val) => {
+  await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
+  alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
+  await refresh();
+};
 let convoPhone = null;
+let convoSig = "";
 window.openConvo = (p) => { convoPhone = p; renderConvo(); };
 window.closeConvo = () => { convoPhone = null; renderConvo(); };
 function renderConvo() {
   let el = document.getElementById("convoRoot");
   if (!el) { el = document.createElement("div"); el.id = "convoRoot"; document.body.appendChild(el); }
-  if (!convoPhone || !cache) { el.innerHTML = ""; return; }
+  if (!convoPhone || !cache) { el.innerHTML = ""; convoSig = ""; return; }
   const c = (cache.contacts || []).find((x) => x.phone === convoPhone);
-  if (!c) { el.innerHTML = ""; return; }
+  if (!c) { el.innerHTML = ""; convoPhone = null; convoSig = ""; return; }
+  const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + (c.outcome || "");
+  if (sig === convoSig && el.innerHTML) return;   // nothing changed — don't rebuild (keeps scroll)
+  const prevMsgs = document.getElementById("convoMsgs");
+  const wasAtBottom = !prevMsgs || (prevMsgs.scrollHeight - prevMsgs.scrollTop - prevMsgs.clientHeight < 60);
+  const prevScroll = prevMsgs ? prevMsgs.scrollTop : 0;
+  convoSig = sig;
   const nm = c.waName || "غير معروف";
   el.innerHTML = '<div class="backdrop" onclick="closeConvo()"></div>' +
     '<aside class="convo" role="dialog" aria-label="المحادثة">' +
@@ -340,8 +352,9 @@ function renderConvo() {
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
-  if (m) m.scrollTop = m.scrollHeight;
+  if (m) m.scrollTop = wasAtBottom ? m.scrollHeight : prevScroll;
 }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && convoPhone) closeConvo(); });
 window.setCampFilter = (f) => { campFilter = f; render(false); };
 
 function vKmon(d) {
@@ -417,7 +430,7 @@ function vKmonDetail(id, d) {
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") +
-    '<input value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #e9edf3;border-radius:999px;padding:7px 13px;background:#f8fafc;width:130px;">' +
+    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #e9edf3;border-radius:999px;padding:7px 13px;background:#f8fafc;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
     (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج</div>') + "</div>";
@@ -508,7 +521,7 @@ function vAimkt() {
       sizes.map((v, i) => chipBtn(v || "الكل", entSize === v, "entSetSize(" + i + ")")).join("") +
       (cities.length > 1 ? '<span style="font-size:11.5px;font-weight:700;color:#7b8597;margin-inline-start:8px;">المدينة:</span>' + cities.map((v, i) => chipBtn(v || "الكل", entCity === v, "entSetCity(" + i + ")")).join("") : "") + "</div>";
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
-      '<input value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
+      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
       (selN ? '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     h += '<div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
@@ -728,7 +741,7 @@ function vPlaceholder(cur) {
   return '<div class="empty"><div class="ic"><span></span></div><div class="t">' + t[0] + '</div><div class="s">هذه الوحدة ضمن المرحلة القادمة من «مسار» وفق خارطة الطريق — وحدة التسويق هي النشطة حاليًا.</div></div>';
 }
 
-window.tog = (p) => { openSet.has(p) ? openSet.delete(p) : openSet.add(p); render(false); };
+
 window.pick = (i) => { selProd = i; render(false); };
 
 function gate(msg) {
@@ -740,6 +753,9 @@ window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); lo
 
 function render(fetchNew) {
   nav();
+  const af = document.activeElement;
+  const afId = af && af.tagName === "INPUT" ? af.id || af.getAttribute("data-fid") : null;
+  const afPos = afId && af.selectionStart != null ? af.selectionStart : null;
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   const b = document.getElementById("body");
   if (cur === "kmon" || cur === "home") {
@@ -753,6 +769,10 @@ function render(fetchNew) {
     b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb()) : vCustomers();
   } else {
     b.innerHTML = vPlaceholder(cur);
+  }
+  if (afId) {
+    const el2 = document.getElementById(afId);
+    if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
   }
 }
 
@@ -777,7 +797,7 @@ async function refresh(force) {
   render(true);
   renderConvo();
 }
-window.addEventListener("hashchange", () => render(false));
+window.addEventListener("hashchange", () => { if (convoPhone) closeConvo(); rQ = ""; render(false); });
 if (!location.hash) location.hash = "kmon";
 refresh();
 setInterval(async () => {

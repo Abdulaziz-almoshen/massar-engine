@@ -162,7 +162,7 @@ function productBlock(): string {
 let hubKb: { product: string; md: string }[] = [];
 export async function refreshKb(): Promise<number> {
   try {
-    productAssets = (await db.listAssets()).map((a) => ({
+    productAssets = (await db.listAssets()).filter((a) => !a.product.startsWith("__")).map((a) => ({
       product: a.product, url: `${cfg.publicBaseUrl}/assets/${a.public_id}.pdf`, filename: a.filename }));
     hubKb = (await db.listKb()).map((r) => ({ product: r.product, md: r.md }));
     console.log(JSON.stringify({ at: "agent", msg: "hub kb refreshed", products: hubKb.map((h) => h.product) }));
