@@ -258,6 +258,7 @@ function funnelData(d) {
 
 function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((c) => c.phone === phone); }
 function seenOf(c) { const st = (c && c.statusTimes) || {}; return Boolean(st.read || st.replied); }
+function interestedOf(c) { return Boolean(c && (c.outcome === "interested" || (c.tags || []).some((t) => t.level === "hot" || t.level === "warm"))); }
 function campStats(camp) {
   const cs = camp.targets.map((t) => contactByPhone(t.phone)).filter(Boolean);
   return {
@@ -266,7 +267,7 @@ function campStats(camp) {
     delivered: cs.filter((c) => (c.statusTimes || {}).delivered).length,
     seen: cs.filter(seenOf).length,
     replied: cs.filter((c) => (c.statusTimes || {}).replied).length,
-    interested: cs.filter((c) => c.outcome === "interested").length,
+    interested: cs.filter(interestedOf).length,
     failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
   };
 }
@@ -350,7 +351,7 @@ function vKmonDetail(id, d) {
     ["all", "الكل", rows.length, (r) => true],
     ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
     ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
-    ["interested", "مهتمون ⭐", st.interested, (r) => r.contact && r.contact.outcome === "interested"],
+    ["interested", "مهتمون ⭐", st.interested, (r) => interestedOf(r.contact)],
     ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
@@ -376,7 +377,7 @@ function vKmonDetail(id, d) {
 
 function vHome(d) {
   const cs = d.contacts || [];
-  const interested = cs.filter((c) => c.outcome === "interested").length;
+  const interested = cs.filter((c) => c.outcome === "interested" || (c.tags || []).some((t) => t.level === "hot" || t.level === "warm")).length;
   return '<div class="kpis">' +
     '<div class="kpi"><div class="k">جهات التواصل</div><div class="v">' + cs.length + "</div></div>" +
     '<div class="kpi"><div class="k">رسائل واردة</div><div class="v">' + ((d.counters || {}).inbound || 0) + "</div></div>" +
