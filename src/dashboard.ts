@@ -18,7 +18,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
-  body { font-family: 'IBM Plex Sans Arabic', sans-serif; background: #F4F6FA; color: #1a2233; font-size: 14px; }
+  body { font-family: 'IBM Plex Sans Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
   .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
@@ -67,11 +67,13 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* ===== components (reference-grade) ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .kpi { background: #fff; border-radius: 16px; padding: 26px 18px; text-align: center; display: flex; flex-direction: column-reverse; gap: 10px; box-shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04); }
+  .kpi { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .kpi .ico { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #E9F7F6; color: #1F7A73; }
   .kpi .k { font-size: 12.5px; color: #667085; font-weight: 600; }
-  .kpi .v { font-size: 32px; font-weight: 700; color: #101828; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  .kpi .v { font-size: 30px; font-weight: 700; color: #101828; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .kpi .dl { font-size: 11.5px; font-weight: 700; }
   .kpi .v small { font-size: 12px; font-weight: 500; color: #98a2b3; }
-  .card { background: #fff; border-radius: 16px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04); }
+  .card { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
   .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #475467; letter-spacing: .1px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 4px 12px; white-space: nowrap; border: 1px solid transparent; }
   .c-grey { background: #F2F4F7; color: #475467; border-color: #E4E7EC; } .c-blue { background: #EFF4FB; color: #2F5F94; border-color: #D6E2F1; }
@@ -89,12 +91,23 @@ export const DASHBOARD_HTML = `<!doctype html>
   .fun .fill { height: 100%; border-radius: 999px; min-width: 3%; }
   .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 90px 20px; text-align: center; }
   .empty .ic { width: 64px; height: 64px; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.08); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #c2cad6; border-radius: 7px; }
+  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #D0D5DD; border-radius: 7px; }
   .empty .t { font-size: 17px; font-weight: 700; color: #101828; }
   .empty .s { font-size: 13px; color: #667085; margin-top: 6px; max-width: 380px; line-height: 1.8; }
 
   /* tables */
-  .tblwrap { background: #fff; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04); }
+  .tblwrap { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #EAECF0; }
+  .cntpill { font-size: 12px; font-weight: 700; color: #1F7A73; background: #E9F7F6; border-radius: 999px; padding: 4px 12px; }
+  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid #EAECF0; background: #F9FAFB; font-size: 11.5px; color: #667085; }
+  .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EAECF0; background: #fff; color: #475467; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .pgbtn.on { background: #101828; color: #fff; border-color: #101828; }
+  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #98A2B3; font-size: 17px; cursor: pointer; line-height: 1; }
+  .kebab:hover { background: #F2F4F7; color: #475467; }
+  .swt { width: 38px; height: 22px; border-radius: 999px; background: #EAECF0; position: relative; flex: none; transition: background .18s ease; }
+  .swt.on { background: #1F7A73; }
+  .swt i { position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 999px; background: #fff; transition: inset-inline-start .18s ease; box-shadow: 0 1px 2px rgba(16,24,40,.2); }
+  .swt.on i { inset-inline-start: 19px; }
   .thead, .trow { display: grid; grid-template-columns: 1.6fr 1.6fr 1.5fr 1.4fr 0.7fr 0.8fr; gap: 12px; padding: 15px 22px; align-items: center; }
   .thead { background: #F9FAFB; border-bottom: 1px solid #EAECF0; font-size: 11.5px; font-weight: 700; color: #667085; }
   .trow { border-bottom: 1px solid #F2F4F7; cursor: pointer; min-height: 62px; }
@@ -123,7 +136,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .bub { max-width: 76%; border-radius: 12px; padding: 9px 13px; font-size: 12.5px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #101828; }
   .b-a { background: #DCF8C6; border-top-left-radius: 3px; margin-inline-start: auto; }
   .b-c { background: #fff; border-top-right-radius: 3px; margin-inline-end: auto; }
-  .b-s { background: rgba(255,255,255,.65); font-size: 11px; color: #5b6678; max-width: 100%; text-align: center; }
+  .b-s { background: rgba(255,255,255,.65); font-size: 11px; color: #475467; max-width: 100%; text-align: center; }
   .bt { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 4px; direction: ltr; }
 
   /* wizard */
@@ -145,7 +158,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12.5px; color: #101828; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
   .wa-prev .t { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 6px; }
   .btn { font-family: inherit; font-size: 13.5px; font-weight: 700; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; }
-  .btn-teal { color: #0B3B38; background: #3FB6B0; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
+  .btn-teal { color: #fff; background: #1F7A73; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
+  .btn-dark { color: #fff; background: #101828; }
+  .btn-ghost { color: #344054; background: #fff; border: 1px solid #D0D5DD; }
+  .btn:hover { filter: brightness(1.04); }
   .btn-dis { color: #98a2b3; background: #F2F4F7; cursor: not-allowed; }
   .note { display: flex; align-items: center; gap: 9px; background: #FFFAEB; border: 1px solid #F5E3B7; border-radius: 12px; padding: 12px 16px; font-size: 12px; color: #B54708; font-weight: 600; margin-top: 14px; }
 
@@ -156,15 +172,49 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .ti { flex: 1; min-width: 0; }
   .kbrow .t1 { font-size: 13.5px; font-weight: 700; color: #101828; }
   .kbrow .t2 { font-size: 11.5px; color: #98a2b3; margin-top: 4px; }
-  .kbrow .ct { font-size: 11.5px; color: #b6bfcc; }
+  .kbrow .ct { font-size: 11.5px; color: #98A2B3; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E4E7EC; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
+  .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .ptitle h1 { margin: 0; font-size: 30px; font-weight: 700; color: #101828; letter-spacing: -.6px; line-height: 1.2; }
+  .ptitle p { margin: 6px 0 0; font-size: 13.5px; color: #667085; }
+  .ptitle .acts { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
   .sec { font-size: 14px; font-weight: 700; color: #475467; margin: 4px 0 14px; }
+  /* motion */
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { animation: rise .42s cubic-bezier(.22,.9,.32,1) both; }
+    .card, .kpi, .statc, .step { transition: transform .18s ease, box-shadow .18s ease; }
+    .kpi:hover, .statc:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,24,40,.08); }
+    .trow { transition: background .15s ease; }
+    .bar i, .fun .fill, .statc .mb i, .prog i { transition: width .7s cubic-bezier(.22,.9,.32,1); }
+    .livechip .d { animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
+  }
+  .skel { background: linear-gradient(90deg, #F2F4F7 25%, #EAECF0 37%, #F2F4F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
   .sec .meta { font-size: 11.5px; font-weight: 600; color: #98a2b3; margin-inline-start: 8px; }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 20c.4-3.3 2.8-5.2 5.5-5.2S14.1 16.7 14.5 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16 5.5a3 3 0 0 1 0 5.6M17.5 20c-.2-1.9-.9-3.4-2-4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 3 10.2l7 2.6 2.6 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.1 5.4L20 10l-5.9 1.6L12 17l-2.1-5.4L4 10l5.9-1.6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+<symbol id="i-reply" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a7 7 0 0 1 7 7v1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3s5 4.2 5 9a5 5 0 0 1-10 0c0-2 1-3.4 1-3.4s.4 1.6 1.6 2C10.6 8.4 12 6.4 12 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v4h4M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</defs></svg>
 <div class="app">
   <aside>
     <div class="brand">
@@ -186,6 +236,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 const qs = new URLSearchParams(location.search);
 if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token")); history.replaceState({}, "", "/dashboard" + location.hash); }
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
+const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = ""; let custQ = "";
@@ -301,7 +352,7 @@ function campStats(camp) {
   };
 }
 function interestChips(c) {
-  if (!c) return '<span style="color:#c2cad6;">—</span>';
+  if (!c) return '<span style="color:#D0D5DD;">—</span>';
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
   if (latest.size) {
@@ -313,7 +364,7 @@ function interestChips(c) {
   }
   if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
   if (c.outcome === "not_interested") return '<span class="chip c-bad">غير مهتم' + (c.outcomeReason ? " · " + esc(c.outcomeReason) : "") + "</span>";
-  return '<span style="color:#c2cad6;">—</span>';
+  return '<span style="color:#D0D5DD;">—</span>';
 }
 function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
 function contactRowsHtml(rows) {
@@ -370,10 +421,10 @@ function renderConvo() {
   el.innerHTML = '<div class="backdrop" onclick="closeConvo()"></div>' +
     '<aside class="convo" role="dialog" aria-label="المحادثة">' +
     '<div class="hd"><div class="av">' + esc(nm.trim().charAt(0)) + '</div>' +
-    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#13294b;">' + esc(nm) + '</div>' +
-    '<div style="font-size:11px;color:#9aa4b4;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
-    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#9aa4b4;background:#f4f6f9;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
-    '<div style="padding:9px 16px;border-bottom:1px solid #f0f2f6;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#101828;">' + esc(nm) + '</div>' +
+    '<div style="font-size:11px;color:#98A2B3;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
+    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#98A2B3;background:#F2F4F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
+    '<div style="padding:9px 16px;border-bottom:1px solid #F2F4F7;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
       '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>" +
     '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12.5px;' +
@@ -381,7 +432,7 @@ function renderConvo() {
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button>" +
     '<button class="btn" title="فصل بيانات الساندبوكس عن الحقيقية" style="flex:none;font-size:11.5px;' +
-    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#7b8597;background:#fff;border:1px solid #e0e5ec;') +
+    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#667085;background:#fff;border:1px solid #D0D5DD;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
     (c.test ? "تجريبي ✓" : "وسم كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
@@ -399,7 +450,7 @@ function campIsTest(cp) {
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#9aa4b4;background:#fff;border:1px dashed #d5dae2;') +
+    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#98A2B3;background:#fff;border:1px dashed #d5dae2;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + nTest + ")") + "</button>";
 }
 
@@ -416,49 +467,73 @@ function vKmon(d) {
   if (campSortKey === "replies") withSt.sort((a, b) => b.st.replied - a.st.replied);
   else if (campSortKey === "seen") withSt.sort((a, b) => b.st.seen - a.st.seen);
   else withSt.sort((a, b) => Number(b.c.created_at) - Number(a.c.created_at));
-  let h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
-    tabs.map((t) => '<button class="btn" style="padding:8px 16px;font-size:12px;border-radius:999px;' +
-      (campTab === t[0] ? 'color:#fff;background:#13294b;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
-      '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + t[2] + ")</button>").join("") +
-    '<span style="flex:1;"></span>' +
-    '<input id="campq" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="font-family:inherit;font-size:12px;border:1px solid #e9edf3;border-radius:999px;padding:9px 15px;background:#fff;width:190px;">' +
-    '<select onchange="setCampSort(this)" style="font-family:inherit;font-size:11.5px;color:#5b6678;border:1px solid #e9edf3;border-radius:10px;padding:9px 11px;background:#fff;">' +
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+
+  let h = '<div class="ptitle rise"><div><h1>الحملات</h1><p>كل إطلاق، أرقامه الحقيقية، ونتيجته — اضغط أي حملة لفتح لوحتها</p></div>' +
+    '<div class="acts"><button class="btn btn-ghost" onclick="exportCampaigns()">' + ic("doc", 17) + ' تصدير CSV</button>' +
+    '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
+  h += '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px;" class="rise">' +
+    tabs.map((t) => '<button class="ptab' + (campTab === t[0] ? " on" : "") + '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + t[2] + ")</button>").join("") + "</div>";
+  if (!campaigns.length) {
+    h += '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#1F7A73;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
+    return h;
+  }
+  h += '<div class="tblwrap rise">';
+  h += '<div class="ttoolbar"><span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:220px;max-width:380px;">' +
+    '<span style="position:absolute;inset-inline-start:14px;color:#98A2B3;display:flex;">' + ic("search", 18) + "</span>" +
+    '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:42px;height:46px;border-radius:999px;"></span>' +
+    '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#344054;">' +
     '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
     '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
     '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>' +
-    '<a href="#aimkt" class="btn btn-teal" style="text-decoration:none;font-size:12.5px;">+ إنشاء حملة</a></div>';
-  if (!campaigns.length) {
-    h += '<div class="empty" style="padding:44px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#2E7D77;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه.</div></div>';
-  } else {
-    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-    h += '<div class="tblwrap"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:820px;">' +
-      '<div style="display:grid;grid-template-columns:1.8fr 1fr .75fr .6fr .6fr .6fr 1fr;gap:10px;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #eef1f5;font-size:11px;font-weight:700;color:#7b8597;">' +
-      '<div>الحملة</div><div>المنتج</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div></div>';
-    withSt.forEach(({ c, st }) => {
-      const prog = pct(st.delivered, st.targeted);
-      h += '<div onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:1.8fr 1fr .75fr .6fr .6fr .6fr 1fr;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid #f3f5f8;cursor:pointer;" onmouseover="this.style.background=\\'#fafbfd\\'" onmouseout="this.style.background=\\'\\'">' +
-        '<div style="min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div><div style="font-size:10.5px;color:#9aa4b4;margin-top:2px;">' + fmtD(c.created_at) + "</div></div>" +
-        '<div style="font-size:11.5px;color:#5b6678;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
-        '<div>' + (campIsTest(c) ? '<span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.targeted.toLocaleString("ar-SA") + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2E7D77;">' + pct(st.seen, st.targeted) + '٪</div>' +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2F5F94;">' + pct(st.replied, st.targeted) + '٪</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:#eef1f5;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:linear-gradient(90deg,#3FB6B0,#2E7D77);border-radius:999px;"></i></div><span style="font-size:10.5px;font-weight:700;color:#7b8597;flex:none;">' + prog + '٪</span></div></div>';
-    });
-    h += "</div></div></div>";
-    h += '<div style="font-size:10.5px;color:#9aa4b4;margin-top:10px;">الأرقام تتحدّث لحظيًا من حالات تسليم واتساب — لا تقديرات.</div>';
-  }
+    '<span style="flex:1"></span><span class="cntpill">' + withSt.length.toLocaleString("ar-SA-u-nu-latn") + " حملة</span></div>";
+  h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
+    '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
+    '<div>الحملة</div><div>المنتج</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+  withSt.forEach(({ c, st }, i) => {
+    const prog = pct(st.delivered, st.targeted);
+    const isTest = campIsTest(c);
+    const stChip = isTest
+      ? '<span class="chip c-warn"><span style="width:6px;height:6px;border-radius:999px;background:#B54708;"></span>تجريبية</span>'
+      : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
+        : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
+    h += '<div class="trow" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '"><i></i></span>' +
+      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
+      '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
+      '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
+      "<div>" + stChip + "</div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + st.targeted.toLocaleString("ar-SA-u-nu-latn") + "</div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + pct(st.seen, st.targeted) + "%</div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + pct(st.replied, st.targeted) + "%</div>" +
+      '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#667085;flex:none;font-variant-numeric:tabular-nums;">' + prog + "%</span></div>" +
+      '<div style="text-align:center;"><button class="kebab" onclick="event.stopPropagation();location.hash=\\'kmon/' + c.id + '\\'">⋯</button></div></div>';
+  });
+  if (!withSt.length) h += '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا نتائج مطابقة للبحث أو التصنيف</div>';
+  h += "</div></div>";
+  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تتحدّث لحظيًا من حالات تسليم واتساب — لا تقديرات</span>' +
+    '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">1</button></span></div>';
+  h += "</div>";
   const organicAll = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
     .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
   const organic = showTest ? organicAll : organicAll.filter((c) => !c.test);
   const nTestOrganic = organicAll.filter((c) => c.test).length;
   if (organicAll.length) {
-    h += '<div class="sec" style="margin-top:22px;">محادثات خارج الحملات <span class="meta">' + organic.length + ' — انضموا للساندبوكس مباشرة</span> ' + testToggleChip(nTestOrganic) + "</div>" +
+    h += '<div class="sec" style="margin-top:26px;">محادثات خارج الحملات <span class="meta">' + organic.length + " — انضموا للساندبوكس مباشرة</span> " + testToggleChip(nTestOrganic) + "</div>" +
       '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-      (organic.length ? contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12px;">كل المحادثات هنا تجريبية — أظهرها بالزر أعلاه</div>') + "</div>";
+      (organic.length ? contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) : '<div style="padding:26px;text-align:center;color:#98A2B3;font-size:12.5px;">كل المحادثات هنا تجريبية — أظهرها بالزر أعلاه</div>') + "</div>";
   }
   return h;
 }
+window.exportCampaigns = () => {
+  const rows = [["الحملة", "المنتج", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "مهتمون"]];
+  campaigns.forEach((c) => { const st = campStats(c); rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]); });
+  const csv = "\\ufeff" + rows.map((r) => r.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(",")).join("\\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = "massar-campaigns.csv"; a.click();
+  alertBar("صُدّر ملف الحملات ✓", false);
+};
 
 let rQ = "";
 window.rSearch = (el) => { rQ = el.value; clearTimeout(window.__rq); window.__rq = setTimeout(() => render(false), 250); };
@@ -470,9 +545,9 @@ function vKmonDetail(id, d) {
   const base = Math.max(1, st.targeted);
   const pct = (v) => Math.round(v / base * 100);
   let h = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">' +
-    '<a href="#kmon" style="font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;">→ كل الحملات</a>' +
-    '<div style="flex:1;min-width:0;"><span style="font-size:16px;font-weight:700;color:#13294b;">' + esc(camp.name) + '</span>' +
-    '<span style="font-size:11.5px;color:#7b8597;margin-inline-start:10px;">' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</span></div>" +
+    '<a href="#kmon" style="font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;">→ كل الحملات</a>' +
+    '<div style="flex:1;min-width:0;"><span style="font-size:16px;font-weight:700;color:#101828;">' + esc(camp.name) + '</span>' +
+    '<span style="font-size:11.5px;color:#667085;margin-inline-start:10px;">' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</span></div>" +
     '<span class="chip c-ok">جارية</span></div>';
   const cards = [
     ["المستهدفون", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
@@ -497,18 +572,18 @@ function vKmonDetail(id, d) {
     label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
     targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
   };
-  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #eef1f5;background:#fff;">' +
-    '<span style="font-size:13px;font-weight:700;color:#13294b;flex:none;">المستهدفون</span>' +
-    '<span style="font-size:11px;color:#9aa4b4;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
+  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EAECF0;background:#fff;">' +
+    '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">المستهدفون</span>' +
+    '<span style="font-size:11px;color:#98A2B3;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
-      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
+      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") +
-    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #e9edf3;border-radius:999px;padding:7px 13px;background:#f8fafc;width:130px;">' +
+    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EAECF0;border-radius:999px;padding:7px 13px;background:#F9FAFB;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج</div>') + "</div>";
+    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
@@ -522,7 +597,7 @@ function vHome(d) {
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
   const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
   let h = '<div class="kpis">' +
-    '<div class="kpi"><div class="k">الحملات الحقيقية</div><div class="v">' + realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <span style="font-size:11px;color:#9aa4b4;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</span>" : "") + "</div></div>" +
+    '<div class="kpi"><div class="k">الحملات الحقيقية</div><div class="v">' + realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <span style="font-size:11px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</span>" : "") + "</div></div>" +
     '<div class="kpi"><div class="k">المستهدفون</div><div class="v">' + entities.length.toLocaleString("ar-SA") + "</div></div>" +
     '<div class="kpi"><div class="k">وصلت إليهم الرسائل</div><div class="v" style="color:#2E8F89">' + delivered + "</div></div>" +
     '<div class="kpi"><div class="k">ردّوا</div><div class="v" style="color:#2F5F94">' + replied + "</div></div>" +
@@ -540,26 +615,26 @@ function vHome(d) {
           const tg = hotOf(c) || (c.tags || [])[0];
           const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
           const ci = insCache[c.phone];
-          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
-            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.waName || "غير معروف") + " " +
+          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F2F4F7;cursor:pointer;">' +
+            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.waName || "غير معروف") + " " +
             (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
             (ci && ci.next_action ? '<div style="font-size:11px;color:#2E7D77;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">← ' + esc(ci.next_action) + '</div>'
-              : (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
+              : (last ? '<div style="font-size:11px;color:#667085;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
-    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #f0f2f6;font-size:11px;color:#7b8597;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#13294b;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
+      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
+    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F2F4F7;font-size:11px;color:#667085;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#101828;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
-          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;">' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
-            '<div style="font-size:10.5px;color:#9aa4b4;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
+          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F2F4F7;">' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
+            '<div style="font-size:10.5px;color:#98A2B3;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + st.targeted + ' مستهدف</span><span class="chip c-teal">شوهدت ' + st.seen + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + st.replied + "</span></a>";
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
+      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
   h += "</div>";
   return h;
 }
@@ -591,7 +666,7 @@ function attrChips(e, max) {
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
-    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
+    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
 // Indexes only in onclick (Arabic keys/values stay out of attribute strings);
@@ -671,47 +746,47 @@ function vAimkt() {
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
-      '<div style="font-size:13.5px;font-weight:700;color:#13294b;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + retargetCohort.targets.length.toLocaleString("ar-SA") + " جهة</div>" +
-      '<div style="font-size:11.5px;color:#7b8597;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
-      '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
+      '<div style="font-size:13.5px;font-weight:700;color:#101828;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + retargetCohort.targets.length.toLocaleString("ar-SA") + " جهة</div>" +
+      '<div style="font-size:11.5px;color:#667085;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
+      '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
   } else if (!entities.length) {
-    h += '<div style="border:1.5px dashed #c9d2df;border-radius:12px;padding:26px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
+    h += '<div style="border:1.5px dashed #D0D5DD;border-radius:12px;padding:26px;text-align:center;color:#667085;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
-      '<span style="font-size:11.5px;font-weight:700;color:#7b8597;min-width:52px;">' + esc(g.key) + ":</span>" +
+      '<span style="font-size:11.5px;font-weight:700;color:#667085;min-width:52px;">' + esc(g.key) + ":</span>" +
       chipBtn("الكل", !entFilters[g.key], "entSetAttr(" + ki + ",-1)") +
       g.values.map(([v, n], vi) => chipBtn(v + " (" + n + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
-      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#f8fafc;">' +
+      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#F9FAFB;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
-      (selN ? '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
+      (selN ? '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     const shown = m.slice(0, LIST_CAP);
     if (m.length > LIST_CAP) {
       h += '<div style="display:flex;align-items:center;gap:12px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:12px;padding:12px 16px;margin-bottom:10px;">' +
         '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + m.length.toLocaleString("ar-SA") + '</span>' +
         '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + LIST_CAP + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
     }
-    h += '<div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
+    h += '<div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
       shown.map((e) => {
         const on = entSel.has(e.id);
-        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #f4f6f9;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
-          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #cdd4de;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
-          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
+        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F2F4F7;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
+          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #D0D5DD;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
+          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#101828;">' + esc(e.name) + "</span>" +
           attrChips(e, 3) +
-          '<span style="font-size:11px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span></div>";
+          '<span style="font-size:11px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7b8597;font-size:12px;background:#fafbfc;">+ ' + (m.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
-      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + (m.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   h += "</div>";
 
   h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
-    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">نص الرسالة</div>' +
-    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#13294b;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
-    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
+    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">نص الرسالة</div>' +
+    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
+    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
     '<div class="wa-prev">' +
     (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.75);border-radius:9px;padding:9px 11px;margin-bottom:8px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
     '<div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div>' +
@@ -723,21 +798,21 @@ function vAimkt() {
 
   const can = selN > 0 && campMsg.trim();
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
-    '<label style="font-size:12.5px;font-weight:700;color:#13294b;flex:none;">اسم الحملة</label>' +
-    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#13294b;border:1.5px solid #e9edf3;border-radius:11px;padding:11px 14px;">' +
+    '<label style="font-size:12.5px;font-weight:700;color:#101828;flex:none;">اسم الحملة</label>' +
+    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#13294b;">' + selN.toLocaleString("ar-SA") + " مستهدف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
-    '<div style="font-size:10.5px;color:#9aa4b4;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + selN.toLocaleString("ar-SA") + " مستهدف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
+    '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
-    '<div style="font-size:17px;font-weight:700;color:#13294b;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:13px;color:#5b6678;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN.toLocaleString("ar-SA") + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    '<div style="font-size:17px;font-weight:700;color:#101828;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
+    '<div style="font-size:13px;color:#475467;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN.toLocaleString("ar-SA") + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
     (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
-    '<button class="btn" style="color:#5b6678;background:#f0f2f6;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
+    '<button class="btn" style="color:#475467;background:#F2F4F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
 }
 
@@ -745,10 +820,10 @@ function mdRender(md) {
   return md.split("\\n").map((raw) => {
     const l = raw.trim();
     if (!l) return "";
-    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#13294b;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
+    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#101828;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
     if (l.startsWith("## ")) return '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;margin:14px 0 6px;">' + esc(l.slice(3)) + "</div>";
-    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#5b6678;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
-    return '<div style="font-size:12.5px;color:#5b6678;line-height:1.9;">' + esc(l) + "</div>";
+    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#475467;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
+    return '<div style="font-size:12.5px;color:#475467;line-height:1.9;">' + esc(l) + "</div>";
   }).join("");
 }
 window.kbPick = () => document.getElementById("kbfile").click();
@@ -798,10 +873,10 @@ function kbRegistry() {
   return reg;
 }
 function uploadZone(scopedProduct) {
-  return '<div onclick="kbPick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
+  return '<div onclick="kbPick()" style="border:1.5px dashed #D0D5DD;background:#F9FAFB;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
     '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">' + (scopedProduct ? "ارفع ملف هذا المنتج — PDF أو Word أو PowerPoint" : "أضف منتجًا جديدًا بملفه — PDF أو Word أو PowerPoint") + "</div>" +
-    '<div style="font-size:11.5px;color:#7b8597;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذا المنتج ويقرأه المساعد فورًا" : "<br>يُستخرج اسم المنتج من الملف تلقائيًا") + "</div></div>" +
+    '<div style="font-size:13.5px;font-weight:700;color:#101828;">' + (scopedProduct ? "ارفع ملف هذا المنتج — PDF أو Word أو PowerPoint" : "أضف منتجًا جديدًا بملفه — PDF أو Word أو PowerPoint") + "</div>" +
+    '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذا المنتج ويقرأه المساعد فورًا" : "<br>يُستخرج اسم المنتج من الملف تلقائيًا") + "</div></div>" +
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
@@ -812,8 +887,8 @@ function vKb() {
   const skill = prodAssets.find((a) => a.product === "__skill__");
   if (skill) {
     h0 = '<div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#F4FBFA;border-color:#B9E4E0;">' +
-      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#13294b;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
-      '<div style="font-size:11.5px;color:#5b6678;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض المنتجات (PDF) ثم ارفعها هنا في صفحة كل منتج. <span style="direction:ltr;color:#9aa4b4;">' + esc(skill.filename) + '</span></div></div>' +
+      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#101828;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
+      '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض المنتجات (PDF) ثم ارفعها هنا في صفحة كل منتج. <span style="direction:ltr;color:#98A2B3;">' + esc(skill.filename) + '</span></div></div>' +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
   }
   let h = h0 + '<div class="sec">منتجات المساعد <span class="meta">' + reg.length + ' منتج · اضغط منتجًا لعرض معرفته وإدارتها</span></div>';
@@ -836,19 +911,19 @@ function vKbProduct(name) {
   const r = reg.find((x) => x.name === name);
   if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">منتج غير موجود</div><div class="s"><a href="#kb" style="color:#2E7D77;font-weight:700;">→ كل المنتجات</a></div></div>';
   const seedP = PRODUCTS_FULL.find((p) => p.n === name);
-  let h = '<a href="#kb" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ كل المنتجات</a>';
+  let h = '<a href="#kb" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ كل المنتجات</a>';
   h += '<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
-    '<div style="width:46px;height:46px;flex:none;border-radius:12px;background:#13294b;display:flex;align-items:center;justify-content:center;color:#3FB6B0;font-weight:700;font-size:20px;">' + esc(name.trim().charAt(0)) + "</div>" +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(name) + "</div>" +
+    '<div style="width:46px;height:46px;flex:none;border-radius:12px;background:#101828;display:flex;align-items:center;justify-content:center;color:#3FB6B0;font-weight:700;font-size:20px;">' + esc(name.trim().charAt(0)) + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(name) + "</div>" +
     '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;">' +
     (r.hub ? '<span class="chip c-ok">يقرأه المساعد الآن ✓</span>' : '<span class="chip c-warn">بانتظار أول ملف</span>') +
     (r.sc !== null ? '<span class="chip c-teal">معرفة مدمجة ' + r.sc + "%</span>" : "") +
-    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#9aa4b4;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#98A2B3;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div></div>";
   const pa = prodAssets.find((a) => a.product === name);
   h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
-    (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#9aa4b4;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
-    '<div style="font-size:12px;color:#7b8597;margin:10px 0;line-height:1.9;">يُرسل تلقائيًا مع افتتاحية الحملة لهذا المنتج، وعندما يطلب العميل تفاصيل أكثر أو ملفًا.</div>' +
+    (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
+    '<div style="font-size:12px;color:#667085;margin:10px 0;line-height:1.9;">يُرسل تلقائيًا مع افتتاحية الحملة لهذا المنتج، وعندما يطلب العميل تفاصيل أكثر أو ملفًا.</div>' +
     '<div onclick="paPick()" style="border:1.5px dashed #B9E4E0;background:#F4FBFA;border-radius:12px;padding:18px;text-align:center;cursor:pointer;">' +
     '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;">' + (pa ? "استبدال الملف التعريفي (PDF)" : "ارفع الملف التعريفي (PDF)") + "</div></div>" +
     '<input id="pafile" type="file" accept=".pdf" style="display:none" data-product="' + esc(name) + '" onchange="paUpload(this)">' +
@@ -857,17 +932,17 @@ function vKbProduct(name) {
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
-      '<div style="border-top:1px solid #f0f2f6;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
+      '<div style="border-top:1px solid #F2F4F7;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
   }
   if (seedP) {
-    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;">' +
+    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
       [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["الأنسب لـ", seedP.best.join("، ")], ["التسعير المسموح ذكره", seedP.pricing]]
         .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
   }
   if (name === "الإجازات المرضية") {
     const dot = { ok: "#2e9e6b", warn: "#d6a01f", bad: "#d85151" };
     const chipm = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
-    h += '<div class="card"><h3>جاهزية الأقسام — 92%</h3><div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;">' +
+    h += '<div class="card"><h3>جاهزية الأقسام — 92%</h3><div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
       KB_SECTIONS.map((x) => '<div class="kbrow"><span class="dt" style="background:' + dot[x[2]] + ';"></span><div class="ti"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div><span class="chip ' + chipm[x[2]][0] + '">' + chipm[x[2]][1] + '</span><span class="ct">' + x[3] + "</span></div>").join("") + "</div></div>";
   }
   return h;
@@ -903,7 +978,7 @@ window.entFileUpload = async (input) => {
     let msg = '<span class="chip c-ok">أُضيف ' + d.added + "</span> ";
     if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + d.updated + "</span> ";
     if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + d.skippedCount + "</span> ";
-    msg += '<div style="font-size:11px;color:#7b8597;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
+    msg += '<div style="font-size:11px;color:#667085;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
     if (d.skippedRows && d.skippedRows.length) {
       msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
@@ -927,12 +1002,12 @@ function vCustomers() {
     '<h3 style="margin:0;flex:1;min-width:180px;">المستهدفون</h3>' +
     '<button class="btn btn-teal" style="font-size:12.5px;padding:11px 18px;" onclick="entFilePick()">⬆ رفع ملف Excel/CSV</button>' +
     '<a href="/assets/audience-template.xlsx" download class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;text-decoration:none;">القالب الجاهز</a></div>' +
-    '<div style="font-size:11px;color:#9aa4b4;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
+    '<div style="font-size:11px;color:#98A2B3;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
     '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
-    '<details style="margin-top:10px;"><summary style="font-size:11.5px;color:#7b8597;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
-    '<div style="font-size:11.5px;color:#7b8597;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
+    '<details style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
+    '<div style="font-size:11.5px;color:#667085;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#101828;">الاسم، الرقم، الحجم، المدينة</b></div>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><button class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></details></div>';
   const groups = segGroups();
   const cq = custQ.trim();
@@ -943,18 +1018,18 @@ function vCustomers() {
   if (!entities.length) {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
   } else {
-    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
+    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
     h += '<div class="tblwrap">' + cshown.map((e) => {
       const hasConvo = Boolean(contactByPhone(e.phone));
-      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;"') + '>' +
-      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
+      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F2F4F7;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F2F4F7;"') + '>' +
+      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#101828;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
       '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
-      '<span style="font-size:11.5px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span>" +
+      '<span style="font-size:11.5px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span>" +
       '<button onclick="event.stopPropagation();entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>';
     }).join("") +
-    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7b8597;font-size:12px;background:#fafbfc;">+ ' + (cm.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
-    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + (cm.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
+    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   return h;
 }
@@ -971,7 +1046,7 @@ function ratesStrip(agg) {
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">' +
     cards.map((c) => '<div class="card" style="margin:0;padding:14px 16px;text-align:center;">' +
       '<div style="font-size:22px;font-weight:700;color:' + c[2] + ';">' + c[1] + '٪</div>' +
-      '<div style="font-size:11px;color:#7b8597;font-weight:600;margin-top:3px;">' + c[0] + "</div></div>").join("") + "</div>";
+      '<div style="font-size:11px;color:#667085;font-weight:600;margin-top:3px;">' + c[0] + "</div></div>").join("") + "</div>";
 }
 function funnelSvg(rows) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
@@ -988,15 +1063,15 @@ function funnelSvg(rows) {
   return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
     '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="قمع الحملات">' + shapes + "</svg></div>" +
     '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
-    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#3b4657;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
+    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#344054;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
 }
 function colChart(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
     rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
-      '<div style="font-size:11px;font-weight:700;color:#13294b;">' + r[1].toLocaleString("ar-SA") + "</div>" +
+      '<div style="font-size:11px;font-weight:700;color:#101828;">' + r[1].toLocaleString("ar-SA") + "</div>" +
       '<div style="width:100%;max-width:46px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:7px 7px 3px 3px;"></div>' +
-      '<div style="font-size:10px;color:#7b8597;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
+      '<div style="font-size:10px;color:#667085;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
 }
 function treemapTiles(rows) {
   const total = Math.max(1, rows.reduce((a, r) => a + r[1], 0));
@@ -1006,13 +1081,13 @@ function treemapTiles(rows) {
       '<div style="font-size:11.5px;font-weight:700;">' + esc(String(r[0])) + '</div><div style="font-size:15px;font-weight:700;">' + r[1].toLocaleString("ar-SA") + "</div></div>").join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
-  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#9aa4b4;">' + sub + "</span></div>" + inner + "</div>";
+  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#98A2B3;">' + sub + "</span></div>" + inner + "</div>";
 }
 function hbarRows(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">' + rows.map((r) =>
-    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#3b4657;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#13294b;">' + r[1].toLocaleString("ar-SA") + "</span></div>" +
-    '<div style="height:8px;background:#eef1f5;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
+    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#344054;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#101828;">' + r[1].toLocaleString("ar-SA") + "</span></div>" +
+    '<div style="height:8px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
 }
 function dailyActivitySvg(cs) {
   const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -1027,13 +1102,13 @@ function dailyActivitySvg(cs) {
   days.forEach((d, i) => {
     const x = 8 + i * (bw + 14);
     const hOut = Math.round(d.outN / mx * 96), hIn = Math.round(d.inN / mx * 96);
-    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#C6D8EE"/>' +
+    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#D0D5DD"/>' +
       '<rect x="' + x + '" y="' + (104 - hOut - hIn) + '" width="' + bw + '" height="' + hIn + '" rx="3" fill="#2E8F89"/>' +
-      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#9aa4b4">' + d.label + "</text>";
+      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#98A2B3">' + d.label + "</text>";
   });
   return '<div dir="ltr" style="overflow-x:auto;" class="ms-scroll"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;min-width:520px;height:auto;display:block;margin-top:10px;" role="img" aria-label="نشاط الرسائل ١٤ يومًا">' +
-    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#e9edf3" stroke-width="1"/>' + bars + "</svg></div>" +
-    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#7b8597;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#C6D8EE;margin-inline-end:5px;"></i>صادرة</span></div>';
+    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#EAECF0" stroke-width="1"/>' + bars + "</svg></div>" +
+    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#667085;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#D0D5DD;margin-inline-end:5px;"></i>صادرة</span></div>';
 }
 function vHomeCharts(cs) {
   const camps = showTest ? campaigns : campaigns.filter((cp) => !campIsTest(cp));
@@ -1056,15 +1131,15 @@ function vHomeCharts(cs) {
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · شاملة التجريبية" : " · الحقيقية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#9aa4b4;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#9aa4b4;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
-    : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
-  h += chartCard("الاهتمام حسب المنتج", "من وسوم المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+      '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
+      '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
+    : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
+  h += chartCard("الاهتمام حسب المنتج", "من وسوم المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
 }
@@ -1101,13 +1176,13 @@ function vWinLoss() {
   h += "</div>";
   return h;
 }
-const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#7b8597"], none: ["لا إشارة بعد", "#9aa4b4"] };
+const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#667085"], none: ["لا إشارة بعد", "#98A2B3"] };
 function toneBadge(label, color) {
-  return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e9edf3;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#3b4657;">' +
+  return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #EAECF0;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#344054;">' +
     '<span style="width:8px;height:8px;border-radius:999px;background:' + color + ';"></span>' + esc(label) + "</span>";
 }
 function tlDot(kind) {
-  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#9aa4b4", sys: "#c9d2df" }[kind] || "#c9d2df";
+  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#98A2B3", sys: "#D0D5DD" }[kind] || "#D0D5DD";
 }
 function vCustomer(ph) {
   if (!profileData || profilePhone !== ph) {
@@ -1120,24 +1195,24 @@ function vCustomer(ph) {
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
   const im = INTENT_META[ins.intent] || INTENT_META.none;
   const missing = (ctx.parts || []).filter((p) => !p.got).slice(0, 2);
-  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
+  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
-    '<div style="width:52px;height:52px;flex:none;border-radius:14px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;">' + esc(nm.trim().charAt(0)) + "</div>" +
-    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+    '<div style="width:52px;height:52px;flex:none;border-radius:14px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;">' + esc(nm.trim().charAt(0)) + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
     '<span class="chip c-teal">واتساب ✓</span>' + (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
-    '<div style="font-size:11.5px;color:#9aa4b4;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
-    '<div style="font-size:11px;color:#9aa4b4;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
+    '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
+    '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
     ((d.campaigns || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + d.campaigns.map((cp) => '<a href="#kmon/' + cp.id + '" style="text-decoration:none;" class="chip c-blue">' + esc(cp.name.slice(0, 30)) + "</a>").join("") + "</div>" : "") +
     "</div></div>" +
-    '<div style="flex:none;display:flex;gap:12px;align-items:center;border-inline-start:1px solid #f0f2f6;padding-inline-start:18px;">' +
+    '<div style="flex:none;display:flex;gap:12px;align-items:center;border-inline-start:1px solid #F2F4F7;padding-inline-start:18px;">' +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">' +
     '<div style="font-size:22px;font-weight:700;color:#2E7D77;">' + ctx.score + '%</div>' +
-    '<div style="width:10px;height:110px;background:#eef1f5;border-radius:999px;position:relative;overflow:hidden;"><i style="position:absolute;bottom:0;left:0;right:0;height:' + ctx.score + '%;background:linear-gradient(180deg,#3FB6B0,#2E7D77);display:block;border-radius:999px;"></i></div>' +
-    '<div style="font-size:10px;font-weight:700;color:#7b8597;">اكتمال السياق</div></div>' +
-    (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#9aa4b4;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
+    '<div style="width:10px;height:110px;background:#EAECF0;border-radius:999px;position:relative;overflow:hidden;"><i style="position:absolute;bottom:0;left:0;right:0;height:' + ctx.score + '%;background:linear-gradient(180deg,#3FB6B0,#2E7D77);display:block;border-radius:999px;"></i></div>' +
+    '<div style="font-size:10px;font-weight:700;color:#667085;">اكتمال السياق</div></div>' +
+    (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#98A2B3;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
     "</div></div>";
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;">' +
     '<button class="btn btn-teal" onclick="openConvo(\\'' + esc(c.phone) + '\\')">فتح المحادثة</button>' +
@@ -1147,14 +1222,14 @@ function vCustomer(ph) {
   h += '<div class="card" style="margin:0;background:#F4FBFA;border-color:#B9E4E0;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;color:#2E7D77;">⁂ فهم المساعد</h3>' + toneBadge(im[0], im[1]) + "</div>";
   if (ins.learning) {
-    h += '<div style="font-size:13px;color:#5b6678;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
-      ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#7b8597")).join("") + "</div>" : "") +
-      '<div style="font-size:11.5px;color:#7b8597;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
+    h += '<div style="font-size:13px;color:#475467;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
+      ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>" : "") +
+      '<div style="font-size:11.5px;color:#667085;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
-    h += '<div style="font-size:13.5px;font-weight:700;color:#13294b;line-height:2;margin-top:12px;">' + esc(ins.summary || "") + "</div>";
-    if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#7b8597")).join("") + "</div>";
-    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#3b4657;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
-    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
+    h += '<div style="font-size:13.5px;font-weight:700;color:#101828;line-height:2;margin-top:12px;">' + esc(ins.summary || "") + "</div>";
+    if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>";
+    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#344054;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
+    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
     const dm = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
     h += '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
       '<span class="chip" style="background:' + dm[2] + ';color:' + dm[1] + ';font-size:12px;padding:6px 14px;">حكم الصفقة: ' + dm[0] + "</span>" +
@@ -1163,21 +1238,21 @@ function vCustomer(ph) {
       (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
     h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
       '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">الخطوة التالية</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#13294b;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
-      (ins.why ? '<div style="font-size:11.5px;color:#5b6678;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
+      '<div style="font-size:13px;font-weight:700;color:#101828;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
+      (ins.why ? '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
       (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">أفضل وقت: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
   }
   h += "</div>";
   // timeline
   h += '<div class="card" style="margin:0;"><h3 style="margin:0 0 4px;">سجل التفاعل</h3>' +
-    '<div style="font-size:11px;color:#9aa4b4;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
+    '<div style="font-size:11px;color:#98A2B3;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
     '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
     ((d.timeline || []).length ? d.timeline.map((ev) =>
-      '<div style="display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid #f3f5f8;">' +
+      '<div style="display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid #F2F4F7;">' +
       '<span style="width:9px;height:9px;flex:none;margin-top:6px;border-radius:999px;background:' + tlDot(ev.kind) + ';"></span>' +
-      '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:#13294b;line-height:1.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div>" +
-      '<div style="font-size:10.5px;color:#9aa4b4;margin-top:2px;">' + esc(ev.meta || "") + " · " + fmtD(ev.ts) + " " + fmtT(ev.ts) + "</div></div></div>").join("")
-      : '<div style="padding:20px;text-align:center;color:#9aa4b4;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:#101828;line-height:1.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div>" +
+      '<div style="font-size:10.5px;color:#98A2B3;margin-top:2px;">' + esc(ev.meta || "") + " · " + fmtD(ev.ts) + " " + fmtT(ev.ts) + "</div></div></div>").join("")
+      : '<div style="padding:20px;text-align:center;color:#98A2B3;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
   h += "</div>";
   return h;
 }
