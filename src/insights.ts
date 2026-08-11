@@ -89,8 +89,9 @@ export type WinLoss = {
 };
 
 /** Aggregate «لماذا نكسب ولماذا نخسر» over CACHED reads only (no LLM calls here). */
-export async function winLossBoard(): Promise<WinLoss> {
-  const rows = await db.listInsights();
+export async function winLossBoard(isTest?: (phone: string) => boolean): Promise<WinLoss> {
+  const all = await db.listInsights();
+  const rows = isTest ? all.filter((r) => !isTest(r.phone)) : all;
   const totals = { won: 0, lost: 0, stalled: 0, active: 0, learning: 0 };
   const causes = new Map<string, { count: number; example: string; products: Set<string> }>();
   const drivers = new Map<string, number>();

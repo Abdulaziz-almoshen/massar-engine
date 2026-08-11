@@ -248,7 +248,10 @@ app.post("/admin/contact/human", async (req, reply) => {
 // «لماذا نكسب ولماذا نخسر» — aggregated over cached reads (no LLM cost per view).
 app.get("/admin/intel/winloss", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  return insights.winLossBoard();
+  // Sandbox conversations must not pollute the real market verdict; ?all=1 includes them
+  // (the portal asks for that only while it is transparently showing sandbox data).
+  const includeTest = String((req.query as any)?.all ?? "") === "1";
+  return insights.winLossBoard(includeTest ? undefined : (phone) => Boolean(tracker.findContact(phone)?.test));
 });
 
 // Cached reads only (no LLM) — lets list rows show next actions cheaply.

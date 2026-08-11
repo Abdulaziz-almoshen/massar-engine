@@ -1434,7 +1434,7 @@ async function refresh(force) {
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/insights", { headers: { "x-admin-token": TOKEN } }),
-        fetch("/admin/intel/winloss", { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/intel/winloss" + (showTest ? "?all=1" : ""), { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
       if (kr.ok) kbDocs = await kr.json();
