@@ -186,6 +186,7 @@ let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
+let campQ = ""; let campTab = "all"; let campSortKey = "new";   // campaigns list controls
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
 let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
@@ -380,6 +381,9 @@ function renderConvo() {
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && convoPhone) closeConvo(); });
 window.setCampFilter = (f) => { campFilter = f; render(false); };
+window.campSearchFn = (el) => { campQ = el.value; clearTimeout(window.__cq2); window.__cq2 = setTimeout(() => render(false), 250); };
+window.setCampTab = (t) => { campTab = t; render(false); };
+window.setCampSort = (el) => { campSortKey = el.value; render(false); };
 window.toggleShowTest = () => { showTest = !showTest; render(false); };
 function campIsTest(cp) {
   return cp.targets.length > 0 && cp.targets.every((t) => { const c = contactByPhone(t.phone); return c && c.test; });
@@ -393,27 +397,48 @@ function testToggleChip(nTest) {
 
 function vKmon(d) {
   const inCamp = new Set(); campaigns.forEach((c) => c.targets.forEach((t) => inCamp.add(t.phone)));
-  let h = '<div class="sec">الحملات <span class="meta">' + campaigns.length + ' حملة · اضغط حملة لفتح لوحتها</span></div>';
+  const tabs = [["all", "الكل", campaigns.length],
+    ["real", "حقيقية", campaigns.filter((c) => !campIsTest(c)).length],
+    ["test", "تجريبية", campaigns.filter((c) => campIsTest(c)).length]];
+  const q = campQ.trim();
+  let list = campaigns.filter((c) =>
+    (campTab === "all" || (campTab === "test") === campIsTest(c)) &&
+    (!q || c.name.includes(q) || (c.product || "").includes(q)));
+  const withSt = list.map((c) => ({ c, st: campStats(c) }));
+  if (campSortKey === "replies") withSt.sort((a, b) => b.st.replied - a.st.replied);
+  else if (campSortKey === "seen") withSt.sort((a, b) => b.st.seen - a.st.seen);
+  else withSt.sort((a, b) => Number(b.c.created_at) - Number(a.c.created_at));
+  let h = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">' +
+    tabs.map((t) => '<button class="btn" style="padding:8px 16px;font-size:12px;border-radius:999px;' +
+      (campTab === t[0] ? 'color:#fff;background:#13294b;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
+      '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + t[2] + ")</button>").join("") +
+    '<span style="flex:1;"></span>' +
+    '<input id="campq" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="font-family:inherit;font-size:12px;border:1px solid #e9edf3;border-radius:999px;padding:9px 15px;background:#fff;width:190px;">' +
+    '<select onchange="setCampSort(this)" style="font-family:inherit;font-size:11.5px;color:#5b6678;border:1px solid #e9edf3;border-radius:10px;padding:9px 11px;background:#fff;">' +
+    '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
+    '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
+    '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>' +
+    '<a href="#aimkt" class="btn btn-teal" style="text-decoration:none;font-size:12.5px;">+ إنشاء حملة</a></div>';
   if (!campaigns.length) {
     h += '<div class="empty" style="padding:44px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#2E7D77;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه.</div></div>';
   } else {
-    h += '<div class="tblwrap"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:760px;">' +
-      '<div style="display:grid;grid-template-columns:1.9fr 1.2fr .9fr .8fr repeat(5,.62fr);gap:10px;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #eef1f5;font-size:11px;font-weight:700;color:#7b8597;">' +
-      '<div>اسم الحملة</div><div>المنتج</div><div>البدء</div><div>الحالة</div><div style="text-align:center;">مستهدفون</div><div style="text-align:center;">وصلت</div><div style="text-align:center;">شوهدت</div><div style="text-align:center;">ردّوا</div><div style="text-align:center;">مهتمون</div></div>';
-    campaigns.forEach((c) => {
-      const st = campStats(c);
-      h += '<div onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:1.9fr 1.2fr .9fr .8fr repeat(5,.62fr);gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid #f3f5f8;cursor:pointer;" onmouseover="this.style.background=\\'#fafbfd\\'" onmouseout="this.style.background=\\'\\'">' +
-        '<div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.name) + "</div>" +
-        '<div style="font-size:11.5px;color:#5b6678;">' + esc(c.product || "—") + "</div>" +
-        '<div style="font-size:11.5px;color:#7b8597;">' + fmtD(c.created_at) + "</div>" +
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+    h += '<div class="tblwrap"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:820px;">' +
+      '<div style="display:grid;grid-template-columns:1.8fr 1fr .75fr .6fr .6fr .6fr 1fr;gap:10px;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #eef1f5;font-size:11px;font-weight:700;color:#7b8597;">' +
+      '<div>الحملة</div><div>المنتج</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div></div>';
+    withSt.forEach(({ c, st }) => {
+      const prog = pct(st.delivered, st.targeted);
+      h += '<div onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:1.8fr 1fr .75fr .6fr .6fr .6fr 1fr;gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid #f3f5f8;cursor:pointer;" onmouseover="this.style.background=\\'#fafbfd\\'" onmouseout="this.style.background=\\'\\'">' +
+        '<div style="min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div><div style="font-size:10.5px;color:#9aa4b4;margin-top:2px;">' + fmtD(c.created_at) + "</div></div>" +
+        '<div style="font-size:11.5px;color:#5b6678;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
         '<div>' + (campIsTest(c) ? '<span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.targeted + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2F5F94;">' + st.delivered + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2E7D77;">' + st.seen + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.replied + "</div>" +
-        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#1f8a52;">' + st.interested + "</div></div>";
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.targeted.toLocaleString("ar-SA") + "</div>" +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2E7D77;">' + pct(st.seen, st.targeted) + '٪</div>' +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2F5F94;">' + pct(st.replied, st.targeted) + '٪</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;height:6px;background:#eef1f5;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:linear-gradient(90deg,#3FB6B0,#2E7D77);border-radius:999px;"></i></div><span style="font-size:10.5px;font-weight:700;color:#7b8597;flex:none;">' + prog + '٪</span></div></div>';
     });
     h += "</div></div></div>";
+    h += '<div style="font-size:10.5px;color:#9aa4b4;margin-top:10px;">الأرقام تتحدّث لحظيًا من حالات تسليم واتساب — لا تقديرات.</div>';
   }
   const organicAll = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
     .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
