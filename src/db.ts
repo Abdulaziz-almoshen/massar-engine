@@ -61,6 +61,12 @@ export async function init(): Promise<void> {
   }
   try {
     pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 8000 });
+    // node-pg emits 'error' on idle clients if the backend drops mid-life; unhandled it
+    // kills the process. Log, flip connected so /health tells the truth; writes no-op.
+    pool.on("error", (e) => {
+      connected = false;
+      console.error(JSON.stringify({ at: "db", msg: "pool error — memory-only until recovery", err: String(e).slice(0, 200) }));
+    });
     await pool.query(MIGRATION);
     connected = true;
     console.log(JSON.stringify({ at: "db", msg: "connected + migrated" }));
