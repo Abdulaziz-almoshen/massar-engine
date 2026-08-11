@@ -186,7 +186,8 @@ function systemPrompt(contact: Contact): string {
     "# قاعدة ذهبية: لا طريق مسدود أبدًا",
     "كل رسالة تنتهي إمّا بسؤال ذكي أو بأزرار (send_buttons). لا ترسل رسالة تُغلق الحوار إلا عند close_conversation.",
     "إذا قال «لا» أو «غير مهتم» عن منتج: تقبّلها بأناقة في نصف سطر، ثم افتح فورًا زاوية جديدة — منتج أنسب لقطاعه أو سؤال عن ألم تشغيلي آخر (استدعِ offer_alternative). بعد بديلين مرفوضين: mark_not_interested واختم بباب مفتوح.",
-    "إذا أبدى اهتمامًا: tag_interest فورًا، ثم ادفع للخطوة الملموسة: عرض تعريفي قصير مع المختص هذا الأسبوع.",
+    "إذا أبدى اهتمامًا: tag_interest فورًا (مرة واحدة لكل منتج — لا تكرر الوسم نفسه)، ثم ادفع للخطوة الملموسة: عرض تعريفي قصير مع المختص هذا الأسبوع.",
+    "لا تنادِ العميل باسم المنشأة («يا مجمع النور الطبي») — استخدم صيغة مهذبة عامة أو اسم الشخص إن عرفته فقط.",
     "",
     "# البيع بالكفاءة (لغتك الأساسية)",
     "بِع النتيجة لا الميزة: وقت الإصدار ↓70%، لا إدخال مزدوج، امتثال جاهز، لوحة لحظية. اربط كل ميزة بألم تشغيلي يعيشه مدير المنشأة يوميًا.",
@@ -388,13 +389,19 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
 
 // ------------------------------ opt-out (pre-LLM, hard rule) ------------------------------
 
-const OPT_OUT_PATTERNS = [
-  /إيقاف|ايقاف|أوقف|اوقف|توقف|لا تراسلني|الغاء الاشتراك|إلغاء الاشتراك|حظر/,
-  /\bstop\b|\bunsubscribe\b|\bquit\b|\bcancel\b/i,
+// Opt-out must be UNMISTAKABLE: a bare command word, or an explicit "don't message me".
+// A verified false positive («كيف أوقف التزوير؟» — the customer quoting our own pitch)
+// silenced a live lead forever, so bare stems only count when the message IS the command.
+const OPT_OUT_EXPLICIT = [
+  /لا\s*تراسل|لا\s*ترسل|ما\s*ابي\s*رسائل|ما\s*أبي\s*رسائل|لا\s*ارغب\s*باستقبال|لا\s*أرغب\s*باستقبال/,
+  /(الغاء|إلغاء)\s*(ال)?اشتراك|ازالة\s*رقمي|إزالة\s*رقمي|احذف\s*رقمي|أحذف\s*رقمي|الغني\s*من\s*القائمة/,
+  /\bunsubscribe\b|\bremove\s+me\b|\bstop\s+messag/i,
 ];
+const OPT_OUT_BARE = /^(إيقاف|ايقاف|أوقف|اوقف|توقف|stop|Stop|STOP|quit|cancel|unsubscribe|الغاء|إلغاء|حظر)[\s!.،؛]*$/;
 function isOptOut(text: string): boolean {
   const t = text.replace(/[ً-ٟـ]/g, "").trim();
-  return OPT_OUT_PATTERNS.some((p) => p.test(t));
+  if (OPT_OUT_BARE.test(t)) return true;                 // the message IS the command
+  return OPT_OUT_EXPLICIT.some((p) => p.test(t));        // or an unambiguous request
 }
 
 // ------------------------------ main turn loop ------------------------------
@@ -412,9 +419,15 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
 
   if (contact.human) return; // explicit portal takeover only — agent silent while a human drives
 
-  if (contact.agentTurns >= MAX_AGENT_TURNS) {
-    tracker.setOutcome(contact.phone, "handoff", "turn cap reached");
-    await safeSend(contact.phone, "شكرًا لتفاعلك — سيتولى أحد مختصينا إكمال الحديث معك مباشرة قريبًا بإذن الله.");
+  // The cap protects against runaway loops, not against a long healthy conversation:
+  // it counts REPLIES TO THIS CUSTOMER'S MESSAGES (campaign blasts and file sends don't
+  // count), and once announced it stays silent instead of repeating the same line forever.
+  const convTurns = (contact.transcript || []).filter((t) => t.role === "customer").length;
+  if (convTurns >= MAX_AGENT_TURNS) {
+    if (contact.outcome !== "handoff") {
+      tracker.setOutcome(contact.phone, "handoff", "turn cap reached — human continues");
+      await safeSend(contact.phone, "شكرًا لتفاعلك — سيتولى أحد مختصينا إكمال الحديث معك مباشرة قريبًا بإذن الله.");
+    }
     return;
   }
 
