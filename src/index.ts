@@ -8,6 +8,7 @@ import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
 import * as kb from "./kb.js";
 import * as audience from "./audience.js";
+import * as insights from "./insights.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -247,6 +248,31 @@ app.post("/admin/contact/human", async (req, reply) => {
   if (!phone) return reply.code(400).send({ error: "body: { phone, human }" });
   tracker.setHuman(String(phone).replace(/\D/g, ""), Boolean(human));
   return { status: "ok" };
+});
+
+// Cached reads only (no LLM) — lets list rows show next actions cheaply.
+app.get("/admin/insights", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listInsights();
+});
+
+// العميل ٣٦٠ — one person, fully assembled: identity + timeline + فهم المساعد + context score.
+app.get("/admin/customer/:phone", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const phone = String((req.params as any).phone || "").replace(/\D/g, "");
+  if (!phone) return reply.code(400).send({ error: "phone required" });
+  const snap = tracker.snapshot() as any;
+  const contact = (snap.contacts || []).find((c: any) => c.phone === phone);
+  if (!contact) return reply.code(404).send({ error: "لا محادثة لهذا الرقم بعد" });
+  const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
+  const force = String((req.query as any)?.refresh ?? "") === "1";
+  const ins = await insights.getInsights(contact, entity, force);
+  return {
+    contact, entity, insights: ins,
+    context: insights.contextScore(contact, entity),
+    timeline: insights.buildTimeline(contact),
+    campaigns: (await db.listCampaigns()).filter((cp: any) => (cp.targets || []).some((t: any) => t.phone === phone)).map((cp: any) => ({ id: cp.id, name: cp.name })),
+  };
 });
 
 // Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.

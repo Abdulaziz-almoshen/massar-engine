@@ -186,9 +186,12 @@ let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
+let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
+let profilePhone = "";        // phone the loaded profile belongs to
+let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
-let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
+let campMsg = "مرحبًا {name}، معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
 const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
@@ -293,13 +296,13 @@ function interestChips(c) {
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
   if (latest.size) {
-    const lv = { hot: ["c-ok", "جاد 🔥"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
+    const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
     return [...latest.values()].map((t) => {
       const m = lv[t.level] || lv.warm;
       return '<span class="chip ' + m[0] + '">' + esc(t.product) + " · " + m[1] + "</span>";
     }).join(" ");
   }
-  if (c.outcome === "interested") return '<span class="chip c-ok">مهتم ⭐</span>';
+  if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
   if (c.outcome === "not_interested") return '<span class="chip c-bad">غير مهتم' + (c.outcomeReason ? " · " + esc(c.outcomeReason) : "") + "</span>";
   return '<span style="color:#c2cad6;">—</span>';
 }
@@ -310,13 +313,14 @@ function contactRowsHtml(rows) {
     const c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
     const nm = c.waName || r.name || "غير معروف";
     const last = (c.transcript || [])[(c.transcript || []).length - 1];
-    h += '<div class="trow" onclick="openConvo(\\'' + esc(c.phone) + '\\')">' +
+    const ci = insCache[c.phone];
+    h += '<div class="trow" onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'">' +
       '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + "</div>" +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
-      '<div class="lastm">' + esc(last ? last.text : "—") + "</div>" +
+      '<div class="lastm">' + (ci && ci.next_action ? '<span style="color:#2E7D77;font-weight:600;">← ' + esc(ci.next_action) + "</span>" : esc(last ? last.text : "—")) + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
-      '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;">عرض المحادثة ←</div></div>';
+      '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;" onclick="event.stopPropagation();openConvo(\\'' + esc(c.phone) + '\\')">المحادثة ←</div></div>';
   });
   return h;
 }
@@ -384,7 +388,7 @@ function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
     (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#9aa4b4;background:#fff;border:1px dashed #d5dae2;') +
-    '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية 🙈" : "إظهار التجريبية (" + nTest + ") 👁") + "</button>";
+    '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + nTest + ")") + "</button>";
 }
 
 function vKmon(d) {
@@ -449,7 +453,7 @@ function vKmonDetail(id, d) {
     ["all", "الكل", rows.length, (r) => true],
     ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
     ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
-    ["interested", "مهتمون ⭐", st.interested, (r) => interestedOf(r.contact)],
+    ["interested", "مهتمون", st.interested, (r) => interestedOf(r.contact)],
     ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
@@ -495,17 +499,19 @@ function vHome(d) {
     '<a href="#customers" class="btn" style="text-decoration:none;color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
     '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">📚 معرفة المنتج</a></div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">عملاء جادّون الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
     (interestedList.length
       ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
           const tg = hotOf(c) || (c.tags || [])[0];
           const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
-          return '<div onclick="openConvo(\\'' + esc(c.phone) + '\\')" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
+          const ci = insCache[c.phone];
+          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
             '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.waName || "غير معروف") + " " +
-            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · جاد 🔥" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا 🤝</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
-            (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "") + "</div>" +
-            '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">المحادثة ←</span></div>';
+            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+            (ci && ci.next_action ? '<div style="font-size:11px;color:#2E7D77;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">← ' + esc(ci.next_action) + '</div>'
+              : (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
+            '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
         }).join("") + "</div>"
       : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
     (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #f0f2f6;font-size:11px;color:#7b8597;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#13294b;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
@@ -688,7 +694,7 @@ function vAimkt() {
   h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
     '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#13294b;">' + selN.toLocaleString("ar-SA") + " مستهدف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
     '<div style="font-size:10.5px;color:#9aa4b4;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
-    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">🚀 إطلاق الحملة</button></div>';
+    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
@@ -881,17 +887,15 @@ window.entDel = async (id) => {
   entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
 };
 function vCustomers() {
-  let h = '<div class="card"><h3>استيراد المستهدفين من ملف</h3>' +
-    '<div onclick="entFilePick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;margin-top:4px;">' +
-    '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">ارفع ملف Excel أو CSV — قائمتك كما هي</div>' +
-    '<div style="font-size:11.5px;color:#7b8597;margin-top:7px;line-height:1.9;">صف العناوين مطلوب: عمود للاسم وعمود للجوال — وكل عمود إضافي (المدينة، الحجم، القطاع…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> تلقائيًا عند إطلاق الحملة<br>التكرار يُحدَّث ولا يُنسخ · أرقام 05 تُحوَّل تلقائيًا إلى صيغة 966</div></div>' +
+  let h = '<div class="card">' +
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+    '<h3 style="margin:0;flex:1;min-width:180px;">المستهدفون</h3>' +
+    '<button class="btn btn-teal" style="font-size:12.5px;padding:11px 18px;" onclick="entFilePick()">⬆ رفع ملف Excel/CSV</button>' +
+    '<a href="/assets/audience-template.xlsx" download class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;text-decoration:none;">القالب الجاهز</a></div>' +
+    '<div style="font-size:11px;color:#9aa4b4;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
-    '<a href="/assets/audience-template.xlsx" download onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#1F4470;background:#E3ECF8;border-radius:10px;padding:9px 15px;text-decoration:none;">⬇ حمّل القالب الجاهز (Excel)</a>' +
-    '<span style="font-size:11px;color:#9aa4b4;">املأه بقائمتك ثم ارفعه هنا كما هو</span></div>' +
-    '<div id="entfstat" style="margin-top:12px;">' + entImportSummary + "</div>" +
-    '<details style="margin-top:14px;"><summary style="font-size:11.5px;color:#7b8597;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
+    '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
+    '<details style="margin-top:10px;"><summary style="font-size:11.5px;color:#7b8597;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
     '<div style="font-size:11.5px;color:#7b8597;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#13294b;">الاسم، الرقم، الحجم، المدينة</b></div>' +
     '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><button class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></details></div>';
@@ -905,20 +909,96 @@ function vCustomers() {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
   } else {
     h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #e9edf3;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
-    h += '<div class="tblwrap">' + cshown.map((e) =>
-      '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;">' +
+    h += '<div class="tblwrap">' + cshown.map((e) => {
+      const hasConvo = Boolean(contactByPhone(e.phone));
+      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f3f5f8;"') + '>' +
       '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + "</span>" +
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#13294b;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
       '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
       '<span style="font-size:11.5px;color:#9aa4b4;direction:ltr;">+' + esc(e.phone) + "</span>" +
-      '<button onclick="entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>'
-    ).join("") +
+      '<button onclick="event.stopPropagation();entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>';
+    }).join("") +
     (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7b8597;font-size:12px;background:#fafbfc;">+ ' + (cm.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
     (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   return h;
 }
 window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
+
+const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#7b8597"], none: ["لا إشارة بعد", "#9aa4b4"] };
+function toneBadge(label, color) {
+  return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e9edf3;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#3b4657;">' +
+    '<span style="width:8px;height:8px;border-radius:999px;background:' + color + ';"></span>' + esc(label) + "</span>";
+}
+function tlDot(kind) {
+  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#9aa4b4", sys: "#c9d2df" }[kind] || "#c9d2df";
+}
+function vCustomer(ph) {
+  if (!profileData || profilePhone !== ph) {
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، واكتمال السياق.</div></div>';
+  }
+  if (profileData.missing) {
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ قائمة المستهدفين</a></div></div>';
+  }
+  const d = profileData; const c = d.contact; const ins = d.insights || {}; const ctx = d.context || { score: 0, parts: [] };
+  const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
+  const im = INTENT_META[ins.intent] || INTENT_META.none;
+  const missing = (ctx.parts || []).filter((p) => !p.got).slice(0, 2);
+  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
+  h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
+    '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
+    '<div style="width:52px;height:52px;flex:none;border-radius:14px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;">' + esc(nm.trim().charAt(0)) + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
+    (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
+    '<span class="chip c-teal">واتساب ✓</span>' + (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
+    '<div style="font-size:11.5px;color:#9aa4b4;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
+    '<div style="font-size:11px;color:#9aa4b4;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
+    ((d.campaigns || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + d.campaigns.map((cp) => '<a href="#kmon/' + cp.id + '" style="text-decoration:none;" class="chip c-blue">' + esc(cp.name.slice(0, 30)) + "</a>").join("") + "</div>" : "") +
+    "</div></div>" +
+    '<div style="flex:none;display:flex;gap:12px;align-items:center;border-inline-start:1px solid #f0f2f6;padding-inline-start:18px;">' +
+    '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">' +
+    '<div style="font-size:22px;font-weight:700;color:#2E7D77;">' + ctx.score + '%</div>' +
+    '<div style="width:10px;height:110px;background:#eef1f5;border-radius:999px;position:relative;overflow:hidden;"><i style="position:absolute;bottom:0;left:0;right:0;height:' + ctx.score + '%;background:linear-gradient(180deg,#3FB6B0,#2E7D77);display:block;border-radius:999px;"></i></div>' +
+    '<div style="font-size:10px;font-weight:700;color:#7b8597;">اكتمال السياق</div></div>' +
+    (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#9aa4b4;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
+    "</div></div>";
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;">' +
+    '<button class="btn btn-teal" onclick="openConvo(\\'' + esc(c.phone) + '\\')">فتح المحادثة</button>' +
+    '<button id="insbtn" class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="refreshInsights()">تحديث قراءة المساعد ↻</button></div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
+  // فهم المساعد
+  h += '<div class="card" style="margin:0;background:#F4FBFA;border-color:#B9E4E0;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;color:#2E7D77;">⁂ فهم المساعد</h3>' + toneBadge(im[0], im[1]) + "</div>";
+  if (ins.learning) {
+    h += '<div style="font-size:13px;color:#5b6678;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
+      ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#7b8597")).join("") + "</div>" : "") +
+      '<div style="font-size:11.5px;color:#7b8597;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
+  } else {
+    h += '<div style="font-size:13.5px;font-weight:700;color:#13294b;line-height:2;margin-top:12px;">' + esc(ins.summary || "") + "</div>";
+    if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#7b8597")).join("") + "</div>";
+    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#3b4657;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
+    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
+    h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
+      '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">الخطوة التالية</div>' +
+      '<div style="font-size:13px;font-weight:700;color:#13294b;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
+      (ins.why ? '<div style="font-size:11.5px;color:#5b6678;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
+      (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">أفضل وقت: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
+  }
+  h += "</div>";
+  // timeline
+  h += '<div class="card" style="margin:0;"><h3 style="margin:0 0 4px;">سجل التفاعل</h3>' +
+    '<div style="font-size:11px;color:#9aa4b4;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
+    '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
+    ((d.timeline || []).length ? d.timeline.map((ev) =>
+      '<div style="display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid #f3f5f8;">' +
+      '<span style="width:9px;height:9px;flex:none;margin-top:6px;border-radius:999px;background:' + tlDot(ev.kind) + ';"></span>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;color:#13294b;line-height:1.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div>" +
+      '<div style="font-size:10.5px;color:#9aa4b4;margin-top:2px;">' + esc(ev.meta || "") + " · " + fmtD(ev.ts) + " " + fmtT(ev.ts) + "</div></div></div>").join("")
+      : '<div style="padding:20px;text-align:center;color:#9aa4b4;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
+  h += "</div>";
+  return h;
+}
 
 function vPlaceholder(cur) {
   const t = TITLES[cur] || ["", ""];
@@ -944,6 +1024,10 @@ function render(fetchNew) {
     if (!cache) return; // first fetch pending
     const campId = cur === "kmon" ? (location.hash || "").split("/")[1] || "" : "";
     b.innerHTML = cur === "kmon" ? (campId ? vKmonDetail(campId, cache) : vKmon(cache)) : vHome(cache);
+  } else if (cur === "customer") {
+    if (!TOKEN) return gate();
+    const ph = (location.hash || "").split("/")[1] || "";
+    b.innerHTML = vCustomer(ph);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
@@ -964,21 +1048,46 @@ async function refresh(force) {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
       else { cache = await r.json(); document.getElementById("upd").textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
-      const [er, kr, cr] = await Promise.all([
+      const [er, kr, cr, ir] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/insights", { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
       if (kr.ok) kbDocs = await kr.json();
       if (cr.ok) campaigns = await cr.json();
+      if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
       try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
+      const curR = (location.hash || "").slice(1).split("/")[0];
+      if (curR === "customer") {
+        const ph = (location.hash || "").split("/")[1] || "";
+        if (ph) {
+          const pr = await fetch("/admin/customer/" + ph, { headers: { "x-admin-token": TOKEN } });
+          if (pr.ok) { profileData = await pr.json(); profilePhone = ph; }
+          else if (pr.status === 404) { profileData = { missing: true }; profilePhone = ph; }
+        }
+      }
     } catch (e) { /* keep last view */ }
   }
   render(true);
   renderConvo();
 }
-window.addEventListener("hashchange", () => { if (convoPhone) closeConvo(); rQ = ""; render(false); });
+window.refreshInsights = async () => {
+  if (!profilePhone) return;
+  const el = document.getElementById("insbtn");
+  if (el) el.textContent = "جارٍ القراءة…";
+  try {
+    const pr = await fetch("/admin/customer/" + profilePhone + "?refresh=1", { headers: { "x-admin-token": TOKEN } });
+    if (pr.ok) { profileData = await pr.json(); render(false); alertBar("حُدّثت قراءة المساعد لهذا العميل ✓", false); }
+  } catch (e) { alertBar("تعذّر تحديث القراءة", true); }
+};
+window.addEventListener("hashchange", () => {
+  if (convoPhone) closeConvo(); rQ = "";
+  const cur = (location.hash || "").slice(1).split("/")[0];
+  if (cur === "customer") { profileData = null; render(false); refresh(); }
+  else render(false);
+});
 if (!location.hash) location.hash = "kmon";
 refresh();
 setInterval(async () => {

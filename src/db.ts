@@ -63,6 +63,12 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS contact_insights (
+  phone       TEXT PRIMARY KEY,
+  data        JSONB NOT NULL,
+  turns_at    INT NOT NULL,
+  computed_at BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS campaigns (
   id         BIGSERIAL PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -239,6 +245,31 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
 export async function deleteEntity(id: number): Promise<void> {
   if (!pool || !connected) return;
   await pool.query(`DELETE FROM entities WHERE id = $1`, [id]);
+}
+
+// ------------------------------ contact insights (فهم المساعد cache) ------------------------------
+
+export async function getInsightsRow(phone: string): Promise<{ data: unknown; turns_at: number; computed_at: number } | null> {
+  if (!pool || !connected) return null;
+  try {
+    const r = await pool.query(`SELECT data, turns_at, computed_at FROM contact_insights WHERE phone = $1`, [phone]);
+    return r.rows[0] ? { data: r.rows[0].data, turns_at: Number(r.rows[0].turns_at), computed_at: Number(r.rows[0].computed_at) } : null;
+  } catch { return null; }
+}
+
+export async function listInsights(): Promise<{ phone: string; data: unknown }[]> {
+  if (!pool || !connected) return [];
+  try {
+    const r = await pool.query(`SELECT phone, data FROM contact_insights`);
+    return r.rows;
+  } catch { return []; }
+}
+
+export function saveInsights(phone: string, data: unknown, turnsAt: number): void {
+  fire(
+    `INSERT INTO contact_insights (phone, data, turns_at, computed_at) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (phone) DO UPDATE SET data = EXCLUDED.data, turns_at = EXCLUDED.turns_at, computed_at = EXCLUDED.computed_at`,
+    [phone, JSON.stringify(data), turnsAt, Date.now()]);
 }
 
 // ------------------------------ product hub (agent-readable KB) ------------------------------
