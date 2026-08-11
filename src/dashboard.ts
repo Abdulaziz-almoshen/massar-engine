@@ -171,7 +171,7 @@ let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const openSet = new Set(); let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; let entSize = ""; let entCity = "";
-let kbDocs = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
+let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
 const NAV = [
@@ -521,6 +521,24 @@ function mdRender(md) {
   }).join("");
 }
 window.kbPick = () => document.getElementById("kbfile").click();
+window.paPick = () => document.getElementById("pafile").click();
+window.paUpload = async (input) => {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const st = document.getElementById("pastat");
+  st.innerHTML = '<span class="chip c-warn">جارٍ رفع الملف…</span>';
+  const fd = new FormData(); fd.append("file", f); fd.append("product", input.dataset.product || "");
+  try {
+    const r = await fetch("/admin/product-asset/upload", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
+    const d = await r.json();
+    if (!r.ok) { st.innerHTML = '<span class="chip c-bad">تعذّر: ' + esc(d.error || r.status) + "</span>"; return; }
+    st.innerHTML = '<span class="chip c-ok">أصبح المساعد يرسل هذا الملف ✓</span>';
+    const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } });
+    if (ar.ok) prodAssets = await ar.json();
+    render(false);
+  } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الرفع</span>'; }
+  input.value = "";
+};
 window.kbUpload = async (input) => {
   const f = input.files && input.files[0];
   if (!f) return;
@@ -566,7 +584,8 @@ function vKb() {
         ? '<span class="sc" style="color:' + tone(r.sc) + '">' + r.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + r.sc + '%;background:' + tone(r.sc) + ';"></i></div>'
         : '<div style="height:6px;"></div>') +
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
-      (r.hub ? '<span class="chip c-ok">ملف معتمد ✓</span>' : '<span class="chip c-grey">لا ملفات بعد</span>') +
+      (r.hub ? '<span class="chip c-ok">معرفة ✓</span>' : '<span class="chip c-grey">لا معرفة بعد</span>') +
+      (prodAssets.some((a) => a.product === r.name) ? '<span class="chip c-teal">ملف تعريفي 📎</span>' : "") +
       '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح ←</span></div>';
     return '<a href="#kb/' + encodeURIComponent(r.name) + '" style="text-decoration:none;"><div class="prod" style="cursor:pointer;">' + inner + "</div></a>";
   }).join("") + "</div>";
@@ -586,7 +605,15 @@ function vKbProduct(name) {
     (r.sc !== null ? '<span class="chip c-teal">معرفة مدمجة ' + r.sc + "%</span>" : "") +
     (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#9aa4b4;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div></div>";
-  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المنتج" : "ارفع أول ملف لهذا المنتج") + "</h3>" + uploadZone(name) + "</div>";
+  const pa = prodAssets.find((a) => a.product === name);
+  h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
+    (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#9aa4b4;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
+    '<div style="font-size:12px;color:#7b8597;margin:10px 0;line-height:1.9;">يُرسل تلقائيًا مع افتتاحية الحملة لهذا المنتج، وعندما يطلب العميل تفاصيل أكثر أو ملفًا.</div>' +
+    '<div onclick="paPick()" style="border:1.5px dashed #B9E4E0;background:#F4FBFA;border-radius:12px;padding:18px;text-align:center;cursor:pointer;">' +
+    '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;">' + (pa ? "استبدال الملف التعريفي (PDF)" : "ارفع الملف التعريفي (PDF)") + "</div></div>" +
+    '<input id="pafile" type="file" accept=".pdf" style="display:none" data-product="' + esc(name) + '" onchange="paUpload(this)">' +
+    '<div id="pastat" style="margin-top:10px;"></div></div>';
+  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المعرفة (Pitch Deck)" : "ارفع ملف المعرفة لهذا المنتج") + "</h3>" + uploadZone(name) + "</div>";
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
@@ -696,6 +723,7 @@ async function refresh(force) {
       if (er.ok) entities = await er.json();
       if (kr.ok) kbDocs = await kr.json();
       if (cr.ok) campaigns = await cr.json();
+      try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
     } catch (e) { /* keep last view */ }
   }
   render(true);

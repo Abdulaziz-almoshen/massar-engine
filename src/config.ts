@@ -21,6 +21,9 @@ export const cfg = {
   // Header token (x-admin-token) for /admin/* endpoints.
   adminToken: process.env.ADMIN_TOKEN || "",
 
+  // Public base URL for serving media to Gupshup.
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || "https://massar-engine.fly.dev",
+
   // Sales assets the agent may send (images/PDFs). JSON array:
   // [{"id":"sickleave-onepager","type":"document","url":"https://…/x.pdf","filename":"الإجازات-المرضية.pdf","caption":"…"}]
   assetsJson: process.env.ASSETS_JSON || "[]",

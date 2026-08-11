@@ -50,6 +50,7 @@ export function currentModel() { return model || "(not initialized)"; }
 // ------------------------------ assets registry ------------------------------
 
 type Asset = { id: string; type: "image" | "document"; url: string; filename?: string; caption?: string; label?: string };
+let productAssets: { product: string; url: string; filename: string }[] = [];
 function assets(): Asset[] {
   try { return JSON.parse(cfg.assetsJson) as Asset[]; } catch { return []; }
 }
@@ -161,6 +162,8 @@ function productBlock(): string {
 let hubKb: { product: string; md: string }[] = [];
 export async function refreshKb(): Promise<number> {
   try {
+    productAssets = (await db.listAssets()).map((a) => ({
+      product: a.product, url: `${cfg.publicBaseUrl}/assets/${a.public_id}.pdf`, filename: a.filename }));
     hubKb = (await db.listKb()).map((r) => ({ product: r.product, md: r.md }));
     console.log(JSON.stringify({ at: "agent", msg: "hub kb refreshed", products: hubKb.map((h) => h.product) }));
   } catch (e) { console.error(JSON.stringify({ at: "agent", msg: "hub kb refresh failed", err: String(e).slice(0, 200) })); }
@@ -196,9 +199,9 @@ function systemPrompt(contact: Contact): string {
     "",
     "# أدوات واتساب — استخدمها بذكاء",
     "- send_buttons: عند عرض خيارات (اهتمام/تفاصيل/موعد) اجعل الرد بضغطة زر — أسهل للعميل وأعلى استجابة. ≤3 أزرار بعناوين قصيرة.",
-    availableAssets.length
-      ? `- send_asset: ملفات معتمدة متاحة: ${availableAssets.map((a) => `${a.id} (${a.label ?? a.type})`).join("، ")} — أرسلها عندما تدعم النقاش.`
-      : "- (لا ملفات معتمدة حاليًا — لا تعِد بإرسال ملف.)",
+    productAssets.length
+      ? `- send_asset: ملف تعريفي PDF متاح لهذه المنتجات: ${productAssets.map((a) => a.product).join("، ")}. أرسله (باسم المنتج) مع افتتاحية الحديث عن المنتج، وعند أي طلب «تفاصيل أكثر / ملف / بروشور». لا ترسل نفس الملف مرتين في المحادثة.`
+      : "- (لا ملفات تعريفية مرفوعة بعد — لا تعِد بإرسال ملف.)",
     "",
     "# المنتجات المعتمدة",
     productBlock(),
@@ -236,8 +239,8 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "send_asset",
-      description: "أرسل ملفًا معتمدًا من السجل (صورة أو PDF) لدعم النقاش.",
-      parameters: { type: "object", properties: { asset_id: { type: "string" } }, required: ["asset_id"] },
+      description: "أرسل الملف التعريفي PDF لمنتج (asset_id = اسم المنتج). استخدمه مع افتتاحية المنتج أو عند طلب تفاصيل/ملف/بروشور.",
+      parameters: { type: "object", properties: { asset_id: { type: "string", description: "اسم المنتج" } }, required: ["asset_id"] },
     },
   },
   {
@@ -307,8 +310,15 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       return "أُرسلت الأزرار. لا تكرر نص الرسالة — إن لم تكن بحاجة لإضافة شيء أرجِع نصًا فارغًا.";
     }
     case "send_asset": {
-      const a = assets().find((x) => x.id === String(args.asset_id));
-      if (!a) return "لا يوجد ملف بهذا المعرف — تابع بدون ملف.";
+      const key = String(args.asset_id ?? args.product ?? "").trim();
+      const pa = productAssets.find((x) => x.product === key || x.product.includes(key));
+      if (pa) {
+        await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
+        tracker.recordAgentReply(contact.phone, `[أُرسل الملف التعريفي: ${pa.product}]`);
+        return "أُرسل الملف التعريفي — علّق عليه بسطر واحد وسؤال متابعة.";
+      }
+      const a = assets().find((x) => x.id === key);
+      if (!a) return "لا يوجد ملف لهذا المنتج — تابع بدون ملف.";
       if (a.type === "image") await gupshup.sendImage(contact.phone, a.url, a.caption);
       else await gupshup.sendDocument(contact.phone, a.url, a.filename ?? "ملف.pdf", a.caption);
       tracker.recordAgentReply(contact.phone, `[أُرسل ملف: ${a.id}]`);

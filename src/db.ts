@@ -73,6 +73,14 @@ CREATE TABLE IF NOT EXISTS campaign_targets (
   name        TEXT,
   PRIMARY KEY (campaign_id, phone)
 );
+CREATE TABLE IF NOT EXISTS product_assets (
+  product      TEXT PRIMARY KEY,
+  public_id    TEXT NOT NULL UNIQUE,
+  filename     TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  bytes        BYTEA NOT NULL,
+  updated_at   BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS product_kb (
   product         TEXT PRIMARY KEY,
   md              TEXT NOT NULL,
@@ -256,4 +264,27 @@ export async function listCampaigns(): Promise<{
     id: Number(c.id), name: c.name, product: c.product, message: c.message, created_at: c.created_at,
     targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
   }));
+}
+
+// ------------------------------ product intro assets (sent by the agent) ------------------------------
+
+export async function saveAsset(product: string, publicId: string, filename: string, contentType: string, bytes: Buffer): Promise<void> {
+  if (!pool || !connected) throw new Error("db not connected");
+  await pool.query(
+    `INSERT INTO product_assets (product, public_id, filename, content_type, bytes, updated_at) VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (product) DO UPDATE SET public_id = EXCLUDED.public_id, filename = EXCLUDED.filename,
+       content_type = EXCLUDED.content_type, bytes = EXCLUDED.bytes, updated_at = EXCLUDED.updated_at`,
+    [product, publicId, filename, contentType, bytes, Date.now()]);
+}
+
+export async function listAssets(): Promise<{ product: string; public_id: string; filename: string }[]> {
+  if (!pool || !connected) return [];
+  return (await pool.query(`SELECT product, public_id, filename FROM product_assets ORDER BY product`)).rows;
+}
+
+export async function getAssetByPublicId(publicId: string):
+  Promise<{ filename: string; content_type: string; bytes: Buffer } | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT filename, content_type, bytes FROM product_assets WHERE public_id = $1`, [publicId]);
+  return r.rows[0] ?? null;
 }

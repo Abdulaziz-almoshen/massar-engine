@@ -7,6 +7,7 @@ import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
 import * as kb from "./kb.js";
+import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
@@ -123,6 +124,9 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
+  const assets = await db.listAssets();
+  const pa = assets.find((a) => a.product === (product || "").trim());
+  const introAsset = pa ? { url: `${cfg.publicBaseUrl}/assets/${pa.public_id}.pdf`, filename: pa.filename } : null;
   const campaignId = await db.createCampaign(campName, (product || "").trim(), message, targets.map(t => ({
     phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })));
   const results: { phone: string; ok: boolean; error?: string }[] = [];
@@ -135,6 +139,11 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     try {
       await gupshup.sendText(phone, personalized);
       tracker.recordAgentReply(phone, personalized);
+      const asset = introAsset;
+      if (asset) {
+        await gupshup.sendDocument(phone, asset.url, asset.filename);
+        tracker.recordAgentReply(phone, `[أُرسل الملف التعريفي: ${asset.filename}]`);
+      }
       results.push({ phone, ok: true });
     } catch (e) {
       tracker.recordSystem(phone, `campaign send failed: ${String(e).slice(0, 150)}`);
@@ -145,6 +154,36 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   const sent = results.filter((r) => r.ok).length;
   log({ at: "campaign", msg: "launch done", campaignId, name: campName, requested: targets.length, sent });
   return { campaignId, name: campName, requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
+});
+
+// Public intro-file serving (Gupshup fetches media by URL — unguessable id, no auth).
+app.get("/assets/:pid", async (req, reply) => {
+  const pid = String((req.params as any).pid || "").replace(/\.pdf$/i, "");
+  const a = await db.getAssetByPublicId(pid);
+  if (!a) return reply.code(404).send({ error: "not found" });
+  reply.type(a.content_type || "application/pdf");
+  reply.header("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(a.filename)}`);
+  return a.bytes;
+});
+
+app.get("/admin/product-assets", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listAssets();
+});
+
+// Upload the product's intro PDF (the file the agent SENDS — separate from knowledge decks).
+app.post("/admin/product-asset/upload", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const file = await (req as any).file();
+  if (!file) return reply.code(400).send({ error: "multipart file required" });
+  const product = String((file.fields?.product as any)?.value ?? "").trim();
+  if (!product) return reply.code(400).send({ error: "multipart field 'product' required" });
+  const buf = await file.toBuffer();
+  const publicId = randomBytes(9).toString("hex");
+  await db.saveAsset(product, publicId, file.filename || "intro.pdf", file.mimetype || "application/pdf", buf);
+  await agent.refreshKb();
+  log({ at: "assets", msg: "intro file saved", product, publicId, size: buf.length });
+  return { product, publicId, filename: file.filename };
 });
 
 // Portal takeover toggle: human=true mutes the agent for this chat; false resumes it.
