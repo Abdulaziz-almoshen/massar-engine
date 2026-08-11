@@ -167,12 +167,16 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // capability ladder if the richer shapes are rejected).
       const BTNS = [{ title: "أرغب بعرض تعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
+      // Fallback fires ONLY when Gupshup answered and rejected the rich shape ("gupshup <status>:").
+      // Ambiguous transport failures rethrow — retrying there risks a double delivery.
+      const rejectedShape = (e: unknown) => String(e).includes("gupshup ");
       const asset = introAsset;
       if (asset) {
         try {
           await gupshup.sendQuickReplyDocument(phone, asset.url, asset.filename, personalized, BTNS);
           tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]${btnNote}`);
-        } catch {
+        } catch (e) {
+          if (!rejectedShape(e)) throw e;
           await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
           tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]`);
         }
@@ -180,7 +184,8 @@ app.post("/admin/campaign/launch", async (req, reply) => {
         try {
           await gupshup.sendQuickReply(phone, personalized, BTNS);
           tracker.recordAgentReply(phone, `${personalized}${btnNote}`);
-        } catch {
+        } catch (e) {
+          if (!rejectedShape(e)) throw e;
           await gupshup.sendText(phone, personalized);
           tracker.recordAgentReply(phone, personalized);
         }
