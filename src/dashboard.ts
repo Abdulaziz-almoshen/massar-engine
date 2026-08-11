@@ -527,7 +527,7 @@ window.paUpload = async (input) => {
   if (!f) return;
   const st = document.getElementById("pastat");
   st.innerHTML = '<span class="chip c-warn">جارٍ رفع الملف…</span>';
-  const fd = new FormData(); fd.append("file", f); fd.append("product", input.dataset.product || "");
+  const fd = new FormData(); fd.append("product", input.dataset.product || ""); fd.append("file", f);
   try {
     const r = await fetch("/admin/product-asset/upload", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
     const d = await r.json();
@@ -544,9 +544,10 @@ window.kbUpload = async (input) => {
   if (!f) return;
   const st = document.getElementById("kbstat");
   st.innerHTML = '<span class="chip c-warn">جارٍ التحليل والاستخراج… قد يستغرق دقيقة</span>';
-  const fd = new FormData(); fd.append("file", f);
   const scoped = input.dataset.product || "";
-  if (scoped) fd.append("product", scoped);
+  const fd = new FormData();
+  if (scoped) fd.append("product", scoped);   // field MUST precede the file in the multipart stream
+  fd.append("file", f);
   try {
     const r = await fetch("/admin/kb/upload", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
     const d = await r.json();
