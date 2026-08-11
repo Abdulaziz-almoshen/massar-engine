@@ -1,9 +1,7 @@
 import OpenAI from "openai";
 import { cfg } from "./config.js";
 import * as db from "./db.js";
-// pdf-parse's index.js runs debug code when it thinks it's the entry module — import the lib directly.
-// @ts-ignore — no types for the direct lib path
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { PDFParse } from "pdf-parse";
 
 // ---------------------------------------------------------------------------
 // Product Hub pipeline: uploaded sales pitch-deck PDF → text → LLM extraction →
@@ -34,8 +32,13 @@ const EXTRACT_SYSTEM = [
 ].join("\n");
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-  const parsed = await pdfParse(buffer);
-  return String(parsed.text || "").trim();
+  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+  try {
+    const result = await parser.getText();
+    return String(result.text || "").trim();
+  } finally {
+    await parser.destroy().catch(() => {});
+  }
 }
 
 export async function processDeck(buffer: Buffer, filename: string):
