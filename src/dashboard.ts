@@ -544,11 +544,20 @@ function vKmonDetail(id, d) {
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
   const base = Math.max(1, st.targeted);
   const pct = (v) => Math.round(v / base * 100);
-  let h = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">' +
-    '<a href="#kmon" style="font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;">→ كل الحملات</a>' +
-    '<div style="flex:1;min-width:0;"><span style="font-size:16px;font-weight:700;color:#101828;">' + esc(camp.name) + '</span>' +
-    '<span style="font-size:11.5px;color:#667085;margin-inline-start:10px;">' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</span></div>" +
-    '<span class="chip c-ok">جارية</span></div>';
+  const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const yieldPer100 = st.targeted ? Math.round(st.interested / st.targeted * 100) : 0;
+  let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#475467;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
+    '<div class="ptitle rise"><div><h1 style="font-size:26px;">' + esc(camp.name) + "</h1>" +
+    '<p>' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</p></div>" +
+    '<div class="acts">' + (campIsTest(camp) ? '<span class="chip c-warn">حملة تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div></div>";
+  h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
+    '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
+    '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
+    (st.replied ? "وصلت إلى " + st.delivered + " جهة، ردّ " + st.replied + " منهم" + (st.interested ? " وأبدى " + st.interested + " اهتمامًا جادًا" : "") + "." : "أُرسلت — بانتظار أول ردّ.") + "</div></div>" +
+    '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
+    [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["مهتمون لكل ١٠٠", yieldPer100]]
+      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + x[1] + '<span style="font-size:14px;color:#9FC0E4;">%</span></div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + "</div></div>").join("") +
+    "</div></div>";
   const cards = [
     ["المستهدفون", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
     ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["مهتمون", st.interested, "#1f8a52"],
