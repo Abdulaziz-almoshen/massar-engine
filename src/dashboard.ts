@@ -196,6 +196,7 @@ let campQ = ""; let campTab = "all"; let campSortKey = "new";   // campaigns lis
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
 let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
+let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
 let campMsg = "مرحبًا {name}، معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
@@ -531,6 +532,7 @@ function vHome(d) {
     '<a href="#customers" class="btn" style="text-decoration:none;color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
     '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">معرفة المنتج</a></div>';
   h += vHomeCharts(cs);
+  h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
     (interestedList.length
@@ -1066,6 +1068,39 @@ function vHomeCharts(cs) {
   h += "</div>";
   return h;
 }
+const DEAL_META = { won: ["صفقة رابحة", "#027A48", "#ECFDF3"], lost: ["خسرناها", "#B42318", "#FEF3F2"], stalled: ["تجمّدت", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
+function vWinLoss() {
+  if (!winloss) return "";
+  const t = winloss.totals || {};
+  const judged = (t.won || 0) + (t.lost || 0) + (t.stalled || 0);
+  let h = '<div class="card" style="margin-bottom:18px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">' +
+    '<h3 style="margin:0;">لماذا نكسب — ولماذا نخسر</h3>' +
+    '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
+    ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + (t[k] || 0) + "</span>").join("") + "</div></div>" +
+    '<div style="font-size:11px;color:#98a2b3;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
+  if (!judged && !(t.active || 0)) {
+    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة رابحة أو خاسرة ستظهر هنا بسببها.</div></div>';
+    return h;
+  }
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
+  h += '<div><div style="font-size:11.5px;font-weight:700;color:#027A48;margin-bottom:9px;">✓ ما يكسب لنا الصفقات</div>' +
+    ((winloss.win_drivers || []).length
+      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F2F4F7;"><span style="flex:1;font-size:12.5px;color:#101828;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + w.count + "</span></div>").join("")
+      : '<div style="font-size:12px;color:#98a2b3;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
+  h += '<div><div style="font-size:11.5px;font-weight:700;color:#B42318;margin-bottom:9px;">✕ ما يخسّرنا الصفقات</div>' +
+    ((winloss.loss_causes || []).length
+      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F2F4F7;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + c.count + "</span></div>" +
+        (c.example ? '<div style="font-size:11.5px;color:#667085;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("")
+      : '<div style="font-size:12px;color:#98a2b3;">لا خسائر محكومة بعد — وهذا خبر جيد.</div>') + "</div>";
+  h += "</div>";
+  if ((winloss.by_product || []).length) {
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F2F4F7;">' +
+      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " رابحة · " + pr.lost + " خاسرة</span>").join("") + "</div>";
+  }
+  h += "</div>";
+  return h;
+}
 const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#7b8597"], none: ["لا إشارة بعد", "#9aa4b4"] };
 function toneBadge(label, color) {
   return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e9edf3;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#3b4657;">' +
@@ -1120,6 +1155,12 @@ function vCustomer(ph) {
     if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#7b8597")).join("") + "</div>";
     if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#3b4657;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
     if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#7b8597;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
+    const dm = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
+      '<span class="chip" style="background:' + dm[2] + ';color:' + dm[1] + ';font-size:12px;padding:6px 14px;">حكم الصفقة: ' + dm[0] + "</span>" +
+      (ins.loss_cause ? '<span class="chip c-bad">السبب: ' + esc(ins.loss_cause) + "</span>" : "") + "</div>" +
+      (ins.evidence ? '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
+      (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
     h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
       '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">الخطوة التالية</div>' +
       '<div style="font-size:13px;font-weight:700;color:#13294b;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
@@ -1189,16 +1230,18 @@ async function refresh(force) {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
       else { cache = await r.json(); document.getElementById("upd").textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
-      const [er, kr, cr, ir] = await Promise.all([
+      const [er, kr, cr, ir, wr] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/insights", { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/intel/winloss", { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
       if (kr.ok) kbDocs = await kr.json();
       if (cr.ok) campaigns = await cr.json();
       if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
+      if (wr.ok) winloss = await wr.json();
       try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
       const curR = (location.hash || "").slice(1).split("/")[0];
       if (curR === "customer") {
