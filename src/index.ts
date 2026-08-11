@@ -116,10 +116,15 @@ app.post("/admin/entities/delete", async (req, reply) => {
 
 app.post("/admin/campaign/launch", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const { targets, message } = (req.body ?? {}) as { targets?: { phone: string; name?: string }[]; message?: string };
+  const { targets, message, name, product } = (req.body ?? {}) as
+    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string };
   if (!Array.isArray(targets) || !targets.length || !message?.trim())
-    return reply.code(400).send({ error: "body: { targets: [{phone,name}], message }" });
+    return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
+  const campName = (name || "").trim() ||
+    `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
+  const campaignId = await db.createCampaign(campName, (product || "").trim(), message, targets.map(t => ({
+    phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })));
   const results: { phone: string; ok: boolean; error?: string }[] = [];
   for (const t of targets) {
     const phone = String(t.phone || "").replace(/\D/g, "");
@@ -138,11 +143,16 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     await new Promise((r) => setTimeout(r, 350));
   }
   const sent = results.filter((r) => r.ok).length;
-  log({ at: "campaign", msg: "launch done", requested: targets.length, sent });
-  return { requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
+  log({ at: "campaign", msg: "launch done", campaignId, name: campName, requested: targets.length, sent });
+  return { campaignId, name: campName, requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
 });
 
 // ------------------------------ product hub (KB uploads) ------------------------------
+
+app.get("/admin/campaigns", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listCampaigns();
+});
 
 app.get("/admin/kb", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });

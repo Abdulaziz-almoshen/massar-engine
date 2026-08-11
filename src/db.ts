@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS entities (
   city       TEXT,
   created_at BIGINT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS campaigns (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  product    TEXT,
+  message    TEXT,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS campaign_targets (
+  campaign_id BIGINT NOT NULL,
+  phone       TEXT NOT NULL,
+  name        TEXT,
+  PRIMARY KEY (campaign_id, phone)
+);
 CREATE TABLE IF NOT EXISTS product_kb (
   product         TEXT PRIMARY KEY,
   md              TEXT NOT NULL,
@@ -213,4 +226,34 @@ export async function saveKb(product: string, md: string, sourceFilename: string
     `INSERT INTO product_kb (product, md, source_filename, updated_at) VALUES ($1,$2,$3,$4)
      ON CONFLICT (product) DO UPDATE SET md = EXCLUDED.md, source_filename = EXCLUDED.source_filename, updated_at = EXCLUDED.updated_at`,
     [product, md, sourceFilename, Date.now()]);
+}
+
+// ------------------------------ campaigns (launches) ------------------------------
+
+export async function createCampaign(name: string, product: string, message: string,
+  targets: { phone: string; name?: string }[]): Promise<number | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(
+    `INSERT INTO campaigns (name, product, message, created_at) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [name, product, message, Date.now()]);
+  const id = Number(r.rows[0].id);
+  for (const t of targets) {
+    await pool.query(
+      `INSERT INTO campaign_targets (campaign_id, phone, name) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+      [id, t.phone, t.name ?? null]);
+  }
+  return id;
+}
+
+export async function listCampaigns(): Promise<{
+  id: number; name: string; product: string | null; message: string | null; created_at: string;
+  targets: { phone: string; name: string | null }[];
+}[]> {
+  if (!pool || !connected) return [];
+  const cs = (await pool.query(`SELECT * FROM campaigns ORDER BY created_at DESC`)).rows;
+  const ts = (await pool.query(`SELECT campaign_id, phone, name FROM campaign_targets`)).rows;
+  return cs.map((c) => ({
+    id: Number(c.id), name: c.name, product: c.product, message: c.message, created_at: c.created_at,
+    targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
+  }));
 }

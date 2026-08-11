@@ -171,7 +171,7 @@ let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const openSet = new Set(); let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; let entSize = ""; let entCity = "";
-let kbDocs = []; let launching = false;
+let kbDocs = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
 const NAV = [
@@ -256,29 +256,30 @@ function funnelData(d) {
   ];
 }
 
-function vKmon(d) {
-  const cs = (d.contacts || []).slice().sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  const fd = funnelData(d); const base = Math.max(1, fd[0][1]);
-  let h = '<div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">' +
-    '<div><div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:6px;">لوحة تحكم الحملة</div>' +
-    '<div style="font-size:18px;font-weight:700;color:#13294b;">حملة الساندبوكس — المساعد البائع</div>' +
-    '<div style="font-size:12px;color:#7b8597;margin-top:6px;">المنتج: الإجازات المرضية · القناة: واتساب · المصدر: <span dir="ltr">+91 78348 11114</span></div></div>' +
-    '<span class="chip c-ok" style="padding:7px 14px;">جارية</span></div>';
-  h += '<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:2px;">' +
-    '<div class="card" style="flex:1 1 380px;min-width:0;"><h3>مسار الحملة</h3>' +
-    fd.map((f, i) => '<div class="fun"><div class="r1"><span class="l">' + f[0] + '</span><span class="m">' + f[1] + " · " + Math.round(f[1] / base * 100) + '%</span></div><div class="track"><div class="fill" style="width:' + Math.max(3, Math.round(f[1] / base * 100)) + '%;background:' + fills[i] + ';"></div></div></div>').join("") +
-    "</div>" +
-    '<div class="card" style="flex:1 1 260px;min-width:0;"><h3>أداء المساعد</h3>' +
-    [["ردود المساعد", (d.counters || {}).agent_reply || 0], ["رسائل واردة", (d.counters || {}).inbound || 0], ["اهتمامات مسجلة", (d.counters || {}).tag || 0], ["تحويلات لمختص", (d.counters || {})["outcome:handoff"] || 0]]
-      .map((x) => '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #f4f6f9;"><span style="font-size:11.5px;color:#7b8597;">' + x[0] + '</span><span style="font-size:12.5px;font-weight:700;color:#13294b;">' + x[1] + "</span></div>").join("") +
-    "</div></div>";
-  h += '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>';
-  if (!cs.length) h += '<div style="padding:44px 20px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا محادثات بعد — أرسل رسالة واتساب إلى <b dir="ltr" style="color:#13294b">+91 78348 11114</b> وستظهر هنا مباشرة.</div>';
-  cs.forEach((c) => {
+function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((c) => c.phone === phone); }
+function seenOf(c) { const st = (c && c.statusTimes) || {}; return Boolean(st.read || st.replied); }
+function campStats(camp) {
+  const cs = camp.targets.map((t) => contactByPhone(t.phone)).filter(Boolean);
+  return {
+    targeted: camp.targets.length,
+    sent: cs.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
+    delivered: cs.filter((c) => (c.statusTimes || {}).delivered).length,
+    seen: cs.filter(seenOf).length,
+    replied: cs.filter((c) => (c.statusTimes || {}).replied).length,
+    interested: cs.filter((c) => c.outcome === "interested").length,
+    failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
+  };
+}
+function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
+function contactRowsHtml(rows) {
+  let h = "";
+  rows.forEach((r) => {
+    const c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
+    const nm = c.waName || r.name || "غير معروف";
     const last = (c.transcript || [])[(c.transcript || []).length - 1];
     const open = openSet.has(c.phone);
     h += '<div class="trow' + (open ? " open" : "") + '" onclick="tog(\\'' + esc(c.phone) + '\\')">' +
-      '<div class="cust"><div class="av">' + esc((c.waName || "؟").trim().charAt(0)) + '</div><div><div class="nm">' + esc(c.waName || "غير معروف") + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
+      '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + "</div>" +
       '<div class="lastm">' + esc(last ? last.text : "—") + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
@@ -286,7 +287,74 @@ function vKmon(d) {
     h += '<div class="thread">' + (c.transcript || []).map((t) =>
       '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>";
   });
-  h += "</div>";
+  return h;
+}
+window.setCampFilter = (f) => { campFilter = f; render(false); };
+
+function vKmon(d) {
+  const inCamp = new Set(); campaigns.forEach((c) => c.targets.forEach((t) => inCamp.add(t.phone)));
+  let h = '<div class="sec">الحملات <span class="meta">' + campaigns.length + ' حملة · اضغط حملة لفتح لوحتها</span></div>';
+  if (!campaigns.length) {
+    h += '<div class="empty" style="padding:44px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#2E7D77;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه.</div></div>';
+  } else {
+    h += '<div class="tblwrap"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:760px;">' +
+      '<div style="display:grid;grid-template-columns:1.9fr 1.2fr .9fr .8fr repeat(5,.62fr);gap:10px;padding:12px 18px;background:#f8fafc;border-bottom:1px solid #eef1f5;font-size:11px;font-weight:700;color:#7b8597;">' +
+      '<div>اسم الحملة</div><div>المنتج</div><div>البدء</div><div>الحالة</div><div style="text-align:center;">مستهدفون</div><div style="text-align:center;">وصلت</div><div style="text-align:center;">شوهدت</div><div style="text-align:center;">ردّوا</div><div style="text-align:center;">مهتمون</div></div>';
+    campaigns.forEach((c) => {
+      const st = campStats(c);
+      h += '<div onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:1.9fr 1.2fr .9fr .8fr repeat(5,.62fr);gap:10px;align-items:center;padding:13px 18px;border-bottom:1px solid #f3f5f8;cursor:pointer;" onmouseover="this.style.background=\\'#fafbfd\\'" onmouseout="this.style.background=\\'\\'">' +
+        '<div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.name) + "</div>" +
+        '<div style="font-size:11.5px;color:#5b6678;">' + esc(c.product || "—") + "</div>" +
+        '<div style="font-size:11.5px;color:#7b8597;">' + fmtD(c.created_at) + "</div>" +
+        '<div><span class="chip c-ok">جارية</span></div>' +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.targeted + "</div>" +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2F5F94;">' + st.delivered + "</div>" +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2E7D77;">' + st.seen + "</div>" +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.replied + "</div>" +
+        '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#1f8a52;">' + st.interested + "</div></div>";
+    });
+    h += "</div></div></div>";
+  }
+  const organic = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
+    .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
+  if (organic.length) {
+    h += '<div class="sec" style="margin-top:22px;">محادثات خارج الحملات <span class="meta">' + organic.length + ' — انضموا للساندبوكس مباشرة</span></div>' +
+      '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+      contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) + "</div>";
+  }
+  return h;
+}
+
+function vKmonDetail(id, d) {
+  const camp = campaigns.find((x) => String(x.id) === String(id));
+  if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#2E7D77;font-weight:700;">→ كل الحملات</a></div></div>';
+  const st = campStats(camp);
+  const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
+  const filters = [
+    ["all", "الكل", rows.length, (r) => true],
+    ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
+    ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
+    ["interested", "مهتمون ⭐", st.interested, (r) => r.contact && r.contact.outcome === "interested"],
+    ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
+  ];
+  const active = filters.find((f) => f[0] === campFilter) || filters[0];
+  const shown = rows.filter(active[3]);
+  let h = '<a href="#kmon" onclick="campFilter=\\'all\\'" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>';
+  h += '<div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">' +
+    '<div><div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:6px;">لوحة تحكم الحملة</div>' +
+    '<div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(camp.name) + "</div>" +
+    '<div style="font-size:12px;color:#7b8597;margin-top:6px;">' + (camp.product ? "المنتج: " + esc(camp.product) + " · " : "") + "القناة: واتساب · البدء: " + fmtD(camp.created_at) + " · " + st.targeted + ' مستهدف</div></div>' +
+    '<span class="chip c-ok" style="padding:7px 14px;">جارية</span></div>';
+  const base = Math.max(1, st.targeted);
+  const fd = [["العملاء المستهدفون", st.targeted], ["تم إرسال الرسائل", st.sent], ["تم التسليم", st.delivered], ["تمت المشاهدة", st.seen], ["تم الرد", st.replied], ["العملاء المهتمون", st.interested]];
+  h += '<div class="card"><h3>مسار الحملة</h3>' +
+    fd.map((f, i) => '<div class="fun"><div class="r1"><span class="l">' + f[0] + '</span><span class="m">' + f[1] + " · " + Math.round(f[1] / base * 100) + '%</span></div><div class="track"><div class="fill" style="width:' + Math.max(3, Math.round(f[1] / base * 100)) + '%;background:' + fills[i] + ';"></div></div></div>').join("") + "</div>";
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 2px 12px;">' +
+    filters.map((f) => '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
+      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
+      '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") + "</div>";
+  h += '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج لهذا الفلتر</div>') + "</div>";
   return h;
 }
 
@@ -323,6 +391,7 @@ window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); r
 window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
 window.entClear = () => { entSel.clear(); render(false); };
 window.campMsgSet = (el) => { campMsg = el.value; };
+window.campNameSet = (el) => { campName = el.value; };
 window.pick = (i) => { selProd = i; render(false); };
 window.openLaunch = () => { if (!entSel.size || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
 window.closeLaunch = () => { const m = document.getElementById("lmodal"); if (m) m.style.display = "none"; };
@@ -333,13 +402,13 @@ window.confirmLaunch = async () => {
   try {
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: campMsg }) });
+      body: JSON.stringify({ targets, message: campMsg, name: campName, product: PRODUCTS[selProd].n }) });
     const d = await r.json();
     launching = false; closeLaunch();
     if (!r.ok) { alertBar("فشل الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
-    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — تابع الحالة الآن في متابعة الحملات", false);
-    entSel.clear();
-    setTimeout(() => { location.hash = "kmon"; refresh(); }, 1200);
+    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — افتحنا لك لوحة الحملة", false);
+    entSel.clear(); campName = "";
+    setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) { launching = false; closeLaunch(); alertBar("خطأ في الإطلاق", true); }
 };
 window.alertBar = (txt, bad) => {
@@ -397,6 +466,10 @@ function vAimkt() {
     '<div class="wa-prev"><div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div></div></div></div></div>';
 
   const can = selN > 0 && campMsg.trim();
+  h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+    '<label style="font-size:12.5px;font-weight:700;color:#13294b;flex:none;">اسم الحملة</label>' +
+    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(PRODUCTS[selProd].n) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#13294b;border:1.5px solid #e9edf3;border-radius:11px;padding:11px 14px;">' +
+    "</div>";
   h += '<div class="step" style="text-align:center;">' +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:15px;padding:16px 34px;" onclick="openLaunch()">🚀 إطلاق الحملة إلى ' + selN + " مستهدف</button>" +
     '<div style="font-size:11.5px;color:#9aa4b4;margin-top:12px;">قناة الساندبوكس: يستلم فعليًا من انضم للرقم التجريبي فقط — البقية تظهر حالتهم «فشل الإرسال» بشفافية. الإطلاق بالقوالب الرسمية يأتي مع رقم الأعمال الإنتاجي.</div></div>';
@@ -570,7 +643,8 @@ function render(fetchNew) {
   if (cur === "kmon" || cur === "home") {
     if (!TOKEN) return gate();
     if (!cache) return; // first fetch pending
-    b.innerHTML = cur === "kmon" ? vKmon(cache) : vHome(cache);
+    const campId = cur === "kmon" ? (location.hash || "").split("/")[1] || "" : "";
+    b.innerHTML = cur === "kmon" ? (campId ? vKmonDetail(campId, cache) : vKmon(cache)) : vHome(cache);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
@@ -587,12 +661,14 @@ async function refresh(force) {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
       else { cache = await r.json(); document.getElementById("upd").textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
-      const [er, kr] = await Promise.all([
+      const [er, kr, cr] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
       if (kr.ok) kbDocs = await kr.json();
+      if (cr.ok) campaigns = await cr.json();
     } catch (e) { /* keep last view */ }
   }
   render(true);
