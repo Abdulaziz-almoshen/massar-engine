@@ -1245,8 +1245,8 @@ function vCustomer(ph) {
     '<button id="insbtn" class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="refreshInsights()">تحديث قراءة المساعد ↻</button></div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد
-  h += '<div class="card" style="margin:0;background:#F4FBFA;border-color:#B9E4E0;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;color:#2E7D77;">⁂ فهم المساعد</h3>' + toneBadge(im[0], im[1]) + "</div>";
+  h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;color:#1F4470;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3>" + toneBadge(im[0], im[1]) + "</div>";
   if (ins.learning) {
     h += '<div style="font-size:13px;color:#475467;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
       ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>" : "") +
