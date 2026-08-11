@@ -57,7 +57,7 @@ export function contextScore(c: Contact, entity: EntityRow | null): { score: num
     { label: "ردّ على حملة", got: Boolean((c.statusTimes || {}).replied || inbound >= 1), pts: 10 },
     { label: "اهتمام موسوم", got: (c.tags || []).length > 0, pts: 15 },
     { label: "نشاط خلال ٣ أيام", got: Date.now() - (c.lastEventAt || 0) < 72 * 3600e3, pts: 10 },
-    { label: "استلم الملف التعريفي", got: (c.transcript || []).some((t) => t.text.includes("أُرسل الملف التعريفي") || t.text.includes("[مرفق:")), pts: 10 },
+    { label: "استلم الملف التعريفي", got: (c.transcript || []).some((t) => t.text.includes("أُرسل الملف التعريفي") || t.text.includes("[مرفق")), pts: 10 },
   ];
   return { score: parts.reduce((s, p) => s + (p.got ? p.pts : 0), 0), parts };
 }
@@ -68,7 +68,7 @@ export function buildTimeline(c: Contact): { ts: number; kind: string; title: st
   for (const t of c.transcript || []) {
     if (t.role === "customer") ev.push({ ts: t.ts, kind: "in", title: t.text.slice(0, 90), meta: "واتساب · وارد" });
     else if (t.role === "agent") {
-      const isFile = t.text.includes("[مرفق:") || t.text.includes("أُرسل الملف التعريفي");
+      const isFile = t.text.includes("[مرفق") || t.text.includes("أُرسل الملف التعريفي");
       const isCamp = t.text.includes("[أزرار:");
       ev.push({ ts: t.ts, kind: isFile ? "file" : isCamp ? "camp" : "out", title: t.text.slice(0, 90), meta: isCamp ? "حملة" : isFile ? "ملف" : "المساعد" });
     } else ev.push({ ts: t.ts, kind: "sys", title: t.text.slice(0, 90), meta: "نظام" });

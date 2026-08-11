@@ -957,7 +957,7 @@ function vKbProduct(name) {
     '<span class="chip c-bad">خاسرة ' + ((wlProd && wlProd.lost) || 0) + "</span>" +
     '<span class="chip c-blue">نشطة ' + ((wlProd && wlProd.active) || 0) + "</span></div>" +
     (prodCauses.length ? '<div style="font-size:11.5px;color:#B42318;margin-top:8px;font-weight:600;">أبرز سبب خسارة: ' + esc(prodCauses[0].cause) + "</div>" : "") + "</div>" +
-    '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-teal" onclick="launchWithProduct(\\'' + esc(name) + '\\')">أطلق حملة بهذا المنتج ←</button></div></div>';
+    '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-teal" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذا المنتج ←</button></div></div>';
   const pa = prodAssets.find((a) => a.product === name);
   h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
     (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
@@ -1399,13 +1399,12 @@ function render(fetchNew) {
   }
 }
 
-const _seenCounts = new WeakSet();
+const _countedValues = new Map();   // label+value signature → animated once per real change
 function countUp() {
   if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   document.querySelectorAll(".kpi .v, .statc .v").forEach((el) => {
-    if (_seenCounts.has(el)) return;
-    _seenCounts.add(el);
     const raw = el.textContent.trim();
+    if (_countedValues.get(el.parentElement ? el.parentElement.textContent.trim() : raw) === raw) return;
     const m = raw.match(/^[\d,٠-٩]+/);
     if (!m) return;
     const target = parseInt(m[0].replace(/[^\d]/g, ""), 10);
@@ -1418,6 +1417,7 @@ function countUp() {
       el.textContent = Math.round(target * eased).toLocaleString("ar-SA-u-nu-latn") + rest;
       if (k < 1) requestAnimationFrame(step);
     };
+    _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
     el.textContent = "0" + rest;
     requestAnimationFrame(step);
   });

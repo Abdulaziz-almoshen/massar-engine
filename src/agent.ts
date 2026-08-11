@@ -398,10 +398,16 @@ const OPT_OUT_EXPLICIT = [
   /\bunsubscribe\b|\bremove\s+me\b|\bstop\s+messag/i,
 ];
 const OPT_OUT_BARE = /^(إيقاف|ايقاف|أوقف|اوقف|توقف|stop|Stop|STOP|quit|cancel|unsubscribe|الغاء|إلغاء|حظر)[\s!.،؛]*$/;
+// Command + messaging-object within a short span: «أوقفوا الرسائل», «توقفوا عن مراسلتي»,
+// «كفى رسائل», «stop all messages» — while «كيف أوقف التزوير؟» stays out (no messaging noun).
+const OPT_OUT_PROXIMITY = /(اوقف|أوقف|وقفوا|وقف|توقف|توقفوا|كفى|بلاش|بطلوا|امتنعوا).{0,15}(رسائل|رسايل|مراسل|الرسال|ارسال|إرسال|واتس)/;
+const OPT_OUT_NEGATION = /(لا|ما|مو|مب)\s*(اريد|أريد|ابي|أبي|ابغى|أبغى|احتاج|أحتاج|رغبه|رغبة).{0,12}(رسائل|رسايل|مراسل|تواصل)/;
+const OPT_OUT_EN = /\bstop\b[\w\s]{0,14}(messag|sending|sms|text)|\bno\s+more\s+(messag|text|sms)/i;
 function isOptOut(text: string): boolean {
   const t = text.replace(/[ً-ٟـ]/g, "").trim();
-  if (OPT_OUT_BARE.test(t)) return true;                 // the message IS the command
-  return OPT_OUT_EXPLICIT.some((p) => p.test(t));        // or an unambiguous request
+  if (OPT_OUT_BARE.test(t)) return true;                     // the message IS the command
+  if (OPT_OUT_EXPLICIT.some((p) => p.test(t))) return true;  // unambiguous request
+  return OPT_OUT_PROXIMITY.test(t) || OPT_OUT_NEGATION.test(t) || OPT_OUT_EN.test(t);
 }
 
 // ------------------------------ main turn loop ------------------------------
@@ -426,6 +432,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   if (convTurns >= MAX_AGENT_TURNS) {
     if (contact.outcome !== "handoff") {
       tracker.setOutcome(contact.phone, "handoff", "turn cap reached — human continues");
+      void notifyLead(contact, "handoff", (contact.tags || [])[0]?.product ?? "غير محدد", "بلغ الحد الأقصى للمحادثة الآلية");
       await safeSend(contact.phone, "شكرًا لتفاعلك — سيتولى أحد مختصينا إكمال الحديث معك مباشرة قريبًا بإذن الله.");
     }
     return;
@@ -463,8 +470,10 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
           // Tools that ARE the message (file with caption, buttons) own the bubble for this
           // turn — enforced in code, because the model was observed ignoring the prompt rule
           // and appending a second bubble to a live thread.
-          if (tc.function.name === "send_asset" || tc.function.name === "send_buttons") sentOwnBubble = true;
           const result = await execTool(contact, tc.function.name, args);
+          // Only a tool that ACTUALLY sent a bubble owns the turn — a not-found asset must
+          // still be answered in text, never with silence.
+          if ((tc.function.name === "send_asset" || tc.function.name === "send_buttons") && /^أُرسل/.test(result)) sentOwnBubble = true;
           messages.push({ role: "tool", tool_call_id: tc.id, content: result });
         }
         continue;
