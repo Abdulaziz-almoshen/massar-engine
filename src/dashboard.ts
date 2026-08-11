@@ -807,8 +807,10 @@ function vAimkt() {
     '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
     '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
     '<div class="wa-prev">' +
-    (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.75);border-radius:9px;padding:9px 11px;margin-bottom:8px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
-    '<div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div>' +
+    '<div class="b" style="padding:0;overflow:hidden;">' +
+    (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.05);padding:11px 12px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
+    '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + "</div></div>" +
+    '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
     ["أرغب بعرض تعريفي", "أرسلوا التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
     "</div></div>" +
@@ -1349,12 +1351,36 @@ function render(fetchNew) {
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
+  countUp();
   if (afId) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
   }
 }
 
+const _seenCounts = new WeakSet();
+function countUp() {
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll(".kpi .v, .statc .v").forEach((el) => {
+    if (_seenCounts.has(el)) return;
+    _seenCounts.add(el);
+    const raw = el.textContent.trim();
+    const m = raw.match(/^[\d,٠-٩]+/);
+    if (!m) return;
+    const target = parseInt(m[0].replace(/[^\d]/g, ""), 10);
+    if (!isFinite(target) || target <= 0 || target > 100000) return;
+    const rest = raw.slice(m[0].length);
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 620);
+      const eased = 1 - Math.pow(1 - k, 3);
+      el.textContent = Math.round(target * eased).toLocaleString("ar-SA-u-nu-latn") + rest;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    el.textContent = "0" + rest;
+    requestAnimationFrame(step);
+  });
+}
 async function refresh(force) {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (TOKEN) {
