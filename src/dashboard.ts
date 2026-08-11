@@ -1461,6 +1461,15 @@ async function refresh(force) {
   render(true);
   renderConvo();
 }
+window.setOutcome = async (btn) => {
+  try {
+    const r = await fetch("/admin/contact/outcome", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: btn.dataset.ph, outcome: btn.dataset.out }) });
+    if (!r.ok) { alertBar("تعذّر تسجيل النتيجة (" + r.status + ")", true); return; }
+    alertBar("سُجّلت النتيجة ✓ — تدخل ضمن قياس أثر الحملات", false);
+    await refresh();
+  } catch (e) { alertBar("تعذّر الاتصال بالخادم", true); }
+};
 window.refreshInsights = async () => {
   if (!profilePhone) return;
   const el = document.getElementById("insbtn");

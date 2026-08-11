@@ -280,6 +280,20 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   };
 });
 
+// Human-confirmed outcome — the loop-closer that turns AI verdicts into countable results.
+app.post("/admin/contact/outcome", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { phone, outcome } = (req.body ?? {}) as { phone?: string; outcome?: string };
+  const allowed = ["meeting_booked", "quote_sent", "postponed", "not_a_fit", "clear"];
+  if (!phone || !allowed.includes(String(outcome))) {
+    return reply.code(400).send({ error: "body: { phone, outcome: meeting_booked|quote_sent|postponed|not_a_fit|clear }" });
+  }
+  const p = String(phone).replace(/\D/g, "");
+  tracker.recordSystem(p, outcome === "clear" ? "[أُزيلت النتيجة البشرية]" : `[نتيجة بشرية: ${outcome}]`);
+  db.insertEvent(p, "human_outcome", String(outcome), Date.now());
+  return { status: "ok" };
+});
+
 // Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.
 app.post("/admin/contact/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
