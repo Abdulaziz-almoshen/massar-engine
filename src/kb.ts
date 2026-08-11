@@ -53,7 +53,7 @@ export async function extractDocText(buffer: Buffer, filename: string): Promise<
   }
 }
 
-export async function processDeck(buffer: Buffer, filename: string):
+export async function processDeck(buffer: Buffer, filename: string, productOverride?: string):
   Promise<{ product: string; md: string; chars: number }> {
   const { text, via } = await extractDocText(buffer, filename);
   if (text.length < 80) throw new Error("document text too short — is this a scanned/image-only file?");
@@ -73,7 +73,7 @@ export async function processDeck(buffer: Buffer, filename: string):
   const raw = completion.choices[0]?.message?.content ?? "{}";
   let parsed: { product?: string; md?: string } = {};
   try { parsed = JSON.parse(raw); } catch { throw new Error("extraction did not return valid JSON"); }
-  const product = (parsed.product || "").trim();
+  const product = (productOverride || parsed.product || "").trim();
   const md = (parsed.md || "").trim();
   if (!product || !md) throw new Error("extraction returned empty product/md");
 

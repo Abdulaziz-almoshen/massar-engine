@@ -154,8 +154,11 @@ app.post("/admin/kb/upload", async (req, reply) => {
   const file = await (req as any).file();
   if (!file) return reply.code(400).send({ error: "multipart file required" });
   const buf = await file.toBuffer();
+  // Optional multipart field "product": scope the upload to an existing product page
+  // (overrides the extracted name so the doc lands under the product the user is viewing).
+  const productOverride = String((file.fields?.product as any)?.value ?? "").trim() || undefined;
   try {
-    const out = await kb.processDeck(buf, file.filename || "deck.pdf");
+    const out = await kb.processDeck(buf, file.filename || "deck.pdf", productOverride);
     await agent.refreshKb();
     return out;
   } catch (e) {

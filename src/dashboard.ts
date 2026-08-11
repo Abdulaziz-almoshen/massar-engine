@@ -192,6 +192,14 @@ const TITLES = {
   targets: ["المستهدفات", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
+const PRODUCTS_FULL = [
+  { n: "الإجازات المرضية", pitch: "إصدار وإدارة الإجازات المرضية إلكترونيًا بتوثيق رسمي معتمد وتكامل HIS/ERP — التفعيل خلال 5 أيام عمل.", eff: ["زمن الإصدار ↓70%", "لا إدخال مزدوج", "توثيق فوري"], best: ["مجمعات طبية", "مراكز", "مستشفيات", "أسنان"], pricing: "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا" },
+  { n: "فحص الموظفين", pitch: "فحوصات اللياقة الطبية بقوالب معتمدة وتقارير جماعية وربط بملف الموظف.", eff: ["امتثال بلا أوراق", "تقارير بضغطة"], best: ["مستشفيات", "مجمعات", "كثافة توظيف"], pricing: "سنوي لكل فحص — يحدده المختص" },
+  { n: "التقارير الطبية", pitch: "تقارير معتمدة إلكترونيًا بتوقيع رقمي وأرشفة مركزية.", eff: ["دقائق بدل أيام", "أرشيف مركزي"], best: ["مراكز", "مختبرات", "عيادات"], pricing: "سنوي حسب الحجم — يحدده المختص" },
+  { n: "خدمات التطعيمات", pitch: "إدارة وتوثيق التطعيمات بسجل موحّد وتنبيهات جرعات.", eff: ["توثيق لحظي", "تنبيهات آلية"], best: ["مراكز صحية", "صيدليات"], pricing: "سنوي — يحدده المختص" },
+  { n: "الشهادات الصحية", pitch: "إصدار فوري للشهادات الصحية بتحقق QR وسجل مركزي.", eff: ["إصدار فوري", "تحقق QR"], best: ["صيدليات", "مراكز"], pricing: "سنوي — يحدده المختص" },
+  { n: "تكامل الأنظمة (HIS/ERP)", pitch: "ربط خدمات لِين بأنظمة المنشأة — تنفيذ خلال أسبوعين.", eff: ["لا إدخال مزدوج", "أسبوعان تنفيذ"], best: ["مستشفيات", "مجمعات كبيرة"], pricing: "مشروع + اشتراك — يحدده المختص" },
+];
 const PRODUCTS = [
   { n: "الإجازات المرضية", sc: 92, gaps: [] },
   { n: "فحص الموظفين", sc: 74, gaps: ["أسئلة شائعة", "مواد معتمدة"] },
@@ -213,7 +221,7 @@ const KB_SECTIONS = [
 ];
 
 function nav() {
-  const cur = (location.hash || "#kmon").slice(1);
+  const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   document.getElementById("nav").innerHTML = NAV.map((x) => x.grp
     ? '<div class="grp">' + x.grp + "</div>"
     : '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
@@ -419,6 +427,8 @@ window.kbUpload = async (input) => {
   const st = document.getElementById("kbstat");
   st.innerHTML = '<span class="chip c-warn">جارٍ التحليل والاستخراج… قد يستغرق دقيقة</span>';
   const fd = new FormData(); fd.append("file", f);
+  const scoped = input.dataset.product || "";
+  if (scoped) fd.append("product", scoped);
   try {
     const r = await fetch("/admin/kb/upload", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
     const d = await r.json();
@@ -426,35 +436,74 @@ window.kbUpload = async (input) => {
     st.innerHTML = '<span class="chip c-ok">تم — «' + esc(d.product) + '» أصبح ضمن معرفة المساعد ✓</span>';
     const kr = await fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } });
     if (kr.ok) kbDocs = await kr.json();
-    render(false);
+    if (scoped) { render(false); } else { location.hash = "kb/" + encodeURIComponent(d.product); }
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الرفع</span>'; }
   input.value = "";
 };
+
+function kbRegistry() {
+  const hubByName = new Map(kbDocs.map((d) => [d.product, d]));
+  const reg = PRODUCTS.map((p) => ({ name: p.n, sc: p.sc, hub: hubByName.get(p.n) || null, seed: true }));
+  kbDocs.forEach((d) => { if (!reg.some((r) => r.name === d.product)) reg.push({ name: d.product, sc: null, hub: d, seed: false }); });
+  return reg;
+}
+function uploadZone(scopedProduct) {
+  return '<div onclick="kbPick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
+    '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
+    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">' + (scopedProduct ? "ارفع ملف هذا المنتج — PDF أو Word أو PowerPoint" : "أضف منتجًا جديدًا بملفه — PDF أو Word أو PowerPoint") + "</div>" +
+    '<div style="font-size:11.5px;color:#7b8597;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذا المنتج ويقرأه المساعد فورًا" : "<br>يُستخرج اسم المنتج من الملف تلقائيًا") + "</div></div>" +
+    '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
+    '<div id="kbstat" style="margin-top:12px;"></div>';
+}
 function vKb() {
-  let h = '<div class="card"><h3>ارفع عرض المبيعات (Pitch Deck) — يتحوّل لمعرفة يقرأها المساعد</h3>' +
-    '<div onclick="kbPick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;">' +
-    '<div style="width:44px;height:44px;margin:0 auto 14px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">اضغط لاختيار الملف — PDF أو Word أو PowerPoint</div>' +
-    '<div style="font-size:11.5px;color:#7b8597;margin-top:8px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub<br>يُعرض هنا للبشر ويقرأه المساعد في كل محادثة</div></div>' +
-    '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" onchange="kbUpload(this)">' +
-    '<div id="kbstat" style="margin-top:12px;"></div></div>';
-
-  if (kbDocs.length) {
-    h += '<div class="sec">Product Hub — ملفات معتمدة <span class="meta">' + kbDocs.length + ' منتج · يقرأها المساعد الآن</span></div>';
-    kbDocs.forEach((d) => {
-      h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
-        '<div style="font-size:14.5px;font-weight:700;color:#13294b;">' + esc(d.product) + '</div>' +
-        '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">يقرأه المساعد الآن ✓</span>' +
-        (d.source_filename ? '<span style="font-size:10.5px;color:#9aa4b4;direction:ltr;">' + esc(d.source_filename) + "</span>" : "") + "</div></div>" +
-        '<div style="border-top:1px solid #f0f2f6;padding-top:10px;">' + mdRender(d.md) + "</div></div>";
-    });
+  const reg = kbRegistry();
+  const tone = (sc) => sc >= 80 ? "#1f8a52" : sc >= 60 ? "#b5810f" : "#c43d3d";
+  let h = '<div class="sec">منتجات المساعد <span class="meta">' + reg.length + ' منتج · اضغط منتجًا لعرض معرفته وإدارتها</span></div>';
+  h += '<div class="prods" style="margin-bottom:20px;">' + reg.map((r) => {
+    const inner =
+      '<div class="pn">' + esc(r.name) + "</div>" +
+      (r.sc !== null
+        ? '<span class="sc" style="color:' + tone(r.sc) + '">' + r.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + r.sc + '%;background:' + tone(r.sc) + ';"></i></div>'
+        : '<div style="height:6px;"></div>') +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
+      (r.hub ? '<span class="chip c-ok">ملف معتمد ✓</span>' : '<span class="chip c-grey">لا ملفات بعد</span>') +
+      '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح ←</span></div>';
+    return '<a href="#kb/' + encodeURIComponent(r.name) + '" style="text-decoration:none;"><div class="prod" style="cursor:pointer;">' + inner + "</div></a>";
+  }).join("") + "</div>";
+  h += '<div class="card"><h3>منتج جديد من ملف</h3>' + uploadZone("") + "</div>";
+  return h;
+}
+function vKbProduct(name) {
+  const reg = kbRegistry();
+  const r = reg.find((x) => x.name === name);
+  if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">منتج غير موجود</div><div class="s"><a href="#kb" style="color:#2E7D77;font-weight:700;">→ كل المنتجات</a></div></div>';
+  const seedP = PRODUCTS_FULL.find((p) => p.n === name);
+  let h = '<a href="#kb" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ كل المنتجات</a>';
+  h += '<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
+    '<div style="width:46px;height:46px;flex:none;border-radius:12px;background:#13294b;display:flex;align-items:center;justify-content:center;color:#3FB6B0;font-weight:700;font-size:20px;">' + esc(name.trim().charAt(0)) + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(name) + "</div>" +
+    '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;">' +
+    (r.hub ? '<span class="chip c-ok">يقرأه المساعد الآن ✓</span>' : '<span class="chip c-warn">بانتظار أول ملف</span>') +
+    (r.sc !== null ? '<span class="chip c-teal">معرفة مدمجة ' + r.sc + "%</span>" : "") +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#9aa4b4;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    "</div></div></div>";
+  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المنتج" : "ارفع أول ملف لهذا المنتج") + "</h3>" + uploadZone(name) + "</div>";
+  if (r.hub) {
+    h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
+      '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
+      '<div style="border-top:1px solid #f0f2f6;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
   }
-
-  const dot = { ok: "#2e9e6b", warn: "#d6a01f", bad: "#d85151" };
-  const chipm = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
-  h += '<div class="sec">المعرفة الأساسية المدمجة <span class="meta">الإجازات المرضية — جاهزية 92%</span></div>' +
-    '<div style="background:#fff;border:1px solid #e9edf3;border-radius:14px;overflow:hidden;">' +
-    KB_SECTIONS.map((x) => '<div class="kbrow"><span class="dt" style="background:' + dot[x[2]] + ';"></span><div class="ti"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div><span class="chip ' + chipm[x[2]][0] + '">' + chipm[x[2]][1] + '</span><span class="ct">' + x[3] + "</span></div>").join("") + "</div>";
+  if (seedP) {
+    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;">' +
+      [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["الأنسب لـ", seedP.best.join("، ")], ["التسعير المسموح ذكره", seedP.pricing]]
+        .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
+  }
+  if (name === "الإجازات المرضية") {
+    const dot = { ok: "#2e9e6b", warn: "#d6a01f", bad: "#d85151" };
+    const chipm = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
+    h += '<div class="card"><h3>جاهزية الأقسام — 92%</h3><div style="border:1px solid #eef1f5;border-radius:12px;overflow:hidden;">' +
+      KB_SECTIONS.map((x) => '<div class="kbrow"><span class="dt" style="background:' + dot[x[2]] + ';"></span><div class="ti"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div><span class="chip ' + chipm[x[2]][0] + '">' + chipm[x[2]][1] + '</span><span class="ct">' + x[3] + "</span></div>").join("") + "</div></div>";
+  }
   return h;
 }
 
@@ -517,7 +566,7 @@ window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); lo
 
 function render(fetchNew) {
   nav();
-  const cur = (location.hash || "#kmon").slice(1);
+  const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   const b = document.getElementById("body");
   if (cur === "kmon" || cur === "home") {
     if (!TOKEN) return gate();
@@ -525,14 +574,15 @@ function render(fetchNew) {
     b.innerHTML = cur === "kmon" ? vKmon(cache) : vHome(cache);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
     if (!TOKEN) return gate();
-    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? vKb() : vCustomers();
+    const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
+    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb()) : vCustomers();
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
 }
 
 async function refresh(force) {
-  const cur = (location.hash || "#kmon").slice(1);
+  const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (TOKEN) {
     try {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
@@ -552,7 +602,7 @@ window.addEventListener("hashchange", () => render(false));
 if (!location.hash) location.hash = "kmon";
 refresh();
 setInterval(async () => {
-  const cur = (location.hash || "#kmon").slice(1);
+  const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (cur === "kmon" || cur === "home") { refresh(); }
   else if (TOKEN) { try { const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } }); if (r.ok) cache = await r.json(); } catch (e) {} }
 }, 5000);
