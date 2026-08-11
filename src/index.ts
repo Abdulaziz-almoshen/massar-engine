@@ -76,7 +76,7 @@ function adminOk(req: any): boolean {
 
 app.get("/admin/state", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  return tracker.snapshot();
+  return { ...tracker.snapshot(), notifyNumber: cfg.notifyNumber };
 });
 
 // ------------------------------ audiences (entities) ------------------------------

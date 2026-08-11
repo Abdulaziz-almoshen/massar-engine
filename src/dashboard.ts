@@ -479,7 +479,8 @@ function vHome(d) {
             (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "") + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">المحادثة ←</span></div>';
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') + "</div>";
+      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
+    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #f0f2f6;font-size:11px;color:#7b8597;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#13294b;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
