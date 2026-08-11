@@ -147,6 +147,15 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   return { campaignId, name: campName, requested: targets.length, sent, failed: results.filter((r) => !r.ok) };
 });
 
+// Portal takeover toggle: human=true mutes the agent for this chat; false resumes it.
+app.post("/admin/contact/human", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { phone, human } = (req.body ?? {}) as { phone?: string; human?: boolean };
+  if (!phone) return reply.code(400).send({ error: "body: { phone, human }" });
+  tracker.setHuman(String(phone).replace(/\D/g, ""), Boolean(human));
+  return { status: "ok" };
+});
+
 // ------------------------------ product hub (KB uploads) ------------------------------
 
 app.get("/admin/campaigns", async (req, reply) => {

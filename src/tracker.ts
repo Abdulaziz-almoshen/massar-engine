@@ -109,10 +109,19 @@ export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: 
   c.outcome = outcome;
   if (reason) c.outcomeReason = reason;
   if (outcome === "opted_out") c.optedOut = true;
-  if (outcome === "handoff") c.human = true;
+  // NOTE: handoff no longer flips `human` — that flag now means "a human is ACTIVELY
+  // handling this chat" and is set only from the portal takeover toggle. A requested
+  // specialist without an active human must never dead-end the customer.
   persist(c);
   bump(`outcome:${outcome}`);
   logEvent(`outcome:${outcome}`, phone, reason ?? "");
+}
+
+export function setHuman(phone: string, human: boolean) {
+  const c = getContact(phone);
+  c.human = human;
+  persist(c);
+  logEvent(human ? "human_takeover" : "agent_resumed", phone, "");
 }
 
 export function snapshot() {

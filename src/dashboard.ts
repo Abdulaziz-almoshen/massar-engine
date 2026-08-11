@@ -240,6 +240,7 @@ function chipRow(c) {
   if (seen) h += '<span class="chip c-teal">شوهدت ✓</span>';
   const oc = { later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "محوّلة لمختص"], opted_out: ["c-bad", "أوقف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
   if (oc) h += '<span class="chip ' + oc[0] + '">' + oc[1] + "</span>";
+  if (c.human) h += '<span class="chip c-warn">المساعد متوقف — بيد البشر</span>';
   if ((c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered) h += '<span class="chip c-bad">فشل الإرسال</span>';
   return h || '<span class="chip c-grey">جديد</span>';
 }
@@ -302,10 +303,19 @@ function contactRowsHtml(rows) {
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
       '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;">' + (open ? "إخفاء" : "عرض المحادثة") + "</div></div>";
     h += '<div class="thread">' + (c.transcript || []).map((t) =>
-      '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>";
+      '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") +
+      '<div style="text-align:center;margin-top:6px;"><button class="btn" style="font-size:11.5px;padding:8px 16px;' +
+      (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
+      '" onclick="event.stopPropagation();setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
+      (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button></div></div>";
   });
   return h;
 }
+window.setHuman = async (phone, val) => {
+  await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
+  alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
+  refresh();
+};
 window.setCampFilter = (f) => { campFilter = f; render(false); };
 
 function vKmon(d) {

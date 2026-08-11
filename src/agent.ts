@@ -176,6 +176,9 @@ function systemPrompt(contact: Contact): string {
     "إيموجي: واحد كحد أقصى في الرسالة، وليس في كل رسالة. 👌 لا زخرفة.",
     "الطول: سطران إلى أربعة. سؤال واحد كحد أقصى. لا خُطب.",
     contact.waName ? `اسم العميل: ${contact.waName} — استخدم اسمه الأول باعتدال.` : "",
+    contact.outcome === "handoff"
+      ? "ملاحظة: سبق إشعار المختص بهذا العميل. تابع خدمته طبيعيًا (رتب العرض التعريفي، أجب أسئلته من المعرفة) ولا تكرر التحويل إلا لسبب جديد."
+      : "",
     "",
     "# قاعدة ذهبية: لا طريق مسدود أبدًا",
     "كل رسالة تنتهي إمّا بسؤال ذكي أو بأزرار (send_buttons). لا ترسل رسالة تُغلق الحوار إلا عند close_conversation.",
@@ -356,7 +359,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
     return;
   }
 
-  if (contact.human) return; // human took over — agent silent
+  if (contact.human) return; // explicit portal takeover only — agent silent while a human drives
 
   if (contact.agentTurns >= MAX_AGENT_TURNS) {
     tracker.setOutcome(contact.phone, "handoff", "turn cap reached");
