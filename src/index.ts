@@ -167,9 +167,9 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // capability ladder if the richer shapes are rejected).
       const BTNS = [{ title: "أرغب بعرض تعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
-      // Fallback fires ONLY when Gupshup answered and rejected the rich shape ("gupshup <status>:").
-      // Ambiguous transport failures rethrow — retrying there risks a double delivery.
-      const rejectedShape = (e: unknown) => String(e).includes("gupshup ");
+      // Fallback fires ONLY on a definitive 4xx shape rejection. 5xx joins transport errors in
+      // the rethrow path — the message MAY have been enqueued, and retrying risks double delivery.
+      const rejectedShape = (e: unknown) => /gupshup 4\d\d:/.test(String(e));
       const asset = introAsset;
       if (asset) {
         try {

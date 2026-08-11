@@ -500,7 +500,7 @@ function vHome(d) {
       ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
           const tg = hotOf(c) || (c.tags || [])[0];
           const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
-          return '<div onclick="openConvo(\\'' + c.phone + '\\')" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
+          return '<div onclick="openConvo(\\'' + esc(c.phone) + '\\')" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
             '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.waName || "غير معروف") + " " +
             (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · جاد 🔥" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا 🤝</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +

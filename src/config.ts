@@ -24,9 +24,10 @@ export const cfg = {
   // Public base URL for serving media to Gupshup.
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "https://massar-engine.fly.dev",
 
-  // The product manager's WhatsApp (digits, country code) — hot leads and handoffs are
-  // pushed here as a lead card. Unset = alerts silently disabled.
-  notifyNumber: process.env.NOTIFY_NUMBER || "",
+  // The product manager's WhatsApp — hot leads and handoffs are pushed here as a lead card.
+  // Digit-stripped at the boundary: the self-alert guard and the PM auto-test-flag both
+  // exact-match against tracker phones, which are always bare digits. Unset = alerts disabled.
+  notifyNumber: (process.env.NOTIFY_NUMBER || "").replace(/\D/g, ""),
 
   // Sales assets the agent may send (images/PDFs). JSON array:
   // [{"id":"sickleave-onepager","type":"document","url":"https://…/x.pdf","filename":"الإجازات-المرضية.pdf","caption":"…"}]

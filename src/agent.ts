@@ -357,7 +357,8 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
     }
     case "tag_interest": {
       const tagProduct = String(args.product ?? PRODUCTS[0].name);
-      const tagLevel = (args.level ?? "warm") as "hot" | "warm" | "cold";
+      const lvlRaw = String(args.level ?? "warm").toLowerCase();
+      const tagLevel = (["hot", "warm", "cold"].includes(lvlRaw) ? lvlRaw : "warm") as "hot" | "warm" | "cold";
       tracker.addTag(contact.phone, tagProduct, tagLevel);
       tracker.setOutcome(contact.phone, "interested");
       if (tagLevel === "hot") void notifyLead(contact, "hot", tagProduct, "مستوى الجدية: جاد 🔥");
