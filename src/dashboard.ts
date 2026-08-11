@@ -244,6 +244,7 @@ const LIST_CAP = 60;   // never render huge audiences — filter/search narrows,
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
 let campQ = ""; let campTab = "all"; let campSortKey = "new";   // campaigns list controls
+let showTestDecided = false;
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
 let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
@@ -443,7 +444,7 @@ window.setCampFilter = (f) => { campFilter = f; render(false); };
 window.campSearchFn = (el) => { campQ = el.value; clearTimeout(window.__cq2); window.__cq2 = setTimeout(() => render(false), 250); };
 window.setCampTab = (t) => { campTab = t; render(false); };
 window.setCampSort = (el) => { campSortKey = el.value; render(false); };
-window.toggleShowTest = () => { showTest = !showTest; render(false); };
+window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; render(false); };
 function campIsTest(cp) {
   return cp.targets.length > 0 && cp.targets.every((t) => { const c = contactByPhone(t.phone); return c && c.test; });
 }
@@ -1178,7 +1179,7 @@ function vHomeCharts(cs) {
   });
   const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · شاملة التجريبية" : " · الحقيقية فقط") + "</span></div>";
+  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات الساندبوكس التجريبية" : " · بيانات حقيقية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
   h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
@@ -1400,6 +1401,10 @@ async function refresh(force) {
       if (cr.ok) campaigns = await cr.json();
       if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
       if (wr.ok) winloss = await wr.json();
+      if (!showTestDecided && cache && (cache.contacts || []).length) {
+        showTestDecided = true;
+        showTest = !(cache.contacts || []).some((c) => !c.test);   // no real contacts → reveal sandbox
+      }
       try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
       const curR = (location.hash || "").slice(1).split("/")[0];
       if (curR === "customer") {
