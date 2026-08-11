@@ -596,16 +596,19 @@ function vHome(d) {
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
   const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
-  let h = '<div class="kpis">' +
-    '<div class="kpi"><div class="k">الحملات الحقيقية</div><div class="v">' + realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <span style="font-size:11px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</span>" : "") + "</div></div>" +
-    '<div class="kpi"><div class="k">المستهدفون</div><div class="v">' + entities.length.toLocaleString("ar-SA") + "</div></div>" +
-    '<div class="kpi"><div class="k">وصلت إليهم الرسائل</div><div class="v" style="color:#2E8F89">' + delivered + "</div></div>" +
-    '<div class="kpi"><div class="k">ردّوا</div><div class="v" style="color:#2F5F94">' + replied + "</div></div>" +
-    '<div class="kpi"><div class="k">مهتمون وجادّون</div><div class="v" style="color:#1f8a52">' + interestedList.length + "</div></div></div>";
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
-    '<a href="#aimkt" style="text-decoration:none;" class="btn btn-teal">+ إنشاء حملة</a>' +
-    '<a href="#customers" class="btn" style="text-decoration:none;color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
-    '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">معرفة المنتج</a></div>';
+  const kpi = (icon, label, value, tint, delta) =>
+    '<div class="kpi rise"><div class="ico" style="background:' + tint[0] + ';color:' + tint[1] + ';">' + ic(icon, 20) + "</div>" +
+    '<div><div class="v">' + value + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
+    (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#667085") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
+  let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
+    '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد مستهدفين</a>" +
+    '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
+  h += '<div class="kpis">' +
+    kpi("send", "الحملات الحقيقية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
+    kpi("users", "المستهدفون", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
+    kpi("check", "وصلت إليهم الرسائل", delivered, ["#E9F7F6", "#1F7A73"]) +
+    kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
+    kpi("flame", "مهتمون وجادّون", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
   h += vHomeCharts(cs);
   h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
@@ -1043,12 +1046,26 @@ function ratesStrip(agg) {
     ["نسبة الردود", pct(agg.replied, agg.delivered), "#2F5F94"],
     ["نسبة الاهتمام", pct(agg.interested, agg.replied), "#1f8a52"],
   ];
-  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">' +
-    cards.map((c) => '<div class="card" style="margin:0;padding:14px 16px;text-align:center;">' +
-      '<div style="font-size:22px;font-weight:700;color:' + c[2] + ';">' + c[1] + '٪</div>' +
-      '<div style="font-size:11px;color:#667085;font-weight:600;margin-top:3px;">' + c[0] + "</div></div>").join("") + "</div>";
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;">' +
+    cards.map((c) => '<div class="card rise" style="margin:0;padding:16px 18px;">' +
+      '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
+      '<div style="font-size:26px;font-weight:700;color:#101828;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + c[1] + '<span style="font-size:14px;color:#98A2B3;">%</span></div>' +
+      '<div style="height:5px;background:#F2F4F7;border-radius:999px;overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:' + Math.min(100, c[1]) + "%;background:" + c[2] + ';border-radius:999px;"></i></div></div>').join("") + "</div>";
 }
-function funnelSvg(rows) {
+function stageBars(rows) {
+  const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
+  return '<div style="margin-top:14px;display:flex;flex-direction:column;gap:11px;">' + rows.map((r, i) => {
+    const w = Math.max(4, Math.round(r[1] / mx * 100));
+    const prev = i > 0 ? rows[i - 1][1] : r[1];
+    const drop = prev > 0 && i > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
+    return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
+      '<span style="font-size:12.5px;font-weight:600;color:#344054;">' + esc(r[0]) + "</span>" +
+      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA-u-nu-latn") +
+      (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + drop + "%</span>" : "") + "</span></div>" +
+      '<div style="height:10px;background:#F2F4F7;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
+  }).join("") + "</div>";
+}
+function funnelSvgUnused(rows) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   const W = 300, segH = 40, gap = 5, H = rows.length * (segH + gap);
   let shapes = "";
@@ -1070,15 +1087,15 @@ function colChart(rows, color) {
   return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
     rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
       '<div style="font-size:11px;font-weight:700;color:#101828;">' + r[1].toLocaleString("ar-SA") + "</div>" +
-      '<div style="width:100%;max-width:46px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:7px 7px 3px 3px;"></div>' +
+      '<div style="width:100%;max-width:44px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:4px 4px 2px 2px;"></div>' +
       '<div style="font-size:10px;color:#667085;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
 }
 function treemapTiles(rows) {
   const total = Math.max(1, rows.reduce((a, r) => a + r[1], 0));
-  const tones = ["#8a5a52", "#a06b60", "#b58177", "#c69a90", "#d4b0a7", "#e0c5bd", "#e9d5cf", "#f0e2dd"];
+  const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#101828"], ["#AFC6DE", "#101828"], ["#D6E2F1", "#101828"], ["#EFF4FB", "#101828"], ["#F9FAFB", "#101828"]];
   return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
-    rows.map((r, i) => '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:74px;border-radius:10px;background:' + tones[i % tones.length] + ';color:#fff;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;">' +
-      '<div style="font-size:11.5px;font-weight:700;">' + esc(String(r[0])) + '</div><div style="font-size:15px;font-weight:700;">' + r[1].toLocaleString("ar-SA") + "</div></div>").join("") + "</div>";
+    rows.map((r, i) => { const tn = tones[i % tones.length]; return '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:78px;border-radius:12px;background:' + tn[0] + ';color:' + tn[1] + ';padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">' +
+      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA-u-nu-latn") + "</div></div>"; }).join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#98A2B3;">' + sub + "</span></div>" + inner + "</div>";
@@ -1131,7 +1148,7 @@ function vHomeCharts(cs) {
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · شاملة التجريبية" : " · الحقيقية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
