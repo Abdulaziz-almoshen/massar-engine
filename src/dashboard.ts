@@ -434,9 +434,9 @@ function vKb() {
   let h = '<div class="card"><h3>ارفع عرض المبيعات (Pitch Deck) — يتحوّل لمعرفة يقرأها المساعد</h3>' +
     '<div onclick="kbPick()" style="border:1.5px dashed #C6D8EE;background:#F8FAFD;border-radius:14px;padding:30px 20px;text-align:center;cursor:pointer;">' +
     '<div style="width:44px;height:44px;margin:0 auto 14px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">اضغط لاختيار ملف PDF</div>' +
-    '<div style="font-size:11.5px;color:#7b8597;margin-top:8px;line-height:1.9;">عرض تقديمي بيعي من مهارة Claude أو أي مصدر — يُحلَّل ويُحفظ Markdown في Product Hub<br>يُعرض هنا للبشر ويقرأه المساعد في كل محادثة</div></div>' +
-    '<input id="kbfile" type="file" accept="application/pdf" style="display:none" onchange="kbUpload(this)">' +
+    '<div style="font-size:13.5px;font-weight:700;color:#13294b;">اضغط لاختيار الملف — PDF أو Word أو PowerPoint</div>' +
+    '<div style="font-size:11.5px;color:#7b8597;margin-top:8px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub<br>يُعرض هنا للبشر ويقرأه المساعد في كل محادثة</div></div>' +
+    '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div></div>';
 
   if (kbDocs.length) {

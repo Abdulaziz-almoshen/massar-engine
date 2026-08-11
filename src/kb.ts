@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { cfg } from "./config.js";
 import * as db from "./db.js";
 import { PDFParse } from "pdf-parse";
+import { toMarkdownBytes } from "@firecrawl/anydoc";
 
 // ---------------------------------------------------------------------------
 // Product Hub pipeline: uploaded sales pitch-deck PDF → text → LLM extraction →
@@ -12,7 +13,7 @@ import { PDFParse } from "pdf-parse";
 const client = new OpenAI({ apiKey: cfg.openaiKey });
 
 const EXTRACT_SYSTEM = [
-  "أنت محلل معرفة منتجات في شركة لِين للصحة الرقمية. ستستلم نص عرض تقديمي (Sales Pitch Deck) مستخرجًا من PDF.",
+  "أنت محلل معرفة منتجات في شركة لِين للصحة الرقمية. ستستلم محتوى عرض تقديمي بيعي (Sales Pitch Deck) مستخرجًا كنص/Markdown من ملف PDF أو Word أو PowerPoint. تجاهل أخطاء تقطيع الحروف العربية الناتجة عن الاستخراج.",
   "مهمتك: استخراج كل المعرفة البيعية وتنظيمها كملف Markdown يقرأه مساعد مبيعات آلي.",
   "قواعد صارمة:",
   "- استخرج فقط ما ورد في النص. لا تخترع أسعارًا أو أرقامًا أو وعودًا غير مذكورة.",
@@ -31,20 +32,31 @@ const EXTRACT_SYSTEM = [
   "## معلومات إضافية (أرقام، مراجع، شهادات، تكاملات)",
 ].join("\n");
 
-export async function extractPdfText(buffer: Buffer): Promise<string> {
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
+/** Primary: Firecrawl AnyDoc (user directive, Aug 11) — 14 formats → GFM markdown,
+ *  format auto-detected from content. Fallback for PDFs: pdf-parse (proven path). */
+export async function extractDocText(buffer: Buffer, filename: string): Promise<{ text: string; via: string }> {
   try {
-    const result = await parser.getText();
-    return String(result.text || "").trim();
-  } finally {
-    await parser.destroy().catch(() => {});
+    const md = await toMarkdownBytes(new Uint8Array(buffer));
+    if (md && md.trim().length >= 80) return { text: md.trim(), via: "anydoc" };
+    throw new Error("anydoc returned too little text");
+  } catch (e) {
+    if (!/\.pdf$/i.test(filename)) throw e;
+    console.error(JSON.stringify({ at: "kb", msg: "anydoc failed — pdf-parse fallback", err: String(e).slice(0, 200) }));
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    try {
+      const result = await parser.getText();
+      return { text: String(result.text || "").trim(), via: "pdf-parse" };
+    } finally {
+      await parser.destroy().catch(() => {});
+    }
   }
 }
 
 export async function processDeck(buffer: Buffer, filename: string):
   Promise<{ product: string; md: string; chars: number }> {
-  const text = await extractPdfText(buffer);
-  if (text.length < 80) throw new Error("PDF text too short — is this a scanned/image-only deck?");
+  const { text, via } = await extractDocText(buffer, filename);
+  if (text.length < 80) throw new Error("document text too short — is this a scanned/image-only file?");
+  console.log(JSON.stringify({ at: "kb", msg: "text extracted", via, chars: text.length, filename }));
   const clipped = text.slice(0, 60_000);
 
   const completion = await client.chat.completions.create({
