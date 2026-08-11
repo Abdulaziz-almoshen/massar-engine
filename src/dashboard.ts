@@ -102,8 +102,20 @@ export const DASHBOARD_HTML = `<!doctype html>
   .cust .ph { font-size: 10.5px; color: #9aa4b4; direction: ltr; text-align: right; }
   .lastm { font-size: 11.5px; color: #7b8597; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tm { font-size: 11px; color: #9aa4b4; font-variant-numeric: tabular-nums; }
-  .thread { display: none; background: #E5DDD4; padding: 16px 20px; border-bottom: 1px solid #f3f5f8; }
-  .open + .thread { display: block; }
+  .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .statc { background: #fff; border: 1px solid #e3e7ee; border-radius: 12px; padding: 13px 15px; }
+  .statc .l { font-size: 11px; color: #7b8597; margin-bottom: 7px; }
+  .statc .v { font-size: 22px; font-weight: 700; color: #13294b; line-height: 1; font-variant-numeric: tabular-nums; }
+  .statc .p { font-size: 10.5px; color: #2E7D77; font-weight: 700; margin-top: 5px; }
+  .statc .mb { height: 4px; background: #eef0f4; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+  .statc .mb i { display: block; height: 100%; border-radius: 999px; }
+  .backdrop { position: fixed; inset: 0; background: rgba(15,37,64,.35); z-index: 69; }
+  .convo { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(420px, 94vw); background: #fff; z-index: 70; display: flex; flex-direction: column; box-shadow: 8px 0 24px rgba(16,38,68,.18); }
+  .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 13px 16px; border-bottom: 1px solid #e3e7ee; }
+  .convo .hd .av { width: 38px; height: 38px; flex: none; border-radius: 10px; background: #13294b; color: #3FB6B0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
+  .convo .msgs { flex: 1; overflow-y: auto; background: #E5DDD4; padding: 16px; }
+  .convo .ft { flex: none; padding: 12px 16px; border-top: 1px solid #e3e7ee; }
+  @media (prefers-reduced-motion: no-preference) { .convo { animation: slideIn .18s ease; } @keyframes slideIn { from { transform: translateX(-30px); opacity: .6; } to { transform: none; opacity: 1; } } }
   .bub { max-width: 76%; border-radius: 11px; padding: 9px 13px; font-size: 12.5px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #13294b; }
   .b-a { background: #DCF8C6; border-top-left-radius: 3px; margin-inline-start: auto; }
   .b-c { background: #fff; border-top-right-radius: 3px; margin-inline-end: auto; }
@@ -294,28 +306,42 @@ function contactRowsHtml(rows) {
     const c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
     const nm = c.waName || r.name || "غير معروف";
     const last = (c.transcript || [])[(c.transcript || []).length - 1];
-    const open = openSet.has(c.phone);
-    h += '<div class="trow' + (open ? " open" : "") + '" onclick="tog(\\'' + esc(c.phone) + '\\')">' +
+    h += '<div class="trow" onclick="openConvo(\\'' + esc(c.phone) + '\\')">' +
       '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + "</div>" +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
       '<div class="lastm">' + esc(last ? last.text : "—") + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
-      '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;">' + (open ? "إخفاء" : "عرض المحادثة") + "</div></div>";
-    h += '<div class="thread">' + (c.transcript || []).map((t) =>
-      '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") +
-      '<div style="text-align:center;margin-top:6px;"><button class="btn" style="font-size:11.5px;padding:8px 16px;' +
-      (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
-      '" onclick="event.stopPropagation();setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
-      (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button></div></div>";
+      '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;">عرض المحادثة ←</div></div>';
   });
   return h;
 }
-window.setHuman = async (phone, val) => {
-  await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
-  alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
-  refresh();
-};
+let convoPhone = null;
+window.openConvo = (p) => { convoPhone = p; renderConvo(); };
+window.closeConvo = () => { convoPhone = null; renderConvo(); };
+function renderConvo() {
+  let el = document.getElementById("convoRoot");
+  if (!el) { el = document.createElement("div"); el.id = "convoRoot"; document.body.appendChild(el); }
+  if (!convoPhone || !cache) { el.innerHTML = ""; return; }
+  const c = (cache.contacts || []).find((x) => x.phone === convoPhone);
+  if (!c) { el.innerHTML = ""; return; }
+  const nm = c.waName || "غير معروف";
+  el.innerHTML = '<div class="backdrop" onclick="closeConvo()"></div>' +
+    '<aside class="convo" role="dialog" aria-label="المحادثة">' +
+    '<div class="hd"><div class="av">' + esc(nm.trim().charAt(0)) + '</div>' +
+    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#13294b;">' + esc(nm) + '</div>' +
+    '<div style="font-size:11px;color:#9aa4b4;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
+    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#9aa4b4;background:#f4f6f9;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
+    '<div style="padding:9px 16px;border-bottom:1px solid #f0f2f6;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
+    '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
+      '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>" +
+    '<div class="ft"><button class="btn" style="width:100%;font-size:12.5px;' +
+    (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
+    '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
+    (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button></div></aside>";
+  const m = document.getElementById("convoMsgs");
+  if (m) m.scrollTop = m.scrollHeight;
+}
 window.setCampFilter = (f) => { campFilter = f; render(false); };
 
 function vKmon(d) {
@@ -352,11 +378,28 @@ function vKmon(d) {
   return h;
 }
 
+let rQ = "";
+window.rSearch = (el) => { rQ = el.value; clearTimeout(window.__rq); window.__rq = setTimeout(() => render(false), 250); };
 function vKmonDetail(id, d) {
   const camp = campaigns.find((x) => String(x.id) === String(id));
   if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#2E7D77;font-weight:700;">→ كل الحملات</a></div></div>';
   const st = campStats(camp);
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
+  const base = Math.max(1, st.targeted);
+  const pct = (v) => Math.round(v / base * 100);
+  let h = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;">' +
+    '<a href="#kmon" style="font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;">→ كل الحملات</a>' +
+    '<div style="flex:1;min-width:0;"><span style="font-size:16px;font-weight:700;color:#13294b;">' + esc(camp.name) + '</span>' +
+    '<span style="font-size:11.5px;color:#7b8597;margin-inline-start:10px;">' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</span></div>" +
+    '<span class="chip c-ok">جارية</span></div>';
+  const cards = [
+    ["المستهدفون", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
+    ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["مهتمون", st.interested, "#1f8a52"],
+  ];
+  h += '<div class="statgrid">' + cards.map((c, i) =>
+    '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + c[1] + "</div>" +
+    '<div class="p">' + (i === 0 ? "&nbsp;" : pct(c[1]) + "% من المستهدفين") + "</div>" +
+    '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
     ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
@@ -365,23 +408,19 @@ function vKmonDetail(id, d) {
     ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
-  const shown = rows.filter(active[3]);
-  let h = '<a href="#kmon" onclick="campFilter=\\'all\\'" style="display:inline-block;font-size:12.5px;font-weight:700;color:#13294b;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>';
-  h += '<div class="card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">' +
-    '<div><div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:6px;">لوحة تحكم الحملة</div>' +
-    '<div style="font-size:18px;font-weight:700;color:#13294b;">' + esc(camp.name) + "</div>" +
-    '<div style="font-size:12px;color:#7b8597;margin-top:6px;">' + (camp.product ? "المنتج: " + esc(camp.product) + " · " : "") + "القناة: واتساب · البدء: " + fmtD(camp.created_at) + " · " + st.targeted + ' مستهدف</div></div>' +
-    '<span class="chip c-ok" style="padding:7px 14px;">جارية</span></div>';
-  const base = Math.max(1, st.targeted);
-  const fd = [["العملاء المستهدفون", st.targeted], ["تم إرسال الرسائل", st.sent], ["تم التسليم", st.delivered], ["تمت المشاهدة", st.seen], ["تم الرد", st.replied], ["العملاء المهتمون", st.interested]];
-  h += '<div class="card"><h3>مسار الحملة</h3>' +
-    fd.map((f, i) => '<div class="fun"><div class="r1"><span class="l">' + f[0] + '</span><span class="m">' + f[1] + " · " + Math.round(f[1] / base * 100) + '%</span></div><div class="track"><div class="fill" style="width:' + Math.max(3, Math.round(f[1] / base * 100)) + '%;background:' + fills[i] + ';"></div></div></div>').join("") + "</div>";
-  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 2px 12px;">' +
-    filters.map((f) => '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
+  const q = rQ.trim();
+  const shown = rows.filter(active[3]).filter((r) => !q || (r.contact && (r.contact.waName || "").includes(q)) || (r.name || "").includes(q) || r.phone.includes(q));
+  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #eef1f5;background:#fff;">' +
+    '<span style="font-size:13px;font-weight:700;color:#13294b;flex:none;">المستهدفون</span>' +
+    '<span style="font-size:11px;color:#9aa4b4;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
+    '<span style="flex:1;"></span>' +
+    filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
-      '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") + "</div>";
-  h += '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج لهذا الفلتر</div>') + "</div>";
+      '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") +
+    '<input value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #e9edf3;border-radius:999px;padding:7px 13px;background:#f8fafc;width:130px;">' +
+    "</div>" +
+    '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
@@ -563,7 +602,7 @@ window.kbUpload = async (input) => {
 function kbRegistry() {
   const hubByName = new Map(kbDocs.map((d) => [d.product, d]));
   const reg = PRODUCTS.map((p) => ({ name: p.n, sc: p.sc, hub: hubByName.get(p.n) || null, seed: true }));
-  kbDocs.forEach((d) => { if (!reg.some((r) => r.name === d.product)) reg.push({ name: d.product, sc: null, hub: d, seed: false }); });
+  kbDocs.forEach((d) => { if (d.product !== "__skill__" && !reg.some((r) => r.name === d.product)) reg.push({ name: d.product, sc: null, hub: d, seed: false }); });
   return reg;
 }
 function uploadZone(scopedProduct) {
@@ -575,9 +614,17 @@ function uploadZone(scopedProduct) {
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
 function vKb() {
+  let h0 = "";
   const reg = kbRegistry();
   const tone = (sc) => sc >= 80 ? "#1f8a52" : sc >= 60 ? "#b5810f" : "#c43d3d";
-  let h = '<div class="sec">منتجات المساعد <span class="meta">' + reg.length + ' منتج · اضغط منتجًا لعرض معرفته وإدارتها</span></div>';
+  const skill = prodAssets.find((a) => a.product === "__skill__");
+  if (skill) {
+    h0 = '<div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#F4FBFA;border-color:#B9E4E0;">' +
+      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#13294b;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
+      '<div style="font-size:11.5px;color:#5b6678;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض المنتجات (PDF) ثم ارفعها هنا في صفحة كل منتج. <span style="direction:ltr;color:#9aa4b4;">' + esc(skill.filename) + '</span></div></div>' +
+      '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
+  }
+  let h = h0 + '<div class="sec">منتجات المساعد <span class="meta">' + reg.length + ' منتج · اضغط منتجًا لعرض معرفته وإدارتها</span></div>';
   h += '<div class="prods" style="margin-bottom:20px;">' + reg.map((r) => {
     const inner =
       '<div class="pn">' + esc(r.name) + "</div>" +
@@ -728,6 +775,7 @@ async function refresh(force) {
     } catch (e) { /* keep last view */ }
   }
   render(true);
+  renderConvo();
 }
 window.addEventListener("hashchange", () => render(false));
 if (!location.hash) location.hash = "kmon";
