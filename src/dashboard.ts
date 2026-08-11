@@ -619,6 +619,7 @@ function vHome(d) {
     kpi("check", "وصلت إليهم الرسائل", delivered, ["#E9F7F6", "#1F7A73"]) +
     kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
     kpi("flame", "مهتمون وجادّون", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
+  h += vActionQueue(cs);
   h += vHomeCharts(cs);
   h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
@@ -1195,6 +1196,45 @@ function vHomeCharts(cs) {
   return h;
 }
 const DEAL_META = { won: ["صفقة رابحة", "#027A48", "#ECFDF3"], lost: ["خسرناها", "#B42318", "#FEF3F2"], stalled: ["تجمّدت", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
+function vActionQueue(cs) {
+  const now = Date.now();
+  const hotIdle = cs.filter((c) => {
+    const ins = insCache[c.phone] || {};
+    const hot = (c.tags || []).some((t) => t.level === "hot") || ins.intent === "high";
+    return hot && (now - (c.lastEventAt || 0)) > 24 * 3600e3 && !c.optedOut;
+  }).sort((a, b) => (a.lastEventAt || 0) - (b.lastEventAt || 0));
+  const seenNoReply = [];
+  campaigns.forEach((cp) => cp.targets.forEach((t) => {
+    const c = contactByPhone(t.phone);
+    if (c && (c.statusTimes || {}).read && !(c.statusTimes || {}).replied && !c.optedOut) seenNoReply.push({ c, cp });
+  }));
+  const stalled = cs.filter((c) => (insCache[c.phone] || {}).deal_state === "stalled");
+  const items = [];
+  hotIdle.slice(0, 3).forEach((c) => {
+    const ins = insCache[c.phone] || {};
+    items.push(["call", "اتصل الآن — عميل جاد يبرد", (c.waName || c.phone) + " · " + Math.round((now - (c.lastEventAt || 0)) / 3600e3) + " ساعة بلا متابعة",
+      ins.next_action || "تواصل مباشرة قبل أن يفتر", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
+  });
+  if (seenNoReply.length) {
+    items.push(["retarget", "فرصة إعادة استهداف", seenNoReply.length + " جهة شاهدت الرسالة ولم تردّ",
+      "أعد استهدافهم بزاوية مختلفة — الاهتمام موجود، الرسالة لم تُقنع", "kmon", "#B54708", "#FFFAEB"]);
+  }
+  stalled.slice(0, 2).forEach((c) => {
+    const ins = insCache[c.phone] || {};
+    items.push(["revive", "صفقة متجمّدة", (c.waName || c.phone) + (ins.loss_cause ? " · " + ins.loss_cause : ""),
+      ins.fix_suggestion || "أعد الإحياء بمعلومة جديدة", "customer/" + c.phone, "#2F5F94", "#EFF4FB"]);
+  });
+  if (!items.length) return "";
+  return '<div class="card rise" style="margin-bottom:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق وقتك الآن</h3>" +
+    '<span class="cntpill">' + items.length + " إجراء</span></div>" +
+    '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">' +
+    items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EAECF0;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
+      '<span style="width:8px;height:8px;border-radius:999px;background:' + it[5] + ';flex:none;"></span>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#101828;">' + it[1] + ' <span style="font-weight:600;color:#667085;">— ' + esc(it[2]) + "</span></div>" +
+      '<div style="font-size:11.5px;color:#475467;margin-top:4px;line-height:1.7;">' + esc(it[3]) + "</div></div>" +
+      '<span style="font-size:12px;font-weight:700;color:' + it[5] + ';flex:none;">افتح ←</span></div>').join("") + "</div></div>";
+}
 function vWinLoss() {
   if (!winloss) return "";
   const t = winloss.totals || {};
