@@ -529,7 +529,8 @@ function vKmon(d) {
 window.exportCampaigns = () => {
   const rows = [["الحملة", "المنتج", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "مهتمون"]];
   campaigns.forEach((c) => { const st = campStats(c); rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]); });
-  const csv = "\\ufeff" + rows.map((r) => r.map((x) => '"' + String(x).replace(/"/g, '""') + '"').join(",")).join("\\n");
+  const safe = (x) => { let v = String(x); if (/^[=+\\-@\\t\\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
+  const csv = "\\ufeff" + rows.map((r) => r.map(safe).join(",")).join("\\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   a.download = "massar-campaigns.csv"; a.click();
