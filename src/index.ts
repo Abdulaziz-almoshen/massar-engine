@@ -261,8 +261,9 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const phone = String((req.params as any).phone || "").replace(/\D/g, "");
   if (!phone) return reply.code(400).send({ error: "phone required" });
-  const snap = tracker.snapshot() as any;
-  const contact = (snap.contacts || []).find((c: any) => c.phone === phone);
+  // Live contact (full transcript) — snapshot caps transcripts at 30 and would freeze
+  // the insight watermark exactly for the most active customers.
+  const contact = tracker.findContact(phone);
   if (!contact) return reply.code(404).send({ error: "لا محادثة لهذا الرقم بعد" });
   const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
   const force = String((req.query as any)?.refresh ?? "") === "1";

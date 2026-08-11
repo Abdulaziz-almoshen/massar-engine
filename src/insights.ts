@@ -12,7 +12,7 @@ import type { EntityRow } from "./db.js";
 // Cached in Postgres keyed by a transcript-length watermark.
 // ---------------------------------------------------------------------------
 
-const client = new OpenAI({ apiKey: cfg.openaiKey });
+const client = new OpenAI({ apiKey: cfg.openaiKey, timeout: 20_000, maxRetries: 1 });
 
 export type Insights = {
   summary: string;
@@ -84,7 +84,9 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   const tags = (c.tags || []).map((t) => `${t.product}:${t.level}`).join(", ") || "لا وسوم";
   const attrs = entity ? Object.entries(entity.attrs).map(([k, v]) => `${k}: ${v}`).join("، ") : "غير مستورد";
   const times = (c.transcript || []).filter((t) => t.role === "customer").slice(-5).map((t) => new Date(t.ts).toISOString()).join(", ");
-  const completion = await client.chat.completions.create({
+  let completion: OpenAI.Chat.Completions.ChatCompletion;
+  try {
+    completion = await client.chat.completions.create({
     model: cfg.openaiModel || "gpt-5.6-terra",
     messages: [
       { role: "system", content: SYSTEM },
@@ -93,6 +95,16 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     response_format: { type: "json_object" },
     ...((cfg.openaiModel || "gpt-5.6-terra").startsWith("gpt-5") ? { reasoning_effort: "none" } : {}),
   } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
+  } catch (e) {
+    console.error(JSON.stringify({ at: "insights", msg: "llm unavailable — degraded read", err: String(e).slice(0, 150) }));
+    // Degraded, NOT cached: identity/timeline/context stay fully usable; next visit retries.
+    return {
+      summary: "قراءة المساعد غير متاحة مؤقتًا — السجل واكتمال السياق أدناه كاملان.",
+      intent: "none", signals: [], objections: [],
+      product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })),
+      next_action: "أعد المحاولة بزر «تحديث قراءة المساعد»", why: "تعذّر الوصول لمحرك القراءة.", best_time: "",
+    };
+  }
   let parsed: Partial<Insights> = {};
   try { parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}"); } catch { /* fall through to safe shape */ }
   const lvl = (x: unknown): "high" | "medium" | "low" => x === "high" ? "high" : x === "low" ? "low" : "medium";

@@ -42,6 +42,11 @@ function logEvent(kind: string, phone: string, note: string) {
   console.log(JSON.stringify({ at: "tracker", kind, phone, note }));
 }
 
+/** Read-only lookup — the LIVE contact with its full transcript (no create, no touch). */
+export function findContact(phone: string): Contact | undefined {
+  return contacts.get(phone);
+}
+
 export function getContact(phone: string, waName?: string): Contact {
   let c = contacts.get(phone);
   if (!c) {

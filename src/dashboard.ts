@@ -1131,7 +1131,8 @@ window.refreshInsights = async () => {
   try {
     const pr = await fetch("/admin/customer/" + profilePhone + "?refresh=1", { headers: { "x-admin-token": TOKEN } });
     if (pr.ok) { profileData = await pr.json(); render(false); alertBar("حُدّثت قراءة المساعد لهذا العميل ✓", false); }
-  } catch (e) { alertBar("تعذّر تحديث القراءة", true); }
+    else { if (el) el.textContent = "تحديث قراءة المساعد ↻"; alertBar("تعذّر التحديث (" + pr.status + ") — أعد المحاولة", true); }
+  } catch (e) { const el2 = document.getElementById("insbtn"); if (el2) el2.textContent = "تحديث قراءة المساعد ↻"; alertBar("تعذّر تحديث القراءة", true); }
 };
 window.addEventListener("hashchange", () => {
   if (convoPhone) closeConvo(); rQ = "";
