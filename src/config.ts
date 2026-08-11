@@ -24,6 +24,10 @@ export const cfg = {
   // Public base URL for serving media to Gupshup.
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "https://massar-engine.fly.dev",
 
+  // The product manager's WhatsApp (digits, country code) — hot leads and handoffs are
+  // pushed here as a lead card. Unset = alerts silently disabled.
+  notifyNumber: process.env.NOTIFY_NUMBER || "",
+
   // Sales assets the agent may send (images/PDFs). JSON array:
   // [{"id":"sickleave-onepager","type":"document","url":"https://…/x.pdf","filename":"الإجازات-المرضية.pdf","caption":"…"}]
   assetsJson: process.env.ASSETS_JSON || "[]",

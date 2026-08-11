@@ -98,7 +98,9 @@ app.post("/admin/entities", async (req, reply) => {
     if (!line) continue;
     const parts = line.split(/[,\t،؛;]/).map((x) => x.trim()).filter(Boolean);
     const name = parts[0] ?? "";
-    const phone = (parts[1] ?? "").replace(/\D/g, "");
+    // Same identity rules as the file path — phone is the upsert key, so 05/Arabic-digit
+    // paste lines must land on the same row a file import would create.
+    const phone = audience.normalizePhone(parts[1] ?? "");
     if (!name || phone.length < 8) { bad.push(line.slice(0, 60)); continue; }
     rows.push({ name, phone, size: parts[2] || undefined, city: parts[3] || undefined });
   }
@@ -161,12 +163,27 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); continue; }
     const personalized = message.replaceAll("{name}", t.name || "").replaceAll("{الاسم}", t.name || "").replace(/\s+([،.!؟])/g, "$1");
     try {
-      await gupshup.sendText(phone, personalized);
-      tracker.recordAgentReply(phone, personalized);
+      // One bubble: opener as the document caption + reply buttons (falls back down the
+      // capability ladder if the richer shapes are rejected).
+      const BTNS = [{ title: "أرغب بعرض تعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
+      const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
       const asset = introAsset;
       if (asset) {
-        await gupshup.sendDocument(phone, asset.url, asset.filename);
-        tracker.recordAgentReply(phone, `[أُرسل الملف التعريفي: ${asset.filename}]`);
+        try {
+          await gupshup.sendQuickReplyDocument(phone, asset.url, asset.filename, personalized, BTNS);
+          tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]${btnNote}`);
+        } catch {
+          await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
+          tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]`);
+        }
+      } else {
+        try {
+          await gupshup.sendQuickReply(phone, personalized, BTNS);
+          tracker.recordAgentReply(phone, `${personalized}${btnNote}`);
+        } catch {
+          await gupshup.sendText(phone, personalized);
+          tracker.recordAgentReply(phone, personalized);
+        }
       }
       results.push({ phone, ok: true });
     } catch (e) {

@@ -300,6 +300,37 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
+// ------------------------------ lead alerts → the product manager ------------------------------
+// Hard rule in code (not prompt): a hot tag or a handoff pushes a lead card to the PM's
+// WhatsApp so a serious lead never dead-ends. Throttled per contact; silent if unset.
+const LEAD_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const lastLeadAlert = new Map<string, number>();   // in-memory: worst case one duplicate after a restart
+
+async function notifyLead(contact: Contact, kind: "hot" | "handoff", product: string, detail: string): Promise<void> {
+  if (!cfg.notifyNumber || contact.phone === cfg.notifyNumber) return;
+  const prev = lastLeadAlert.get(contact.phone) ?? 0;
+  if (Date.now() - prev < LEAD_ALERT_COOLDOWN_MS) return;
+  lastLeadAlert.set(contact.phone, Date.now());
+  const lastCustomerLine = [...contact.transcript].reverse().find((t) => t.role === "customer")?.text ?? "";
+  const title = kind === "hot" ? "🔥 عميل جاد الآن" : "🤝 طلب تدخّل بشري";
+  const card = [
+    title,
+    `العميل: ${contact.waName || "غير معروف"} — ‎+${contact.phone}`,
+    `المنتج: ${product}${detail ? ` · ${detail}` : ""}`,
+    lastCustomerLine ? `آخر رسالة: «${lastCustomerLine.slice(0, 120)}»` : "",
+    `المحادثة: ${cfg.publicBaseUrl}/dashboard#kmon`,
+  ].filter(Boolean).join("\n");
+  try {
+    await gupshup.sendText(cfg.notifyNumber, card);
+    tracker.recordSystem(contact.phone, `[أُبلغ المدير: ${kind === "hot" ? "عميل جاد" : "طلب تدخّل"}]`);
+    db.insertEvent(contact.phone, "lead_alert", `${kind}:${product}`, Date.now());
+    console.log(JSON.stringify({ at: "agent", msg: "lead alert sent", phone: contact.phone, kind, product }));
+  } catch (e) {
+    lastLeadAlert.delete(contact.phone);   // failed send shouldn't consume the cooldown
+    console.error(JSON.stringify({ at: "agent", msg: "lead alert failed", err: String(e).slice(0, 150) }));
+  }
+}
+
 async function execTool(contact: Contact, name: string, args: any): Promise<string> {
   switch (name) {
     case "send_buttons": {
@@ -324,19 +355,27 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       tracker.recordAgentReply(contact.phone, `[أُرسل ملف: ${a.id}]`);
       return "أُرسل الملف.";
     }
-    case "tag_interest":
-      tracker.addTag(contact.phone, String(args.product ?? PRODUCTS[0].name), (args.level ?? "warm"));
+    case "tag_interest": {
+      const tagProduct = String(args.product ?? PRODUCTS[0].name);
+      const tagLevel = (args.level ?? "warm") as "hot" | "warm" | "cold";
+      tracker.addTag(contact.phone, tagProduct, tagLevel);
       tracker.setOutcome(contact.phone, "interested");
+      if (tagLevel === "hot") void notifyLead(contact, "hot", tagProduct, "مستوى الجدية: جاد 🔥");
       return "سُجّل الاهتمام — ادفع الآن لموعد العرض التعريفي.";
+    }
     case "offer_alternative":
       tracker.recordSystem(contact.phone, `cross-sell offered: ${args.product}`);
       return "سُجّل — قدّم البديل بزاوية كفاءة مختلفة عن المنتج المرفوض.";
     case "mark_not_interested":
       tracker.setOutcome(contact.phone, "not_interested", String(args.reason ?? "other"));
       return "سُجّل. اختم بلباقة وباب مفتوح.";
-    case "request_human_handoff":
-      tracker.setOutcome(contact.phone, "handoff", String(args.reason ?? ""));
+    case "request_human_handoff": {
+      const why = String(args.reason ?? "");
+      tracker.setOutcome(contact.phone, "handoff", why);
+      const hotTag = (contact.tags || []).find((t) => t.level === "hot") || (contact.tags || [])[0];
+      void notifyLead(contact, "handoff", hotTag?.product ?? "غير محدد", why);
       return "أُشعر المختص وسيتواصل قريبًا — أبلغ العميل بذلك بثقة.";
+    }
     case "close_conversation":
       tracker.setOutcome(contact.phone, (args.outcome === "later" ? "later" : args.outcome === "interested" ? "interested" : "closed"));
       return "أنهِ برسالة ختامية قصيرة أنيقة.";

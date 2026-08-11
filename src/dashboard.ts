@@ -185,6 +185,8 @@ let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = ""; let custQ = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
+let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
+let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
 
 const NAV = [
@@ -428,10 +430,16 @@ function vKmonDetail(id, d) {
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
   const q = rQ.trim();
   const shown = rows.filter(active[3]).filter((r) => !q || (r.contact && (r.contact.waName || "").includes(q)) || (r.name || "").includes(q) || r.phone.includes(q));
+  // Snapshot the visible cohort so «إعادة استهداف» carries exactly what the founder is looking at.
+  lastDetailCohort = {
+    label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
+    targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
+  };
   h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #eef1f5;background:#fff;">' +
     '<span style="font-size:13px;font-weight:700;color:#13294b;flex:none;">المستهدفون</span>' +
     '<span style="font-size:11px;color:#9aa4b4;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
     '<span style="flex:1;"></span>' +
+    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") +
@@ -444,16 +452,46 @@ function vKmonDetail(id, d) {
 
 function vHome(d) {
   const cs = d.contacts || [];
-  const interested = cs.filter((c) => c.outcome === "interested" || (c.tags || []).some((t) => t.level === "hot" || t.level === "warm")).length;
-  return '<div class="kpis">' +
-    '<div class="kpi"><div class="k">جهات التواصل</div><div class="v">' + cs.length + "</div></div>" +
-    '<div class="kpi"><div class="k">رسائل واردة</div><div class="v">' + ((d.counters || {}).inbound || 0) + "</div></div>" +
-    '<div class="kpi"><div class="k">ردود المساعد</div><div class="v">' + ((d.counters || {}).agent_reply || 0) + "</div></div>" +
-    '<div class="kpi"><div class="k">مهتمون</div><div class="v" style="color:#1f8a52">' + interested + "</div></div></div>" +
-    '<div class="card"><h3>حالة المنصة</h3><div style="font-size:13px;color:#5b6678;line-height:2.1;">' +
-    'المساعد البائع يعمل الآن على واتساب (ساندبوكس) ويبيع كامل سلة المنتجات الصحية.<br>' +
-    'وحدة <b>التسويق</b> نشطة: <a href="#kmon" style="color:#2E7D77;font-weight:700;">متابعة الحملات</a> حيّة، و<a href="#aimkt" style="color:#2E7D77;font-weight:700;">إنشاء حملة</a> و<a href="#kb" style="color:#2E7D77;font-weight:700;">معرفة المنتج</a> بواجهاتها الأصلية.<br>' +
-    'بقية الوحدات (العملاء، الفرص، لوحة المتابعة…) ضمن المراحل القادمة حسب خارطة الطريق.</div></div>';
+  const interestedList = cs.filter((c) => interestedOf(c) || c.outcome === "handoff");
+  const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
+  const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
+  const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
+  let h = '<div class="kpis">' +
+    '<div class="kpi"><div class="k">الحملات</div><div class="v">' + campaigns.length + "</div></div>" +
+    '<div class="kpi"><div class="k">المستهدفون</div><div class="v">' + entities.length.toLocaleString("ar-SA") + "</div></div>" +
+    '<div class="kpi"><div class="k">وصلت إليهم الرسائل</div><div class="v" style="color:#2E8F89">' + delivered + "</div></div>" +
+    '<div class="kpi"><div class="k">ردّوا</div><div class="v" style="color:#2F5F94">' + replied + "</div></div>" +
+    '<div class="kpi"><div class="k">مهتمون وجادّون</div><div class="v" style="color:#1f8a52">' + interestedList.length + "</div></div></div>";
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
+    '<a href="#aimkt" style="text-decoration:none;" class="btn btn-teal">+ إنشاء حملة</a>' +
+    '<a href="#customers" style="text-decoration:none;" class="btn" style="color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
+    '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">📚 معرفة المنتج</a></div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">عملاء جادّون الآن</h3><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span></div>" +
+    (interestedList.length
+      ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
+          const tg = hotOf(c) || (c.tags || [])[0];
+          const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
+          return '<div onclick="openConvo(\\'' + c.phone + '\\')" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
+            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.waName || "غير معروف") + " " +
+            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · جاد 🔥" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا 🤝</span>' : "")) + "</div>" +
+            (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "") + "</div>" +
+            '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">المحادثة ←</span></div>';
+        }).join("") + "</div>"
+      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') + "</div>";
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
+    (campaigns.length
+      ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
+          const st = campStats(cp);
+          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;">' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + "</div>" +
+            '<div style="font-size:10.5px;color:#9aa4b4;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
+            '<span class="chip c-blue">' + st.targeted + ' مستهدف</span><span class="chip c-teal">شوهدت ' + st.seen + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + st.replied + "</span></a>";
+        }).join("") + "</div>"
+      : '<div style="font-size:12px;color:#9aa4b4;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
+  h += "</div>";
+  return h;
 }
 
 // Segment groups derive from whatever columns the imported file carried:
@@ -500,21 +538,31 @@ window.entClear = () => { entSel.clear(); render(false); };
 window.campMsgSet = (el) => { campMsg = el.value; };
 window.campNameSet = (el) => { campName = el.value; };
 window.pick = (i) => { selProd = i; render(false); };
-window.openLaunch = () => { if (!entSel.size || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
+window.startRetarget = () => {
+  if (!lastDetailCohort || !lastDetailCohort.targets.length) return;
+  retargetCohort = lastDetailCohort;
+  if (!campName.trim()) campName = "إعادة استهداف — " + retargetCohort.label + " — " + retargetCohort.campaign;
+  location.hash = "aimkt";
+};
+window.clearRetarget = () => { retargetCohort = null; campName = ""; render(false); };
+function launchTargets() {
+  return retargetCohort ? retargetCohort.targets : entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
+}
+window.openLaunch = () => { if (!launchTargets().length || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
 window.closeLaunch = () => { const m = document.getElementById("lmodal"); if (m) m.style.display = "none"; };
 window.confirmLaunch = async () => {
   if (launching) return; launching = true;
   const btn = document.getElementById("lgo"); if (btn) { btn.textContent = "جارٍ الإرسال…"; }
-  const targets = entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
+  const targets = launchTargets();
   try {
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: campMsg, name: campName, product: PRODUCTS[selProd].n }) });
+      body: JSON.stringify({ targets, message: campMsg, name: campName, product: wizProducts()[selProd].name }) });
     const d = await r.json();
     launching = false; closeLaunch();
     if (!r.ok) { alertBar("فشل الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
     alertBar("أُرسلت " + d.sent + " من " + d.requested + " — افتحنا لك لوحة الحملة", false);
-    entSel.clear(); campName = "";
+    entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) { launching = false; closeLaunch(); alertBar("خطأ في الإطلاق", true); }
 };
@@ -526,21 +574,37 @@ window.alertBar = (txt, bad) => {
   document.body.appendChild(el); setTimeout(() => el.remove(), 3800);
 };
 
+function wizProducts() { return kbRegistry(); }
 function vAimkt() {
-  const p = PRODUCTS[selProd];
+  const reg = wizProducts();
+  if (selProd >= reg.length) selProd = 0;
   const tone = (sc) => sc >= 80 ? ["#1f8a52", "جاهز للبيع", "c-ok"] : sc >= 60 ? ["#b5810f", "جاهز بتحفّظ", "c-warn"] : ["#c43d3d", "غير جاهز", "c-bad"];
   const m = entMatches();
-  const selN = entSel.size;
-  const firstSel = entities.find(e => entSel.has(e.id));
+  const selN = launchTargets().length;
+  const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));
   const groups = segGroups();
   const allOn = m.length && m.every(e => entSel.has(e.id));
+  const selName = reg[selProd] ? reg[selProd].name : "";
+  const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">يعتمد المساعد على معرفة المنتج المسجّلة + ملفات Product Hub.</div></div></div><div class="prods">' +
-    PRODUCTS.map((x, i) => { const t = tone(x.sc); return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + x.n + '</div><span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span></button>"; }).join("") + "</div></div>";
+  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">القائمة تشمل منتجات Product Hub المرفوعة بملفاتها — لا تقتصر على المنتجات المدمجة.</div></div></div><div class="prods">' +
+    reg.map((x, i) => {
+      const inner = x.sc !== null
+        ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
+        : '<div style="height:6px;"></div><span class="chip c-teal">معرفة من Product Hub ✓</span>';
+      const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
+      return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
+    }).join("") + "</div></div>";
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يتحدّث فورًا.</div></div>' +
-    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">مختار من ' + entities.length + "</span></span></div>";
-  if (!entities.length) {
+    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة معاد استهدافها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
+  if (retargetCohort) {
+    h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
+      '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
+      '<div style="font-size:13.5px;font-weight:700;color:#13294b;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + retargetCohort.targets.length.toLocaleString("ar-SA") + " جهة</div>" +
+      '<div style="font-size:11.5px;color:#7b8597;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
+      '<button class="btn" style="font-size:12px;color:#7b8597;background:#fff;border:1px solid #e0e5ec;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
+  } else if (!entities.length) {
     h += '<div style="border:1.5px dashed #c9d2df;border-radius:12px;padding:26px;text-align:center;color:#7b8597;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += groups.map((g, ki) =>
@@ -577,17 +641,25 @@ function vAimkt() {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
     '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">نص الرسالة</div>' +
     '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#13294b;border:1.5px solid #e9edf3;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
-    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">معاينة واتساب</div>' +
-    '<div class="wa-prev"><div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div></div></div></div></div>';
+    '<div><div style="font-size:11.5px;color:#7b8597;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
+    '<div class="wa-prev">' +
+    (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.75);border-radius:9px;padding:9px 11px;margin-bottom:8px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
+    '<div class="b">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + '</div><div class="t">الآن ✓✓</div>' +
+    '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
+    ["أرغب بعرض تعريفي", "أرسلوا التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
+    "</div></div>" +
+    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذا المنتج بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة المنتج ليُضمَّن.</div>') +
+    "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
     '<label style="font-size:12.5px;font-weight:700;color:#13294b;flex:none;">اسم الحملة</label>' +
-    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(PRODUCTS[selProd].n) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#13294b;border:1.5px solid #e9edf3;border-radius:11px;padding:11px 14px;">' +
+    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#13294b;border:1.5px solid #e9edf3;border-radius:11px;padding:11px 14px;">' +
     "</div>";
-  h += '<div class="step" style="text-align:center;">' +
-    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:15px;padding:16px 34px;" onclick="openLaunch()">🚀 إطلاق الحملة إلى ' + selN.toLocaleString("ar-SA") + " مستهدف</button>" +
-    '<div style="font-size:11.5px;color:#9aa4b4;margin-top:12px;">قناة الساندبوكس: يستلم فعليًا من انضم للرقم التجريبي فقط — البقية تظهر حالتهم «فشل الإرسال» بشفافية. الإطلاق بالقوالب الرسمية يأتي مع رقم الأعمال الإنتاجي.</div></div>';
+  h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#13294b;">' + selN.toLocaleString("ar-SA") + " مستهدف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
+    '<div style="font-size:10.5px;color:#9aa4b4;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
+    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">🚀 إطلاق الحملة</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +

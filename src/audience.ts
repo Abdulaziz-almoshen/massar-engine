@@ -7,7 +7,9 @@ import * as XLSX from "xlsx";
 // ---------------------------------------------------------------------------
 
 const NAME_HEADERS = ["الاسم", "اسم", "الجهة", "جهة", "العميل", "الشركة", "المنشأة", "name", "company", "entity", "client"];
-const PHONE_HEADERS = ["الجوال", "جوال", "الهاتف", "هاتف", "رقم الجوال", "رقم", "واتساب", "phone", "mobile", "whatsapp", "tel", "number"];
+// Bare "رقم" stays LAST: the substring pass scans in this order, and a generic "رقم"
+// must not shadow specific columns (رقم السجل التجاري…) when a واتساب/جوال column exists.
+const PHONE_HEADERS = ["الجوال", "جوال", "رقم الجوال", "واتساب", "whatsapp", "الهاتف", "هاتف", "phone", "mobile", "tel", "number", "رقم"];
 
 const MAX_ROWS = 5000;
 
@@ -31,11 +33,16 @@ function matchHeader(headers: string[], candidates: string[]): number {
 /** KSA-aware: 05XXXXXXXX → 966XXXXXXXXX; bare 5XXXXXXXX → 966…; otherwise digits as-is. */
 export function normalizePhone(raw: unknown): string {
   let d = String(raw ?? "").replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c))).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 13 && d.startsWith("9660")) d = "966" + d.slice(4);   // 966 + 05… double-prefix
   if (d.length === 10 && d.startsWith("05")) d = "966" + d.slice(1);
   else if (d.length === 9 && d.startsWith("5")) d = "966" + d;
-  else if (d.startsWith("00")) d = d.slice(2);
   return d;
 }
+
+/** Excel formats number-typed cells ("966512345678" General) as "9.66512E+11" — the digits
+ *  survive the strip and pass length gates, silently corrupting the primary onboarding path. */
+const SCI_NOTATION = /\d\s*[eE]\s*\+?\s*\d/;
 
 /** The fill-in template users download from the portal (headers + example rows). */
 export function buildTemplateXlsx(): Buffer {
@@ -65,6 +72,9 @@ export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("الملف لا يحتوي على أي ورقة بيانات");
   const grid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: false });
+  // Second read with raw values: phones typed as NUMBERS format to scientific notation in the
+  // formatted grid; the raw cell (exact integer < 2^53) is the truth for the phone column.
+  const rawGrid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: true });
   if (grid.length < 2) throw new Error("الملف يحتاج صف عناوين وصفًا واحدًا على الأقل من البيانات");
 
   const headers = (grid[0] ?? []).map((h) => String(h ?? "").trim());
@@ -84,10 +94,18 @@ export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse
     const line = dataRows[r] ?? [];
     const rowNo = r + 2; // 1-based + header row
     const name = String(line[nameIdx] ?? "").trim();
-    const phone = normalizePhone(line[phoneIdx]);
+    const formattedPhone = String(line[phoneIdx] ?? "").trim();
+    const rawPhone = (rawGrid[r + 1] ?? [])[phoneIdx];
+    const phoneSource = typeof rawPhone === "number" && Number.isFinite(rawPhone)
+      ? String(Math.round(rawPhone)) : formattedPhone;
+    if (SCI_NOTATION.test(phoneSource)) {
+      skipped.push({ row: rowNo, reason: `جوال بصيغة رقمية تالفة (${formattedPhone}) — نسّق العمود كنص` });
+      continue;
+    }
+    const phone = normalizePhone(phoneSource);
     if (!name && !phone) continue; // fully empty line — not an error
     if (!name) { skipped.push({ row: rowNo, reason: "بدون اسم" }); continue; }
-    if (phone.length < 8) { skipped.push({ row: rowNo, reason: `جوال غير صالح: ${String(line[phoneIdx] ?? "").trim() || "(فارغ)"}` }); continue; }
+    if (phone.length < 8) { skipped.push({ row: rowNo, reason: `جوال غير صالح: ${formattedPhone || "(فارغ)"}` }); continue; }
     const attrs: Record<string, string> = {};
     for (const { h, i } of attrIdx) {
       const v = String(line[i] ?? "").trim();

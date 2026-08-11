@@ -94,6 +94,23 @@ export async function sendQuickReply(
   return postForm(MSG_URL, { ...baseParams(destination), message: JSON.stringify(message) });
 }
 
+/** One bubble: document header + caption text + up to 3 quick-reply buttons. */
+export async function sendQuickReplyDocument(
+  destination: string,
+  url: string,
+  filename: string,
+  body: string,
+  options: { title: string }[],
+) {
+  const message = {
+    type: "quick_reply",
+    msgid: `qrd-${Date.now()}`,
+    content: { type: "document", url, filename, caption: body },
+    options: options.slice(0, 3),
+  };
+  return postForm(MSG_URL, { ...baseParams(destination), message: JSON.stringify(message) });
+}
+
 /** Image inside the service window (public URL; caption optional). */
 export async function sendImage(destination: string, url: string, caption?: string) {
   const message = { type: "image", originalUrl: url, previewUrl: url, ...(caption ? { caption } : {}) };
