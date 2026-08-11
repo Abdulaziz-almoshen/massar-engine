@@ -497,7 +497,8 @@ function vHome(d) {
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
     '<a href="#aimkt" style="text-decoration:none;" class="btn btn-teal">+ إنشاء حملة</a>' +
     '<a href="#customers" class="btn" style="text-decoration:none;color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
-    '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">📚 معرفة المنتج</a></div>';
+    '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">معرفة المنتج</a></div>';
+  h += vHomeCharts(cs);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
     (interestedList.length
@@ -925,6 +926,56 @@ function vCustomers() {
 }
 window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
 
+function chartCard(title, sub, inner) {
+  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#9aa4b4;">' + sub + "</span></div>" + inner + "</div>";
+}
+function hbarRows(rows, color) {
+  const mx = Math.max(1, ...rows.map((r) => r[1]));
+  return '<div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">' + rows.map((r) =>
+    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#3b4657;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#13294b;">' + r[1].toLocaleString("ar-SA") + "</span></div>" +
+    '<div style="height:8px;background:#eef1f5;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
+}
+function dailyActivitySvg(cs) {
+  const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
+  for (let i = 13; i >= 0; i--) { const d = new Date(now.getTime() - i * 864e5); days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0, label: d.toLocaleDateString("ar-SA", { day: "numeric", month: "numeric" }) }); }
+  cs.forEach((c) => (c.transcript || []).forEach((t) => {
+    const d = days.find((x) => t.ts >= x.t0 && t.ts < x.t1);
+    if (d) { if (t.role === "customer") d.inN++; else if (t.role === "agent") d.outN++; }
+  }));
+  const mx = Math.max(1, ...days.map((d) => d.inN + d.outN));
+  const W = 616, H = 132, bw = 30;
+  let bars = "";
+  days.forEach((d, i) => {
+    const x = 8 + i * (bw + 14);
+    const hOut = Math.round(d.outN / mx * 96), hIn = Math.round(d.inN / mx * 96);
+    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#C6D8EE"/>' +
+      '<rect x="' + x + '" y="' + (104 - hOut - hIn) + '" width="' + bw + '" height="' + hIn + '" rx="3" fill="#2E8F89"/>' +
+      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#9aa4b4">' + d.label + "</text>";
+  });
+  return '<div dir="ltr" style="overflow-x:auto;" class="ms-scroll"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;min-width:520px;height:auto;display:block;margin-top:10px;" role="img" aria-label="نشاط الرسائل ١٤ يومًا">' +
+    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#e9edf3" stroke-width="1"/>' + bars + "</svg></div>" +
+    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#7b8597;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#C6D8EE;margin-inline-end:5px;"></i>صادرة</span></div>';
+}
+function vHomeCharts(cs) {
+  const camps = showTest ? campaigns : campaigns.filter((cp) => !campIsTest(cp));
+  const agg = { targeted: 0, sent: 0, delivered: 0, seen: 0, replied: 0, interested: 0 };
+  camps.forEach((cp) => { const st = campStats(cp); Object.keys(agg).forEach((k) => { agg[k] += st[k] || 0; }); });
+  const funnel = [["المستهدفون", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["مهتمون", agg.interested, "#1f8a52"]];
+  const byProd = new Map();
+  cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
+  const prodRows = [...byProd.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
+  const byCity = new Map();
+  entities.forEach((e) => { const city = (e.attrs || {})["المدينة"]; if (city) byCity.set(city, (byCity.get(city) || 0) + 1); });
+  const cityRows = [...byCity.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
+  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · شاملة التجريبية" : " · الحقيقية فقط") + "</span></div>";
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
+  h += chartCard("قمع الحملات", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? hbarRows(funnel, "#2F5F94") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
+  h += chartCard("الاهتمام حسب المنتج", "من وسوم المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? hbarRows(cityRows, "#C9A227") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  h += "</div>";
+  return h;
+}
 const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#7b8597"], none: ["لا إشارة بعد", "#9aa4b4"] };
 function toneBadge(label, color) {
   return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #e9edf3;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#3b4657;">' +
