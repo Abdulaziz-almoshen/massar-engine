@@ -301,7 +301,9 @@ const KB_SECTIONS = [
 ];
 
 function nav() {
-  const cur = (location.hash || "#kmon").slice(1).split("/")[0];
+  // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
+  const raw = (location.hash || "#kmon").slice(1).split("/")[0];
+  const cur = raw === "customer" ? "customers" : raw;
   document.getElementById("nav").innerHTML = NAV.map((x) => x.grp
     ? '<div class="grp">' + x.grp + "</div>"
     : '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
@@ -499,7 +501,7 @@ function vKmon(d) {
       : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
         : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
     h += '<div class="trow" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '"><i></i></span>' +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '" role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة حقيقية مفعّلة") + '" title="' + (isTest ? "حملة تجريبية (ساندبوكس)" : "حملة حقيقية مفعّلة") + '"><i></i></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
       '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
       '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
