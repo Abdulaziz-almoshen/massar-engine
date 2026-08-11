@@ -926,6 +926,51 @@ function vCustomers() {
 }
 window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
 
+function ratesStrip(agg) {
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  const cards = [
+    ["نسبة الوصول", pct(agg.delivered, agg.sent || agg.targeted), "#3FB6B0"],
+    ["نسبة المشاهدة", pct(agg.seen, agg.delivered), "#2E8F89"],
+    ["نسبة الردود", pct(agg.replied, agg.delivered), "#2F5F94"],
+    ["نسبة الاهتمام", pct(agg.interested, agg.replied), "#1f8a52"],
+  ];
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">' +
+    cards.map((c) => '<div class="card" style="margin:0;padding:14px 16px;text-align:center;">' +
+      '<div style="font-size:22px;font-weight:700;color:' + c[2] + ';">' + c[1] + '٪</div>' +
+      '<div style="font-size:11px;color:#7b8597;font-weight:600;margin-top:3px;">' + c[0] + "</div></div>").join("") + "</div>";
+}
+function funnelSvg(rows) {
+  const mx = Math.max(1, ...rows.map((r) => r[1]));
+  const W = 300, segH = 40, gap = 5, H = rows.length * (segH + gap);
+  let shapes = "";
+  rows.forEach((r, i) => {
+    const wTop = Math.max(0.16, (i === 0 ? rows[0][1] : rows[i - 1][1]) / mx) * (W - 20);
+    const wBot = Math.max(0.16, r[1] / mx) * (W - 20);
+    const y = i * (segH + gap);
+    const x1t = (W - wTop) / 2, x2t = (W + wTop) / 2, x1b = (W - wBot) / 2, x2b = (W + wBot) / 2;
+    shapes += '<polygon points="' + x1t + ',' + y + ' ' + x2t + ',' + y + ' ' + x2b + ',' + (y + segH) + ' ' + x1b + ',' + (y + segH) + '" fill="' + r[2] + '" opacity="0.92"/>' +
+      '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + r[1].toLocaleString("ar-SA") + "</text>";
+  });
+  return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
+    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="قمع الحملات"></svg-fix>' + shapes + "</svg></div>" +
+    '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
+    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#3b4657;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
+}
+function colChart(rows, color) {
+  const mx = Math.max(1, ...rows.map((r) => r[1]));
+  return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
+    rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
+      '<div style="font-size:11px;font-weight:700;color:#13294b;">' + r[1].toLocaleString("ar-SA") + "</div>" +
+      '<div style="width:100%;max-width:46px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:7px 7px 3px 3px;"></div>' +
+      '<div style="font-size:10px;color:#7b8597;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
+}
+function treemapTiles(rows) {
+  const total = Math.max(1, rows.reduce((a, r) => a + r[1], 0));
+  const tones = ["#8a5a52", "#a06b60", "#b58177", "#c69a90", "#d4b0a7", "#e0c5bd", "#e9d5cf", "#f0e2dd"];
+  return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
+    rows.map((r, i) => '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:74px;border-radius:10px;background:' + tones[i % tones.length] + ';color:#fff;padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;">' +
+      '<div style="font-size:11.5px;font-weight:700;">' + esc(String(r[0])) + '</div><div style="font-size:15px;font-weight:700;">' + r[1].toLocaleString("ar-SA") + "</div></div>").join("") + "</div>";
+}
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#9aa4b4;">' + sub + "</span></div>" + inner + "</div>";
 }
@@ -967,12 +1012,25 @@ function vHomeCharts(cs) {
   const byCity = new Map();
   entities.forEach((e) => { const city = (e.attrs || {})["المدينة"]; if (city) byCity.set(city, (byCity.get(city) || 0) + 1); });
   const cityRows = [...byCity.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
+  const bySize = new Map(); const bySec = new Map();
+  entities.forEach((e) => {
+    const sz = (e.attrs || {})["الحجم"]; if (sz) bySize.set(sz, (bySize.get(sz) || 0) + 1);
+    const sec = (e.attrs || {})["القطاع"]; if (sec) bySec.set(sec, (bySec.get(sec) || 0) + 1);
+  });
+  const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · شاملة التجريبية" : " · الحقيقية فقط") + "</span></div>";
+  h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("قمع الحملات", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? hbarRows(funnel, "#2F5F94") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
+  h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
+    ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
+      '<div><div style="font-size:10.5px;font-weight:700;color:#9aa4b4;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
+      '<div><div style="font-size:10.5px;font-weight:700;color:#9aa4b4;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
+    : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
   h += chartCard("الاهتمام حسب المنتج", "من وسوم المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? hbarRows(cityRows, "#C9A227") : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#9aa4b4;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
 }
