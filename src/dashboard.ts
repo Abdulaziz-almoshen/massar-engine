@@ -91,7 +91,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* campaign table */
   .tblwrap { background: #fff; border: 1px solid #e3e7ee; border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
-  .thead, .trow { display: grid; grid-template-columns: 1.7fr 2fr 1.6fr 1.6fr 0.8fr; gap: 12px; padding: 13px 18px; align-items: center; }
+  .thead, .trow { display: grid; grid-template-columns: 1.6fr 1.6fr 1.5fr 1.4fr 0.7fr 0.8fr; gap: 12px; padding: 13px 18px; align-items: center; }
   .thead { background: #f8fafc; border-bottom: 1px solid #eef1f5; font-size: 11px; font-weight: 700; color: #7b8597; }
   .trow { border-bottom: 1px solid #f3f5f8; cursor: pointer; }
   .trow:hover { background: #fafbfd; }
@@ -143,7 +143,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .ct { font-size: 11.5px; color: #b6bfcc; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border: 1px solid #e3e7ee; border-radius: 16px; padding: 28px; text-align: center; }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #d8dee8; border-radius: 10px; padding: 11px 13px; margin: 14px 0; direction: ltr; }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.6fr 1.8fr 1fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } }
+  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.3fr; } .thead div:nth-child(n+4), .trow > div:nth-child(n+4) { display: none; } }
 </style>
 </head>
 <body>
@@ -238,9 +238,9 @@ function chipRow(c) {
   if (st.sent || (c.transcript || []).some((t) => t.role === "agent")) h += '<span class="chip c-grey">أُرسلت</span>';
   if (st.delivered) h += '<span class="chip c-blue">وصلت</span>';
   if (seen) h += '<span class="chip c-teal">شوهدت ✓</span>';
-  const oc = { interested: ["c-ok", "مهتم ⭐"], not_interested: ["c-bad", "غير مهتم"], later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "محوّلة لمختص"], opted_out: ["c-bad", "أوقف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
+  const oc = { later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "محوّلة لمختص"], opted_out: ["c-bad", "أوقف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
   if (oc) h += '<span class="chip ' + oc[0] + '">' + oc[1] + "</span>";
-  (c.tags || []).forEach((t) => h += '<span class="chip ' + (t.level === "hot" ? "c-ok" : "c-warn") + '">اهتمام: ' + esc(t.product) + "</span>");
+  if ((c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered) h += '<span class="chip c-bad">فشل الإرسال</span>';
   return h || '<span class="chip c-grey">جديد</span>';
 }
 const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
@@ -270,6 +270,21 @@ function campStats(camp) {
     failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
   };
 }
+function interestChips(c) {
+  if (!c) return '<span style="color:#c2cad6;">—</span>';
+  const latest = new Map();
+  (c.tags || []).forEach((t) => latest.set(t.product, t));
+  if (latest.size) {
+    const lv = { hot: ["c-ok", "جاد 🔥"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
+    return [...latest.values()].map((t) => {
+      const m = lv[t.level] || lv.warm;
+      return '<span class="chip ' + m[0] + '">' + esc(t.product) + " · " + m[1] + "</span>";
+    }).join(" ");
+  }
+  if (c.outcome === "interested") return '<span class="chip c-ok">مهتم ⭐</span>';
+  if (c.outcome === "not_interested") return '<span class="chip c-bad">غير مهتم' + (c.outcomeReason ? " · " + esc(c.outcomeReason) : "") + "</span>";
+  return '<span style="color:#c2cad6;">—</span>';
+}
 function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
 function contactRowsHtml(rows) {
   let h = "";
@@ -281,6 +296,7 @@ function contactRowsHtml(rows) {
     h += '<div class="trow' + (open ? " open" : "") + '" onclick="tog(\\'' + esc(c.phone) + '\\')">' +
       '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + "</div>" +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
       '<div class="lastm">' + esc(last ? last.text : "—") + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
       '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;">' + (open ? "إخفاء" : "عرض المحادثة") + "</div></div>";
@@ -319,7 +335,7 @@ function vKmon(d) {
     .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
   if (organic.length) {
     h += '<div class="sec" style="margin-top:22px;">محادثات خارج الحملات <span class="meta">' + organic.length + ' — انضموا للساندبوكس مباشرة</span></div>' +
-      '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+      '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
       contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) + "</div>";
   }
   return h;
@@ -353,7 +369,7 @@ function vKmonDetail(id, d) {
     filters.map((f) => '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#5b6678;background:#fff;border:1px solid #e9edf3;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") + "</div>";
-  h += '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+  h += '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
     (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#9aa4b4;font-size:12.5px;">لا نتائج لهذا الفلتر</div>') + "</div>";
   return h;
 }
