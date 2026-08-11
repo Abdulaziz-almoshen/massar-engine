@@ -239,8 +239,8 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "send_asset",
-      description: "أرسل الملف التعريفي PDF لمنتج (asset_id = اسم المنتج). استخدمه مع افتتاحية المنتج أو عند طلب تفاصيل/ملف/بروشور.",
-      parameters: { type: "object", properties: { asset_id: { type: "string", description: "اسم المنتج" } }, required: ["asset_id"] },
+      description: "أرسل الملف التعريفي PDF لمنتج في رسالة واحدة مع تعليقك (asset_id = اسم المنتج، caption = سطرك المرافق وسؤال المتابعة). استخدمه مع افتتاحية المنتج أو عند طلب تفاصيل/ملف/بروشور — لا تكتب رسالة نصية إضافية بعده.",
+      parameters: { type: "object", properties: { asset_id: { type: "string", description: "اسم المنتج" }, caption: { type: "string", description: "تعليق قصير + سؤال متابعة يُضمّن مع الملف في نفس الرسالة" } }, required: ["asset_id"] },
     },
   },
   {
@@ -342,11 +342,12 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
     }
     case "send_asset": {
       const key = String(args.asset_id ?? args.product ?? "").trim();
+      const cap = String(args.caption ?? "").slice(0, 500);
       const pa = productAssets.find((x) => x.product === key || x.product.includes(key));
       if (pa) {
-        await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
-        tracker.recordAgentReply(contact.phone, `[أُرسل الملف التعريفي: ${pa.product}]`);
-        return "أُرسل الملف التعريفي — علّق عليه بسطر واحد وسؤال متابعة.";
+        await gupshup.sendDocument(contact.phone, pa.url, pa.filename, cap || undefined);
+        tracker.recordAgentReply(contact.phone, `${cap ? cap + " " : ""}[مرفق في نفس الرسالة: ${pa.product}]`);
+        return "أُرسل الملف مع تعليقك في رسالة واحدة — لا ترسل نصًا إضافيًا الآن؛ أرجِع ردًا فارغًا.";
       }
       const a = assets().find((x) => x.id === key);
       if (!a) return "لا يوجد ملف لهذا المنتج — تابع بدون ملف.";

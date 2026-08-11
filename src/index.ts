@@ -168,19 +168,14 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // capability ladder if the richer shapes are rejected).
       const BTNS = [{ title: "أرغب بعرض تعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
-      // Fallback fires ONLY on a definitive 4xx shape rejection. 5xx joins transport errors in
-      // the rethrow path — the message MAY have been enqueued, and retrying risks double delivery.
+      // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
+      // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
+      // guaranteed single bubble — that is the primary shape for asset launches now.
       const rejectedShape = (e: unknown) => /gupshup 4\d\d:/.test(String(e));
       const asset = introAsset;
       if (asset) {
-        try {
-          await gupshup.sendQuickReplyDocument(phone, asset.url, asset.filename, personalized, BTNS);
-          tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]${btnNote}`);
-        } catch (e) {
-          if (!rejectedShape(e)) throw e;
-          await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
-          tracker.recordAgentReply(phone, `${personalized} [مرفق: ${asset.filename}]`);
-        }
+        await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
+        tracker.recordAgentReply(phone, `${personalized} [مرفق في نفس الرسالة: ${asset.filename}]`);
       } else {
         try {
           await gupshup.sendQuickReply(phone, personalized, BTNS);
