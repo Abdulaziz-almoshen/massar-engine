@@ -937,7 +937,7 @@ function hbarRows(rows, color) {
 }
 function dailyActivitySvg(cs) {
   const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
-  for (let i = 13; i >= 0; i--) { const d = new Date(now.getTime() - i * 864e5); days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0, label: d.toLocaleDateString("ar-SA", { day: "numeric", month: "numeric" }) }); }
+  for (let i = 0; i <= 13; i++) { const d = new Date(now.getTime() - i * 864e5); days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0, label: i === 0 ? "اليوم" : d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) }); }
   cs.forEach((c) => (c.transcript || []).forEach((t) => {
     const d = days.find((x) => t.ts >= x.t0 && t.ts < x.t1);
     if (d) { if (t.role === "customer") d.inN++; else if (t.role === "agent") d.outN++; }
