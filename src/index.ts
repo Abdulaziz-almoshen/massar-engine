@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { cfg, configReport } from "./config.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
+import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
@@ -58,6 +59,7 @@ app.get("/health", async () => ({
   gupshupAppName: gupshup.appName() || "(unknown — learned from first webhook)",
   sourceNumber: gupshup.sourceNumber() || "(unset — auto-learns from v3 webhooks)",
   outbound: gupshup.outboundReady(),
+  db: { enabled: db.enabled(), connected: db.isConnected(), counts: await db.counts() },
   config: configReport(),
 }));
 
@@ -93,6 +95,8 @@ app.post("/admin/send-template", async (req, reply) => {
 
 const main = async () => {
   log({ at: "boot", config: configReport() });
+  await db.init();                            // memory-only if DATABASE_URL unset/down
+  if (db.isConnected()) await tracker.hydrate();
   agent.initModel().catch(() => { /* retried lazily on first turn */ });
   await app.listen({ port: cfg.port, host: "0.0.0.0" });
   log({ at: "boot", msg: `listening on :${cfg.port}` });
