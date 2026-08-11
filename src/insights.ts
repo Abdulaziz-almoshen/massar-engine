@@ -132,7 +132,15 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   }
   if (!force) {
     const cached = await db.getInsightsRow(c.phone);
-    if (cached && cached.turns_at === turns) return cached.data as Insights;
+    if (cached && cached.turns_at === turns) {
+      // Silence is itself a signal: a conversation that has gone quiet past the stall window
+      // must be re-read once so an "active" verdict can become "stalled".
+      const quietMs = Date.now() - (c.lastEventAt || 0);
+      const staleRead = Date.now() - (cached.computed_at || 0);
+      const prev = cached.data as Insights;
+      const needsStallCheck = quietMs > 48 * 3600e3 && prev.deal_state === "active" && staleRead > 24 * 3600e3;
+      if (!needsStallCheck) return prev;
+    }
   }
   const convo = (c.transcript || []).map((t) => `${t.role === "customer" ? "العميل" : t.role === "agent" ? "المساعد" : "نظام"}: ${t.text}`).join("\n").slice(-8000);
   const tags = (c.tags || []).map((t) => `${t.product}:${t.level}`).join(", ") || "لا وسوم";
