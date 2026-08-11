@@ -185,6 +185,7 @@ let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = ""; let custQ = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
+let showTest = false;         // sandbox separation: test traffic hidden from real views by default
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
 let campMsg = "مرحبًا {name} 👋 معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
@@ -327,6 +328,14 @@ window.setHuman = async (phone, val) => {
   } catch (e) { alertBar("تعذّر الاتصال بالخادم — أعد المحاولة", true); return; }
   await refresh();
 };
+window.setTestFlag = async (phone, val) => {
+  try {
+    const r = await fetch("/admin/contact/test", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, test: val }) });
+    if (!r.ok) { alertBar("تعذّر تحديث الوسم (" + r.status + ")", true); return; }
+    alertBar(val ? "وُسمت المحادثة كتجريبية — خارج الأرقام الحقيقية" : "أُعيدت المحادثة للبيانات الحقيقية", false);
+  } catch (e) { alertBar("تعذّر الاتصال بالخادم", true); return; }
+  await refresh();
+};
 let convoPhone = null;
 let convoSig = "";
 window.openConvo = (p) => { convoPhone = p; renderConvo(); };
@@ -337,7 +346,7 @@ function renderConvo() {
   if (!convoPhone || !cache) { el.innerHTML = ""; convoSig = ""; return; }
   const c = (cache.contacts || []).find((x) => x.phone === convoPhone);
   if (!c) { el.innerHTML = ""; convoPhone = null; convoSig = ""; return; }
-  const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + (c.outcome || "") +
+  const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + c.test + "|" + (c.outcome || "") +
     "|" + Object.keys(c.statusTimes || {}).join(",") + "|" + (c.tags || []).map((t) => t.product + ":" + t.level).join(",");
   if (sig === convoSig && el.innerHTML) return;   // nothing changed — don't rebuild (keeps scroll)
   const prevMsgs = document.getElementById("convoMsgs");
@@ -354,15 +363,29 @@ function renderConvo() {
     '<div style="padding:9px 16px;border-bottom:1px solid #f0f2f6;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
       '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>" +
-    '<div class="ft"><button class="btn" style="width:100%;font-size:12.5px;' +
+    '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12.5px;' +
     (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
-    (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button></div></aside>";
+    (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button>" +
+    '<button class="btn" title="فصل بيانات الساندبوكس عن الحقيقية" style="flex:none;font-size:11.5px;' +
+    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#7b8597;background:#fff;border:1px solid #e0e5ec;') +
+    '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
+    (c.test ? "تجريبي ✓" : "وسم كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
   if (m) m.scrollTop = wasAtBottom ? m.scrollHeight : prevScroll;
 }
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && convoPhone) closeConvo(); });
 window.setCampFilter = (f) => { campFilter = f; render(false); };
+window.toggleShowTest = () => { showTest = !showTest; render(false); };
+function campIsTest(cp) {
+  return cp.targets.length > 0 && cp.targets.every((t) => { const c = contactByPhone(t.phone); return c && c.test; });
+}
+function testToggleChip(nTest) {
+  if (!nTest) return "";
+  return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
+    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#9aa4b4;background:#fff;border:1px dashed #d5dae2;') +
+    '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية 🙈" : "إظهار التجريبية (" + nTest + ") 👁") + "</button>";
+}
 
 function vKmon(d) {
   const inCamp = new Set(); campaigns.forEach((c) => c.targets.forEach((t) => inCamp.add(t.phone)));
@@ -379,7 +402,7 @@ function vKmon(d) {
         '<div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.name) + "</div>" +
         '<div style="font-size:11.5px;color:#5b6678;">' + esc(c.product || "—") + "</div>" +
         '<div style="font-size:11.5px;color:#7b8597;">' + fmtD(c.created_at) + "</div>" +
-        '<div><span class="chip c-ok">جارية</span></div>' +
+        '<div>' + (campIsTest(c) ? '<span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div>" +
         '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#13294b;">' + st.targeted + "</div>" +
         '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2F5F94;">' + st.delivered + "</div>" +
         '<div style="text-align:center;font-size:12.5px;font-weight:700;color:#2E7D77;">' + st.seen + "</div>" +
@@ -388,12 +411,14 @@ function vKmon(d) {
     });
     h += "</div></div></div>";
   }
-  const organic = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
+  const organicAll = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
     .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  if (organic.length) {
-    h += '<div class="sec" style="margin-top:22px;">محادثات خارج الحملات <span class="meta">' + organic.length + ' — انضموا للساندبوكس مباشرة</span></div>' +
+  const organic = showTest ? organicAll : organicAll.filter((c) => !c.test);
+  const nTestOrganic = organicAll.filter((c) => c.test).length;
+  if (organicAll.length) {
+    h += '<div class="sec" style="margin-top:22px;">محادثات خارج الحملات <span class="meta">' + organic.length + ' — انضموا للساندبوكس مباشرة</span> ' + testToggleChip(nTestOrganic) + "</div>" +
       '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-      contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) + "</div>";
+      (organic.length ? contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) : '<div style="padding:22px;text-align:center;color:#9aa4b4;font-size:12px;">كل المحادثات هنا تجريبية — أظهرها بالزر أعلاه</div>') + "</div>";
   }
   return h;
 }
@@ -451,13 +476,16 @@ function vKmonDetail(id, d) {
 }
 
 function vHome(d) {
-  const cs = d.contacts || [];
+  const csAll = d.contacts || [];
+  const cs = showTest ? csAll : csAll.filter((c) => !c.test);
+  const nTest = csAll.filter((c) => c.test).length;
+  const realCampaigns = campaigns.filter((cp) => !campIsTest(cp));
   const interestedList = cs.filter((c) => interestedOf(c) || c.outcome === "handoff");
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
   const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
   let h = '<div class="kpis">' +
-    '<div class="kpi"><div class="k">الحملات</div><div class="v">' + campaigns.length + "</div></div>" +
+    '<div class="kpi"><div class="k">الحملات الحقيقية</div><div class="v">' + realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <span style="font-size:11px;color:#9aa4b4;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</span>" : "") + "</div></div>" +
     '<div class="kpi"><div class="k">المستهدفون</div><div class="v">' + entities.length.toLocaleString("ar-SA") + "</div></div>" +
     '<div class="kpi"><div class="k">وصلت إليهم الرسائل</div><div class="v" style="color:#2E8F89">' + delivered + "</div></div>" +
     '<div class="kpi"><div class="k">ردّوا</div><div class="v" style="color:#2F5F94">' + replied + "</div></div>" +
@@ -467,7 +495,7 @@ function vHome(d) {
     '<a href="#customers" style="text-decoration:none;" class="btn" style="color:#1F4470;background:#E3ECF8;">⬆ استيراد مستهدفين</a>' +
     '<a href="#kb" style="text-decoration:none;color:#1F4470;background:#E3ECF8;border-radius:11px;padding:12px 18px;font-size:13px;font-weight:700;">📚 معرفة المنتج</a></div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">عملاء جادّون الآن</h3><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span></div>" +
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">عملاء جادّون الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
     (interestedList.length
       ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
           const tg = hotOf(c) || (c.tags || [])[0];
@@ -475,7 +503,7 @@ function vHome(d) {
           return '<div onclick="openConvo(\\'' + c.phone + '\\')" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;cursor:pointer;">' +
             '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#13294b;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;">' + esc(c.waName || "غير معروف") + " " +
-            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · جاد 🔥" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا 🤝</span>' : "")) + "</div>" +
+            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · جاد 🔥" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا 🤝</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
             (last ? '<div style="font-size:11px;color:#8a94a4;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "") + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">المحادثة ←</span></div>';
         }).join("") + "</div>"
@@ -486,7 +514,7 @@ function vHome(d) {
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
           return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #f3f5f8;">' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + "</div>" +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#13294b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
             '<div style="font-size:10.5px;color:#9aa4b4;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + st.targeted + ' مستهدف</span><span class="chip c-teal">شوهدت ' + st.seen + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + st.replied + "</span></a>";
         }).join("") + "</div>"

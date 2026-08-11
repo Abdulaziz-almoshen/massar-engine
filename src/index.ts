@@ -244,6 +244,15 @@ app.post("/admin/contact/human", async (req, reply) => {
   return { status: "ok" };
 });
 
+// Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.
+app.post("/admin/contact/test", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { phone, test } = (req.body ?? {}) as { phone?: string; test?: boolean };
+  if (!phone) return reply.code(400).send({ error: "body: { phone, test }" });
+  tracker.setTest(String(phone).replace(/\D/g, ""), Boolean(test));
+  return { status: "ok" };
+});
+
 // ------------------------------ product hub (KB uploads) ------------------------------
 
 app.get("/admin/campaigns", async (req, reply) => {
@@ -295,6 +304,7 @@ app.post("/admin/send-template", async (req, reply) => {
 
 const main = async () => {
   log({ at: "boot", config: configReport() });
+  tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
   if (db.isConnected()) await tracker.hydrate();
   if (db.isConnected()) await agent.refreshKb();

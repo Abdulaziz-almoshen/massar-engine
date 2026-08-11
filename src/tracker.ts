@@ -25,6 +25,7 @@ export type Contact = {
   outcomeReason?: string;
   optedOut: boolean;
   human: boolean;        // true → human took over, agent stays silent
+  test: boolean;         // sandbox/demo traffic — excluded from real campaign views
   agentTurns: number;
 };
 
@@ -47,7 +48,7 @@ export function getContact(phone: string, waName?: string): Contact {
     c = {
       phone, firstSeenAt: Date.now(), lastEventAt: Date.now(),
       statusTimes: {}, transcript: [], tags: [],
-      optedOut: false, human: false, agentTurns: 0,
+      optedOut: false, human: false, test: testNumbers.has(phone), agentTurns: 0,
     };
     contacts.set(phone, c);
   }
@@ -124,6 +125,15 @@ export function setHuman(phone: string, human: boolean) {
   logEvent(human ? "human_takeover" : "agent_resumed", phone, "");
 }
 
+let testNumbers = new Set<string>();
+export function setTestNumbers(nums: string[]) { testNumbers = new Set(nums.filter(Boolean)); }
+export function setTest(phone: string, test: boolean) {
+  const c = getContact(phone);
+  c.test = test;
+  persist(c);
+  logEvent(test ? "marked_test" : "unmarked_test", phone, "");
+}
+
 export function snapshot() {
   return {
     counters,
@@ -153,6 +163,7 @@ export async function hydrate(): Promise<number> {
       outcomeReason: r.outcome_reason ?? undefined,
       optedOut: Boolean(r.opted_out),
       human: Boolean(r.human),
+      test: Boolean(r.test) || testNumbers.has(r.phone),
       agentTurns: Number(r.agent_turns),
     };
     contacts.set(c.phone, c);

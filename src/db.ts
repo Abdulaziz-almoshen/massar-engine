@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS entities (
   created_at BIGINT NOT NULL
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE IF NOT EXISTS campaigns (
   id         BIGSERIAL PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -122,11 +123,11 @@ function fire(q: string, params: unknown[]): void {
 export function upsertContact(c: {
   phone: string; waName?: string; firstSeenAt: number; lastEventAt: number;
   statusTimes: Record<string, number>; outcome?: string; outcomeReason?: string;
-  optedOut: boolean; human: boolean; agentTurns: number; lastError?: string;
+  optedOut: boolean; human: boolean; test?: boolean; agentTurns: number; lastError?: string;
 }): void {
   fire(
-    `INSERT INTO contacts (phone, wa_name, first_seen_at, last_event_at, status_times, outcome, outcome_reason, opted_out, human, agent_turns, last_error)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `INSERT INTO contacts (phone, wa_name, first_seen_at, last_event_at, status_times, outcome, outcome_reason, opted_out, human, test, agent_turns, last_error)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      ON CONFLICT (phone) DO UPDATE SET
        wa_name = COALESCE(EXCLUDED.wa_name, contacts.wa_name),
        last_event_at = EXCLUDED.last_event_at,
@@ -135,10 +136,11 @@ export function upsertContact(c: {
        outcome_reason = EXCLUDED.outcome_reason,
        opted_out = EXCLUDED.opted_out,
        human = EXCLUDED.human,
+       test = EXCLUDED.test,
        agent_turns = EXCLUDED.agent_turns,
        last_error = EXCLUDED.last_error`,
     [c.phone, c.waName ?? null, c.firstSeenAt, c.lastEventAt, JSON.stringify(c.statusTimes),
-     c.outcome ?? null, c.outcomeReason ?? null, c.optedOut, c.human, c.agentTurns, c.lastError ?? null],
+     c.outcome ?? null, c.outcomeReason ?? null, c.optedOut, c.human, Boolean(c.test), c.agentTurns, c.lastError ?? null],
   );
 }
 
@@ -155,7 +157,7 @@ export function insertEvent(phone: string, kind: string, note: string, ts: numbe
 export type HydratedContact = {
   phone: string; wa_name: string | null; first_seen_at: string; last_event_at: string;
   status_times: Record<string, number>; outcome: string | null; outcome_reason: string | null;
-  opted_out: boolean; human: boolean; agent_turns: number; last_error: string | null;
+  opted_out: boolean; human: boolean; test?: boolean; agent_turns: number; last_error: string | null;
 };
 
 /** Load everything needed to rebuild the in-memory tracker at boot. */
