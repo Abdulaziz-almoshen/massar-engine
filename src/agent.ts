@@ -444,6 +444,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
 
   try {
     let finalText = "";
+    let sentOwnBubble = false;
     for (let round = 0; round < 4; round++) {
       const completion = await client.chat.completions.create({
         model, messages, tools, tool_choice: "auto",
@@ -459,6 +460,10 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
           if (tc.type !== "function") continue;
           let args: any = {};
           try { args = JSON.parse(tc.function.arguments || "{}"); } catch {}
+          // Tools that ARE the message (file with caption, buttons) own the bubble for this
+          // turn — enforced in code, because the model was observed ignoring the prompt rule
+          // and appending a second bubble to a live thread.
+          if (tc.function.name === "send_asset" || tc.function.name === "send_buttons") sentOwnBubble = true;
           const result = await execTool(contact, tc.function.name, args);
           messages.push({ role: "tool", tool_call_id: tc.id, content: result });
         }
@@ -469,7 +474,11 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
       break;
     }
 
-    if (finalText) await safeSend(contact.phone, finalText);
+    if (finalText && sentOwnBubble) {
+      console.log(JSON.stringify({ at: "agent", msg: "suppressed trailing bubble after self-contained tool send", phone: contact.phone, dropped: finalText.slice(0, 80) }));
+    } else if (finalText) {
+      await safeSend(contact.phone, finalText);
+    }
   } catch (e) {
     console.error(JSON.stringify({ at: "agent", msg: "turn failed", phone: contact.phone, err: String(e).slice(0, 400) }));
   }
