@@ -1306,9 +1306,14 @@ function vCustomer(ph) {
     '<div style="font-size:10px;font-weight:700;color:#667085;">اكتمال السياق</div></div>' +
     (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#98A2B3;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
     "</div></div>";
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;">' +
-    '<button class="btn btn-teal" onclick="openConvo(\\'' + esc(c.phone) + '\\')">فتح المحادثة</button>' +
-    '<button id="insbtn" class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="refreshInsights()">تحديث قراءة المساعد ↻</button></div>';
+  const hOut = [...(c.transcript || [])].reverse().find((t) => t.role === "system" && t.text.indexOf("نتيجة بشرية") >= 0);
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +
+    '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
+    '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد ↻</button>' +
+    '<span style="flex:1"></span>' +
+    '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
+    [["meeting_booked", "حُجز اجتماع", "#027A48"], ["quote_sent", "أُرسل عرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
+      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (hOut && hOut.text.indexOf(o[0]) >= 0 ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +
