@@ -2,7 +2,7 @@
 // Shell: navy sidebar + grouped nav + topbar. Marketing module screens:
 //   متابعة الحملات — LIVE command center (funnel, contact tracker, transcripts)
 //   إنشاء حملة    — the prototype's 4-step wizard, wired to today's backend (launch gated)
-//   معرفة المنتج   — readiness view over the agent's real seed KB (editing = next phase)
+//   معرفة الخدمة   — readiness view over the agent's real seed KB (editing = next phase)
 //   شركاء المبيعات + non-marketing screens — the prototype's empty-state pattern.
 // Single-file RTL SPA (hash router), 5s refresh from /admin/state (token → localStorage).
 
@@ -251,53 +251,53 @@ let insCache = {};            // phone → cached فهم المساعد (list ro
 let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
-let campMsg = "مرحبًا {name}، معك مساعد لِين الرقمي. نساعد المنشآت الصحية على تقليل زمن إصدار الإجازات المرضية بنسبة 70% بتوثيق رسمي وتكامل مع أنظمتكم. هل يناسبكم عرض تعريفي قصير هذا الأسبوع؟";
+let campMsg = "مرحبًا {name}، معكم مساعد لِين الرقمي. ارتقوا بكفاءة منشأتكم من خلال إصدار الإجازات المرضية بتوثيق رسمي وتكامل مباشر مع أنظمتكم، مما يساهم في تقليل زمن الإصدار بنسبة 70%. يسعدنا التنسيق معكم لعرض آلية التكامل ومناقشة الخطوات القادمة.";
 
 const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
   { grp: "دورة البيع" }, { id: "customers", l: "العملاء", g: "g-ci" }, { id: "opps", l: "فرص البيع", g: "g-tr" }, { id: "pipeline", l: "لوحة المتابعة", g: "g-ba" },
-  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", g: "g-di" }, { id: "kmon", l: "متابعة الحملات", g: "g-ba" }, { id: "kb", l: "معرفة المنتج", g: "g-ri" }, { id: "partners", l: "شركاء المبيعات", g: "g-ci" },
-  { grp: "التخطيط والأداء" }, { id: "products", l: "المنتجات", g: "g-di" }, { id: "targets", l: "المستهدفات", g: "g-ri" }, { id: "reports", l: "التقارير", g: "g-tb" },
+  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", g: "g-di" }, { id: "kmon", l: "متابعة الحملات", g: "g-ba" }, { id: "kb", l: "معرفة الخدمة", g: "g-ri" }, { id: "partners", l: "شركاء المبيعات", g: "g-ci" },
+  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", g: "g-di" }, { id: "targets", l: "جهات الاستهداف", g: "g-ri" }, { id: "reports", l: "التقارير", g: "g-tb" },
   { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", g: "g-tree" },
 ];
 const TITLES = {
-  home: ["الرئيسية", "نظرة عامة على نشاط مسار الحي"],
-  kmon: ["الحملات الذكية", "مركز متابعة أداء حملات المساعد الذكي"],
-  aimkt: ["إنشاء حملة", "أنشئ حملة موجّهة للمنشآت الصحية في خطوات قليلة"],
-  kb: ["معرفة المنتج للمساعد الذكي", "ما يعرفه مساعد المبيعات ويبيع به في واتساب"],
+  home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
+  kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
+  aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
+  kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
-  customers: ["قائمة المستهدفين", "استيراد وإدارة جهات الاستهداف للحملات"],
-  customer: ["ملف العميل ٣٦٠", "هوية العميل، فهم المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
+  customers: ["قائمة المستهدفين", "استورد جهات الاستهداف وأدرها للحملات"],
+  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
   pipeline: ["لوحة متابعة الفرص", "ضمن المرحلة القادمة"], products: ["المنتجات", "ضمن المرحلة القادمة"],
-  targets: ["المستهدفات", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  targets: ["جهات الاستهداف", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
-  { n: "الإجازات المرضية", pitch: "إصدار وإدارة الإجازات المرضية إلكترونيًا بتوثيق رسمي معتمد وتكامل HIS/ERP — التفعيل خلال 5 أيام عمل.", eff: ["زمن الإصدار ↓70%", "لا إدخال مزدوج", "توثيق فوري"], best: ["مجمعات طبية", "مراكز", "مستشفيات", "أسنان"], pricing: "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا" },
-  { n: "فحص الموظفين", pitch: "فحوصات اللياقة الطبية بقوالب معتمدة وتقارير جماعية وربط بملف الموظف.", eff: ["امتثال بلا أوراق", "تقارير بضغطة"], best: ["مستشفيات", "مجمعات", "كثافة توظيف"], pricing: "سنوي لكل فحص — يحدده المختص" },
-  { n: "التقارير الطبية", pitch: "تقارير معتمدة إلكترونيًا بتوقيع رقمي وأرشفة مركزية.", eff: ["دقائق بدل أيام", "أرشيف مركزي"], best: ["مراكز", "مختبرات", "عيادات"], pricing: "سنوي حسب الحجم — يحدده المختص" },
-  { n: "خدمات التطعيمات", pitch: "إدارة وتوثيق التطعيمات بسجل موحّد وتنبيهات جرعات.", eff: ["توثيق لحظي", "تنبيهات آلية"], best: ["مراكز صحية", "صيدليات"], pricing: "سنوي — يحدده المختص" },
-  { n: "الشهادات الصحية", pitch: "إصدار فوري للشهادات الصحية بتحقق QR وسجل مركزي.", eff: ["إصدار فوري", "تحقق QR"], best: ["صيدليات", "مراكز"], pricing: "سنوي — يحدده المختص" },
-  { n: "تكامل الأنظمة (HIS/ERP)", pitch: "ربط خدمات لِين بأنظمة المنشأة — تنفيذ خلال أسبوعين.", eff: ["لا إدخال مزدوج", "أسبوعان تنفيذ"], best: ["مستشفيات", "مجمعات كبيرة"], pricing: "مشروع + اشتراك — يحدده المختص" },
+  { n: "الإجازات المرضية", pitch: "مكّن منشأتكم من إصدار الإجازات المرضية وإدارتها إلكترونيًا، بتوثيق رسمي وتكامل مباشر مع HIS وERP، والتفعيل خلال 5 أيام عمل.", eff: ["زمن الإصدار ↓70%", "لا إدخال مزدوج", "توثيق فوري"], best: ["مجمعات طبية", "مراكز", "مستشفيات", "أسنان"], pricing: "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا" },
+  { n: "فحص الموظفين", pitch: "مكّن منشأتكم من إدارة فحوصات اللياقة الطبية بقوالب معتمدة، وتقارير جماعية، وربط مباشر بملف الموظف.", eff: ["امتثال دون معاملات ورقية", "تقارير جاهزة"], best: ["مستشفيات", "مجمعات", "كثافة توظيف"], pricing: "سنوي لكل فحص — يحدده المختص" },
+  { n: "التقارير الطبية", pitch: "أصدر تقارير طبية معتمدة إلكترونيًا، بتوقيع رقمي وأرشفة مركزية.", eff: ["دقائق بدل أيام", "أرشيف مركزي"], best: ["مراكز", "مختبرات", "عيادات"], pricing: "سنوي حسب الحجم — يحدده المختص" },
+  { n: "خدمات التطعيمات", pitch: "مكّن منشأتكم من إدارة التطعيمات وتوثيقها عبر سجل موحّد وتنبيهات للجرعات.", eff: ["توثيق لحظي", "تنبيهات آلية"], best: ["مراكز صحية", "صيدليات"], pricing: "سنوي — يحدده المختص" },
+  { n: "الشهادات الصحية", pitch: "مكّن منشأتكم من إصدار الشهادات الصحية فورًا، مع تحقق QR وسجل مركزي.", eff: ["إصدار فوري", "تحقق QR"], best: ["صيدليات", "مراكز"], pricing: "سنوي — يحدده المختص" },
+  { n: "تكامل الأنظمة (HIS/ERP)", pitch: "مكّن منشأتكم من استخدام خدمات لِين داخل أنظمتها، عبر تكامل يُنفّذ خلال أسبوعين.", eff: ["لا إدخال مزدوج", "تنفيذ خلال أسبوعين"], best: ["مستشفيات", "مجمعات كبيرة"], pricing: "مشروع تكامل واشتراك سنوي — يحدده المختص" },
 ];
 const PRODUCTS = [
   { n: "الإجازات المرضية", sc: 92, gaps: [] },
   { n: "فحص الموظفين", sc: 74, gaps: ["أسئلة شائعة", "مواد معتمدة"] },
   { n: "التقارير الطبية", sc: 71, gaps: ["مقارنة المنافسين"] },
-  { n: "خدمات التطعيمات", sc: 55, gaps: ["أسئلة شائعة", "ردود الاعتراضات"] },
-  { n: "الشهادات الصحية", sc: 55, gaps: ["أسئلة شائعة", "ردود الاعتراضات"] },
+  { n: "خدمات التطعيمات", sc: 55, gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
+  { n: "الشهادات الصحية", sc: 55, gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
   { n: "تكامل الأنظمة (HIS/ERP)", sc: 63, gaps: ["التسعير التفصيلي"] },
 ];
 const KB_SECTIONS = [
   ["نظرة عامة على المنتج", "الوصف وآلية العمل ومدة التنفيذ", "ok", "مكتمل"],
-  ["القيمة المقدَّمة", "جُمل الإقناع: زمن الإصدار ↓70%، لا إدخال مزدوج، توثيق فوري", "ok", "مكتمل"],
-  ["العملاء المستهدفون", "المجمعات والمراكز والمستشفيات ومراكز الأسنان", "ok", "مكتمل"],
+  ["القيمة التشغيلية", "القيمة التشغيلية: زمن الإصدار ↓70%، دون إدخال مزدوج، وتوثيق فوري", "ok", "مكتمل"],
+  ["جهات الاستهداف", "المجمعات والمراكز والمستشفيات ومراكز الأسنان", "ok", "مكتمل"],
   ["التسعير والباقات", "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا", "ok", "مكتمل"],
   ["الأسئلة الشائعة", "الاعتماد، مدة الربط (5 أيام)، التجربة (14 يومًا)", "ok", "3 عناصر"],
   ["معالجة الاعتراضات", "«السعر مرتفع» · «عندنا نظام حالي»", "warn", "2 من 8"],
-  ["مقارنة المنافسين", "غير مُدخلة بعد", "bad", "لم يبدأ"],
-  ["ضوابط المساعد", "لا خصومات، لا مواعيد غير معتمدة، تحويل الشكاوى لمختص", "ok", "مكتمل"],
-  ["مواد ومرفقات", "سجل الملفات فارغ — أضف الكتيبات لتفعيل الإرسال", "warn", "0 ملفات"],
+  ["مقارنة المنافسين", "لم تُسجّل بعد", "bad", "لم يبدأ"],
+  ["ضوابط المساعد", "لا خصومات أو مواعيد غير معتمدة، وتُحال الشكاوى إلى مختص المبيعات", "ok", "مكتمل"],
+  ["مواد ومرفقات", "لا توجد ملفات. أضف الملفات التعريفية لتفعيل الإرسال.", "warn", "0 ملفات"],
 ];
 
 function nav() {
@@ -319,8 +319,8 @@ function chipRow(c) {
   const st = c.statusTimes || {}; const seen = st.read || st.replied; let h = "";
   if (st.sent || (c.transcript || []).some((t) => t.role === "agent")) h += '<span class="chip c-grey">أُرسلت</span>';
   if (st.delivered) h += '<span class="chip c-blue">وصلت</span>';
-  if (seen) h += '<span class="chip c-teal">شوهدت ✓</span>';
-  const oc = { later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "محوّلة لمختص"], opted_out: ["c-bad", "أوقف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
+  if (seen) h += '<span class="chip c-teal">شوهدت</span>';
+  const oc = { later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "مُحالة إلى مختص المبيعات"], opted_out: ["c-bad", "إيقاف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
   if (oc) h += '<span class="chip ' + oc[0] + '">' + oc[1] + "</span>";
   if (c.human) h += '<span class="chip c-warn">المساعد متوقف — بيد البشر</span>';
   if ((c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered) h += '<span class="chip c-bad">فشل الإرسال</span>';
@@ -333,9 +333,9 @@ function funnelData(d) {
   const cs = d.contacts || []; const n = cs.length;
   const cnt = (f) => cs.filter(f).length;
   return [
-    ["العملاء المستهدفون", n], ["تم إرسال الرسائل", cnt((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent"))],
-    ["تم التسليم", cnt((c) => (c.statusTimes || {}).delivered)], ["تمت المشاهدة", cnt((c) => (c.statusTimes || {}).read || (c.statusTimes || {}).replied)],
-    ["تم الرد", cnt((c) => (c.statusTimes || {}).replied)], ["العملاء المهتمون", cnt((c) => c.outcome === "interested")],
+    ["جهات الاستهداف", n], ["أُرسلت الرسائل", cnt((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent"))],
+    ["وصلت الرسائل", cnt((c) => (c.statusTimes || {}).delivered)], ["شوهدت الرسائل", cnt((c) => (c.statusTimes || {}).read || (c.statusTimes || {}).replied)],
+    ["وردت الردود", cnt((c) => (c.statusTimes || {}).replied)], ["الجهات المهتمة", cnt((c) => c.outcome === "interested")],
   ];
 }
 
@@ -359,7 +359,7 @@ function interestChips(c) {
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
   if (latest.size) {
-    const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
+    const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "اهتمام منخفض"] };
     return [...latest.values()].map((t) => {
       const m = lv[t.level] || lv.warm;
       return '<span class="chip ' + m[0] + '">' + esc(t.product) + " · " + m[1] + "</span>";
@@ -391,15 +391,15 @@ window.setHuman = async (phone, val) => {
   try {
     const r = await fetch("/admin/contact/human", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, human: val }) });
     if (!r.ok) { alertBar("تعذّر تبديل حالة المساعد (" + r.status + ")", true); return; }
-    alertBar(val ? "توقف المساعد — المحادثة بيدك الآن" : "استأنف المساعد المحادثة ✓", false);
-  } catch (e) { alertBar("تعذّر الاتصال بالخادم — أعد المحاولة", true); return; }
+    alertBar(val ? "توقف المساعد، وأصبحت المحادثة بيدكم" : "استأنف المساعد المحادثة", false);
+  } catch (e) { alertBar("تعذّر الاتصال بالخادم. أعد المحاولة.", true); return; }
   await refresh();
 };
 window.setTestFlag = async (phone, val) => {
   try {
     const r = await fetch("/admin/contact/test", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ phone, test: val }) });
     if (!r.ok) { alertBar("تعذّر تحديث الوسم (" + r.status + ")", true); return; }
-    alertBar(val ? "وُسمت المحادثة كتجريبية — خارج الأرقام الحقيقية" : "أُعيدت المحادثة للبيانات الحقيقية", false);
+    alertBar(val ? "صُنّفت المحادثة كتجريبية، ولن تُحتسب ضمن البيانات الفعلية" : "أُعيدت المحادثة إلى البيانات الفعلية", false);
   } catch (e) { alertBar("تعذّر الاتصال بالخادم", true); return; }
   await refresh();
 };
@@ -433,11 +433,11 @@ function renderConvo() {
     '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12.5px;' +
     (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
-    (c.human ? "استئناف المساعد ▶" : "إيقاف المساعد — أنا أتولى المحادثة") + "</button>" +
-    '<button class="btn" title="فصل بيانات الساندبوكس عن الحقيقية" style="flex:none;font-size:11.5px;' +
+    (c.human ? "استئناف المساعد" : "إيقاف المساعد") + "</button>" +
+    '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:11.5px;' +
     (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#667085;background:#fff;border:1px solid #D0D5DD;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
-    (c.test ? "تجريبي ✓" : "وسم كتجريبي") + "</button></div></aside>";
+    (c.test ? "تجريبي" : "تصنيف كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
   if (m) m.scrollTop = wasAtBottom ? m.scrollHeight : prevScroll;
 }
@@ -460,7 +460,7 @@ function testToggleChip(nTest) {
 function vKmon(d) {
   const inCamp = new Set(); campaigns.forEach((c) => c.targets.forEach((t) => inCamp.add(t.phone)));
   const tabs = [["all", "الكل", campaigns.length],
-    ["real", "حقيقية", campaigns.filter((c) => !campIsTest(c)).length],
+    ["real", "فعلية", campaigns.filter((c) => !campIsTest(c)).length],
     ["test", "تجريبية", campaigns.filter((c) => campIsTest(c)).length]];
   const q = campQ.trim();
   let list = campaigns.filter((c) =>
@@ -472,7 +472,7 @@ function vKmon(d) {
   else withSt.sort((a, b) => Number(b.c.created_at) - Number(a.c.created_at));
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 
-  let h = '<div class="ptitle rise"><div><h1>الحملات</h1><p>كل إطلاق، أرقامه الحقيقية، ونتيجته — اضغط أي حملة لفتح لوحتها</p></div>' +
+  let h = '<div class="ptitle rise"><div><h1>الحملات</h1><p>كل إطلاق، أرقامه الفعلية، ونتيجته — اضغط أي حملة لفتح لوحتها</p></div>' +
     '<div class="acts"><button class="btn btn-ghost" onclick="exportCampaigns()">' + ic("doc", 17) + ' تصدير CSV</button>' +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px;" class="rise">' +
@@ -501,7 +501,7 @@ function vKmon(d) {
       : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
         : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
     h += '<div class="trow" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '" role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة حقيقية مفعّلة") + '" title="' + (isTest ? "حملة تجريبية (ساندبوكس)" : "حملة حقيقية مفعّلة") + '"><i></i></span>' +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '" role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية مفعّلة") + '" title="' + (isTest ? "حملة تجريبية (ساندبوكس)" : "حملة فعلية مفعّلة") + '"><i></i></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
       '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
       '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
@@ -520,14 +520,14 @@ function vKmon(d) {
   return h;
 }
 window.exportCampaigns = () => {
-  const rows = [["الحملة", "المنتج", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "مهتمون"]];
+  const rows = [["الحملة", "المنتج", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "جهات مهتمة"]];
   campaigns.forEach((c) => { const st = campStats(c); rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]); });
   const safe = (x) => { let v = String(x); if (/^[=+\\-@\\t\\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
   const csv = "\\ufeff" + rows.map((r) => r.map(safe).join(",")).join("\\n");
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   a.download = "massar-campaigns.csv"; a.click();
-  alertBar("صُدّر ملف الحملات ✓", false);
+  alertBar("صُدّر ملف الحملات", false);
 };
 
 let rQ = "";
@@ -548,18 +548,18 @@ function vKmonDetail(id, d) {
   h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
     '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
     '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
-    (st.replied ? "وصلت إلى " + st.delivered + " جهة، ردّ " + st.replied + " منهم" + (st.interested ? " وأبدى " + st.interested + " اهتمامًا جادًا" : "") + "." : "أُرسلت — بانتظار أول ردّ.") + "</div></div>" +
+    (st.replied ? "وصلت إلى " + st.delivered + " جهة، ردّ " + st.replied + " منهم" + (st.interested ? " وأبدى " + st.interested + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
-    [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["مهتمون لكل ١٠٠", yieldPer100]]
+    [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
       .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + x[1] + '<span style="font-size:14px;color:#9FC0E4;">%</span></div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + "</div></div>").join("") +
     "</div></div>";
   const cards = [
-    ["المستهدفون", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
-    ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["مهتمون", st.interested, "#1f8a52"],
+    ["جهات الاستهداف", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
+    ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["جهات مهتمة", st.interested, "#1f8a52"],
   ];
   h += '<div class="statgrid">' + cards.map((c, i) =>
     '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + c[1] + "</div>" +
-    '<div class="p">' + (i === 0 ? "&nbsp;" : pct(c[1]) + "% من المستهدفين") + "</div>" +
+    '<div class="p">' + (i === 0 ? "&nbsp;" : pct(c[1]) + "% من جهات الاستهداف") + "</div>" +
     '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
   const seenSilent = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied);
@@ -570,10 +570,10 @@ function vKmonDetail(id, d) {
   lostHere.forEach((i) => { causeTally[i.loss_cause] = (causeTally[i.loss_cause] || 0) + 1; });
   const topCause = Object.keys(causeTally).sort((a, b) => causeTally[b] - causeTally[a])[0];
   const moves = [];
-  if (hotHere.length) moves.push(["اتصل أولًا بـ" + hotHere.length + " عميلًا جادًا", "هم أعلى احتمال إغلاق في هذه الحملة — ابدأ بهم قبل أن يبردوا", "#027A48", "#ECFDF3"]);
-  if (seenSilent.length) moves.push(["أعد استهداف " + seenSilent.length + " جهة شاهدت ولم تردّ", "الاهتمام موجود والرسالة لم تُقنع — غيّر الزاوية" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
-  if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام أو أعد المحاولة في وقت آخر", "#B42318", "#FEF3F2"]);
-  if (topCause) moves.push(["أبرز سبب خسارة: " + topCause, "عالجه في رسالة الحملة القادمة لهذا المنتج", "#2F5F94", "#EFF4FB"]);
+  if (hotHere.length) moves.push(["ابدأ التواصل مع" + hotHere.length + " فرصة مؤهلة", "أظهرت هذه الجهات أعلى مؤشرات التقدم في الحملة، فابدأ التواصل معها", "#027A48", "#ECFDF3"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + seenSilent.length + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
+  if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
+  if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB"]);
   if (moves.length) {
     h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "الخطوة التالية لهذه الحملة</h3>" +
       '<span class="cntpill">' + moves.length + " توصية</span></div>" +
@@ -584,10 +584,10 @@ function vKmonDetail(id, d) {
   }
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
-    ["seen", "شوهدت ✓", st.seen, (r) => seenOf(r.contact)],
+    ["seen", "شوهدت", st.seen, (r) => seenOf(r.contact)],
     ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
-    ["interested", "مهتمون", st.interested, (r) => interestedOf(r.contact)],
-    ["silent", "شوهدت بلا ردّ", seenSilent.length, (r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied],
+    ["interested", "جهات مهتمة", st.interested, (r) => interestedOf(r.contact)],
+    ["silent", "شوهدت دون ردّ", seenSilent.length, (r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied],
     ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
@@ -599,7 +599,7 @@ function vKmonDetail(id, d) {
     targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
   };
   h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EAECF0;background:#fff;">' +
-    '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">المستهدفون</span>' +
+    '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">جهات الاستهداف</span>' +
     '<span style="font-size:11px;color:#98A2B3;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
@@ -630,11 +630,11 @@ function vHome(d) {
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد مستهدفين</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
-    kpi("send", "الحملات الحقيقية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
-    kpi("users", "المستهدفون", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
-    kpi("check", "وصلت إليهم الرسائل", delivered, ["#E9F7F6", "#1F7A73"]) +
+    kpi("send", "الحملات الفعلية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
+    kpi("users", "جهات الاستهداف", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
+    kpi("check", "وصلت الرسائل إلى الجهات", delivered, ["#E9F7F6", "#1F7A73"]) +
     kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
-    kpi("flame", "مهتمون وجادّون", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
+    kpi("flame", "جهات مهتمة ومؤهلة", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
   h += vActionQueue(cs);
   h += vHomeCharts(cs);
   h += vWinLoss();
@@ -653,7 +653,7 @@ function vHome(d) {
               : (last ? '<div style="font-size:11px;color:#667085;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;line-height:1.9;">حين يرصد المساعد عميلًا جادًا سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
+      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;line-height:1.9;">حين يرصد المساعد فرصة مؤهلة سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
     (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F2F4F7;font-size:11px;color:#667085;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#101828;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
@@ -723,7 +723,7 @@ window.launchWithProduct = (name) => {
 window.startRetarget = () => {
   if (!lastDetailCohort || !lastDetailCohort.targets.length) return;
   retargetCohort = lastDetailCohort;
-  if (!campName.trim()) campName = "إعادة استهداف — " + retargetCohort.label + " — " + retargetCohort.campaign;
+  if (!campName.trim()) campName = "إعادة التواصل — " + retargetCohort.label + " — " + retargetCohort.campaign;
   location.hash = "aimkt";
 };
 window.clearRetarget = () => { retargetCohort = null; campName = ""; render(false); };
@@ -746,7 +746,7 @@ window.confirmLaunch = async () => {
     alertBar("أُرسلت " + d.sent + " من " + d.requested + " — افتحنا لك لوحة الحملة", false);
     entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
-  } catch (e) { launching = false; closeLaunch(); alertBar("خطأ في الإطلاق", true); }
+  } catch (e) { launching = false; closeLaunch(); alertBar("تعذّر الإطلاق", true); }
 };
 window.alertBar = (txt, bad) => {
   const el = document.createElement("div");
@@ -760,7 +760,7 @@ function wizProducts() { return kbRegistry(); }
 function vAimkt() {
   const reg = wizProducts();
   if (selProd >= reg.length) selProd = 0;
-  const tone = (sc) => sc >= 80 ? ["#1f8a52", "جاهز للبيع", "c-ok"] : sc >= 60 ? ["#b5810f", "جاهز بتحفّظ", "c-warn"] : ["#c43d3d", "غير جاهز", "c-bad"];
+  const tone = (sc) => sc >= 80 ? ["#1f8a52", "جاهز للاستخدام", "c-ok"] : sc >= 60 ? ["#b5810f", "جاهز جزئيًا", "c-warn"] : ["#c43d3d", "غير جاهز", "c-bad"];
   const m = entMatches();
   const selN = launchTargets().length;
   const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));
@@ -779,7 +779,7 @@ function vAimkt() {
     }).join("") + "</div></div>";
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يتحدّث فورًا.</div></div>' +
-    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة معاد استهدافها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
+    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
@@ -830,9 +830,9 @@ function vAimkt() {
     '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + "</div></div>" +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
-    ["أرغب بعرض تعريفي", "أرسلوا التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
+    ["تنسيق عرض تعريفي", "إرسال التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذا المنتج بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة المنتج ليُضمَّن.</div>') +
+    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذا المنتج بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة الخدمة ليُضمَّن.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
@@ -841,7 +841,7 @@ function vAimkt() {
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + selN.toLocaleString("ar-SA") + " مستهدف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + selN.toLocaleString("ar-SA") + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
     '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
@@ -914,7 +914,7 @@ function kbRegistry() {
 function uploadZone(scopedProduct) {
   return '<div onclick="kbPick()" style="border:1.5px dashed #D0D5DD;background:#F9FAFB;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
     '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#101828;">' + (scopedProduct ? "ارفع ملف هذا المنتج — PDF أو Word أو PowerPoint" : "أضف منتجًا جديدًا بملفه — PDF أو Word أو PowerPoint") + "</div>" +
+    '<div style="font-size:13.5px;font-weight:700;color:#101828;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
     '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذا المنتج ويقرأه المساعد فورًا" : "<br>يُستخرج اسم المنتج من الملف تلقائيًا") + "</div></div>" +
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
@@ -972,7 +972,7 @@ function vKbProduct(name) {
     '<span class="chip c-ok">رابحة ' + ((wlProd && wlProd.won) || 0) + "</span>" +
     '<span class="chip c-bad">خاسرة ' + ((wlProd && wlProd.lost) || 0) + "</span>" +
     '<span class="chip c-blue">نشطة ' + ((wlProd && wlProd.active) || 0) + "</span></div>" +
-    (prodCauses.length ? '<div style="font-size:11.5px;color:#B42318;margin-top:8px;font-weight:600;">أبرز سبب خسارة: ' + esc(prodCauses[0].cause) + "</div>" : "") + "</div>" +
+    (prodCauses.length ? '<div style="font-size:11.5px;color:#B42318;margin-top:8px;font-weight:600;">أبرز أسباب عدم الإغلاق: ' + esc(prodCauses[0].cause) + "</div>" : "") + "</div>" +
     '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-teal" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذا المنتج ←</button></div></div>';
   const pa = prodAssets.find((a) => a.product === name);
   h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
@@ -982,7 +982,7 @@ function vKbProduct(name) {
     '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;">' + (pa ? "استبدال الملف التعريفي (PDF)" : "ارفع الملف التعريفي (PDF)") + "</div></div>" +
     '<input id="pafile" type="file" accept=".pdf" style="display:none" data-product="' + esc(name) + '" onchange="paUpload(this)">' +
     '<div id="pastat" style="margin-top:10px;"></div></div>';
-  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المعرفة (Pitch Deck)" : "ارفع ملف المعرفة لهذا المنتج") + "</h3>" + uploadZone(name) + "</div>";
+  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المعرفة (Pitch Deck)" : "ارفع ملف معرفة الخدمة") + "</h3>" + uploadZone(name) + "</div>";
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
@@ -990,7 +990,7 @@ function vKbProduct(name) {
   }
   if (seedP) {
     h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
-      [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["الأنسب لـ", seedP.best.join("، ")], ["التسعير المسموح ذكره", seedP.pricing]]
+      [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["ملائم لـ", seedP.best.join("، ")], ["التسعير المعتمد", seedP.pricing]]
         .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
   }
   if (name === "الإجازات المرضية") {
@@ -1053,7 +1053,7 @@ window.entDel = async (id) => {
 function vCustomers() {
   let h = '<div class="card">' +
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-    '<h3 style="margin:0;flex:1;min-width:180px;">المستهدفون</h3>' +
+    '<h3 style="margin:0;flex:1;min-width:180px;">جهات الاستهداف</h3>' +
     '<button class="btn btn-teal" style="font-size:12.5px;padding:11px 18px;" onclick="entFilePick()">⬆ رفع ملف Excel/CSV</button>' +
     '<a href="/assets/audience-template.xlsx" download class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;text-decoration:none;">القالب الجاهز</a></div>' +
     '<div style="font-size:11px;color:#98A2B3;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
@@ -1067,7 +1067,7 @@ function vCustomers() {
   const cq = custQ.trim();
   const cm = cq ? entities.filter((e) => e.name.includes(cq) || e.phone.includes(cq)) : entities;
   const cshown = cm.slice(0, LIST_CAP);
-  h += '<div class="sec">المستهدفون <span class="meta">' + entities.length.toLocaleString("ar-SA") + " جهة" +
+  h += '<div class="sec">جهات الاستهداف <span class="meta">' + entities.length.toLocaleString("ar-SA") + " جهة" +
     (groups.length ? " · شرائح: " + groups.map((g) => esc(g.key)).join("، ") : "") + "</span></div>";
   if (!entities.length) {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
@@ -1129,7 +1129,7 @@ function funnelSvgUnused(rows) {
       '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + r[1].toLocaleString("ar-SA") + "</text>";
   });
   return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
-    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="قمع الحملات">' + shapes + "</svg></div>" +
+    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار تحويل الحملات">' + shapes + "</svg></div>" +
     '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
     rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#344054;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
 }
@@ -1182,7 +1182,7 @@ function vHomeCharts(cs) {
   const camps = showTest ? campaigns : campaigns.filter((cp) => !campIsTest(cp));
   const agg = { targeted: 0, sent: 0, delivered: 0, seen: 0, replied: 0, interested: 0 };
   camps.forEach((cp) => { const st = campStats(cp); Object.keys(agg).forEach((k) => { agg[k] += st[k] || 0; }); });
-  const funnel = [["المستهدفون", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["مهتمون", agg.interested, "#1f8a52"]];
+  const funnel = [["جهات الاستهداف", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["جهات مهتمة", agg.interested, "#1f8a52"]];
   const byProd = new Map();
   cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
   const prodRows = [...byProd.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
@@ -1196,22 +1196,22 @@ function vHomeCharts(cs) {
   });
   const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات الساندبوكس التجريبية" : " · بيانات حقيقية فقط") + "</span></div>";
+  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("قمع التسويق", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "حقيقية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
       '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
       '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
     : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
-  h += chartCard("الاهتمام حسب المنتج", "من وسوم المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("المستهدفون حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  h += chartCard("الاهتمام حسب المنتج", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("جهات الاستهداف حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
 }
-const DEAL_META = { won: ["صفقة رابحة", "#027A48", "#ECFDF3"], lost: ["خسرناها", "#B42318", "#FEF3F2"], stalled: ["تجمّدت", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
+const DEAL_META = { won: ["صفقة مكتسبة", "#027A48", "#ECFDF3"], lost: ["غير مكتسبة", "#B42318", "#FEF3F2"], stalled: ["متوقفة", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
 function vActionQueue(cs) {
   const now = Date.now();
   const hotIdle = cs.filter((c) => {
@@ -1228,17 +1228,17 @@ function vActionQueue(cs) {
   const items = [];
   hotIdle.slice(0, 3).forEach((c) => {
     const ins = insCache[c.phone] || {};
-    items.push(["call", "اتصل الآن — عميل جاد يبرد", (c.waName || c.phone) + " · " + Math.round((now - (c.lastEventAt || 0)) / 3600e3) + " ساعة بلا متابعة",
-      ins.next_action || "تواصل مباشرة قبل أن يفتر", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
+    items.push(["call", "تواصل الآن مع الفرصة المؤهلة", (c.waName || c.phone) + " · " + Math.round((now - (c.lastEventAt || 0)) / 3600e3) + " ساعة بلا متابعة",
+      ins.next_action || "تواصل مباشرة لاستكمال الاهتمام", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
   });
   if (seenNoReply.length) {
-    items.push(["retarget", "فرصة إعادة استهداف", seenNoReply.length + " جهة شاهدت الرسالة ولم تردّ",
-      "أعد استهدافهم بزاوية مختلفة — الاهتمام موجود، الرسالة لم تُقنع", "kmon", "#B54708", "#FFFAEB"]);
+    items.push(["retarget", "فرصة لإعادة التواصل", seenNoReply.length + " جهة شاهدت الرسالة دون ردّ",
+      "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", "kmon", "#B54708", "#FFFAEB"]);
   }
   stalled.slice(0, 2).forEach((c) => {
     const ins = insCache[c.phone] || {};
-    items.push(["revive", "صفقة متجمّدة", (c.waName || c.phone) + (ins.loss_cause ? " · " + ins.loss_cause : ""),
-      ins.fix_suggestion || "أعد الإحياء بمعلومة جديدة", "customer/" + c.phone, "#2F5F94", "#EFF4FB"]);
+    items.push(["revive", "صفقة متوقفة", (c.waName || c.phone) + (ins.loss_cause ? " · " + ins.loss_cause : ""),
+      ins.fix_suggestion || "تابع بمعلومة جديدة", "customer/" + c.phone, "#2F5F94", "#EFF4FB"]);
   });
   if (!items.length) return "";
   return '<div class="card rise" style="margin-bottom:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
@@ -1262,7 +1262,7 @@ function vWinLoss() {
     ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + (t[k] || 0) + "</span>").join("") + "</div></div>" +
     '<div style="font-size:11px;color:#98a2b3;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
   if (!judged && !(t.active || 0)) {
-    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة رابحة أو خاسرة ستظهر هنا بسببها.</div></div>';
+    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو خاسرة ستظهر هنا بسببها.</div></div>';
     return h;
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
@@ -1278,12 +1278,12 @@ function vWinLoss() {
   h += "</div>";
   if ((winloss.by_product || []).length) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F2F4F7;">' +
-      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " رابحة · " + pr.lost + " خاسرة</span>").join("") + "</div>";
+      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " مكتسبة · " + pr.lost + " خاسرة</span>").join("") + "</div>";
   }
   h += "</div>";
   return h;
 }
-const INTENT_META = { high: ["نية شراء مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#667085"], none: ["لا إشارة بعد", "#98A2B3"] };
+const INTENT_META = { high: ["نية مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#667085"], none: ["لا إشارة بعد", "#98A2B3"] };
 function toneBadge(label, color) {
   return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #EAECF0;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#344054;">' +
     '<span style="width:8px;height:8px;border-radius:999px;background:' + color + ';"></span>' + esc(label) + "</span>";
@@ -1321,13 +1321,13 @@ function vCustomer(ph) {
     '<div style="font-size:10px;font-weight:700;color:#667085;">اكتمال السياق</div></div>' +
     (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#98A2B3;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
     "</div></div>";
-  const hOut = [...(c.transcript || [])].reverse().find((t) => t.role === "system" && t.text.indexOf("نتيجة بشرية") >= 0);
+  const hOut = [...(c.transcript || [])].reverse().find((t) => t.role === "system" && t.text.indexOf("نتيجة موثقة يدويًا") >= 0);
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
-    '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد ↻</button>' +
+    '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
     '<span style="flex:1"></span>' +
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
-    [["meeting_booked", "حُجز اجتماع", "#027A48"], ["quote_sent", "أُرسل عرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
+    [["meeting_booked", "حُجز اجتماع", "#027A48"], ["quote_sent", "أُرسل العرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
       .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (hOut && hOut.text.indexOf(o[0]) >= 0 ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد
@@ -1342,7 +1342,7 @@ function vCustomer(ph) {
       '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
       '<div style="font-size:14px;font-weight:700;color:#101828;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
     const dmx = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
-    const mcards = [["نية الشراء", im[0], im[1]], ["حكم الصفقة", dmx[0], dmx[1]], ["القناة المفضّلة", "واتساب", "#1F7A73"], ["أفضل وقت", (ins.best_time || "—").slice(0, 30), "#2F5F94"]];
+    const mcards = [["نية الشراء", im[0], im[1]], ["حكم الصفقة", dmx[0], dmx[1]], ["القناة المفضّلة", "واتساب", "#1F7A73"], ["وقت التواصل", (ins.best_time || "—").slice(0, 30), "#2F5F94"]];
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">' +
       mcards.map((m) => '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:13px 14px;">' +
         '<div style="font-size:10.5px;color:#667085;font-weight:600;">' + m[0] + "</div>" +
@@ -1360,7 +1360,7 @@ function vCustomer(ph) {
       '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">الخطوة التالية</div>' +
       '<div style="font-size:13px;font-weight:700;color:#101828;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
       (ins.why ? '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
-      (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">أفضل وقت: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
+      (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">وقت التواصل: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
   }
   h += "</div>";
   // timeline
@@ -1512,7 +1512,7 @@ window.setOutcome = async (btn) => {
     const r = await fetch("/admin/contact/outcome", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({ phone: btn.dataset.ph, outcome: btn.dataset.out }) });
     if (!r.ok) { alertBar("تعذّر تسجيل النتيجة (" + r.status + ")", true); return; }
-    alertBar("سُجّلت النتيجة ✓ — تدخل ضمن قياس أثر الحملات", false);
+    alertBar("سُجّلت النتيجة، وستُحتسب ضمن قياس أثر الحملات", false);
     await refresh();
   } catch (e) { alertBar("تعذّر الاتصال بالخادم", true); }
 };
@@ -1522,9 +1522,9 @@ window.refreshInsights = async () => {
   if (el) el.textContent = "جارٍ القراءة…";
   try {
     const pr = await fetch("/admin/customer/" + profilePhone + "?refresh=1", { headers: { "x-admin-token": TOKEN } });
-    if (pr.ok) { profileData = await pr.json(); render(false); alertBar("حُدّثت قراءة المساعد لهذا العميل ✓", false); }
-    else { if (el) el.textContent = "تحديث قراءة المساعد ↻"; alertBar("تعذّر التحديث (" + pr.status + ") — أعد المحاولة", true); }
-  } catch (e) { const el2 = document.getElementById("insbtn"); if (el2) el2.textContent = "تحديث قراءة المساعد ↻"; alertBar("تعذّر تحديث القراءة", true); }
+    if (pr.ok) { profileData = await pr.json(); render(false); alertBar("حُدّثت قراءة المساعد لهذه الجهة", false); }
+    else { if (el) el.textContent = "تحديث قراءة المساعد"; alertBar("تعذّر التحديث (" + pr.status + ") — أعد المحاولة", true); }
+  } catch (e) { const el2 = document.getElementById("insbtn"); if (el2) el2.textContent = "تحديث قراءة المساعد"; alertBar("تعذّر تحديث القراءة", true); }
 };
 window.addEventListener("hashchange", () => {
   if (convoPhone) closeConvo(); rQ = "";

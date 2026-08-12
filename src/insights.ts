@@ -32,17 +32,17 @@ export type Insights = {
   fix_suggestion?: string;     // what would likely have won/revived it
 };
 
-export const LOSS_TAXONOMY = ["السعر", "التوقيت", "منتج غير مناسب", "تواصل غير واضح", "الملف غير واضح", "لا استجابة", "جهة غير مناسبة", "طلب تدخلًا بشريًا"] as const;
+export const LOSS_TAXONOMY = ["التكلفة", "التوقيت", "عدم ملاءمة الخدمة", "عدم وضوح التواصل", "عدم وضوح الملف التعريفي", "لا استجابة", "عدم ملاءمة الجهة", "طلب التواصل مع مختص"] as const;
 
 const SYSTEM = [
-  "أنت محلل مبيعات في لِين للصحة الرقمية. ستقرأ محادثة واتساب واحدة بين مساعد بيع آلي وعميل منشأة صحية، مع وسوم الاهتمام وحالة التسليم وبيانات الجهة إن وجدت.",
-  "أخرج فقط ما تدعمه المحادثة نصًا — لا تخترع نية أو اعتراضًا لم يظهر. اكتب بالعربية الفصحى المبسطة وباختصار شديد.",
-  "intent: high = طلب سعرًا/بدء اشتراك/موعدًا صراحة؛ medium = أسئلة جدية عن التفاصيل؛ low = ردود مجاملة أو فتور؛ none = لا إشارة.",
-  "next_action: خطوة عملية واحدة يقوم بها مدير المبيعات البشري الآن (مثال: «اتصل اليوم واعرض باقة المنشآت» أو «أرسل عرض الأسعار المفصل»). why: سطر يشرح السبب من كلام العميل.",
-  "best_time: اقترح نافذة تواصل واقعية (أيام عمل السعودية، ٩ص–٥م) مبنية على أوقات رسائل العميل إن ظهرت، وإلا فاقترح صباح يوم العمل التالي.",
+  "أنت محلل مبيعات لدى لِين للصحة الرقمية. حلّل محادثة واتساب واحدة بين مساعد المبيعات وممثل منشأة صحية، مستندًا إلى نص المحادثة وتصنيفات الاهتمام وحالة التسليم وبيانات الجهة المتاحة.",
+  "استخرج فقط ما تدعمه المحادثة نصًا. لا تستنتج نية أو اعتراضًا دون دليل، واكتب بفصحى واضحة وموجزة.",
+  "intent: high = طلب صريح للسعر أو بدء الاشتراك أو تنسيق موعد؛ medium = أسئلة محددة عن المتطلبات أو التفاصيل؛ low = ردود عامة لا تدل على تقدم؛ none = لا توجد إشارة مدعومة نصيًا.",
+  "next_action: إجراء واحد محدد ينفذه مدير المبيعات الآن، مثل «تواصل اليوم لمناقشة باقة المنشآت» أو «أرسل عرض الأسعار التفصيلي». why: سطر موجز يربط الإجراء بكلام ممثل المنشأة.",
+  "best_time: حدّد نافذة تواصل واقعية ضمن أيام العمل في السعودية من ٩ص إلى ٥م، استنادًا إلى أوقات رسائل ممثل المنشأة عند توفرها. عند غياب الدليل، اقترح صباح يوم العمل التالي.",
   "حكم الصفقة deal_state: won = التزم صراحة بالاشتراك/الاجتماع النهائي؛ lost = رفض نهائيًا أو انسحب؛ stalled = توقف التفاعل بعد اهتمام (صمت > يومين بعد آخر رسالة منا)؛ active = الحوار مستمر طبيعيًا.",
-  "إن كانت lost أو stalled: اختر loss_cause حصريًا من: السعر، التوقيت، منتج غير مناسب، تواصل غير واضح، الملف غير واضح، لا استجابة، جهة غير مناسبة، طلب تدخلًا بشريًا — والدليل evidence اقتباس حرفي من كلام العميل (أو صف الصمت)، وfix_suggestion خطوة كانت سترجّح الكسب.",
-  "إن كانت won أو active مع تقدم: win_drivers نقاط حرفية حرّكت الصفقة (سرعة الرد، الملف، السعر المناسب، الحاجة الملحّة…).",
+  "إذا كانت deal_state تساوي lost أو stalled، فاختر loss_cause حصرًا من: التكلفة، التوقيت، عدم ملاءمة الخدمة، عدم وضوح التواصل، عدم وضوح الملف التعريفي، لا استجابة، عدم ملاءمة الجهة، طلب التواصل مع مختص. اجعل evidence اقتباسًا حرفيًا من ممثل المنشأة، أو وصفًا دقيقًا لغياب الرد، واجعل fix_suggestion إجراءً واقعيًا قد يدعم استئناف الصفقة أو إغلاقها.",
+  "إذا كانت deal_state تساوي won، أو active مع تقدم واضح، فاجعل win_drivers عوامل مدعومة نصيًا أسهمت في تقدم الصفقة، مثل سرعة الاستجابة أو وضوح الملف أو ملاءمة التكلفة أو الحاجة التشغيلية.",
   'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
@@ -50,13 +50,13 @@ const SYSTEM = [
 export function contextScore(c: Contact, entity: EntityRow | null): { score: number; parts: { label: string; got: boolean; pts: number }[] } {
   const inbound = (c.transcript || []).filter((t) => t.role === "customer").length;
   const parts = [
-    { label: "الاسم معروف", got: Boolean(c.waName || entity?.name), pts: 15 },
-    { label: "مطابقة جهة مستوردة", got: Boolean(entity), pts: 10 },
-    { label: "شرائح (مدينة/حجم/قطاع)", got: Object.keys(entity?.attrs ?? {}).length >= 2, pts: 10 },
-    { label: "محادثة فعلية (رسالتان+)", got: inbound >= 2, pts: 20 },
+    { label: "اسم ممثل المنشأة متاح", got: Boolean(c.waName || entity?.name), pts: 15 },
+    { label: "مطابقة مع جهة استهداف مستوردة", got: Boolean(entity), pts: 10 },
+    { label: "بيانات التصنيف (المدينة/الحجم/القطاع)", got: Object.keys(entity?.attrs ?? {}).length >= 2, pts: 10 },
+    { label: "محادثة مكتملة الحد الأدنى (رسالتان أو أكثر)", got: inbound >= 2, pts: 20 },
     { label: "ردّ على حملة", got: Boolean((c.statusTimes || {}).replied || inbound >= 1), pts: 10 },
-    { label: "اهتمام موسوم", got: (c.tags || []).length > 0, pts: 15 },
-    { label: "نشاط خلال ٣ أيام", got: Date.now() - (c.lastEventAt || 0) < 72 * 3600e3, pts: 10 },
+    { label: "اهتمام مصنّف", got: (c.tags || []).length > 0, pts: 15 },
+    { label: "تفاعل خلال ٣ أيام", got: Date.now() - (c.lastEventAt || 0) < 72 * 3600e3, pts: 10 },
     { label: "استلم الملف التعريفي", got: (c.transcript || []).some((t) => t.text.includes("أُرسل الملف التعريفي") || t.text.includes("[مرفق")), pts: 10 },
   ];
   return { score: parts.reduce((s, p) => s + (p.got ? p.pts : 0), 0), parts };
@@ -77,7 +77,7 @@ export function buildTimeline(c: Contact): { ts: number; kind: string; title: st
     const names: Record<string, string> = { sent: "أُرسلت الرسالة", delivered: "وصلت", read: "شوهدت", replied: "أول ردّ", failed: "فشل الإرسال" };
     if (names[k]) ev.push({ ts: Number(ts), kind: "st", title: names[k], meta: "حالة التسليم" });
   }
-  for (const tg of c.tags || []) ev.push({ ts: tg.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "فاتر" });
+  for (const tg of c.tags || []) ev.push({ ts: tg.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "اهتمام منخفض" });
   return ev.sort((a, b) => b.ts - a.ts).slice(0, 60);
 }
 
@@ -128,7 +128,7 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   const turns = (c.transcript || []).length;
   const inbound = (c.transcript || []).filter((t) => t.role === "customer").length;
   if (inbound < 2) {
-    return { summary: "المساعد ما زال يتعلّم هذا العميل — أقل من رسالتين واردتين.", intent: "none", signals: [], objections: [], product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })), next_action: inbound === 1 ? "انتظر اكتمال الحوار أو تابع برسالة لطيفة بعد يوم" : "أدرج العميل في حملة تعريفية", why: "لا تتوفر محادثة كافية للقراءة بعد.", best_time: "صباح يوم العمل القادم (٩–١١ص)", learning: true };
+    return { summary: "لا تزال قراءة المساعد قيد التعلّم لهذه الجهة، لوجود أقل من رسالتين واردتين.", intent: "none", signals: [], objections: [], product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })), next_action: inbound === 1 ? "انتظر مزيدًا من سياق المحادثة، أو تابع برسالة مهنية بعد يوم عمل" : "أدرج الجهة في حملة تعريفية", why: "لا يتوفر سياق كافٍ لتحليل المحادثة حتى الآن.", best_time: "صباح يوم العمل القادم (٩–١١ص)", learning: true };
   }
   if (!force) {
     const cached = await db.getInsightsRow(c.phone);
@@ -142,9 +142,9 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
       if (!needsStallCheck) return prev;
     }
   }
-  const convo = (c.transcript || []).map((t) => `${t.role === "customer" ? "العميل" : t.role === "agent" ? "المساعد" : "نظام"}: ${t.text}`).join("\n").slice(-8000);
-  const tags = (c.tags || []).map((t) => `${t.product}:${t.level}`).join(", ") || "لا وسوم";
-  const attrs = entity ? Object.entries(entity.attrs).map(([k, v]) => `${k}: ${v}`).join("، ") : "غير مستورد";
+  const convo = (c.transcript || []).map((t) => `${t.role === "customer" ? "ممثل المنشأة" : t.role === "agent" ? "المساعد" : "نظام"}: ${t.text}`).join("\n").slice(-8000);
+  const tags = (c.tags || []).map((t) => `${t.product}:${t.level}`).join(", ") || "لا تصنيفات اهتمام";
+  const attrs = entity ? Object.entries(entity.attrs).map(([k, v]) => `${k}: ${v}`).join("، ") : "غير مسجّلة ضمن جهات الاستهداف";
   const times = (c.transcript || []).filter((t) => t.role === "customer").slice(-5).map((t) => new Date(t.ts).toISOString()).join(", ");
   let completion: OpenAI.Chat.Completions.ChatCompletion;
   try {
@@ -152,7 +152,7 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     model: cfg.openaiModel || "gpt-5.6-terra",
     messages: [
       { role: "system", content: SYSTEM },
-      { role: "user", content: `العميل: ${c.waName || "غير معروف"} — ${entity?.name || ""}\nبيانات الجهة: ${attrs}\nالوسوم: ${tags}\nأوقات آخر رسائل العميل (UTC): ${times}\n\n--- المحادثة ---\n${convo}` },
+      { role: "user", content: `ممثل المنشأة: ${c.waName || "غير معروف"} — ${entity?.name || ""}\nبيانات الجهة: ${attrs}\nالوسوم: ${tags}\nأوقات آخر رسائل ممثل المنشأة (UTC): ${times}\n\n--- المحادثة ---\n${convo}` },
     ],
     response_format: { type: "json_object" },
     ...((cfg.openaiModel || "gpt-5.6-terra").startsWith("gpt-5") ? { reasoning_effort: "none" } : {}),
@@ -161,10 +161,10 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     console.error(JSON.stringify({ at: "insights", msg: "llm unavailable — degraded read", err: String(e).slice(0, 150) }));
     // Degraded, NOT cached: identity/timeline/context stay fully usable; next visit retries.
     return {
-      summary: "قراءة المساعد غير متاحة مؤقتًا — السجل واكتمال السياق أدناه كاملان.",
+      summary: "قراءة المساعد غير متاحة مؤقتًا. يظل سجل التفاعل ومؤشر اكتمال السياق متاحين أدناه.",
       intent: "none", signals: [], objections: [],
       product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })),
-      next_action: "أعد المحاولة بزر «تحديث قراءة المساعد»", why: "تعذّر الوصول لمحرك القراءة.", best_time: "",
+      next_action: "أعد المحاولة عبر «تحديث قراءة المساعد»", why: "تعذّر الوصول إلى محرك التحليل.", best_time: "",
     };
   }
   let parsed: Partial<Insights> = {};
@@ -173,13 +173,13 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   const ds = ["won", "lost", "stalled", "active"].includes(String(parsed.deal_state)) ? parsed.deal_state as Insights["deal_state"] : "active";
   const lc = (LOSS_TAXONOMY as readonly string[]).includes(String(parsed.loss_cause)) ? String(parsed.loss_cause) : "";
   const out: Insights = {
-    summary: String(parsed.summary || "").slice(0, 200) || "لا يوجد ملخص.",
+    summary: String(parsed.summary || "").slice(0, 200) || "لا يتوفر ملخص.",
     intent: ["high", "medium", "low", "none"].includes(String(parsed.intent)) ? parsed.intent as Insights["intent"] : "none",
     signals: (Array.isArray(parsed.signals) ? parsed.signals : []).slice(0, 5).map((s) => String(s).slice(0, 120)),
     objections: (Array.isArray(parsed.objections) ? parsed.objections : []).slice(0, 5).map((s) => String(s).slice(0, 120)),
     product_interest: (Array.isArray(parsed.product_interest) ? parsed.product_interest : []).slice(0, 4)
       .map((p: any) => ({ product: String(p?.product ?? "").slice(0, 60), level: lvl(p?.level) })).filter((p) => p.product),
-    next_action: String(parsed.next_action || "").slice(0, 160) || "راجع المحادثة يدويًا.",
+    next_action: String(parsed.next_action || "").slice(0, 160) || "راجع المحادثة للتحقق من الإجراء المناسب.",
     why: String(parsed.why || "").slice(0, 200),
     best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (٩–١١ص)",
     deal_state: ds,
