@@ -1416,7 +1416,7 @@ function vSalesPath(ins) {
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
     '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("target", 18, "#1F7A73") + "مسار البيع مع هذا العميل</h3>" +
     '<span class="chip c-teal">المرحلة ' + (cur + 1) + " من " + SALES_PATH.length + "</span></div>" +
-    '<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;" class="ms-scroll">' +
+    '<div id="pathScroll" style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;" class="ms-scroll">' +
     SALES_PATH.map((st, i) => {
       const done = i < cur, now = i === cur;
       const col = done ? "#1F7A73" : now ? "#101828" : "#D0D5DD";
@@ -1424,7 +1424,7 @@ function vSalesPath(ins) {
         (i > 0 ? '<span style="position:absolute;top:13px;inset-inline-end:50%;width:100%;height:2px;background:' + (done || now ? "#1F7A73" : "#EAECF0") + ';"></span>' : "") +
         '<span style="position:relative;z-index:1;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' +
         (done ? "background:#1F7A73;color:#fff;" : now ? "background:#101828;color:#fff;box-shadow:0 0 0 4px rgba(16,24,40,.08);" : "background:#fff;color:#98A2B3;border:2px solid #EAECF0;") + '">' + (done ? "✓" : (i + 1)) + "</span>" +
-        '<div style="font-size:11.5px;font-weight:' + (now ? "700" : "600") + ';color:' + col + ';margin-top:8px;line-height:1.5;">' + st + "</div></div>";
+        '<div' + (now ? ' id="pathNow"' : "") + ' style="font-size:11.5px;font-weight:' + (now ? "700" : "600") + ';color:' + col + ';margin-top:8px;line-height:1.5;">' + st + "</div></div>";
     }).join("") + "</div>" +
     (ins.stage_reason ? '<div style="font-size:12px;color:#475467;margin-top:16px;padding-top:14px;border-top:1px solid #F2F4F7;line-height:1.9;"><b style="color:#101828;">لماذا هذه المرحلة:</b> ' + esc(ins.stage_reason) + "</div>" : "") +
     "</div>";
@@ -1587,6 +1587,11 @@ function render(fetchNew) {
     b.innerHTML = vPlaceholder(cur);
   }
   countUp();
+  // The current stage must be what you see first, even when the path overflows.
+  const pnow = document.getElementById("pathNow"), pscroll = document.getElementById("pathScroll");
+  if (pnow && pscroll && pscroll.scrollWidth > pscroll.clientWidth) {
+    pscroll.scrollLeft = pnow.offsetLeft - pscroll.clientWidth / 2 + pnow.offsetWidth / 2;
+  }
   if (afId) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
