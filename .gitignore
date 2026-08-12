@@ -3,3 +3,6 @@ dist/
 .env
 .DS_Store
 .gstack/
+
+# smoke-test venv (browser render guard)
+.venv/

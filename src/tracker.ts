@@ -111,12 +111,20 @@ export function addTag(phone: string, product: string, level: Tag["level"]) {
 }
 
 /** Curate a contact's interest tags (admin correction path) — memory + ledger together. */
-export async function replaceTags(phone: string, tags: { product: string; level: Tag["level"] }[]): Promise<void> {
-  const c = getContact(phone);
-  c.tags = tags.map((t) => ({ product: t.product, level: t.level, ts: Date.now() }));
-  await db.replaceTags(phone, c.tags);
+/** Correct a contact's interest tags. Curation fixes what we recorded — it must not restate
+ *  WHEN the customer showed interest, so a tag whose product is unchanged keeps its original
+ *  ts. Returns false when the phone is unknown, rather than manufacturing a contact from a typo. */
+export async function replaceTags(phone: string, tags: { product: string; level: Tag["level"]; ts?: number }[]): Promise<boolean> {
+  const c = findContact(phone);
+  if (!c) return false;
+  const prior = new Map((c.tags || []).map((t) => [t.product, t.ts]));
+  const next = tags.map((t) => ({ product: t.product, level: t.level, ts: t.ts ?? prior.get(t.product) ?? Date.now() }));
+  // DB first: if it throws, memory still matches the ledger instead of drifting ahead of it.
+  await db.replaceTags(phone, next);
+  c.tags = next;
   persist(c);
   logEvent("tags_curated", phone, tags.map((t) => `${t.product}:${t.level}`).join(" | "));
+  return true;
 }
 
 export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: string) {

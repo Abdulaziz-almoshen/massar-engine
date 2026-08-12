@@ -103,15 +103,23 @@ export function buildTimeline(c: Contact): { ts: number; kind: string; title: st
     if (t.role === "customer") ev.push({ ts: t.ts, kind: "in", title: t.text.slice(0, 90), meta: "واتساب · وارد" });
     else if (t.role === "agent") {
       const isFile = t.text.includes("[مرفق") || t.text.includes("أُرسل الملف التعريفي");
-      const isCamp = t.text.includes("[أزرار:");
-      ev.push({ ts: t.ts, kind: isFile ? "file" : isCamp ? "camp" : "out", title: t.text.slice(0, 90), meta: isCamp ? "حملة" : isFile ? "ملف" : "المساعد" });
+      // Buttons are not a campaign — the assistant attaches them to ordinary replies too, so
+      // labelling every one «حملة» told the profile a blast had gone out when none had.
+      const hasButtons = t.text.includes("[أزرار:");
+      ev.push({ ts: t.ts, kind: isFile ? "file" : hasButtons ? "camp" : "out", title: t.text.slice(0, 90), meta: hasButtons ? "المساعد · أزرار" : isFile ? "ملف" : "المساعد" });
     } else ev.push({ ts: t.ts, kind: "sys", title: t.text.slice(0, 90), meta: "نظام" });
   }
   for (const [k, ts] of Object.entries(c.statusTimes || {})) {
     const names: Record<string, string> = { sent: "أُرسلت الرسالة", delivered: "وصلت", read: "شوهدت", replied: "أول ردّ", failed: "فشل الإرسال" };
     if (names[k]) ev.push({ ts: Number(ts), kind: "st", title: names[k], meta: "حالة التسليم" });
   }
-  for (const tg of c.tags || []) ev.push({ ts: tg.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "اهتمام منخفض" });
+  // Tags are a label we derived, not something the customer did. «سجل التفاعل» is a record of
+  // touchpoints, so a tag only belongs on it anchored to the message that produced it — never
+  // at the moment an operator corrected it, which would move the customer's history forward.
+  for (const tg of c.tags || []) {
+    const spoken = (c.transcript || []).filter((t) => t.role === "customer" && t.ts <= tg.ts).pop();
+    if (spoken) ev.push({ ts: spoken.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: (tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "اهتمام منخفض") + " · قراءة من هذه الرسالة" });
+  }
   return ev.sort((a, b) => b.ts - a.ts).slice(0, 60);
 }
 

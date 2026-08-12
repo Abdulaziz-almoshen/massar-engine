@@ -153,11 +153,23 @@ export function upsertContact(c: {
 export function insertMessage(phone: string, role: string, text: string, ts: number): void {
   fire(`INSERT INTO messages (phone, role, text, ts) VALUES ($1,$2,$3,$4)`, [phone, role, text, ts]);
 }
+/** Atomic: a failed INSERT halfway through must not leave the contact with its old tags
+ *  deleted and its new ones missing. One client, one transaction, rolled back on any throw. */
 export async function replaceTags(phone: string, tags: { product: string; level: string; ts: number }[]): Promise<void> {
   if (!pool || !connected) return;
-  await pool.query(`DELETE FROM interest_tags WHERE phone = $1`, [phone]);
-  for (const t of tags) {
-    await pool.query(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, t.product, t.level, t.ts]);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM interest_tags WHERE phone = $1`, [phone]);
+    for (const t of tags) {
+      await client.query(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, t.product, t.level, t.ts]);
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
   }
 }
 export function insertTag(phone: string, product: string, level: string, ts: number): void {

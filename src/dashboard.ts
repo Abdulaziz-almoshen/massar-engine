@@ -79,6 +79,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   .c-grey { background: #F2F4F7; color: #475467; border-color: #E4E7EC; } .c-blue { background: #EFF4FB; color: #2F5F94; border-color: #D6E2F1; }
   .c-teal { background: #E9F7F6; color: #2E7D77; border-color: #C4E8E5; } .c-ok { background: #ECFDF3; color: #027A48; border-color: #C7EED8; }
   .c-warn { background: #FFFAEB; color: #B54708; border-color: #F5E3B7; } .c-bad { background: #FEF3F2; color: #B42318; border-color: #F7D4D1; }
+  /* An assistant reading is not a confirmed tag. Same hue so the level still reads at a
+     glance, but hollow with a dashed edge so it can never be mistaken for a recorded fact. */
+  .c-read { background: transparent; border-style: dashed; font-weight: 600; }
+  .c-read .rd { font-weight: 700; opacity: .72; font-size: 10px; }
   .ptab { font-family: inherit; font-size: 13px; font-weight: 700; border: 1px solid #E4E7EC; background: #fff; color: #475467; border-radius: 999px; padding: 10px 20px; cursor: pointer; }
   .ptab.on { background: #101828; color: #fff; border-color: #101828; }
   .inp { font-family: inherit; font-size: 13px; color: #101828; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
@@ -360,6 +364,9 @@ function campStats(camp) {
     failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
   };
 }
+function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+/** Arabic-Indic digits, matching every other number on these screens. */
+function fmtN(n) { return Number(n || 0).toLocaleString("ar-SA"); }
 function interestChips(c) {
   if (!c) return '<span style="color:#D0D5DD;">—</span>';
   const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
@@ -374,11 +381,11 @@ function interestChips(c) {
   const ins = insCache[c.phone] || {};
   const pi = (ins.product_interest || []).filter((x) => x.product);
   if (pi.length) {
-    return pi.slice(0, 2).map((x) => '<span class="chip ' + (x.level === "high" ? "c-ok" : x.level === "medium" ? "c-warn" : "c-grey") + '" title="من قراءة المساعد">' +
-      esc(x.product) + " · " + (x.level === "high" ? "نية مرتفعة" : x.level === "medium" ? "مهتم" : "فاتر") + "</span>").join(" ");
+    return pi.slice(0, 2).map((x) => '<span class="chip c-read ' + (x.level === "high" ? "c-ok" : x.level === "medium" ? "c-warn" : "c-grey") + '" title="' + esc(x.product) + " — قراءة المساعد من نص المحادثة، لم تُسجَّل كوسم مؤكد" + '">' +
+      '<span class="rd">قراءة</span>' + esc(clip(x.product, 24)) + " · " + (x.level === "high" ? "نية مرتفعة" : x.level === "medium" ? "مهتم" : "فاتر") + "</span>").join(" ");
   }
-  if (ins.intent === "high") return '<span class="chip c-ok">نية مرتفعة</span>';
-  if (ins.intent === "medium") return '<span class="chip c-warn">اهتمام مبدئي</span>';
+  if (ins.intent === "high") return '<span class="chip c-read c-ok" title="قراءة المساعد من نص المحادثة"><span class="rd">قراءة</span>نية مرتفعة</span>';
+  if (ins.intent === "medium") return '<span class="chip c-read c-warn" title="قراءة المساعد من نص المحادثة"><span class="rd">قراءة</span>اهتمام مبدئي</span>';
   if (c.outcome === "handoff") return '<span class="chip c-warn">طلب تواصلًا</span>';
   if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
   if (c.outcome === "not_interested") return '<span class="chip c-grey">غير مهتم</span>';
@@ -585,7 +592,10 @@ function vKmonDetail(id, d) {
   lostHere.forEach((i) => { causeTally[i.loss_cause] = (causeTally[i.loss_cause] || 0) + 1; });
   const topCause = Object.keys(causeTally).sort((a, b) => causeTally[b] - causeTally[a])[0];
   const moves = [];
-  if (hotHere.length) moves.push(["ابدأ التواصل مع" + hotHere.length + " فرصة مؤهلة", "أظهرت هذه الجهات أعلى مؤشرات التقدم في الحملة، فابدأ التواصل معها", "#027A48", "#ECFDF3"]);
+  // Deliberately wider than the «جهات مهتمة» counter above: that one counts confirmed tags and
+  // human outcomes, this one also trusts a high-intent reading with no tag yet. Two numbers that
+  // legitimately differ must not share a word — the counter says «مهتمة», this says «تستحق المتابعة».
+  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#027A48", "#ECFDF3"]);
   if (seenSilent.length) moves.push(["أعد استهداف " + seenSilent.length + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
   if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
   if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB"]);
@@ -1417,7 +1427,7 @@ function vWinLoss() {
   h += "</div>";
   if ((winloss.by_product || []).length) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F2F4F7;">' +
-      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " مكتسبة · " + pr.lost + " غير مكتسبة</span>").join("") + "</div>";
+      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue" title="' + esc(pr.product) + '">' + esc(clip(pr.product, 24)) + ": " + fmtN(pr.won) + " مكتسبة · " + fmtN(pr.lost) + " غير مكتسبة</span>").join("") + "</div>";
   }
   h += "</div>";
   return h;
@@ -1428,7 +1438,7 @@ function vSalesPath(ins) {
   return '<div class="card rise" style="padding:22px 24px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
     '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("target", 18, "#1F7A73") + "مسار البيع مع هذا العميل</h3>" +
-    '<span class="chip c-teal">المرحلة ' + (cur + 1) + " من " + SALES_PATH.length + "</span></div>" +
+    '<span class="chip c-teal">' + (ins.learning ? "المرحلة قيد التعلّم" : "المرحلة " + fmtN(cur + 1) + " من " + fmtN(SALES_PATH.length)) + "</span></div>" +
     '<div id="pathScroll" style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;" class="ms-scroll">' +
     SALES_PATH.map((st, i) => {
       const done = i < cur, now = i === cur;
@@ -1436,7 +1446,7 @@ function vSalesPath(ins) {
       return '<div style="flex:1;min-width:110px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;">' +
         (i > 0 ? '<span style="position:absolute;top:13px;inset-inline-end:50%;width:100%;height:2px;background:' + (done || now ? "#1F7A73" : "#EAECF0") + ';"></span>' : "") +
         '<span style="position:relative;z-index:1;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' +
-        (done ? "background:#1F7A73;color:#fff;" : now ? "background:#101828;color:#fff;box-shadow:0 0 0 4px rgba(16,24,40,.08);" : "background:#fff;color:#98A2B3;border:2px solid #EAECF0;") + '">' + (done ? "✓" : (i + 1)) + "</span>" +
+        (done ? "background:#1F7A73;color:#fff;" : now ? "background:#101828;color:#fff;box-shadow:0 0 0 4px rgba(16,24,40,.08);" : "background:#fff;color:#98A2B3;border:2px solid #EAECF0;") + '">' + (done ? "✓" : fmtN(i + 1)) + "</span>" +
         '<div' + (now ? ' id="pathNow"' : "") + ' style="font-size:11.5px;font-weight:' + (now ? "700" : "600") + ';color:' + col + ';margin-top:8px;line-height:1.5;">' + st + "</div></div>";
     }).join("") + "</div>" +
     (ins.stage_reason ? '<div style="font-size:12px;color:#475467;margin-top:16px;padding-top:14px;border-top:1px solid #F2F4F7;line-height:1.9;"><b style="color:#101828;">لماذا هذه المرحلة:</b> ' + esc(ins.stage_reason) + "</div>" : "") +

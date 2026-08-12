@@ -24,6 +24,8 @@ ROUTES = [
     ("#customers", "جهات الاستهداف"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#kb", "خدمات المساعد"),
+    # The most-edited surface, and the one the blank-page class would hit hardest.
+    ("#customer/966500000850", "مسار البيع مع هذا العميل"),
 ]
 MIN_CHARS = 400
 
@@ -65,6 +67,7 @@ def main() -> int:
 
         routes = ROUTES + ([detail_route] if detail_route else [])
         for route, landmark in routes:
+            before = len(failures)
             errors: list[str] = []
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             page.on("pageerror", lambda e, acc=errors: acc.append(f"pageerror: {e}"))
@@ -81,8 +84,8 @@ def main() -> int:
             if errors:
                 failures.append(f"{route}: {len(errors)} runtime error(s) — {errors[0]}")
 
-            status = "ok" if not failures or not failures[-1].startswith(route) else "FAIL"
-            print(f"  {route:24} {body_len:>7} chars  {status}")
+            ok = len(failures) == before
+            print(f"  {route:26} {body_len:>7} chars  {'ok' if ok else 'FAIL'}  «{landmark}»")
             page.close()
 
         browser.close()

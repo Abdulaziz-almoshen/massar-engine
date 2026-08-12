@@ -316,7 +316,8 @@ app.post("/admin/contact/tags", async (req, reply) => {
     product: String(t.product).slice(0, 80),
     level: (["hot", "warm", "cold"].includes(String(t.level)) ? String(t.level) : "warm") as "hot" | "warm" | "cold",
   }));
-  await tracker.replaceTags(String(phone).replace(/\D/g, ""), clean);
+  const ok = await tracker.replaceTags(String(phone).replace(/\D/g, ""), clean);
+  if (!ok) return reply.code(404).send({ error: "unknown phone — curation never creates a contact" });
   return { status: "ok", tags: clean.length };
 });
 
