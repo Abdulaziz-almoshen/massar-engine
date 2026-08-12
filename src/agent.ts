@@ -4,7 +4,7 @@ import * as gupshup from "./gupshup.js";
 import * as tracker from "./tracker.js";
 import * as db from "./db.js";
 import type { Contact } from "./tracker.js";
-import { SANDBOX_ACTIVATION_RE } from "./insights.js";
+import { SANDBOX_ACTIVATION_RE, SERVICE_CATALOGUE } from "./insights.js";
 
 // ---------------------------------------------------------------------------
 // The Arabic AI salesperson — full-capability edition.
@@ -139,6 +139,14 @@ const PRODUCTS: Product[] = [
     objections: [],
   },
 ];
+
+// The analyst clamps every extracted service name to SERVICE_CATALOGUE. That list and this one
+// are two copies of the same truth, so drift here silently files a real service as «خدمة أخرى»
+// on every board. Fail the BUILD instead of discovering it in a demo.
+const _catalogueDrift = PRODUCTS.map((p) => p.name).filter((n) => !(SERVICE_CATALOGUE as readonly string[]).includes(n));
+if (_catalogueDrift.length) {
+  throw new Error(`service catalogue drift — in PRODUCTS but not SERVICE_CATALOGUE (insights.ts): ${_catalogueDrift.join(", ")}`);
+}
 
 // Segment → next-best pivot when the current product gets a "no".
 const PIVOTS = [

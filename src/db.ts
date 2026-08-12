@@ -321,11 +321,11 @@ export async function saveKb(product: string, md: string, sourceFilename: string
 // ------------------------------ campaigns (launches) ------------------------------
 
 export async function createCampaign(name: string, product: string, message: string,
-  targets: { phone: string; name?: string }[]): Promise<number | null> {
+  targets: { phone: string; name?: string }[], test = false): Promise<number | null> {
   if (!pool || !connected) return null;
   const r = await pool.query(
-    `INSERT INTO campaigns (name, product, message, created_at) VALUES ($1,$2,$3,$4) RETURNING id`,
-    [name, product, message, Date.now()]);
+    `INSERT INTO campaigns (name, product, message, created_at, test) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+    [name, product, message, Date.now(), test]);
   const id = Number(r.rows[0].id);
   for (const t of targets) {
     await pool.query(

@@ -154,8 +154,15 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   const assets = await db.listAssets();
   const pa = assets.find((a) => a.product === (product || "").trim());
   const introAsset = pa ? { url: `${cfg.publicBaseUrl}/assets/${pa.public_id}.pdf`, filename: pa.filename } : null;
+  // Classify at launch, when we still know WHY this went out. Hand-flagging afterwards is data
+  // entry that rots: ten rehearsals had to be corrected by hand precisely because every launch
+  // was born «فعلية». A launch that reaches only sandbox contacts is a rehearsal; the caller may
+  // say so explicitly, and either way the flag stays editable afterwards.
+  const phones = targets.map((t) => String(t.phone || "").replace(/\D/g, "")).filter(Boolean);
+  const allSandbox = phones.length > 0 && phones.every((p) => Boolean(tracker.findContact(p)?.test));
+  const isRehearsal = typeof (req.body as any)?.test === "boolean" ? Boolean((req.body as any).test) : allSandbox;
   const campaignId = await db.createCampaign(campName, (product || "").trim(), message, targets.map(t => ({
-    phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })));
+    phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })), isRehearsal);
   const results: { phone: string; ok: boolean; error?: string }[] = [];
   for (const t of targets) {
     const phone = String(t.phone || "").replace(/\D/g, "");
