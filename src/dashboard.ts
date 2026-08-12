@@ -737,18 +737,30 @@ window.closeLaunch = () => { const m = document.getElementById("lmodal"); if (m)
 window.confirmLaunch = async () => {
   if (launching) return; launching = true;
   const btn = document.getElementById("lgo"); if (btn) { btn.textContent = "جارٍ الإرسال…"; }
-  const targets = launchTargets();
   try {
+    const targets = launchTargets();
+    const reg = wizProducts();
+    const prod = reg[selProd] ? reg[selProd].name : "";
+    // Resolve the service variable in the founder's template before sending.
+    const msgOut = campMsg.replaceAll("{product}", prod);
+    if (!targets.length) throw new Error("لم تُحدَّد أي جهة استهداف");
+    if (!msgOut.trim()) throw new Error("نص الرسالة فارغ");
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: msgOut, name: campName, product: wizProducts()[selProd].name }) });
-    const d = await r.json();
-    launching = false; closeLaunch();
-    if (!r.ok) { alertBar("فشل الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
-    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — افتحنا لك لوحة الحملة", false);
+      body: JSON.stringify({ targets, message: msgOut, name: campName, product: prod }) });
+    const d = await r.json().catch(() => ({}));
+    closeLaunch();
+    if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
+    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — فتحنا لك لوحة الحملة", false);
     entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
-  } catch (e) { launching = false; closeLaunch(); alertBar("تعذّر الإطلاق", true); }
+  } catch (e) {
+    closeLaunch();
+    alertBar("تعذّر الإطلاق: " + esc(String(e && e.message ? e.message : e).slice(0, 90)), true);
+  } finally {
+    launching = false;
+    const b2 = document.getElementById("lgo"); if (b2) b2.textContent = "تأكيد الإطلاق ✓";
+  }
 };
 window.alertBar = (txt, bad) => {
   const el = document.createElement("div");
