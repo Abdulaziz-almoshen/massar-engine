@@ -1476,6 +1476,10 @@ async function refresh(force) {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
       else { cache = await r.json(); }
+      if (!showTestDecided && cache && (cache.contacts || []).length) {
+        showTestDecided = true;
+        showTest = !(cache.contacts || []).some((c) => !c.test);   // no real contacts → reveal sandbox
+      }
       const [er, kr, cr, ir, wr] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
@@ -1488,10 +1492,6 @@ async function refresh(force) {
       if (cr.ok) campaigns = await cr.json();
       if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
       if (wr.ok) winloss = await wr.json();
-      if (!showTestDecided && cache && (cache.contacts || []).length) {
-        showTestDecided = true;
-        showTest = !(cache.contacts || []).some((c) => !c.test);   // no real contacts → reveal sandbox
-      }
       try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
       const curR = (location.hash || "").slice(1).split("/")[0];
       if (curR === "customer") {
