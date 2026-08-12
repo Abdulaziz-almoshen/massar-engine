@@ -1588,10 +1588,14 @@ function render(fetchNew) {
   }
   countUp();
   // The current stage must be what you see first, even when the path overflows.
-  const pnow = document.getElementById("pathNow"), pscroll = document.getElementById("pathScroll");
-  if (pnow && pscroll && pscroll.scrollWidth > pscroll.clientWidth) {
-    pscroll.scrollLeft = pnow.offsetLeft - pscroll.clientWidth / 2 + pnow.offsetWidth / 2;
-  }
+  // Deferred a frame: at innerHTML-assignment time the strip has no layout yet.
+  requestAnimationFrame(() => {
+    const pnow = document.getElementById("pathNow"), pscroll = document.getElementById("pathScroll");
+    if (!pnow || !pscroll || pscroll.scrollWidth <= pscroll.clientWidth) return;
+    const target = pnow.offsetLeft - (pscroll.clientWidth - pnow.offsetWidth) / 2;
+    pscroll.scrollLeft = target;   // RTL scrollLeft is negative-indexed in some engines; clamp both ways
+    if (Math.abs(pscroll.scrollLeft - target) > 4) pscroll.scrollLeft = -Math.abs(target);
+  });
   if (afId) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
