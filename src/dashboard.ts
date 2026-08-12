@@ -249,7 +249,9 @@ let manualOpen = false; let manualStat = ""; let custQ = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
-let campQ = ""; let campTab = "all"; let campSortKey = "new";   // campaigns list controls
+// Opens on «فعلية»: rehearsals and duplicate launches are one click away under «تجريبية»,
+// not the first thing on the screen. Defaulting to «الكل» made the list read as clutter.
+let campQ = ""; let campTab = "real"; let campSortKey = "new";   // campaigns list controls
 let showTestDecided = false;
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
