@@ -187,6 +187,8 @@ function systemPrompt(contact: Contact): string {
     "- فصحى مبسطة يفهمها مدير عمليات، لا لغة تسويقية ولا مصطلحات إنجليزية إلا التقنية المتعارف عليها (HIS، ERP، PDF).",
     "- أرقام محددة بدل الصفات: «يقل زمن الإصدار من ٣ أيام إلى دقائق» أفضل من «تحسين كبير في الكفاءة».",
     "- لا رموز تعبيرية، ولا علامات تعجب، ولا عبارات مثل «فرصة لا تُعوّض» أو «الأفضل في السوق».",
+    "- لا تستخدم تنسيق ماركداون. واتساب لا يعرف **النجمتين** ويعرضهما كما هما؛ للتأكيد استخدم نجمة واحدة *هكذا* أو أعد الصياغة.",
+    "- إن وصلتك رسالة تفعيل من منصة الاختبار (مثل «proxy» أو «Proxy Massar»)، فهي إجراء تقني من المنصة وليست اسم خدمة. لا تسأل عنها ولا تُحِلها إلى مختص — رحّب وابدأ المحادثة.",
     "- لا تبدأ رسالتين متتاليتين بالصيغة نفسها.",
     contact.waName ? `- الاسم الظاهر في واتساب: «${contact.waName}». إن كان اسم شخص فاستخدم اسمه الأول مرة أو مرتين في المحادثة كلها؛ وإن كان اسم منشأة فلا تنادِ به إطلاقًا واكتفِ بصيغة الجمع.` : "",
     "",
@@ -500,8 +502,29 @@ function isOptOut(text: string): boolean {
 
 const MAX_AGENT_TURNS = 12;
 
+// Gupshup's sandbox makes every new person send «proxy <botname>» to activate the bot, after
+// an English boilerplate about bot-building and anagram puzzles. That phrase is platform
+// plumbing, not a customer message — but the model read «Proxy Massar» as a product name and
+// burned the single most valuable message in the conversation asking «هل تقصدون خدمة باسم
+// Proxy Massar؟», and in one case escalated a human handoff for a service that does not exist.
+// Every one of the four real conversations opened this way. Hard rule, in code.
+// `\b` forms no boundary after Arabic letters (JS \w is ASCII-only), so the Arabic spelling
+// needs its own whitespace/end anchor. The length cap keeps a genuine sentence that happens to
+// contain the word «proxy» from being swallowed as plumbing.
+const SANDBOX_ACTIVATION = /^\s*(?:proxy\b|بروكسي(?:\s|$))[\s\S]{0,40}$/i;
+
 export async function handleInbound(contact: Contact, text: string): Promise<void> {
   if (contact.optedOut) return;
+
+  if (SANDBOX_ACTIVATION.test(text)) {
+    // Answer the greeting the customer actually intended, and do not let the activation
+    // phrase reach the model or the transcript's meaning as a product enquiry.
+    console.log(JSON.stringify({ at: "agent", msg: "sandbox activation phrase — answered with the real opener", phone: contact.phone }));
+    const opener = "أهلًا بكم. أنا المساعد الرقمي لشركة لِين لخدمات الأعمال، وأساعد المنشآت الصحية على تنفيذ خدمات مثل الإجازات المرضية وسجل التطعيمات الوطني مباشرة من داخل أنظمتها."
+      + "\nكيف يمكنني خدمتكم؟";
+    await safeSend(contact.phone, opener);
+    return;
+  }
 
   if (isOptOut(text)) {
     tracker.setOutcome(contact.phone, "opted_out");
