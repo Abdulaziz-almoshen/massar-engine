@@ -663,7 +663,10 @@ function vHome(d) {
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
     kpi("send", "الحملات الفعلية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
-    kpi("users", "جهات الاستهداف", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
+    // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
+    // reached (4), while this counts the whole imported book (15). One label, two numbers, one
+    // screen is exactly the contradiction the funnel fix just removed.
+    kpi("users", "جهات في قوائمك", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
     kpi("check", "وصلت الرسائل إلى الجهات", delivered, ["#E9F7F6", "#1F7A73"]) +
     kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
     kpi("flame", "جهات مهتمة ومؤهلة", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
