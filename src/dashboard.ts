@@ -333,6 +333,18 @@ function chipRow(c) {
   return out.join(" ");
 }
 
+function campStats(camp) {
+  const cs = camp.targets.map((t) => contactByPhone(t.phone)).filter(Boolean);
+  return {
+    targeted: camp.targets.length,
+    sent: cs.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
+    delivered: cs.filter((c) => (c.statusTimes || {}).delivered).length,
+    seen: cs.filter(seenOf).length,
+    replied: cs.filter((c) => (c.statusTimes || {}).replied).length,
+    interested: cs.filter(interestedOf).length,
+    failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
+  };
+}
 function interestChips(c) {
   if (!c) return '<span style="color:#D0D5DD;">—</span>';
   const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
