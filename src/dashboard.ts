@@ -30,7 +30,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .brand .logo { width: 42px; height: 42px; flex: none; border-radius: 12px; background: linear-gradient(135deg, #3FB6B0, #2E8F89); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; color: #1F4470; }
   .brand .t1 { font-size: 21px; font-weight: 700; color: #fff; line-height: 1; }
   .brand .t2 { font-size: 11.5px; color: #8ea3c0; margin-top: 4px; }
-  nav { flex: 1; overflow-y: auto; padding: 14px 12px; }
+  nav { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 22px; }
   .grp { font-size: 11px; letter-spacing: .6px; color: #a9c2e0; padding: 15px 12px 8px; margin-top: 7px; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.1); }
   .grp:first-child { border-top: none; margin-top: 0; }
   .nv { display: flex; align-items: center; gap: 12px; width: 100%; font-family: inherit; font-size: 13.5px; font-weight: 500; color: #cdd6e6; background: transparent; border: none; border-radius: 10px; padding: 11px 12px; cursor: pointer; text-align: right; margin-bottom: 3px; }
@@ -50,7 +50,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   .g-tree { width: 13px; height: 13px; border: 2px solid #7f95b4; border-radius: 3px; }
   .nv.on .gx > * { background-color: #3FB6B0; border-color: #3FB6B0; }
   .nv.on .g-tr { background: none; border-bottom-color: #3FB6B0; }
-  .userbox { padding: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 11px; }
+  /* flex:none — without it the card is squeezed by the scrolling nav above and the last nav
+     item reads as clipped behind it, on every screen. */
+  .userbox { flex: none; padding: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 11px; background: #1F4470; }
   .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #1c3a5e; display: flex; align-items: center; justify-content: center; color: #cdd6e6; font-weight: 700; font-size: 14px; }
   .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
   .userbox .r { font-size: 11px; color: #8ea3c0; }
@@ -1333,7 +1335,12 @@ function dailyActivitySvg(cs) {
     '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#667085;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#D0D5DD;margin-inline-end:5px;"></i>صادرة</span></div>';
 }
 function vHomeCharts(cs) {
-  const camps = showTest ? campaigns : campaigns.filter((cp) => !campIsTest(cp));
+  // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
+  // «is this a real customer?». The funnel must ask the SAME question, or the two disagree on one
+  // screen — «ردّوا ٤» above «ردّوا ٠» under «بيانات فعلية فقط». Campaign-level classification is
+  // for the campaigns LIST; here a launch counts when it reached at least one real contact.
+  const camps = showTest ? campaigns : campaigns.filter((cp) =>
+    (cp.targets || []).some((t) => { const c = contactByPhone(t.phone); return c && !c.test; }));
   const agg = { targeted: 0, sent: 0, delivered: 0, seen: 0, replied: 0, interested: 0 };
   camps.forEach((cp) => { const st = campStats(cp); Object.keys(agg).forEach((k) => { agg[k] += st[k] || 0; }); });
   const funnel = [["جهات الاستهداف", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["جهات مهتمة", agg.interested, "#1f8a52"]];

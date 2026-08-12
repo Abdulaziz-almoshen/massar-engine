@@ -328,10 +328,15 @@ app.post("/admin/contact/tags", async (req, reply) => {
 app.post("/admin/campaign/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { id, test } = (req.body ?? {}) as { id?: number; test?: boolean };
-  if (!id) return reply.code(400).send({ error: "body: { id, test }" });
-  const ok = await db.setCampaignTest(Number(id), test !== false);
+  // Number("abc") is NaN, which reached Postgres and came back as a 500 leaking «22P02 invalid
+  // input syntax for bigint». Validate here, and require `test` explicitly rather than defaulting
+  // a missing field to true — the sibling contact route uses Boolean(test).
+  const cid = Number(id);
+  if (!Number.isSafeInteger(cid) || cid <= 0) return reply.code(400).send({ error: "body: { id: positive integer, test: boolean }" });
+  if (typeof test !== "boolean") return reply.code(400).send({ error: "body: { id, test: boolean } — test must be explicit" });
+  const ok = await db.setCampaignTest(cid, test);
   if (!ok) return reply.code(404).send({ error: "unknown campaign" });
-  return { status: "ok", id: Number(id), test: test !== false };
+  return { status: "ok", id: cid, test };
 });
 
 // Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.

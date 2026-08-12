@@ -4,6 +4,7 @@ import * as gupshup from "./gupshup.js";
 import * as tracker from "./tracker.js";
 import * as db from "./db.js";
 import type { Contact } from "./tracker.js";
+import { SANDBOX_ACTIVATION_RE } from "./insights.js";
 
 // ---------------------------------------------------------------------------
 // The Arabic AI salesperson — full-capability edition.
@@ -508,10 +509,10 @@ const MAX_AGENT_TURNS = 12;
 // burned the single most valuable message in the conversation asking «هل تقصدون خدمة باسم
 // Proxy Massar؟», and in one case escalated a human handoff for a service that does not exist.
 // Every one of the four real conversations opened this way. Hard rule, in code.
-// `\b` forms no boundary after Arabic letters (JS \w is ASCII-only), so the Arabic spelling
-// needs its own whitespace/end anchor. The length cap keeps a genuine sentence that happens to
-// contain the word «proxy» from being swallowed as plumbing.
-const SANDBOX_ACTIVATION = /^\s*(?:proxy\b|بروكسي(?:\s|$))[\s\S]{0,40}$/i;
+// Defined once in insights.ts and shared, so the guard here and the interaction log there can
+// never disagree about what counts as platform plumbing. (`\b` forms no boundary after Arabic
+// letters — JS \w is ASCII-only — so the Arabic spelling carries its own anchor there.)
+const SANDBOX_ACTIVATION = SANDBOX_ACTIVATION_RE;
 
 export async function handleInbound(contact: Contact, text: string): Promise<void> {
   if (contact.optedOut) return;
@@ -526,6 +527,9 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
     return;
   }
 
+  // A human driving the chat must not be interrupted by an automated opener.
+  if (contact.human) return;
+
   // Only the very first turn can be platform plumbing; after that «proxy …» is the customer talking.
   if (SANDBOX_ACTIVATION.test(text) && (contact.transcript || []).filter((t) => t.role === "customer").length <= 1) {
     console.log(JSON.stringify({ at: "agent", msg: "sandbox activation phrase — answered with the real opener", phone: contact.phone }));
@@ -535,7 +539,8 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
     return;
   }
 
-  if (contact.human) return; // explicit portal takeover only — agent silent while a human drives
+  // (the takeover guard now sits above the activation branch, so nothing is emitted into a
+  //  conversation a human has taken over)
 
   // The cap protects against runaway loops, not against a long healthy conversation:
   // it counts REPLIES TO THIS CUSTOMER'S MESSAGES (campaign blasts and file sends don't

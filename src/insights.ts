@@ -48,24 +48,41 @@ export const OTHER_SERVICE = "خدمة أخرى";
 // stages are already clamped to a closed list; services now are too. First pattern wins, so
 // the list is ordered by which noun is the subject when a phrase names two.
 const SERVICE_PATTERNS: [RegExp, string][] = [
+  // A phrase that OPENS with integration is about integration, whatever it integrates:
+  // «تكامل خدمة الإجازات المرضية مع سجل التطعيمات» is an integration deal, while
+  // «الإجازات المرضية مع تكامل HIS» is a sick-leave deal. Anchored, so it only wins when leading.
+  [/^\s*(?:تكامل|الربط|ربط)\b/, "تكامل الأنظمة (HIS/ERP)"],
   [/إجاز|مرضي/, "الإجازات المرضية"],
   [/تطعيم|NVR|السجل الوطني/i, "خدمات التطعيمات"],
   [/شهاد/, "الشهادات الصحية"],
-  [/فحص|الموظفين/, "فحص الموظفين"],
+  // تقارير before فحص: «تقارير طبية عن الموظفين» is a reports deal, and «الموظفين» alone
+  // would otherwise capture it for فحص الموظفين.
   [/تقرير|تقارير/, "التقارير الطبية"],
+  [/فحص|الموظفين/, "فحص الموظفين"],
   [/تكامل|ربط|الربط|HIS|ERP|واجهات/i, "تكامل الأنظمة (HIS/ERP)"],
 ];
+
+/** The sandbox handshake Gupshup forces on every new contact — shared with the agent so the
+ *  guard and the interaction log always agree on what counts as platform plumbing. */
+export const SANDBOX_ACTIVATION_RE = /^\s*(?:proxy\b|بروكسي(?:\s|$))[\s\S]{0,40}$/i;
 
 /** Apply the clamp on the way OUT of the cache as well. Rows written before it existed still
  *  hold free text, and the portal's chips, filters and boards all read those rows directly —
  *  normalising only at the aggregate left «باقات NVR لتغطية 8 مواقع» on the campaign row. */
 export function normalizeCached<T extends { product_interest?: { product: string; level: string }[] }>(d: T): T {
   if (!d || !Array.isArray(d.product_interest)) return d;
-  const seen = new Set<string>();
-  const pi = d.product_interest
-    .map((p) => ({ ...p, product: canonicalService(p.product) }))
-    .filter((p) => p.product && !seen.has(p.product) && seen.add(p.product));
-  return { ...d, product_interest: pi };
+  // Two readings can collapse onto one service («نظام الإجازات المرضية» low + «إصدار الإجازات
+  // المرضية» high). Keeping the first would discard the hotter signal — and that level drives
+  // the chip colour — so merge on the strongest.
+  const rank = { high: 3, medium: 2, low: 1 } as Record<string, number>;
+  const best = new Map<string, { product: string; level: string }>();
+  for (const p of d.product_interest) {
+    const product = canonicalService(p.product);
+    if (!product) continue;
+    const prev = best.get(product);
+    if (!prev || (rank[p.level] ?? 0) > (rank[prev.level] ?? 0)) best.set(product, { ...p, product });
+  }
+  return { ...d, product_interest: [...best.values()] as typeof d.product_interest };
 }
 
 /** Map a free-text service mention onto the catalogue; anything unrecognised shares one
@@ -111,7 +128,24 @@ export function contextScore(c: Contact, entity: EntityRow | null): { score: num
 /** Merged chronological story of this person across everything we hold. */
 export function buildTimeline(c: Contact): { ts: number; kind: string; title: string; meta?: string }[] {
   const ev: { ts: number; kind: string; title: string; meta?: string }[] = [];
+  // Conversations opened before the activation guard existed still carry the sandbox handshake:
+  // the customer was forced to type «proxy <bot>», and the assistant answered it as if it were a
+  // service enquiry. We do not rewrite what was said — we name it, so the log stops reading as
+  // the assistant asking a real customer about a product that never existed.
+  const firstCustomer = (c.transcript || []).find((t) => t.role === "customer");
+  const openedWithActivation = Boolean(firstCustomer && SANDBOX_ACTIVATION_RE.test(firstCustomer.text));
+  const replyToActivation = openedWithActivation
+    ? (c.transcript || []).find((t) => t.role === "agent" && t.ts >= (firstCustomer as any).ts)
+    : undefined;
   for (const t of c.transcript || []) {
+    if (t === firstCustomer && openedWithActivation) {
+      ev.push({ ts: t.ts, kind: "sys", title: t.text.slice(0, 90), meta: "تفعيل تقني من منصة الاختبار — ليست رسالة من العميل" });
+      continue;
+    }
+    if (t === replyToActivation) {
+      ev.push({ ts: t.ts, kind: "sys", title: t.text.slice(0, 90), meta: "ردّ قبل ضبط التفعيل — لا يُحتسب ضمن الحوار" });
+      continue;
+    }
     if (t.role === "customer") ev.push({ ts: t.ts, kind: "in", title: t.text.slice(0, 90), meta: "واتساب · وارد" });
     else if (t.role === "agent") {
       const isFile = t.text.includes("[مرفق") || t.text.includes("أُرسل الملف التعريفي");
@@ -130,7 +164,13 @@ export function buildTimeline(c: Contact): { ts: number; kind: string; title: st
   // at the moment an operator corrected it, which would move the customer's history forward.
   for (const tg of c.tags || []) {
     const spoken = (c.transcript || []).filter((t) => t.role === "customer" && t.ts <= tg.ts).pop();
-    if (spoken) ev.push({ ts: spoken.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: (tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "اهتمام منخفض") + " · قراءة من هذه الرسالة" });
+    const level = tg.level === "hot" ? "نية مرتفعة" : tg.level === "warm" ? "مهتم" : "اهتمام منخفض";
+    // No preceding customer message (a curated tag on someone who never replied, or an early tag
+    // on a thread whose hydration capped the transcript) — show it at its own time rather than
+    // dropping it. The card promises to list وسوم; silently omitting one is evidence loss.
+    ev.push(spoken
+      ? { ts: spoken.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: level + " · قراءة من هذه الرسالة" }
+      : { ts: tg.ts, kind: "tag", title: `اهتمام: ${tg.product}`, meta: level + " · وسم مسجَّل" });
   }
   return ev.sort((a, b) => b.ts - a.ts).slice(0, 60);
 }
@@ -176,7 +216,10 @@ export async function winLossBoard(isTest?: (phone: string) => boolean): Promise
     totals,
     loss_causes: [...causes.entries()].map(([cause, c]) => ({ cause, count: c.count, example: c.example, products: [...c.products].slice(0, 3) })).sort((a, b) => b.count - a.count).slice(0, 8),
     win_drivers: [...drivers.entries()].map(([driver, count]) => ({ driver, count })).sort((a, b) => b.count - a.count).slice(0, 8),
-    by_product: [...prod.entries()].map(([product, r]) => ({ product, ...r })).sort((a, b) => (b.won + b.lost) - (a.won + a.lost)),
+    // «خدمة أخرى» is our own catch-all, not something Lean sells — a market verdict BY SERVICE
+    // must not list it as one. The readings behind it still count in `totals`.
+    by_product: [...prod.entries()].filter(([product]) => product !== OTHER_SERVICE)
+      .map(([product, r]) => ({ product, ...r })).sort((a, b) => (b.won + b.lost) - (a.won + a.lost)),
   };
 }
 
