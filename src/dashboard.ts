@@ -1341,8 +1341,25 @@ function vHomeCharts(cs) {
   // for the campaigns LIST; here a launch counts when it reached at least one real contact.
   const camps = showTest ? campaigns : campaigns.filter((cp) =>
     (cp.targets || []).some((t) => { const c = contactByPhone(t.phone); return c && !c.test; }));
-  const agg = { targeted: 0, sent: 0, delivered: 0, seen: 0, replied: 0, interested: 0 };
-  camps.forEach((cp) => { const st = campStats(cp); Object.keys(agg).forEach((k) => { agg[k] += st[k] || 0; }); });
+  // Count PEOPLE, not target rows. One contact can sit in several launches (ياسمين is in three),
+  // so summing per-campaign stats turned four people into six and put «ردّوا ٦» under a KPI card
+  // reading «ردّوا ٤» on the same screen. The KPI row counts distinct contacts; so does this.
+  const seenPhones = new Set();
+  const reached = [];
+  camps.forEach((cp) => (cp.targets || []).forEach((t) => {
+    if (seenPhones.has(t.phone)) return;
+    seenPhones.add(t.phone);
+    const c = contactByPhone(t.phone);
+    if (c && (showTest || !c.test)) reached.push(c);
+  }));
+  const agg = {
+    targeted: reached.length,
+    sent: reached.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
+    delivered: reached.filter((c) => (c.statusTimes || {}).delivered).length,
+    seen: reached.filter(seenOf).length,
+    replied: reached.filter((c) => (c.statusTimes || {}).replied).length,
+    interested: reached.filter(interestedOf).length,
+  };
   const funnel = [["جهات الاستهداف", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["جهات مهتمة", agg.interested, "#1f8a52"]];
   const byProd = new Map();
   cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
