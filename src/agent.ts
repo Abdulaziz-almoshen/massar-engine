@@ -516,19 +516,22 @@ const SANDBOX_ACTIVATION = /^\s*(?:proxy\b|بروكسي(?:\s|$))[\s\S]{0,40}$/i;
 export async function handleInbound(contact: Contact, text: string): Promise<void> {
   if (contact.optedOut) return;
 
-  if (SANDBOX_ACTIVATION.test(text)) {
-    // Answer the greeting the customer actually intended, and do not let the activation
-    // phrase reach the model or the transcript's meaning as a product enquiry.
+  // OPT-OUT IS CHECKED FIRST, ALWAYS. Nothing may sit above it. The activation branch below
+  // tolerates up to 40 trailing characters, so when it ran first «proxy stop messaging me» and
+  // «بروكسي أوقفوا الرسائل» were swallowed as plumbing: the person asking us to stop was never
+  // marked opted out and got an opener back. CLAUDE.md §8 forbids weakening this path.
+  if (isOptOut(text)) {
+    tracker.setOutcome(contact.phone, "opted_out");
+    await safeSend(contact.phone, "تم إيقاف الرسائل. شكرًا لوقتكم، ونعتذر عن الإزعاج.");
+    return;
+  }
+
+  // Only the very first turn can be platform plumbing; after that «proxy …» is the customer talking.
+  if (SANDBOX_ACTIVATION.test(text) && (contact.transcript || []).filter((t) => t.role === "customer").length <= 1) {
     console.log(JSON.stringify({ at: "agent", msg: "sandbox activation phrase — answered with the real opener", phone: contact.phone }));
     const opener = "أهلًا بكم. أنا المساعد الرقمي لشركة لِين لخدمات الأعمال، وأساعد المنشآت الصحية على تنفيذ خدمات مثل الإجازات المرضية وسجل التطعيمات الوطني مباشرة من داخل أنظمتها."
       + "\nكيف يمكنني خدمتكم؟";
     await safeSend(contact.phone, opener);
-    return;
-  }
-
-  if (isOptOut(text)) {
-    tracker.setOutcome(contact.phone, "opted_out");
-    await safeSend(contact.phone, "تم إيقاف الرسائل. شكرًا لوقتكم، ونعتذر عن الإزعاج.");
     return;
   }
 

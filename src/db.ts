@@ -63,9 +63,6 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
--- A campaign was only "sandbox" if every target happened to be a test contact, so a real
--- launch used as a rehearsal had nowhere to be filed. This makes it an explicit property.
-ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE IF NOT EXISTS contact_insights (
   phone       TEXT PRIMARY KEY,
   data        JSONB NOT NULL,
@@ -79,6 +76,12 @@ CREATE TABLE IF NOT EXISTS campaigns (
   message    TEXT,
   created_at BIGINT NOT NULL
 );
+-- A campaign was only "sandbox" if every target happened to be a test contact, so a real launch
+-- used as a rehearsal had nowhere to be filed. This makes it an explicit property.
+-- MUST stay AFTER the CREATE above: this whole schema runs as ONE simple query, so an ALTER on a
+-- table that does not exist yet aborts every statement after it — on a fresh or restored database
+-- that means no tables, connected=false, and the engine silently running memory-only.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE IF NOT EXISTS campaign_targets (
   campaign_id BIGINT NOT NULL,
   phone       TEXT NOT NULL,
