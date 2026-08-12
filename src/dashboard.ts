@@ -329,6 +329,7 @@ function chipRow(c) {
   if (c.outcome === "handoff") out.push('<span class="chip c-warn">مع مختص المبيعات</span>');
   if (c.human) out.push('<span class="chip c-warn">بيد البشر</span>');
   if (c.optedOut) out.push('<span class="chip c-bad">أوقف التواصل</span>');
+  if (!out.length) out.push('<span class="chip c-grey">جديد</span>');
   return out.join(" ");
 }
 const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
@@ -1604,9 +1605,8 @@ function render(fetchNew) {
   requestAnimationFrame(() => {
     const pnow = document.getElementById("pathNow"), pscroll = document.getElementById("pathScroll");
     if (!pnow || !pscroll || pscroll.scrollWidth <= pscroll.clientWidth) return;
-    const target = pnow.offsetLeft - (pscroll.clientWidth - pnow.offsetWidth) / 2;
-    pscroll.scrollLeft = target;   // RTL scrollLeft is negative-indexed in some engines; clamp both ways
-    if (Math.abs(pscroll.scrollLeft - target) > 4) pscroll.scrollLeft = -Math.abs(target);
+    // Let the engine do the RTL maths — hand-computed scrollLeft was wrong in every direction.
+    pnow.scrollIntoView({ inline: "center", block: "nearest" });
   });
   if (afId) {
     const el2 = document.getElementById(afId);
