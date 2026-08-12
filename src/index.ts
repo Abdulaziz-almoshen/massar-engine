@@ -285,15 +285,6 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
   const force = String((req.query as any)?.refresh ?? "") === "1";
   const ins = await insights.getInsights(contact, entity, force);
-  // Self-healing interest: the assistant sometimes reads a clear high-intent product from the
-  // conversation without having called tag_interest. Promote that read into a real tag once,
-  // so the tracker, the campaign columns and the win/loss board all stay current.
-  for (const pi of ins.product_interest ?? []) {
-    if (pi.level !== "high" || !pi.product) continue;
-    if ((contact.tags ?? []).some((t) => t.product === pi.product)) continue;
-    tracker.addTag(contact.phone, pi.product, "hot");
-    log({ at: "insights", msg: "promoted assistant read to interest tag", phone: contact.phone, product: pi.product });
-  }
   return {
     contact, entity, insights: ins,
     context: insights.contextScore(contact, entity),
