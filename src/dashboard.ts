@@ -501,10 +501,13 @@ function vKmon(d) {
   let list = campaigns.filter((c) =>
     (campTab === "all" || (campTab === "test") === campIsTest(c)) &&
     (!q || c.name.includes(q) || (c.product || "").includes(q)));
-  const withSt = list.map((c) => ({ c, st: campStats(c) }));
-  if (campSortKey === "replies") withSt.sort((a, b) => b.st.replied - a.st.replied);
-  else if (campSortKey === "seen") withSt.sort((a, b) => b.st.seen - a.st.seen);
-  else withSt.sort((a, b) => Number(b.c.created_at) - Number(a.c.created_at));
+  const withStAll = list.map((c) => ({ c, st: campStats(c) }));
+  if (campSortKey === "replies") withStAll.sort((a, b) => b.st.replied - a.st.replied);
+  else if (campSortKey === "seen") withStAll.sort((a, b) => b.st.seen - a.st.seen);
+  else withStAll.sort((a, b) => Number(b.c.created_at) - Number(a.c.created_at));
+  // Cap what we render, and declare the remainder in the footer rather than truncating silently.
+  const withSt = withStAll.slice(0, LIST_CAP);
+  const nOver = withStAll.length - withSt.length;
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 
   let h = '<div class="ptitle rise"><div><h1>الحملات</h1><p>كل إطلاق، أرقامه الفعلية، ونتيجته. اضغط أي حملة لفتح لوحتها.</p></div>' +
@@ -514,7 +517,7 @@ function vKmon(d) {
     tabs.map((t) => '<button class="ptab' + (campTab === t[0] ? " on" : "") + '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + fmtN(t[2]) + ")</button>").join("") + "</div>";
   // Say why the list is short, so a true screen never reads as a failed load.
   const nReal = tabs[1][2], nTest = tabs[2][2];
-  if (campTab === "real" && nReal <= 2 && nTest) {
+  if (campTab === "real" && nReal >= 1 && nReal <= 2 && nTest) {
     h += '<div class="sparse rise">' + ic("eye", 16, "#1F7A73") +
       "<div>هذه القائمة تعرض <b>" + fmtN(nReal) + " حملة فعلية</b> فقط، وهي كل ما أُطلق حتى الآن. " +
       "<b>" + fmtN(nTest) + "</b> حملة تجريبية وبروفات محفوظة في تبويب " +
@@ -533,7 +536,7 @@ function vKmon(d) {
     '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
     '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
     '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>' +
-    '<span style="flex:1"></span><span class="cntpill">' + fmtN(withSt.length) + " حملة</span></div>";
+    '<span style="flex:1"></span><span class="cntpill">' + fmtN(withStAll.length) + " حملة</span></div>";
   h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
     '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
     '<div>الحملة</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
@@ -557,12 +560,21 @@ function vKmon(d) {
       '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") +
       '" onclick="event.stopPropagation();setCampClass(' + c.id + "," + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + "</button></div></div>";
   });
-  if (!withSt.length) h += '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا نتائج مطابقة للبحث أو التصنيف</div>';
+  if (!withSt.length) {
+    // Say which of the two reasons this is: an empty class, or a search that matched nothing.
+    // Rendering «لا نتائج مطابقة» beside a «تعرض ٠ حملة فعلية» explainer gave two answers at once.
+    h += campQ.trim()
+      ? '<div style="padding:44px;text-align:center;color:#667085;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#98A2B3;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
+      : (campTab === "real"
+        ? '<div style="padding:44px;text-align:center;color:#667085;font-size:13px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#1F7A73;font-weight:700;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
+        : '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا حملات في هذا التبويب</div>');
+  }
   h += "</div></div>";
-  // The page control was hardcoded to a single «1», so one row sat under a pager implying more
-  // pages existed. A pager that can never move is the loudest broken signal on a sparse screen.
+  // The page control was hardcoded to «1», so one row sat under a pager implying more pages
+  // existed. There is no pagination here — the list is capped and says so. A control that
+  // cannot move is worse than no control; a silent truncation is worse still.
   h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span>' +
-    (withSt.length > LIST_CAP ? '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">١</button></span>' : "") + "</div>";
+    (nOver ? '<span style="color:#B54708;font-weight:700;">تُعرض أحدث ' + fmtN(LIST_CAP) + " حملة من " + fmtN(withSt.length + nOver) + ". ضيّق بالبحث لرؤية الباقي.</span>" : "") + "</div>";
   h += "</div>";
   return h;
 }

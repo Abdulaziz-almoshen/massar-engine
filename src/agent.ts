@@ -141,11 +141,20 @@ const PRODUCTS: Product[] = [
 ];
 
 // The analyst clamps every extracted service name to SERVICE_CATALOGUE. That list and this one
-// are two copies of the same truth, so drift here silently files a real service as «خدمة أخرى»
-// on every board. Fail the BUILD instead of discovering it in a demo.
-const _catalogueDrift = PRODUCTS.map((p) => p.name).filter((n) => !(SERVICE_CATALOGUE as readonly string[]).includes(n));
-if (_catalogueDrift.length) {
-  throw new Error(`service catalogue drift — in PRODUCTS but not SERVICE_CATALOGUE (insights.ts): ${_catalogueDrift.join(", ")}`);
+// are two copies of the same truth, so drift files a real service as «خدمة أخرى» on every board.
+// LOG, NEVER THROW: this module is imported before the server listens, so throwing here would
+// crash-loop the engine — no /health, no webhook, and no opt-out processing — which is far worse
+// than one mislabelled row on a dashboard. `npm run check:catalogue` fails loudly in CI instead.
+export function catalogueDrift(): string[] {
+  return PRODUCTS.map((p) => p.name).filter((n) => !(SERVICE_CATALOGUE as readonly string[]).includes(n));
+}
+{
+  const drift = catalogueDrift();
+  if (drift.length) {
+    console.error(JSON.stringify({ at: "agent", level: "error",
+      msg: "service catalogue drift — present in PRODUCTS but missing from SERVICE_CATALOGUE (insights.ts); these will be filed as «خدمة أخرى» on every board",
+      services: drift }));
+  }
 }
 
 // Segment → next-best pivot when the current product gets a "no".

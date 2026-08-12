@@ -10,8 +10,9 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "smoke": "./.venv/bin/python scripts/smoke.py",
-    "deploy": "fly deploy --ha=false && npm run smoke",
-    "smoke:setup": "python3 -m venv .venv && ./.venv/bin/pip -q install playwright && ./.venv/bin/python -m playwright install chromium"
+    "deploy": "npm run check:catalogue && fly deploy --ha=false && npm run smoke",
+    "smoke:setup": "python3 -m venv .venv && ./.venv/bin/pip -q install playwright && ./.venv/bin/python -m playwright install chromium",
+    "check:catalogue": "node scripts/check-catalogue.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",
