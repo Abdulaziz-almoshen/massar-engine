@@ -251,7 +251,7 @@ let insCache = {};            // phone → cached فهم المساعد (list ro
 let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
-let campMsg = "مرحبًا {name}، معكم مساعد لِين الرقمي. ارتقوا بكفاءة منشأتكم من خلال إصدار الإجازات المرضية بتوثيق رسمي وتكامل مباشر مع أنظمتكم، مما يساهم في تقليل زمن الإصدار بنسبة 70%. يسعدنا التنسيق معكم لعرض آلية التكامل ومناقشة الخطوات القادمة.";
+let campMsg = "ارتقِ بكفاءة منشأتكم من خلال التكامل المباشر بين نظام HIS وخدمة {product}.\\n\\nيُمكّن التكامل الممارسين من تنفيذ الخدمة مباشرة من داخل نظام المنشأة، دون الحاجة للتنقل بين أنظمة متعددة، مما يساهم في تسريع الإجراءات، تقليل العمل اليدوي، وتحسين تجربة الممارسين.\\n\\nفريقنا جاهز لدعمكم في رحلة التكامل من المتطلبات التقنية وحتى التفعيل.\\n\\nيسعدنا التنسيق معكم لعرض آلية التكامل ومناقشة الخطوات القادمة.";
 
 const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
@@ -739,7 +739,7 @@ window.confirmLaunch = async () => {
   try {
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: campMsg, name: campName, product: wizProducts()[selProd].name }) });
+      body: JSON.stringify({ targets, message: msgOut, name: campName, product: wizProducts()[selProd].name }) });
     const d = await r.json();
     launching = false; closeLaunch();
     if (!r.ok) { alertBar("فشل الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
@@ -827,7 +827,8 @@ function vAimkt() {
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
     (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.05);padding:11px 12px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
-    '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي"))) + "</div></div>" +
+    '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName)) + "</div></div>" +
+    '<div style="font-size:10.5px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
     ["تنسيق عرض تعريفي", "إرسال التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
