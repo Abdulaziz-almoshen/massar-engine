@@ -105,7 +105,9 @@ export async function sendQuickReplyDocument(
   const message = {
     type: "quick_reply",
     msgid: `qrd-${Date.now()}`,
-    content: { type: "document", url, filename, caption: body },
+    // Gupshup's interactive shape wants the caption in `text` (not `caption`) for a
+    // document header — the earlier `caption` payload is what split it into two bubbles.
+    content: { type: "document", url, filename, text: body },
     options: options.slice(0, 3),
   };
   return postForm(MSG_URL, { ...baseParams(destination), message: JSON.stringify(message) });

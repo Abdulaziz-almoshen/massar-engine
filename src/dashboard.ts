@@ -268,7 +268,7 @@ const TITLES = {
   aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
   kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
-  customers: ["قائمة المستهدفين", "استورد جهات الاستهداف وأدرها للحملات"],
+  customers: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
   pipeline: ["لوحة متابعة الفرص", "ضمن المرحلة القادمة"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
@@ -516,7 +516,7 @@ function vKmon(d) {
   });
   if (!withSt.length) h += '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا نتائج مطابقة للبحث أو التصنيف</div>';
   h += "</div></div>";
-  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تتحدّث لحظيًا من حالات تسليم واتساب — لا تقديرات</span>' +
+  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب — لا تقديرات</span>' +
     '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">1</button></span></div>';
   h += "</div>";
   return h;
@@ -629,7 +629,7 @@ function vHome(d) {
     '<div><div class="v">' + value + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
     (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#667085") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
   let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
-    '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد مستهدفين</a>" +
+    '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
     kpi("send", "الحملات الفعلية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
@@ -792,7 +792,7 @@ function vAimkt() {
       return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
 
-  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يتحدّث فورًا.</div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
@@ -801,7 +801,7 @@ function vAimkt() {
       '<div style="font-size:11.5px;color:#667085;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
       '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
   } else if (!entities.length) {
-    h += '<div style="border:1.5px dashed #D0D5DD;border-radius:12px;padding:26px;text-align:center;color:#667085;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">قائمة المستهدفين</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
+    h += '<div style="border:1.5px dashed #D0D5DD;border-radius:12px;padding:26px;text-align:center;color:#667085;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
@@ -996,13 +996,13 @@ function vKbProduct(name) {
   // ── Performance row: one scoreboard, not scattered chips ──
   const cells = [
     ["حملات الخدمة", prodCamps.length, "#101828"],
-    ["صفقات مكتملة", (wlProd && wlProd.won) || 0, "#027A48"],
-    ["لم تُغلق", (wlProd && wlProd.lost) || 0, "#B42318"],
+    ["صفقات مكتسبة", (wlProd && wlProd.won) || 0, "#027A48"],
+    ["غير مكتسبة", (wlProd && wlProd.lost) || 0, "#B42318"],
     ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#2F5F94"],
   ];
   h += '<div class="card rise" style="padding:0;overflow:hidden;">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
-    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-end:1px solid #EAECF0;" : "") + '">' +
+    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #EAECF0;" : "") + '">' +
       '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
       '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + c[1] + "</div></div>").join("") +
     "</div>" +
@@ -1349,7 +1349,7 @@ function vActionQueue(cs) {
   });
   if (!items.length) return "";
   return '<div class="card rise" style="margin-bottom:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
-    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق وقتك الآن</h3>" +
+    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق المتابعة الآن</h3>" +
     '<span class="cntpill">' + items.length + " إجراء</span></div>" +
     '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">' +
     items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EAECF0;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
@@ -1403,7 +1403,7 @@ function vCustomer(ph) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، واكتمال السياق.</div></div>';
   }
   if (profileData.missing) {
-    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ قائمة المستهدفين</a></div></div>';
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
   }
   const d = profileData; const c = d.contact; const ins = d.insights || {}; const ctx = d.context || { score: 0, parts: [] };
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
@@ -1434,7 +1434,7 @@ function vCustomer(ph) {
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
     '<span style="flex:1"></span>' +
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
-    [["meeting_booked", "حُجز اجتماع", "#027A48"], ["quote_sent", "أُرسل العرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
+    [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "أُرسل العرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
       .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (hOut && hOut.text.indexOf(o[0]) >= 0 ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد
