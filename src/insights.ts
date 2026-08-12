@@ -26,12 +26,15 @@ export type Insights = {
   learning?: boolean;          // < 2 customer messages — mirror the reference's "Learning…"
   // Win/Loss attribution («لماذا بعنا ولماذا لم نبع») — evidence-quoted, never invented.
   deal_state?: "won" | "lost" | "stalled" | "active";
+  stage?: string;
+  stage_reason?: string;
   loss_cause?: string;         // from LOSS_TAXONOMY (empty unless lost/stalled)
   win_drivers?: string[];      // what moved this deal forward (verbatim-anchored)
   evidence?: string;           // the customer quote that proves the call
   fix_suggestion?: string;     // what would likely have won/revived it
 };
 
+export const SALES_STAGES = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"] as const;
 export const LOSS_TAXONOMY = ["التكلفة", "التوقيت", "عدم ملاءمة الخدمة", "عدم وضوح التواصل", "عدم وضوح الملف التعريفي", "لا استجابة", "عدم ملاءمة الجهة", "طلب التواصل مع مختص"] as const;
 
 const SYSTEM = [
@@ -40,10 +43,11 @@ const SYSTEM = [
   "intent: high = طلب صريح للسعر أو بدء الاشتراك أو تنسيق موعد؛ medium = أسئلة محددة عن المتطلبات أو التفاصيل؛ low = ردود عامة لا تدل على تقدم؛ none = لا توجد إشارة مدعومة نصيًا.",
   "next_action: إجراء واحد محدد ينفذه مدير المبيعات الآن، مثل «تواصل اليوم لمناقشة باقة المنشآت» أو «أرسل عرض الأسعار التفصيلي». why: سطر موجز يربط الإجراء بكلام ممثل المنشأة.",
   "best_time: حدّد نافذة تواصل واقعية ضمن أيام العمل في السعودية من ٩ص إلى ٥م، استنادًا إلى أوقات رسائل ممثل المنشأة عند توفرها. عند غياب الدليل، اقترح صباح يوم العمل التالي.",
+  "stage: حدّد أين يقف العميل على مسار البيع، واختر حصريًا من: تعارف · تشخيص الاحتياج · عرض الحل · معالجة الاعتراض · تنسيق العرض التعريفي · الإغلاق. stage_reason: سطر واحد يبرر الاختيار من كلام العميل.",
   "حكم الصفقة deal_state: won = التزم صراحة بالاشتراك/الاجتماع النهائي؛ lost = رفض نهائيًا أو انسحب؛ stalled = توقف التفاعل بعد اهتمام (صمت > يومين بعد آخر رسالة منا)؛ active = الحوار مستمر طبيعيًا.",
   "إذا كانت deal_state تساوي lost أو stalled، فاختر loss_cause حصرًا من: التكلفة، التوقيت، عدم ملاءمة الخدمة، عدم وضوح التواصل، عدم وضوح الملف التعريفي، لا استجابة، عدم ملاءمة الجهة، طلب التواصل مع مختص. اجعل evidence اقتباسًا حرفيًا من ممثل المنشأة، أو وصفًا دقيقًا لغياب الرد، واجعل fix_suggestion إجراءً واقعيًا قد يدعم استئناف الصفقة أو إغلاقها.",
   "إذا كانت deal_state تساوي won، أو active مع تقدم واضح، فاجعل win_drivers عوامل مدعومة نصيًا أسهمت في تقدم الصفقة، مثل سرعة الاستجابة أو وضوح الملف أو ملاءمة التكلفة أو الحاجة التشغيلية.",
-  'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
+  'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","stage":"واحدة من المراحل الست","stage_reason":"سبب قصير","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
 /** Deterministic completeness of what the platform knows about this person (0–100). */
@@ -183,6 +187,8 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     why: String(parsed.why || "").slice(0, 200),
     best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (٩–١١ص)",
     deal_state: ds,
+    stage: (SALES_STAGES as readonly string[]).includes(String(parsed.stage)) ? String(parsed.stage) : (ds === "won" ? "الإغلاق" : "تعارف"),
+    stage_reason: String(parsed.stage_reason || "").slice(0, 160),
     loss_cause: (ds === "lost" || ds === "stalled") ? lc : "",
     win_drivers: (Array.isArray(parsed.win_drivers) ? parsed.win_drivers : []).slice(0, 4).map((x) => String(x).slice(0, 100)),
     evidence: String(parsed.evidence || "").slice(0, 200),

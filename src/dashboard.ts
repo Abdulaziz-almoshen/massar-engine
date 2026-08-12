@@ -713,6 +713,24 @@ window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); r
 window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
 window.entClear = () => { entSel.clear(); render(false); };
 window.campMsgSet = (el) => { campMsg = el.value; };
+window.composeMsg = async () => {
+  const btn = document.getElementById("cmpbtn");
+  const reg = wizProducts(); const prod = reg[selProd] ? reg[selProd].name : "";
+  if (!prod) return;
+  const groups = segGroups();
+  const audience = Object.keys(entFilters).filter((k) => entFilters[k]).map((k) => k + ": " + entFilters[k]).join("، ");
+  if (btn) { btn.disabled = true; btn.textContent = "جارٍ الكتابة…"; }
+  try {
+    const r = await fetch("/admin/compose", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ product: prod, audience }) });
+    const d = await r.json();
+    if (!r.ok || !d.message) { alertBar("تعذّرت الكتابة: " + esc(d.error || r.status), true); return; }
+    campMsg = d.message;
+    render(false);
+    alertBar("كُتبت الرسالة — راجعها وعدّلها قبل الإطلاق", false);
+  } catch (e) { alertBar("تعذّر الاتصال بمحرك الكتابة", true); }
+  finally { const b2 = document.getElementById("cmpbtn"); if (b2) { b2.disabled = false; } }
+};
 window.campNameSet = (el) => { campName = el.value; };
 window.pick = (i) => { selProd = i; render(false); };
 window.launchWithProduct = (name) => {
@@ -835,7 +853,8 @@ function vAimkt() {
 
   h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
-    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">نص الرسالة</div>' +
+    '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
+    '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
     '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
     '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
     '<div class="wa-prev">' +
@@ -1390,6 +1409,26 @@ function vWinLoss() {
   h += "</div>";
   return h;
 }
+const SALES_PATH = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"];
+function vSalesPath(ins) {
+  const cur = Math.max(0, SALES_PATH.indexOf(ins.stage || "تعارف"));
+  return '<div class="card rise" style="padding:22px 24px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
+    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("target", 18, "#1F7A73") + "مسار البيع مع هذا العميل</h3>" +
+    '<span class="chip c-teal">المرحلة ' + (cur + 1) + " من " + SALES_PATH.length + "</span></div>" +
+    '<div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;" class="ms-scroll">' +
+    SALES_PATH.map((st, i) => {
+      const done = i < cur, now = i === cur;
+      const col = done ? "#1F7A73" : now ? "#101828" : "#D0D5DD";
+      return '<div style="flex:1;min-width:110px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;">' +
+        (i > 0 ? '<span style="position:absolute;top:13px;right:50%;width:100%;height:2px;background:' + (done || now ? "#1F7A73" : "#EAECF0") + ';"></span>' : "") +
+        '<span style="position:relative;z-index:1;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' +
+        (done ? "background:#1F7A73;color:#fff;" : now ? "background:#101828;color:#fff;box-shadow:0 0 0 4px rgba(16,24,40,.08);" : "background:#fff;color:#98A2B3;border:2px solid #EAECF0;") + '">' + (done ? "✓" : (i + 1)) + "</span>" +
+        '<div style="font-size:11.5px;font-weight:' + (now ? "700" : "600") + ';color:' + col + ';margin-top:8px;line-height:1.5;">' + st + "</div></div>";
+    }).join("") + "</div>" +
+    (ins.stage_reason ? '<div style="font-size:12px;color:#475467;margin-top:16px;padding-top:14px;border-top:1px solid #F2F4F7;line-height:1.9;"><b style="color:#101828;">لماذا هذه المرحلة:</b> ' + esc(ins.stage_reason) + "</div>" : "") +
+    "</div>";
+}
 const INTENT_META = { high: ["نية مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#667085"], none: ["لا إشارة بعد", "#98A2B3"] };
 function toneBadge(label, color) {
   return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #EAECF0;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#344054;">' +
@@ -1436,6 +1475,7 @@ function vCustomer(ph) {
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "أُرسل العرض", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
       .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (hOut && hOut.text.indexOf(o[0]) >= 0 ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
+  if (!ins.learning) h += vSalesPath(ins);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +

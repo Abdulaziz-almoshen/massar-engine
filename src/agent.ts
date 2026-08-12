@@ -326,6 +326,33 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
+// ------------------------------ campaign copy the model writes ------------------------------
+/** Writes a campaign opener in the platform's selling voice, grounded in the approved KB. */
+export async function composeOpener(product: string, audience: string, angle: string): Promise<string> {
+  const p = PRODUCTS.find((x) => x.name === product);
+  const hub = hubKb.find((h) => h.product === product);
+  const know = [
+    p ? `العرض: ${p.pitch}` : "",
+    p ? `القيمة التشغيلية: ${p.efficiency.join(" · ")}` : "",
+    p ? `الأنسب لـ: ${p.bestFor.join("، ")}` : "",
+    hub ? hub.md.slice(0, 3000) : "",
+  ].filter(Boolean).join("\n");
+  const sys = [
+    "أنت كاتب رسائل مبيعات لشركة لِين للصحة الرقمية، تكتب افتتاحية حملة واتساب لمنشأة صحية سعودية.",
+    "اكتب كبائع محترف لا كمعلن: ابدأ بألم تشغيلي محدد يعرفه المسؤول، ثم اذكر المكسب برقم من المعرفة المرفقة، ثم اختم بسؤال واحد سهل الإجابة.",
+    "أربع فقرات قصيرة كحد أقصى، سطر أو سطران لكل فقرة. فصحى مبسطة. لا رموز تعبيرية ولا علامات تعجب ولا مبالغة.",
+    "لا تخترع رقمًا أو وعدًا غير موجود في المعرفة المرفقة. استخدم {name} إن أردت مخاطبة الجهة باسمها.",
+    "أعد نص الرسالة فقط دون أي شرح أو عنوان.",
+  ].join("\n");
+  const usr = `الخدمة: ${product}\n${audience ? "الجمهور: " + audience + "\n" : ""}${angle ? "الزاوية المطلوبة: " + angle + "\n" : ""}\n--- المعرفة المعتمدة ---\n${know}`;
+  const completion = await client.chat.completions.create({
+    model: model || cfg.openaiModel || "gpt-5.6-terra",
+    messages: [{ role: "system", content: sys }, { role: "user", content: usr }],
+    ...((model || cfg.openaiModel || "gpt-5.6-terra").startsWith("gpt-5") ? { reasoning_effort: "none" } : {}),
+  } as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming);
+  return (completion.choices[0]?.message?.content ?? "").trim();
+}
+
 // ------------------------------ lead alerts → the product manager ------------------------------
 // Hard rule in code (not prompt): a hot tag or a handoff pushes a lead card to the PM's
 // WhatsApp so a serious lead never dead-ends. Throttled per contact; silent if unset.

@@ -245,6 +245,19 @@ app.post("/admin/contact/human", async (req, reply) => {
   return { status: "ok" };
 });
 
+// Let the model write the opener: product knowledge + audience shape → a seller's message.
+app.post("/admin/compose", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { product, audience, angle } = (req.body ?? {}) as { product?: string; audience?: string; angle?: string };
+  if (!product) return reply.code(400).send({ error: "body: { product, audience?, angle? }" });
+  try {
+    const text = await agent.composeOpener(String(product), String(audience || ""), String(angle || ""));
+    return { message: text };
+  } catch (e) {
+    return reply.code(502).send({ error: String(e instanceof Error ? e.message : e).slice(0, 200) });
+  }
+});
+
 // «لماذا نكسب ولماذا نخسر» — aggregated over cached reads (no LLM cost per view).
 app.get("/admin/intel/winloss", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
