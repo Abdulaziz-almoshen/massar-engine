@@ -105,6 +105,12 @@ export const DASHBOARD_HTML = `<!doctype html>
   .tblwrap { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
   .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #EAECF0; }
   .cntpill { font-size: 12px; font-weight: 700; color: #1F7A73; background: #E9F7F6; border-radius: 999px; padding: 4px 12px; }
+  /* Sparse-state rule (portal-wide): a screen with few rows must read as DELIBERATE, not
+     half-loaded. One line, directly under the controls, that says what is here and where the
+     rest is. Real data is still thin on most screens, so this recurs — it lives once. */
+  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #475467; }
+  .sparse b { color: #101828; font-weight: 700; }
+  .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
   .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid #EAECF0; background: #F9FAFB; font-size: 11.5px; color: #667085; }
   .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EAECF0; background: #fff; color: #475467; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .pgbtn.on { background: #101828; color: #fff; border-color: #101828; }
@@ -505,7 +511,16 @@ function vKmon(d) {
     '<div class="acts"><button class="btn btn-ghost" onclick="exportCampaigns()">' + ic("doc", 17) + ' تصدير CSV</button>' +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px;" class="rise">' +
-    tabs.map((t) => '<button class="ptab' + (campTab === t[0] ? " on" : "") + '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + t[2] + ")</button>").join("") + "</div>";
+    tabs.map((t) => '<button class="ptab' + (campTab === t[0] ? " on" : "") + '" onclick="setCampTab(\\'' + t[0] + '\\')">' + t[1] + " (" + fmtN(t[2]) + ")</button>").join("") + "</div>";
+  // Say why the list is short, so a true screen never reads as a failed load.
+  const nReal = tabs[1][2], nTest = tabs[2][2];
+  if (campTab === "real" && nReal <= 2 && nTest) {
+    h += '<div class="sparse rise">' + ic("eye", 16, "#1F7A73") +
+      "<div>هذه القائمة تعرض <b>" + fmtN(nReal) + " حملة فعلية</b> فقط، وهي كل ما أُطلق حتى الآن. " +
+      "<b>" + fmtN(nTest) + "</b> حملة تجريبية وبروفات محفوظة في تبويب " +
+      '<span class="lnk" onclick="setCampTab(\\'test\\')">تجريبية</span>' +
+      " ولا تدخل في أرقام الأداء.</div></div>";
+  }
   if (!campaigns.length) {
     h += '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#1F7A73;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
     return h;
@@ -530,7 +545,7 @@ function vKmon(d) {
       : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
         : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
     h += '<div class="trow" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span class="swt' + (isTest ? "" : " on") + '" role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية مفعّلة") + '" title="' + (isTest ? "حملة تجريبية (ساندبوكس)" : "حملة فعلية مفعّلة") + '"><i></i></span>' +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
       '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
       '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
@@ -539,15 +554,36 @@ function vKmon(d) {
       '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + pct(st.seen, st.targeted) + "%</div>" +
       '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + pct(st.replied, st.targeted) + "%</div>" +
       '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#667085;flex:none;font-variant-numeric:tabular-nums;">' + prog + "%</span></div>" +
-      '<div style="text-align:center;"><button class="kebab" onclick="event.stopPropagation();location.hash=\\'kmon/' + c.id + '\\'">⋯</button></div></div>';
+      '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") +
+      '" onclick="event.stopPropagation();setCampClass(' + c.id + "," + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + "</button></div></div>";
   });
   if (!withSt.length) h += '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا نتائج مطابقة للبحث أو التصنيف</div>';
   h += "</div></div>";
-  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب — لا تقديرات</span>' +
-    '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">1</button></span></div>';
+  // The page control was hardcoded to a single «1», so one row sat under a pager implying more
+  // pages existed. A pager that can never move is the loudest broken signal on a sparse screen.
+  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span>' +
+    (withSt.length > LIST_CAP ? '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">١</button></span>' : "") + "</div>";
   h += "</div>";
   return h;
 }
+// Reclassify a launch from the list itself. Until now this took an authenticated curl, which is
+// why ten rehearsals sat in the founder's real reporting until someone noticed.
+window.setCampClass = async (id, test) => {
+  const cp = campaigns.find((c) => Number(c.id) === Number(id));
+  if (!cp) return;
+  try {
+    const r = await fetch("/admin/campaign/test", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-token": TOKEN },
+      body: JSON.stringify({ id: Number(id), test: Boolean(test) }),
+    });
+    if (!r.ok) { alertBar("تعذّر تغيير تصنيف الحملة (" + r.status + ")", true); return; }
+    cp.test = Boolean(test);           // optimistic: the next poll confirms from the ledger
+    render(false);
+    alertBar(test ? "نُقلت «" + cp.name + "» إلى التجريبية، وخرجت من أرقام الأداء"
+                  : "عادت «" + cp.name + "» إلى الحملات الفعلية", false);
+  } catch (e) { alertBar("تعذّر الاتصال بالخادم. أعد المحاولة.", true); }
+};
 window.exportCampaigns = () => {
   const rows = [["الحملة", "الخدمة", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "جهات مهتمة"]];
   campaigns.forEach((c) => { const st = campStats(c); rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]); });
