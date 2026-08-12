@@ -14,11 +14,11 @@ export const DASHBOARD_HTML = `<!doctype html>
 <title>مَسار — نظام إدارة المبيعات</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
-  body { font-family: 'IBM Plex Sans Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
+  body { font-family: 'Cairo', 'IBM Plex Sans Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
   .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
@@ -1390,7 +1390,33 @@ function gate(msg) {
 }
 window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN); refresh(); };
 
+let _viewSig = "";
+function stamp() {
+  const u = document.getElementById("upd");
+  if (u) u.textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function dataSignature() {
+  const cs = (cache && cache.contacts) || [];
+  return [
+    location.hash,
+    cs.length,
+    cs.reduce((a, c) => a + (c.transcript || []).length + (c.tags || []).length + Object.keys(c.statusTimes || {}).length + (c.human ? 1 : 0) + (c.test ? 2 : 0), 0),
+    campaigns.length, entities.length, kbDocs.length, prodAssets.length,
+    Object.keys(insCache).length,
+    winloss ? JSON.stringify(winloss.totals) : "",
+    showTest, campTab, campSortKey, campQ, entQ, custQ, campFilter, rQ, selProd,
+    retargetCohort ? retargetCohort.targets.length : 0,
+    profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
+    JSON.stringify(entFilters), [...entSel].join(","),
+  ].join("~");
+}
 function render(fetchNew) {
+  // A poll that changes nothing must not repaint the screen — otherwise the page
+  // visibly churns every 5 seconds while the operator is reading it.
+  const sig = dataSignature();
+  if (fetchNew && sig === _viewSig && document.getElementById("body").innerHTML) { stamp(); return; }
+  _viewSig = sig;
+  stamp();
   nav();
   const af = document.activeElement;
   const afId = af && af.tagName === "INPUT" ? af.id || af.getAttribute("data-fid") : null;
@@ -1449,7 +1475,7 @@ async function refresh(force) {
     try {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
       if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
-      else { cache = await r.json(); document.getElementById("upd").textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+      else { cache = await r.json(); }
       const [er, kr, cr, ir, wr] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
