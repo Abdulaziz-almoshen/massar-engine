@@ -471,12 +471,11 @@ window.campSearchFn = (el) => { campQ = el.value; clearTimeout(window.__cq2); wi
 window.setCampTab = (t) => { campTab = t; render(false); };
 window.setCampSort = (el) => { campSortKey = el.value; render(false); };
 window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; render(false); };
-function campIsTest(cp) {
-  // An explicit flag wins: a rehearsal aimed at real numbers is still a rehearsal. Otherwise
-  // fall back to the derived rule — every target is a sandbox contact.
-  if (cp.test === true) return true;
-  return cp.targets.length > 0 && cp.targets.every((t) => { const c = contactByPhone(t.phone); return c && c.test; });
-}
+// A launch is a rehearsal because we say it is — not because of who it happened to reach.
+// The old derived rule («every target is a sandbox contact») filed a real campaign aimed at
+// seeded demo contacts as sandbox, while four genuine rehearsals aimed at real numbers sat in
+// the live list. Contacts keep their own `test` flag for the KPIs; this classifies the launch.
+function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
