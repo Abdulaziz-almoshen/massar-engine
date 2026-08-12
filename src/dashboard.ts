@@ -240,7 +240,8 @@ const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 2
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
-let manualRows = [{ name: "", phone: "", size: "", city: "" }]; let custQ = "";
+let manualRows = [{ name: "", phone: "", size: "", city: "" }];
+let manualOpen = false; let manualStat = ""; let custQ = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
@@ -1064,7 +1065,9 @@ function manualRowsHtml() {
       : '<span style="width:32px;flex:none;"></span>') + "</div>").join("");
 }
 window.entRowSet = (el) => { manualRows[+el.dataset.i][el.dataset.k] = el.value; };
+window.entManualOpened = () => { manualStat = ""; };
 window.entAddRow = () => {
+  manualStat = "";
   manualRows.push({ name: "", phone: "", size: "", city: "" });
   const box = document.getElementById("manualrows");
   if (box) { box.innerHTML = manualRowsHtml(); const ins = box.querySelectorAll("input"); if (ins.length >= 4) ins[ins.length - 4].focus(); }
@@ -1091,7 +1094,9 @@ window.entManualSave = async () => {
     const res = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
     const d = await res.json();
     if (!res.ok) { if (st) st.innerHTML = '<span class="chip c-bad">' + esc(d.error || res.status) + "</span>"; return; }
-    if (st) st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span>" : "");
+    manualStat = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span>" : "");
+    if (st) st.innerHTML = manualStat;
+    manualOpen = true;
     manualRows = [{ name: "", phone: "", size: "", city: "" }];
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
@@ -1140,13 +1145,13 @@ function vCustomers() {
     '<div style="font-size:11px;color:#98A2B3;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
     '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
-    '<details id="manualbox" style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
+    '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
     '<div style="font-size:11.5px;color:#98A2B3;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · الحجم والمدينة يصبحان شريحتَي استهداف</div>' +
     '<div id="manualrows">' + manualRowsHtml() + '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-teal" style="font-size:12.5px;" onclick="entManualSave()">حفظ الجهات ←</button>' +
     '<button class="btn btn-ghost" style="font-size:12px;" onclick="entAddRow()">+ صف آخر</button>' +
-    '<span id="entstat"></span><span style="flex:1"></span>' +
+    '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
     '<button class="btn" style="font-size:11.5px;background:transparent;color:#667085;padding:8px 4px;" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
     '<div id="pastebox" style="display:none;margin-top:12px;">' +
     '<div style="font-size:11.5px;color:#667085;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#101828;">الاسم، الجوال، الحجم، المدينة</b></div>' +
