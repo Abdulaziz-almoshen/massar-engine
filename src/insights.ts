@@ -56,6 +56,18 @@ const SERVICE_PATTERNS: [RegExp, string][] = [
   [/تكامل|ربط|الربط|HIS|ERP|واجهات/i, "تكامل الأنظمة (HIS/ERP)"],
 ];
 
+/** Apply the clamp on the way OUT of the cache as well. Rows written before it existed still
+ *  hold free text, and the portal's chips, filters and boards all read those rows directly —
+ *  normalising only at the aggregate left «باقات NVR لتغطية 8 مواقع» on the campaign row. */
+export function normalizeCached<T extends { product_interest?: { product: string; level: string }[] }>(d: T): T {
+  if (!d || !Array.isArray(d.product_interest)) return d;
+  const seen = new Set<string>();
+  const pi = d.product_interest
+    .map((p) => ({ ...p, product: canonicalService(p.product) }))
+    .filter((p) => p.product && !seen.has(p.product) && seen.add(p.product));
+  return { ...d, product_interest: pi };
+}
+
 /** Map a free-text service mention onto the catalogue; anything unrecognised shares one
  *  honest bucket rather than becoming a service Lean does not sell. */
 export function canonicalService(raw: string): string {

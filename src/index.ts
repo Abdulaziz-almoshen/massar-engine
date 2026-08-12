@@ -270,7 +270,9 @@ app.get("/admin/intel/winloss", async (req, reply) => {
 // Cached reads only (no LLM) — lets list rows show next actions cheaply.
 app.get("/admin/insights", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  return db.listInsights();
+  // Clamp service names on the way out: rows cached before the catalogue existed hold free text,
+  // and the portal renders these straight into chips and filters.
+  return (await db.listInsights()).map((r: any) => ({ ...r, data: insights.normalizeCached(r.data) }));
 });
 
 // العميل ٣٦٠ — one person, fully assembled: identity + timeline + فهم المساعد + context score.
@@ -284,7 +286,7 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   if (!contact) return reply.code(404).send({ error: "لا محادثة لهذا الرقم بعد" });
   const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
   const force = String((req.query as any)?.refresh ?? "") === "1";
-  const ins = await insights.getInsights(contact, entity, force);
+  const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
   return {
     contact, entity, insights: ins,
     context: insights.contextScore(contact, entity),
