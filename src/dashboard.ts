@@ -474,7 +474,8 @@ window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; re
 // A launch is a rehearsal because we say it is — not because of who it happened to reach.
 // The old derived rule («every target is a sandbox contact») filed a real campaign aimed at
 // seeded demo contacts as sandbox, while four genuine rehearsals aimed at real numbers sat in
-// the live list. Contacts keep their own `test` flag for the KPIs; this classifies the launch.
+// the live list. Contacts keep their own test flag for the KPIs; this classifies the launch.
+// (No backticks in this file's comments — the client code lives inside a template literal.)
 function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
