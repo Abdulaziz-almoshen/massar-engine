@@ -11,7 +11,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>مَسار — نظام إدارة المبيعات</title>
+<title>مسار — نظام إدارة المبيعات</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -219,14 +219,14 @@ export const DASHBOARD_HTML = `<!doctype html>
   <aside>
     <div class="brand">
       <div class="logo">م</div>
-      <div><div class="t1">مَسار</div><div class="t2">نظام إدارة المبيعات</div></div>
+      <div><div class="t1">مسار</div><div class="t2">نظام إدارة المبيعات</div></div>
     </div>
     <nav class="ms-scroll" id="nav"></nav>
     <div class="userbox"><div class="av">ع</div><div><div class="n">عبدالعزيز المحسن</div><div class="r">المدير التنفيذي</div></div></div>
   </aside>
   <main>
     <header>
-      <div class="tt"><div class="t" id="pt">مَسار</div><div class="s" id="ps"></div></div>
+      <div class="tt"><div class="t" id="pt">مسار</div><div class="s" id="ps"></div></div>
       <span class="livechip" id="live" style="display:none"><span class="d"></span> مباشر · <span id="upd">—</span></span>
     </header>
     <div class="body ms-scroll" id="body"></div>
@@ -1384,7 +1384,7 @@ function vPlaceholder(cur) {
 }
 
 function gate(msg) {
-  document.getElementById("body").innerHTML = '<div class="gate"><div style="font-size:16px;font-weight:700;">دخول مَسار</div>' +
+  document.getElementById("body").innerHTML = '<div class="gate"><div style="font-size:16px;font-weight:700;">الدخول إلى مسار</div>' +
     '<input id="tok" placeholder="admin token" dir="ltr"><button class="btn btn-teal" onclick="saveTok()">دخول</button>' +
     (msg ? '<div style="color:#c43d3d;font-size:12px;margin-top:10px;">' + esc(msg) + "</div>" : "") + "</div>";
 }
