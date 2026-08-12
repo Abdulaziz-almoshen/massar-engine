@@ -291,7 +291,7 @@ const PRODUCTS = [
   { n: "تكامل الأنظمة (HIS/ERP)", sc: 63, gaps: ["التسعير التفصيلي"] },
 ];
 const KB_SECTIONS = [
-  ["نظرة عامة على المنتج", "الوصف وآلية العمل ومدة التنفيذ", "ok", "مكتمل"],
+  ["نظرة عامة على الخدمة", "الوصف وآلية العمل ومدة التنفيذ", "ok", "مكتمل"],
   ["القيمة التشغيلية", "القيمة التشغيلية: زمن الإصدار ↓70%، دون إدخال مزدوج، وتوثيق فوري", "ok", "مكتمل"],
   ["جهات الاستهداف", "المجمعات والمراكز والمستشفيات ومراكز الأسنان", "ok", "مكتمل"],
   ["التسعير والباقات", "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا", "ok", "مكتمل"],
@@ -494,7 +494,7 @@ function vKmon(d) {
     '<span style="flex:1"></span><span class="cntpill">' + withSt.length.toLocaleString("ar-SA-u-nu-latn") + " حملة</span></div>";
   h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
     '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
-    '<div>الحملة</div><div>المنتج</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+    '<div>الحملة</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
   withSt.forEach(({ c, st }, i) => {
     const prog = pct(st.delivered, st.targeted);
     const isTest = campIsTest(c);
@@ -522,7 +522,7 @@ function vKmon(d) {
   return h;
 }
 window.exportCampaigns = () => {
-  const rows = [["الحملة", "المنتج", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "جهات مهتمة"]];
+  const rows = [["الحملة", "الخدمة", "التاريخ", "الجمهور", "وصلت", "شوهدت", "ردّوا", "جهات مهتمة"]];
   campaigns.forEach((c) => { const st = campStats(c); rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]); });
   const safe = (x) => { let v = String(x); if (/^[=+\\-@\\t\\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
   const csv = "\\ufeff" + rows.map((r) => r.map(safe).join(",")).join("\\n");
@@ -801,7 +801,7 @@ function vAimkt() {
   const selName = reg[selProd] ? reg[selProd].name : "";
   const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي منتج يبيعه المساعد؟</div><div class="hs">القائمة تشمل منتجات Product Hub المرفوعة بملفاتها — لا تقتصر على المنتجات المدمجة.</div></div></div><div class="prods">' +
+  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمةات المدمجة.</div></div></div><div class="prods">' +
     reg.map((x, i) => {
       const inner = x.sc !== null
         ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
@@ -866,7 +866,7 @@ function vAimkt() {
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
     ["تنسيق عرض تعريفي", "إرسال التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذا المنتج بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة الخدمة ليُضمَّن.</div>') +
+    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة الخدمة ليُضمَّن.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
@@ -949,7 +949,7 @@ function uploadZone(scopedProduct) {
   return '<div onclick="kbPick()" style="border:1.5px dashed #D0D5DD;background:#F9FAFB;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
     '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
     '<div style="font-size:13.5px;font-weight:700;color:#101828;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
-    '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذا المنتج ويقرأه المساعد فورًا" : "<br>يُستخرج اسم المنتج من الملف تلقائيًا") + "</div></div>" +
+    '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذه الخدمة ويقرأه المساعد فورًا" : "<br>يُستخرج اسم الخدمة من الملف تلقائيًا") + "</div></div>" +
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
@@ -961,10 +961,10 @@ function vKb() {
   if (skill) {
     h0 = '<div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#F4FBFA;border-color:#B9E4E0;">' +
       '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#101828;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
-      '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض المنتجات (PDF) ثم ارفعها هنا في صفحة كل منتج. <span style="direction:ltr;color:#98A2B3;">' + esc(skill.filename) + '</span></div></div>' +
+      '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض الخدمات (PDF) ثم ارفعها هنا في صفحة كل خدمة. <span style="direction:ltr;color:#98A2B3;">' + esc(skill.filename) + '</span></div></div>' +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
   }
-  let h = h0 + '<div class="sec">منتجات المساعد <span class="meta">' + reg.length + ' منتج · اضغط منتجًا لعرض معرفته وإدارتها</span></div>';
+  let h = h0 + '<div class="sec">خدمات المساعد <span class="meta">' + reg.length + ' خدمة · اضغط خدمةً لعرض معرفته وإدارتها</span></div>';
   h += '<div class="prods" style="margin-bottom:20px;">' + reg.map((r) => {
     const inner =
       '<div class="pn">' + esc(r.name) + "</div>" +
@@ -974,7 +974,7 @@ function vKb() {
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
       (r.hub ? '<span class="chip c-ok">معرفة ✓</span>' : '<span class="chip c-grey">لا معرفة بعد</span>') +
       (prodAssets.some((a) => a.product === r.name) ? '<span class="chip c-teal">ملف تعريفي 📎</span>' : "") +
-      '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح ←</span></div>';
+      '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح التفاصيل ←</span></div>';
     return '<a href="#kb/' + encodeURIComponent(r.name) + '" style="text-decoration:none;"><div class="prod" style="cursor:pointer;">' + inner + "</div></a>";
   }).join("") + "</div>";
   return h;
@@ -1332,7 +1332,7 @@ function vHomeCharts(cs) {
       '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
       '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
     : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
-  h += chartCard("الاهتمام حسب المنتج", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
   h += chartCard("جهات الاستهداف حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
@@ -1375,7 +1375,7 @@ function vActionQueue(cs) {
       '<span style="width:8px;height:8px;border-radius:999px;background:' + it[5] + ';flex:none;"></span>' +
       '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#101828;">' + it[1] + ' <span style="font-weight:600;color:#667085;">— ' + esc(it[2]) + "</span></div>" +
       '<div style="font-size:11.5px;color:#475467;margin-top:4px;line-height:1.7;">' + esc(it[3]) + "</div></div>" +
-      '<span style="font-size:12px;font-weight:700;color:' + it[5] + ';flex:none;">افتح ←</span></div>').join("") + "</div></div>";
+      '<span style="font-size:12px;font-weight:700;color:' + it[5] + ';flex:none;">افتح التفاصيل ←</span></div>').join("") + "</div></div>";
 }
 function vWinLoss() {
   if (!winloss) return "";
@@ -1388,7 +1388,7 @@ function vWinLoss() {
     ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + (t[k] || 0) + "</span>").join("") + "</div></div>" +
     '<div style="font-size:11px;color:#98a2b3;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
   if (!judged && !(t.active || 0)) {
-    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو خاسرة ستظهر هنا بسببها.</div></div>';
+    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
     return h;
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
@@ -1404,7 +1404,7 @@ function vWinLoss() {
   h += "</div>";
   if ((winloss.by_product || []).length) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F2F4F7;">' +
-      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " مكتسبة · " + pr.lost + " خاسرة</span>").join("") + "</div>";
+      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue">' + esc(pr.product) + ": " + pr.won + " مكتسبة · " + pr.lost + " غير مكتسبة</span>").join("") + "</div>";
   }
   h += "</div>";
   return h;
