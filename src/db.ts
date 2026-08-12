@@ -153,6 +153,13 @@ export function upsertContact(c: {
 export function insertMessage(phone: string, role: string, text: string, ts: number): void {
   fire(`INSERT INTO messages (phone, role, text, ts) VALUES ($1,$2,$3,$4)`, [phone, role, text, ts]);
 }
+export async function replaceTags(phone: string, tags: { product: string; level: string; ts: number }[]): Promise<void> {
+  if (!pool || !connected) return;
+  await pool.query(`DELETE FROM interest_tags WHERE phone = $1`, [phone]);
+  for (const t of tags) {
+    await pool.query(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, t.product, t.level, t.ts]);
+  }
+}
 export function insertTag(phone: string, product: string, level: string, ts: number): void {
   fire(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, product, level, ts]);
 }

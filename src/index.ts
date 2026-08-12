@@ -307,6 +307,19 @@ app.post("/admin/contact/outcome", async (req, reply) => {
   return { status: "ok" };
 });
 
+// Correct a contact's interest tags (removes fabricated or duplicated entries).
+app.post("/admin/contact/tags", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { phone, tags } = (req.body ?? {}) as { phone?: string; tags?: { product: string; level: string }[] };
+  if (!phone || !Array.isArray(tags)) return reply.code(400).send({ error: "body: { phone, tags: [{product, level}] }" });
+  const clean = tags.filter((t) => t && t.product).slice(0, 8).map((t) => ({
+    product: String(t.product).slice(0, 80),
+    level: (["hot", "warm", "cold"].includes(String(t.level)) ? String(t.level) : "warm") as "hot" | "warm" | "cold",
+  }));
+  await tracker.replaceTags(String(phone).replace(/\D/g, ""), clean);
+  return { status: "ok", tags: clean.length };
+});
+
 // Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.
 app.post("/admin/contact/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });

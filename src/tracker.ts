@@ -110,6 +110,15 @@ export function addTag(phone: string, product: string, level: Tag["level"]) {
   logEvent("tag", phone, `${product}:${level}`);
 }
 
+/** Curate a contact's interest tags (admin correction path) — memory + ledger together. */
+export async function replaceTags(phone: string, tags: { product: string; level: Tag["level"] }[]): Promise<void> {
+  const c = getContact(phone);
+  c.tags = tags.map((t) => ({ product: t.product, level: t.level, ts: Date.now() }));
+  await db.replaceTags(phone, c.tags);
+  persist(c);
+  logEvent("tags_curated", phone, tags.map((t) => `${t.product}:${t.level}`).join(" | "));
+}
+
 export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: string) {
   const c = getContact(phone);
   c.outcome = outcome;
