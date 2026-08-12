@@ -239,7 +239,8 @@ let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
-let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = ""; let custQ = "";
+let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
+let manualRows = [{ name: "", phone: "", size: "", city: "" }]; let custQ = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
@@ -1052,6 +1053,52 @@ window.entImport = async () => {
     render(false);
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ</span>'; }
 };
+function manualRowsHtml() {
+  const F = (i, k, ph, w) => '<input class="inp" data-i="' + i + '" data-k="' + k + '" value="' + esc(manualRows[i][k]) + '" oninput="entRowSet(this)" placeholder="' + ph + '" style="flex:' + w + ';min-width:0;font-size:12.5px;padding:10px 13px;">';
+  return manualRows.map((r, i) =>
+    '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">' +
+    F(i, "name", "اسم الجهة", "2.2") + F(i, "phone", "الجوال", "1.5") +
+    F(i, "size", "الحجم — اختياري", "1.1") + F(i, "city", "المدينة — اختيارية", "1.1") +
+    (manualRows.length > 1
+      ? '<button class="kebab" title="حذف الصف" data-i="' + i + '" onclick="entDelRow(this)" style="flex:none;">×</button>'
+      : '<span style="width:32px;flex:none;"></span>') + "</div>").join("");
+}
+window.entRowSet = (el) => { manualRows[+el.dataset.i][el.dataset.k] = el.value; };
+window.entAddRow = () => {
+  manualRows.push({ name: "", phone: "", size: "", city: "" });
+  const box = document.getElementById("manualrows");
+  if (box) { box.innerHTML = manualRowsHtml(); const ins = box.querySelectorAll("input"); if (ins.length >= 4) ins[ins.length - 4].focus(); }
+};
+window.entDelRow = (btn) => {
+  manualRows.splice(+btn.dataset.i, 1);
+  if (!manualRows.length) manualRows = [{ name: "", phone: "", size: "", city: "" }];
+  const box = document.getElementById("manualrows");
+  if (box) box.innerHTML = manualRowsHtml();
+};
+window.entTogglePaste = () => {
+  const b = document.getElementById("pastebox");
+  if (b) b.style.display = b.style.display === "none" ? "block" : "none";
+};
+window.entManualSave = async () => {
+  const rows = manualRows.filter((r) => r.name.trim() || r.phone.trim());
+  const st = document.getElementById("entstat");
+  if (!rows.length) { if (st) st.innerHTML = '<span class="chip c-warn">أدخل جهة واحدة على الأقل</span>'; return; }
+  const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-9٠-٩]/g, "").length < 9);
+  if (bad.length) { if (st) st.innerHTML = '<span class="chip c-bad">تحقّق من الاسم والجوال في ' + bad.length + ' صف</span>'; return; }
+  if (st) st.innerHTML = '<span class="chip c-teal">جارٍ الحفظ…</span>';
+  const text = rows.map((r) => [r.name.trim(), r.phone.trim(), r.size.trim(), r.city.trim()].filter(Boolean).join("، ")).join("\\n");
+  try {
+    const res = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+    const d = await res.json();
+    if (!res.ok) { if (st) st.innerHTML = '<span class="chip c-bad">' + esc(d.error || res.status) + "</span>"; return; }
+    if (st) st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span>" : "");
+    manualRows = [{ name: "", phone: "", size: "", city: "" }];
+    const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
+    if (er.ok) entities = await er.json();
+    alertBar("أُضيفت الجهات إلى قائمة الاستهداف", false);
+    render(false);
+  } catch (e) { if (st) st.innerHTML = '<span class="chip c-bad">تعذّر الحفظ</span>'; }
+};
 window.entFilePick = () => document.getElementById("entfile").click();
 window.entFileUpload = async (input) => {
   const f = input.files && input.files[0];
@@ -1093,10 +1140,19 @@ function vCustomers() {
     '<div style="font-size:11px;color:#98A2B3;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
     '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
-    '<details style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة سريعة بدون ملف (لصق سطور)</summary>' +
-    '<div style="font-size:11.5px;color:#667085;margin:10px 0 8px;line-height:1.9;">سطر لكل جهة: <b style="color:#101828;">الاسم، الرقم، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" style="font-family:inherit;width:100%;font-size:12.5px;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;"></textarea>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:10px;"><button class="btn" style="color:#1F4470;background:#E3ECF8;" onclick="entImport()">استيراد ←</button><span id="entstat"></span></div></details></div>';
+    '<details id="manualbox" style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
+    '<div style="font-size:11.5px;color:#98A2B3;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · الحجم والمدينة يصبحان شريحتَي استهداف</div>' +
+    '<div id="manualrows">' + manualRowsHtml() + '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
+    '<button class="btn btn-teal" style="font-size:12.5px;" onclick="entManualSave()">حفظ الجهات ←</button>' +
+    '<button class="btn btn-ghost" style="font-size:12px;" onclick="entAddRow()">+ صف آخر</button>' +
+    '<span id="entstat"></span><span style="flex:1"></span>' +
+    '<button class="btn" style="font-size:11.5px;background:transparent;color:#667085;padding:8px 4px;" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
+    '<div id="pastebox" style="display:none;margin-top:12px;">' +
+    '<div style="font-size:11.5px;color:#667085;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#101828;">الاسم، الجوال، الحجم، المدينة</b></div>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12.5px;line-height:2;resize:vertical;"></textarea>' +
+    '<button class="btn btn-ghost" style="font-size:12px;margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
+    '</details></div>';
   const groups = segGroups();
   const cq = custQ.trim();
   const cm = cq ? entities.filter((e) => e.name.includes(cq) || e.phone.includes(cq)) : entities;
