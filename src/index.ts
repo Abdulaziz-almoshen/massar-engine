@@ -323,6 +323,17 @@ app.post("/admin/contact/tags", async (req, reply) => {
   return { status: "ok", tags: clean.length };
 });
 
+// Sandbox separation for a whole launch: a rehearsal sent to real numbers is still a rehearsal,
+// and «campaign is test only if every target is a test contact» could not express that.
+app.post("/admin/campaign/test", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { id, test } = (req.body ?? {}) as { id?: number; test?: boolean };
+  if (!id) return reply.code(400).send({ error: "body: { id, test }" });
+  const ok = await db.setCampaignTest(Number(id), test !== false);
+  if (!ok) return reply.code(404).send({ error: "unknown campaign" });
+  return { status: "ok", id: Number(id), test: test !== false };
+});
+
 // Sandbox separation: test=true keeps this chat out of the real campaign views/KPIs.
 app.post("/admin/contact/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });

@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
+-- A campaign was only "sandbox" if every target happened to be a test contact, so a real
+-- launch used as a rehearsal had nowhere to be filed. This makes it an explicit property.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 CREATE TABLE IF NOT EXISTS contact_insights (
   phone       TEXT PRIMARY KEY,
   data        JSONB NOT NULL,
@@ -171,6 +174,12 @@ export async function replaceTags(phone: string, tags: { product: string; level:
   } finally {
     client.release();
   }
+}
+/** Mark a campaign as a sandbox/rehearsal launch so the real views stop counting it. */
+export async function setCampaignTest(id: number, test: boolean): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const r = await pool.query(`UPDATE campaigns SET test = $2 WHERE id = $1`, [id, test]);
+  return (r.rowCount ?? 0) > 0;
 }
 export function insertTag(phone: string, product: string, level: string, ts: number): void {
   fire(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, product, level, ts]);
@@ -325,13 +334,14 @@ export async function createCampaign(name: string, product: string, message: str
 
 export async function listCampaigns(): Promise<{
   id: number; name: string; product: string | null; message: string | null; created_at: string;
-  targets: { phone: string; name: string | null }[];
+  test: boolean; targets: { phone: string; name: string | null }[];
 }[]> {
   if (!pool || !connected) return [];
   const cs = (await pool.query(`SELECT * FROM campaigns ORDER BY created_at DESC`)).rows;
   const ts = (await pool.query(`SELECT campaign_id, phone, name FROM campaign_targets`)).rows;
   return cs.map((c) => ({
     id: Number(c.id), name: c.name, product: c.product, message: c.message, created_at: c.created_at,
+    test: Boolean(c.test),
     targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
   }));
 }

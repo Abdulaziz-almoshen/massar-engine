@@ -470,6 +470,9 @@ window.setCampTab = (t) => { campTab = t; render(false); };
 window.setCampSort = (el) => { campSortKey = el.value; render(false); };
 window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; render(false); };
 function campIsTest(cp) {
+  // An explicit flag wins: a rehearsal aimed at real numbers is still a rehearsal. Otherwise
+  // fall back to the derived rule — every target is a sandbox contact.
+  if (cp.test === true) return true;
   return cp.targets.length > 0 && cp.targets.every((t) => { const c = contactByPhone(t.phone); return c && c.test; });
 }
 function testToggleChip(nTest) {
