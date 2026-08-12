@@ -517,15 +517,6 @@ function vKmon(d) {
   h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تتحدّث لحظيًا من حالات تسليم واتساب — لا تقديرات</span>' +
     '<span style="display:flex;gap:7px;align-items:center;"><button class="pgbtn on">1</button></span></div>';
   h += "</div>";
-  const organicAll = ((d && d.contacts) || []).filter((c) => !inCamp.has(c.phone))
-    .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  const organic = showTest ? organicAll : organicAll.filter((c) => !c.test);
-  const nTestOrganic = organicAll.filter((c) => c.test).length;
-  if (organicAll.length) {
-    h += '<div class="sec" style="margin-top:26px;">محادثات خارج الحملات <span class="meta">' + organic.length + " — انضموا للساندبوكس مباشرة</span> " + testToggleChip(nTestOrganic) + "</div>" +
-      '<div class="tblwrap"><div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-      (organic.length ? contactRowsHtml(organic.map((c) => ({ phone: c.phone, contact: c }))) : '<div style="padding:26px;text-align:center;color:#98A2B3;font-size:12.5px;">كل المحادثات هنا تجريبية — أظهرها بالزر أعلاه</div>') + "</div>";
-  }
   return h;
 }
 window.exportCampaigns = () => {
