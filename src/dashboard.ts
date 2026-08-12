@@ -318,60 +318,47 @@ function nav() {
 }
 
 function chipRow(c) {
-  const st = c.statusTimes || {}; const seen = st.read || st.replied; let h = "";
-  if (st.sent || (c.transcript || []).some((t) => t.role === "agent")) h += '<span class="chip c-grey">أُرسلت</span>';
-  if (st.delivered) h += '<span class="chip c-blue">وصلت</span>';
-  if (seen) h += '<span class="chip c-teal">شوهدت</span>';
-  const oc = { later: ["c-warn", "لاحقًا"], handoff: ["c-blue", "مُحالة إلى مختص المبيعات"], opted_out: ["c-bad", "إيقاف الرسائل"], closed: ["c-grey", "مغلقة"] }[c.outcome];
-  if (oc) h += '<span class="chip ' + oc[0] + '">' + oc[1] + "</span>";
-  if (c.human) h += '<span class="chip c-warn">المساعد متوقف — بيد البشر</span>';
-  if ((c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered) h += '<span class="chip c-bad">فشل الإرسال</span>';
-  return h || '<span class="chip c-grey">جديد</span>';
-}
-const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
-const fills = ["#2F5F94", "#2F5F94", "#3FB6B0", "#3FB6B0", "#2E8F89", "#1f8a52"];
-
-function funnelData(d) {
-  const cs = d.contacts || []; const n = cs.length;
-  const cnt = (f) => cs.filter(f).length;
-  return [
-    ["جهات الاستهداف", n], ["أُرسلت الرسائل", cnt((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent"))],
-    ["وصلت الرسائل", cnt((c) => (c.statusTimes || {}).delivered)], ["شوهدت الرسائل", cnt((c) => (c.statusTimes || {}).read || (c.statusTimes || {}).replied)],
-    ["وردت الردود", cnt((c) => (c.statusTimes || {}).replied)], ["الجهات المهتمة", cnt((c) => c.outcome === "interested")],
-  ];
+  if (!c) return "";
+  const st = c.statusTimes || {};
+  const out = [];
+  // Furthest state reached, stated once — not the whole delivery history in every row.
+  if (st.failed && !st.delivered) out.push('<span class="chip c-bad">فشل الإرسال</span>');
+  else if (st.replied) out.push('<span class="chip c-ok">ردّ</span>');
+  else if (st.read) out.push('<span class="chip c-teal">شوهدت</span>');
+  else if (st.delivered) out.push('<span class="chip c-blue">وصلت</span>');
+  else if (st.sent || st.enqueued) out.push('<span class="chip c-grey">أُرسلت</span>');
+  if (c.outcome === "handoff") out.push('<span class="chip c-warn">مع مختص المبيعات</span>');
+  if (c.human) out.push('<span class="chip c-warn">بيد البشر</span>');
+  if (c.optedOut) out.push('<span class="chip c-bad">أوقف التواصل</span>');
+  return out.join(" ");
 }
 
-function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((c) => c.phone === phone); }
-function seenOf(c) { const st = (c && c.statusTimes) || {}; return Boolean(st.read || st.replied); }
-function interestedOf(c) { return Boolean(c && (c.outcome === "interested" || (c.tags || []).some((t) => t.level === "hot" || t.level === "warm"))); }
-function campStats(camp) {
-  const cs = camp.targets.map((t) => contactByPhone(t.phone)).filter(Boolean);
-  return {
-    targeted: camp.targets.length,
-    sent: cs.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
-    delivered: cs.filter((c) => (c.statusTimes || {}).delivered).length,
-    seen: cs.filter(seenOf).length,
-    replied: cs.filter((c) => (c.statusTimes || {}).replied).length,
-    interested: cs.filter(interestedOf).length,
-    failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
-  };
-}
 function interestChips(c) {
   if (!c) return '<span style="color:#D0D5DD;">—</span>';
+  const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
   if (latest.size) {
-    const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "اهتمام منخفض"] };
     return [...latest.values()].map((t) => {
       const m = lv[t.level] || lv.warm;
       return '<span class="chip ' + m[0] + '">' + esc(t.product) + " · " + m[1] + "</span>";
     }).join(" ");
   }
+  // No explicit tag yet — use what the assistant already understood from the conversation.
+  const ins = insCache[c.phone] || {};
+  const pi = (ins.product_interest || []).filter((p) => p.product);
+  if (pi.length) {
+    return pi.slice(0, 2).map((p) => '<span class="chip ' + (p.level === "high" ? "c-ok" : p.level === "medium" ? "c-warn" : "c-grey") + '" title="من قراءة المساعد">' +
+      esc(p.product) + " · " + (p.level === "high" ? "نية مرتفعة" : p.level === "medium" ? "مهتم" : "فاتر") + "</span>").join(" ");
+  }
+  if (ins.intent === "high") return '<span class="chip c-ok">نية مرتفعة</span>';
+  if (ins.intent === "medium") return '<span class="chip c-warn">اهتمام مبدئي</span>';
+  if (c.outcome === "handoff") return '<span class="chip c-warn">طلب تواصلًا</span>';
   if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
-  if (c.outcome === "not_interested") return '<span class="chip c-bad">غير مهتم' + (c.outcomeReason ? " · " + esc(c.outcomeReason) : "") + "</span>";
+  if (c.outcome === "not_interested") return '<span class="chip c-grey">غير مهتم</span>';
   return '<span style="color:#D0D5DD;">—</span>';
 }
-function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
+
 function contactRowsHtml(rows) {
   let h = "";
   rows.forEach((r) => {
@@ -600,15 +587,17 @@ function vKmonDetail(id, d) {
     label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
     targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
   };
-  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EAECF0;background:#fff;">' +
-    '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#98A2B3;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
-    '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
-    filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
-      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
+  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid #EAECF0;">' +
+    '<span style="font-size:13.5px;font-weight:700;color:#101828;">جهات الاستهداف</span>' +
+    '<span class="cntpill">' + shown.length + " من " + rows.length + "</span>" +
+    '<span style="flex:1"></span>' +
+    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" class="inp" style="font-size:12px;padding:9px 14px;width:170px;border-radius:999px;">' +
+    (shown.length ? '<button class="btn" style="padding:9px 16px;font-size:12px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف (' + shown.length + ")</button>" : "") +
+    "</div>" +
+    '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid #EAECF0;background:#F9FAFB;">' +
+    filters.map((f) => '<button class="btn" style="padding:6px 13px;font-size:11.5px;border-radius:999px;' +
+      (campFilter === f[0] ? 'color:#fff;background:#101828;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + f[2] + ")</button>").join("") +
-    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EAECF0;border-radius:999px;padding:7px 13px;background:#F9FAFB;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
     (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج</div>') + "</div>";
