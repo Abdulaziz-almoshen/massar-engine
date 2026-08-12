@@ -949,41 +949,74 @@ function vKb() {
 function vKbProduct(name) {
   const reg = kbRegistry();
   const r = reg.find((x) => x.name === name);
-  if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">منتج غير موجود</div><div class="s"><a href="#kb" style="color:#2E7D77;font-weight:700;">→ كل المنتجات</a></div></div>';
+  if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">الخدمة غير موجودة</div><div class="s"><a href="#kb" style="color:#1F7A73;font-weight:700;">→ كل الخدمات</a></div></div>';
   const seedP = PRODUCTS_FULL.find((p) => p.n === name);
-  let h = '<a href="#kb" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ كل المنتجات</a>';
-  h += '<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
-    '<div style="width:46px;height:46px;flex:none;border-radius:12px;background:#101828;display:flex;align-items:center;justify-content:center;color:#3FB6B0;font-weight:700;font-size:20px;">' + esc(name.trim().charAt(0)) + "</div>" +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(name) + "</div>" +
-    '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;">' +
-    (r.hub ? '<span class="chip c-ok">يقرأه المساعد الآن ✓</span>' : '<span class="chip c-warn">بانتظار أول ملف</span>') +
-    (r.sc !== null ? '<span class="chip c-teal">معرفة مدمجة ' + r.sc + "%</span>" : "") +
-    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#98A2B3;direction:ltr;align-self:center;">' + esc(r.hub.source_filename) + "</span>" : "") +
-    "</div></div></div>";
-  // Hub interconnection: this product's campaigns + its win/loss verdict + a launch CTA.
   const prodCamps = campaigns.filter((c) => (c.product || "") === name);
   const wlProd = ((winloss && winloss.by_product) || []).find((x) => x.product === name);
   const prodCauses = ((winloss && winloss.loss_causes) || []).filter((c) => (c.products || []).includes(name));
-  h += '<div class="card rise" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;align-items:center;">' +
-    '<div><div style="font-size:11px;color:#667085;font-weight:600;">حملات هذا المنتج</div>' +
-    '<div style="font-size:24px;font-weight:700;color:#101828;margin-top:5px;">' + prodCamps.length + "</div>" +
-    (prodCamps.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + prodCamps.slice(0, 3).map((c) => '<a href="#kmon/' + c.id + '" class="chip c-blue" style="text-decoration:none;">' + esc(c.name.slice(0, 22)) + "</a>").join("") + "</div>" : "") + "</div>" +
-    '<div><div style="font-size:11px;color:#667085;font-weight:600;">حكم السوق على المنتج</div>' +
-    '<div style="display:flex;gap:8px;margin-top:7px;flex-wrap:wrap;">' +
-    '<span class="chip c-ok">رابحة ' + ((wlProd && wlProd.won) || 0) + "</span>" +
-    '<span class="chip c-bad">خاسرة ' + ((wlProd && wlProd.lost) || 0) + "</span>" +
-    '<span class="chip c-blue">نشطة ' + ((wlProd && wlProd.active) || 0) + "</span></div>" +
-    (prodCauses.length ? '<div style="font-size:11.5px;color:#B42318;margin-top:8px;font-weight:600;">أبرز أسباب عدم الإغلاق: ' + esc(prodCauses[0].cause) + "</div>" : "") + "</div>" +
-    '<div style="display:flex;justify-content:flex-end;"><button class="btn btn-teal" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذا المنتج ←</button></div></div>';
+  const pa0 = prodAssets.find((a) => a.product === name);
+  const ready = r.sc !== null ? r.sc : (r.hub ? 100 : 0);
+  const readyTone = ready >= 80 ? "#027A48" : ready >= 60 ? "#B54708" : "#B42318";
+
+  let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#475467;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
+
+  // ── Hero: identity, readiness ring, and the primary action together ──
+  h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
+    '<div style="width:56px;height:56px;flex:none;border-radius:16px;background:linear-gradient(135deg,#1F4470,#2F5F94);display:flex;align-items:center;justify-content:center;color:#7FE3DC;font-weight:700;font-size:24px;">' + esc(name.trim().charAt(0)) + "</div>" +
+    '<div style="flex:1;min-width:220px;">' +
+    '<h1 style="margin:0;font-size:23px;font-weight:700;color:#101828;letter-spacing:-.3px;">' + esc(name) + "</h1>" +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
+    (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
+    (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    "</div></div>" +
+    '<div style="flex:none;display:flex;align-items:center;gap:12px;">' +
+    '<div style="position:relative;width:64px;height:64px;flex:none;">' +
+    '<svg viewBox="0 0 36 36" style="width:64px;height:64px;transform:rotate(-90deg);"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#EAECF0" stroke-width="3.2"/>' +
+    '<circle cx="18" cy="18" r="15.5" fill="none" stroke="' + readyTone + '" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="' + (ready * 0.974) + ' 100"/></svg>' +
+    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#101828;">' + ready + "%</span></div></div>" +
+    '<div style="font-size:11px;color:#667085;font-weight:600;line-height:1.6;max-width:78px;">جاهزية<br>معرفة المساعد</div></div>' +
+    '<button class="btn btn-teal" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
+    "</div>";
+
+  // ── Performance row: one scoreboard, not scattered chips ──
+  const cells = [
+    ["حملات الخدمة", prodCamps.length, "#101828"],
+    ["صفقات مكتملة", (wlProd && wlProd.won) || 0, "#027A48"],
+    ["لم تُغلق", (wlProd && wlProd.lost) || 0, "#B42318"],
+    ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#2F5F94"],
+  ];
+  h += '<div class="card rise" style="padding:0;overflow:hidden;">' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
+    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-end:1px solid #EAECF0;" : "") + '">' +
+      '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
+      '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + c[1] + "</div></div>").join("") +
+    "</div>" +
+    (prodCamps.length || prodCauses.length
+      ? '<div style="border-top:1px solid #EAECF0;background:#F9FAFB;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+        (prodCauses.length ? '<span style="font-size:11.5px;font-weight:700;color:#B42318;">أبرز سبب لعدم الإغلاق: ' + esc(prodCauses[0].cause) + '</span><span style="flex:1"></span>' : '<span style="flex:1"></span>') +
+        prodCamps.slice(0, 3).map((c) => '<a href="#kmon/' + c.id + '" class="chip c-blue" style="text-decoration:none;">' + esc(c.name.slice(0, 26)) + "</a>").join("") +
+        "</div>"
+      : "") +
+    "</div>";
   const pa = prodAssets.find((a) => a.product === name);
-  h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;"><h3 style="margin:0;">الملف التعريفي — يرسله المساعد في واتساب</h3>' +
-    (pa ? '<div style="display:flex;gap:7px;align-items:center;"><span class="chip c-ok">ملف مرفق ✓</span><span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(pa.filename) + "</span></div>" : '<span class="chip c-grey">لا ملف بعد</span>') + "</div>" +
-    '<div style="font-size:12px;color:#667085;margin:10px 0;line-height:1.9;">يُرسل تلقائيًا مع افتتاحية الحملة لهذا المنتج، وعندما يطلب العميل تفاصيل أكثر أو ملفًا.</div>' +
-    '<div onclick="paPick()" style="border:1.5px dashed #B9E4E0;background:#F4FBFA;border-radius:12px;padding:18px;text-align:center;cursor:pointer;">' +
-    '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;">' + (pa ? "استبدال الملف التعريفي (PDF)" : "ارفع الملف التعريفي (PDF)") + "</div></div>" +
+  const fileRow = (title, sub, chip, btnLabel, onclick) =>
+    '<div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #F2F4F7;flex-wrap:wrap;">' +
+    '<div style="width:40px;height:40px;flex:none;border-radius:11px;background:#F2F4F7;display:flex;align-items:center;justify-content:center;color:#475467;">' + ic("doc", 19) + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13.5px;font-weight:700;color:#101828;">' + title + "</div>" +
+    '<div style="font-size:11.5px;color:#667085;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
+    chip + '<button class="btn btn-ghost" style="font-size:12px;padding:9px 16px;" onclick="' + onclick + '">' + btnLabel + "</button></div>";
+  h += '<div class="card" style="padding:0;overflow:hidden;"><div style="padding:18px 22px 0;"><h3 style="margin:0 0 4px;">ملفات الخدمة</h3>' +
+    '<div style="font-size:11.5px;color:#98A2B3;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
+    fileRow("الملف التعريفي", "يُرسل مع افتتاحية الحملة وعند طلب العميل للتفاصيل" + (pa ? ' · <span style="direction:ltr;">' + esc(pa.filename) + "</span>" : ""),
+      (pa ? '<span class="chip c-ok">مرفق</span>' : '<span class="chip c-grey">غير مرفق</span>'),
+      (pa ? "استبدال" : "رفع PDF"), "paPick()") +
+    fileRow("ملف المعرفة", "يقرأه المساعد ليجيب عن الأسعار والاعتراضات" + (r.hub && r.hub.source_filename ? ' · <span style="direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : ""),
+      (r.hub ? '<span class="chip c-ok">محمّل</span>' : '<span class="chip c-warn">مطلوب</span>'),
+      (r.hub ? "تحديث" : "رفع الملف"), "kbPick()") +
     '<input id="pafile" type="file" accept=".pdf" style="display:none" data-product="' + esc(name) + '" onchange="paUpload(this)">' +
-    '<div id="pastat" style="margin-top:10px;"></div></div>';
-  h += '<div class="card"><h3>' + (r.hub ? "تحديث ملف المعرفة (Pitch Deck)" : "ارفع ملف معرفة الخدمة") + "</h3>" + uploadZone(name) + "</div>";
+    '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(name) + '" onchange="kbUpload(this)">' +
+    '<div style="padding:12px 22px;"><span id="pastat"></span> <span id="kbstat"></span></div></div>';
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
