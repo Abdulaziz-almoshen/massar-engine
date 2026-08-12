@@ -37,6 +37,35 @@ export type Insights = {
 export const SALES_STAGES = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"] as const;
 export const LOSS_TAXONOMY = ["التكلفة", "التوقيت", "عدم ملاءمة الخدمة", "عدم وضوح التواصل", "عدم وضوح الملف التعريفي", "لا استجابة", "عدم ملاءمة الجهة", "طلب التواصل مع مختص"] as const;
 
+/** The service names in `PRODUCTS` (agent.ts) — keep in step when the catalogue changes. */
+export const SERVICE_CATALOGUE = ["الإجازات المرضية", "فحص الموظفين", "التقارير الطبية", "خدمات التطعيمات", "الشهادات الصحية", "تكامل الأنظمة (HIS/ERP)"] as const;
+export const OTHER_SERVICE = "خدمة أخرى";
+
+// The model describes what the customer asked about in its own words, so one service arrives
+// under many names («نظام الإجازات المرضية», «ربط وإصدار الإجازات المرضية عبر النظام الحالي»,
+// «إجراءات الإجازات المرضية الإلكترونية» …). Left raw, the market verdict splits one service
+// across a dozen rows and invents services the catalogue does not contain. Loss causes and
+// stages are already clamped to a closed list; services now are too. First pattern wins, so
+// the list is ordered by which noun is the subject when a phrase names two.
+const SERVICE_PATTERNS: [RegExp, string][] = [
+  [/إجاز|مرضي/, "الإجازات المرضية"],
+  [/تطعيم|NVR|السجل الوطني/i, "خدمات التطعيمات"],
+  [/شهاد/, "الشهادات الصحية"],
+  [/فحص|الموظفين/, "فحص الموظفين"],
+  [/تقرير|تقارير/, "التقارير الطبية"],
+  [/تكامل|ربط|الربط|HIS|ERP|واجهات/i, "تكامل الأنظمة (HIS/ERP)"],
+];
+
+/** Map a free-text service mention onto the catalogue; anything unrecognised shares one
+ *  honest bucket rather than becoming a service Lean does not sell. */
+export function canonicalService(raw: string): string {
+  const s = String(raw || "").trim();
+  if (!s) return "";
+  if ((SERVICE_CATALOGUE as readonly string[]).includes(s)) return s;
+  for (const [re, name] of SERVICE_PATTERNS) if (re.test(s)) return name;
+  return OTHER_SERVICE;
+}
+
 const SYSTEM = [
   "أنت محلل مبيعات لدى لِين لخدمات الأعمال. حلّل محادثة واتساب واحدة بين مساعد المبيعات وممثل منشأة صحية، مستندًا إلى نص المحادثة وتصنيفات الاهتمام وحالة التسليم وبيانات الجهة المتاحة.",
   "استخرج فقط ما تدعمه المحادثة نصًا. لا تستنتج نية أو اعتراضًا دون دليل، واكتب بفصحى واضحة وموجزة.",
@@ -47,6 +76,7 @@ const SYSTEM = [
   "حكم الصفقة deal_state: won = التزم صراحة بالاشتراك/الاجتماع النهائي؛ lost = رفض نهائيًا أو انسحب؛ stalled = توقف التفاعل بعد اهتمام (صمت > يومين بعد آخر رسالة منا)؛ active = الحوار مستمر طبيعيًا.",
   "إذا كانت deal_state تساوي lost أو stalled، فاختر loss_cause حصرًا من: التكلفة، التوقيت، عدم ملاءمة الخدمة، عدم وضوح التواصل، عدم وضوح الملف التعريفي، لا استجابة، عدم ملاءمة الجهة، طلب التواصل مع مختص. اجعل evidence اقتباسًا حرفيًا من ممثل المنشأة، أو وصفًا دقيقًا لغياب الرد، واجعل fix_suggestion إجراءً واقعيًا قد يدعم استئناف الصفقة أو إغلاقها.",
   "إذا كانت deal_state تساوي won، أو active مع تقدم واضح، فاجعل win_drivers عوامل مدعومة نصيًا أسهمت في تقدم الصفقة، مثل سرعة الاستجابة أو وضوح الملف أو ملاءمة التكلفة أو الحاجة التشغيلية.",
+  `product_interest.product: اسم الخدمة كما هو في كتالوج لِين حصرًا، واحد من: ${SERVICE_CATALOGUE.join("، ")}. لا تصف الخدمة بعبارة من عندك ولا تدمج خدمتين في اسم واحد؛ إن ذكر ممثل المنشأة أكثر من خدمة فأدرج كل واحدة في عنصر مستقل. وإن كان ما سأل عنه خارج الكتالوج فاكتب «${OTHER_SERVICE}».`,
   'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","stage":"واحدة من المراحل الست","stage_reason":"سبب قصير","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
@@ -105,7 +135,9 @@ export async function winLossBoard(isTest?: (phone: string) => boolean): Promise
     if (!d || d.learning) { totals.learning++; continue; }
     const ds = d.deal_state ?? "active";
     totals[ds] = (totals[ds] ?? 0) + 1;
-    const products = (d.product_interest ?? []).map((p) => p.product);
+    // Normalise here too, not only on the way in: rows cached before the clamp existed still
+    // hold free text, and re-reading them would mean an LLM call per contact.
+    const products = [...new Set((d.product_interest ?? []).map((p) => canonicalService(p.product)).filter(Boolean))];
     for (const p of products) {
       const row = prod.get(p) ?? { won: 0, lost: 0, stalled: 0, active: 0 };
       row[ds] = (row[ds] ?? 0) + 1;
@@ -182,7 +214,7 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
     signals: (Array.isArray(parsed.signals) ? parsed.signals : []).slice(0, 5).map((s) => String(s).slice(0, 120)),
     objections: (Array.isArray(parsed.objections) ? parsed.objections : []).slice(0, 5).map((s) => String(s).slice(0, 120)),
     product_interest: (Array.isArray(parsed.product_interest) ? parsed.product_interest : []).slice(0, 4)
-      .map((p: any) => ({ product: String(p?.product ?? "").slice(0, 60), level: lvl(p?.level) })).filter((p) => p.product),
+      .map((p: any) => ({ product: canonicalService(String(p?.product ?? "")), level: lvl(p?.level) })).filter((p) => p.product),
     next_action: String(parsed.next_action || "").slice(0, 160) || "راجع المحادثة للتحقق من الإجراء المناسب.",
     why: String(parsed.why || "").slice(0, 200),
     best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (٩–١١ص)",
