@@ -154,7 +154,6 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
   // From the founder's own approved template (VOICE-REFERENCE.md).
-  const CAMPAIGN_HEADER = "لِين لخدمات الأعمال";
   const CAMPAIGN_FOOTER = "حلول تكامل للقطاع الصحي";
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
@@ -203,7 +202,11 @@ app.post("/admin/campaign/launch", async (req, reply) => {
           // ONE bubble, with the header and footer WhatsApp gives interactive messages, and the
           // file offered rather than attached. The approved template's own footer now reaches
           // the device instead of living only in the portal preview.
-          await gupshup.sendQuickReply(phone, personalized, BTNS, CAMPAIGN_FOOTER, CAMPAIGN_HEADER);
+          // Footer only. A `header` string on a text quick_reply is rejected by Meta with
+          // «131009 Parameter value is not valid» — measured on a real send, not assumed. The
+          // header exists on WhatsApp interactive messages but wants a typed object this
+          // Gupshup v1 shape does not expose; an approved template carries it properly.
+          await gupshup.sendQuickReply(phone, personalized, BTNS, CAMPAIGN_FOOTER);
           tracker.recordAgentReply(phone, `${personalized}${btnNote}`);
         } catch (e) {
           if (!rejectedShape(e)) throw e;
