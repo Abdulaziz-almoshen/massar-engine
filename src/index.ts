@@ -9,6 +9,7 @@ import { enqueue } from "./queue.js";
 import * as kb from "./kb.js";
 import * as audience from "./audience.js";
 import * as insights from "./insights.js";
+import * as segments from "./segments.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -328,6 +329,43 @@ app.post("/admin/contact/tags", async (req, reply) => {
   const ok = await tracker.replaceTags(String(phone).replace(/\D/g, ""), clean);
   if (!ok) return reply.code(404).send({ error: "unknown phone — curation never creates a contact" });
   return { status: "ok", tags: clean.length };
+});
+
+// Behavioural segmentation — evaluate a segment against the live ledger and return what would
+// be sent, what is suppressed, and what is too new. Read-only: it never sends and never writes.
+app.post("/admin/segments/preview", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const body = (req.body ?? {}) as { def?: segments.SegmentDef; includeTest?: boolean };
+  const def = body.def;
+  if (!def || !Array.isArray(def.conditions) || !def.conditions.length) {
+    return reply.code(400).send({ error: "body: { def: { match, conditions: [...] } }" });
+  }
+  if (def.conditions.length > 8) return reply.code(400).send({ error: "بحد أقصى ٨ شروط" });
+  const pool = tracker.listContacts().filter((c: any) => (body.includeTest ? true : !c.test));
+  const r = segments.evaluate(def, pool);
+  const oldest = pool.reduce((m: number, c: any) => Math.max(m, Date.now() - (c.firstSeenAt || Date.now())), 0);
+  return {
+    describe: segments.describeSegment(def),
+    matched: r.matched.length,
+    sample: r.matched.slice(0, 12).map((c) => ({
+      phone: c.phone, name: c.waName || c.phone, daysSilent: segments.daysSilent(c),
+    })),
+    suppressed: r.suppressed,
+    tooNew: r.tooNew,
+    // The tenure state needs a real forecast, not «no results»: how old the book actually is.
+    oldestContactDays: Math.floor(oldest / 86_400_000),
+    poolSize: pool.length,
+  };
+});
+
+app.get("/admin/segments/presets", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const w = Number((req.query as any)?.window) || segments.DEFAULT_WINDOW_DAYS;
+  const win = Math.min(segments.WINDOW_MAX, Math.max(segments.WINDOW_MIN, w));
+  const pool = tracker.listContacts().filter((c: any) => !c.test);
+  return segments.presets(win).map((p) => ({
+    ...p, describe: segments.describeSegment(p.def), matched: segments.evaluate(p.def, pool).matched.length,
+  }));
 });
 
 // Sandbox separation for a whole launch: a rehearsal sent to real numbers is still a rehearsal,

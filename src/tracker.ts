@@ -156,6 +156,12 @@ export function setTest(phone: string, test: boolean) {
   logEvent(test ? "marked_test" : "unmarked_test", phone, "");
 }
 
+/** Full contacts, untruncated. snapshot() caps each transcript at the last 30 turns for the
+ *  portal payload — segmentation counts reply occurrences, so it must not read a truncated one. */
+export function listContacts(): Contact[] {
+  return [...contacts.values()];
+}
+
 export function snapshot() {
   return {
     counters,
