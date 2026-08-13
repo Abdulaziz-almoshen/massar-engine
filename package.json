@@ -15,7 +15,8 @@
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
     "check:buttons": "npm run build && node scripts/check-buttons.mjs",
-    "check": "npm run check:catalogue && npm run check:numerals && npm run check:buttons"
+    "check": "npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns",
+    "check:campaigns": "npm run build && node scripts/check-campaign-scope.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",

@@ -6,3 +6,4 @@ dist/
 
 # smoke-test venv (browser render guard)
 .venv/
+scripts/__pycache__/

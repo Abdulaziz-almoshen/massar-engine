@@ -157,7 +157,15 @@ export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean
 
   // An explicit refusal in the customer's OWN words. Deliberately narrow and anchored — these are
   // statements of disinterest, not the opt-out path (which is handled pre-LLM and is sacred).
-  const REFUSAL = /(ما\s?ني|ماني|مو|لست|لسنا|غير)\s*مهتم|لا\s*(تتصل|تراسل|ترسل|تكلم)|ما\s*نبغى|ما\s*نحتاج|لا\s*نحتاج/;
+  // Anchored to end-of-clause. The first version matched «ما نبغى نتأخر» (we don't want to be late),
+  // «لا نحتاج وقت طويل» (we don't need long) and — worst — «مو مهتم بالسعر بقدر الجودة» (not
+  // interested in price so much as quality), a BUYING signal, all labelled «رفض صريح». A bare
+  // negation plus a verb is not a refusal; a refusal ends the thought.
+  const EOC = "(?=\\s*($|[.،؛!؟]))";
+  const REFUSAL = new RegExp(
+    "(ما\\s?ني|ماني|مو|لست|لسنا|غير)\\s*مهتم" + EOC +
+    "|لا\\s*(تتصل|تراسل|ترسل|تكلم)" +
+    "|(ما|لا)\\s*(نبغى|نحتاج|نبي)" + EOC);
   const refusal = typed.some((t) => REFUSAL.test(t.text));
 
   let state: InteractionRead["state"], stateLabel: string, stateReason: string;

@@ -367,11 +367,26 @@ function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((
 // ONE latest timestamp per status, and tags/outcome are lifetime — none of them are per-campaign,
 // so reading them raw attributes every past success to the newest send.
 function campWin(camp) {
-  const raw = camp && (camp.launched_at || camp.created_at);
-  const n = typeof raw === "number" ? raw : Date.parse(raw || "");
-  return Number.isFinite(n) ? n : 0;
+  // created_at is BIGINT and node-pg returns int8 as a STRING of digits ("1786644640706").
+  // Date.parse on that is NaN, which made the first version of this fix a NO-OP in production:
+  // window 0, every comparison true, every past reply credited to the newest campaign again.
+  // Verified against the live API before trusting either branch.
+  const raw = camp && camp.created_at;
+  if (raw === undefined || raw === null || raw === "") return Infinity;
+  const asNum = Number(raw);
+  if (Number.isFinite(asNum) && asNum > 0) return asNum;      // epoch millis, number or digit-string
+  const parsed = Date.parse(String(raw));                      // ISO fallback
+  // FAIL CLOSED. An unreadable launch time must show nothing, never everything — the whole defect
+  // was a screen that reported success it could not substantiate.
+  return Number.isFinite(parsed) ? parsed : Infinity;
 }
-function atOrAfter(ts, win) { return Number(ts || 0) >= win; }
+// A MISSING timestamp is not "before the window" — it is no event at all. Number(undefined || 0)
+// used to yield 0, which passed >= 0 and counted every contact as delivered while making failed
+// permanently zero.
+function atOrAfter(ts, win) {
+  const n = Number(ts);
+  return Number.isFinite(n) && n > 0 && n >= win;
+}
 function repliedIn(c, win) {
   return (c && (c.transcript || []).some((t) => t.role === "customer" && atOrAfter(t.ts, win))) || false;
 }
@@ -667,7 +682,7 @@ function vKmonDetail(id, d) {
     '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
   const seenSilent = rows.filter((r) => r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin));
-  const notDelivered = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered);
+  const notDelivered = rows.filter((r) => r.contact && atOrAfter((r.contact.statusTimes || {}).failed, cwin) && !atOrAfter((r.contact.statusTimes || {}).delivered, cwin));
   const hotHere = rows.filter((r) => r.contact && ((r.contact.tags || []).some((t) => t.level === "hot") || (insCache[r.phone] || {}).intent === "high"));
   const lostHere = rows.map((r) => insCache[r.phone]).filter((i) => i && i.deal_state === "lost" && i.loss_cause);
   const causeTally = {};
@@ -1733,10 +1748,13 @@ function vActionQueue(cs) {
     return hot && (now - (c.lastEventAt || 0)) > 24 * 3600e3 && !c.optedOut;
   }).sort((a, b) => (a.lastEventAt || 0) - (b.lastEventAt || 0));
   const seenNoReply = [];
-  campaigns.forEach((cp) => cp.targets.forEach((t) => {
+  // Windowed per campaign: this pairs a contact WITH a campaign, so it is a campaign claim and
+  // reading lifetime state here would queue a retarget for someone who already replied to that very
+  // send — or, worse, who replied to a different campaign entirely.
+  campaigns.forEach((cp) => { const w = campWin(cp); cp.targets.forEach((t) => {
     const c = contactByPhone(t.phone);
-    if (c && (c.statusTimes || {}).read && !(c.statusTimes || {}).replied && !c.optedOut) seenNoReply.push({ c, cp });
-  }));
+    if (c && atOrAfter((c.statusTimes || {}).read, w) && !repliedIn(c, w) && !c.optedOut) seenNoReply.push({ c, cp });
+  }); });
   const stalled = cs.filter((c) => (insCache[c.phone] || {}).deal_state === "stalled");
   const items = [];
   hotIdle.slice(0, 3).forEach((c) => {
