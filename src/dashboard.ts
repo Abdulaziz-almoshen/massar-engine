@@ -704,7 +704,7 @@ function vHome(d) {
   const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
   const kpi = (icon, label, value, tint, delta) =>
     '<div class="kpi rise"><div class="ico" style="background:' + tint[0] + ';color:' + tint[1] + ';">' + ic(icon, 20) + "</div>" +
-    '<div><div class="v">' + value + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
+    '<div><div class="v">' + (typeof value === "number" ? fmtN(value) : value) + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
     (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#667085") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
   let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
@@ -882,7 +882,7 @@ function vAimkt() {
   const selName = reg[selProd] ? reg[selProd].name : "";
   const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمةات المدمجة.</div></div></div><div class="prods">' +
+  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمةات المدمجة.</div></div></div><div class="prods">' +
     reg.map((x, i) => {
       const inner = x.sc !== null
         ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + fmtN(x.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
@@ -891,7 +891,7 @@ function vAimkt() {
       return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
 
-  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
@@ -906,7 +906,7 @@ function vAimkt() {
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
       '<span style="font-size:11.5px;font-weight:700;color:#667085;min-width:52px;">' + esc(g.key) + ":</span>" +
       chipBtn("الكل", !entFilters[g.key], "entSetAttr(" + ki + ",-1)") +
-      g.values.map(([v, n], vi) => chipBtn(v + " (" + n + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
+      g.values.map(([v, n], vi) => chipBtn(v + " (" + fmtN(n) + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#F9FAFB;">' +
@@ -932,7 +932,7 @@ function vAimkt() {
   }
   h += "</div>";
 
-  h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num">٣</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
     '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
@@ -1497,7 +1497,7 @@ function vWinLoss() {
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
   h += '<div><div style="font-size:11.5px;font-weight:700;color:#027A48;margin-bottom:9px;">✓ ما يكسب لنا الصفقات</div>' +
     ((winloss.win_drivers || []).length
-      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F2F4F7;"><span style="flex:1;font-size:12.5px;color:#101828;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + w.count + "</span></div>").join("")
+      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F2F4F7;"><span style="flex:1;font-size:12.5px;color:#101828;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + fmtN(w.count) + "</span></div>").join("")
       : '<div style="font-size:12px;color:#98a2b3;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
   h += '<div><div style="font-size:11.5px;font-weight:700;color:#B42318;margin-bottom:9px;">✕ ما يخسّرنا الصفقات</div>' +
     ((winloss.loss_causes || []).length
@@ -1565,7 +1565,7 @@ function vCustomer(ph) {
     "</div></div>" +
     '<div style="flex:none;display:flex;gap:12px;align-items:center;border-inline-start:1px solid #F2F4F7;padding-inline-start:18px;">' +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">' +
-    '<div style="font-size:22px;font-weight:700;color:#2E7D77;">' + ctx.score + '%</div>' +
+    '<div style="font-size:22px;font-weight:700;color:#2E7D77;">' + fmtN(ctx.score) + '٪</div>' +
     '<div style="width:10px;height:110px;background:#EAECF0;border-radius:999px;position:relative;overflow:hidden;"><i style="position:absolute;bottom:0;left:0;right:0;height:' + ctx.score + '%;background:linear-gradient(180deg,#3FB6B0,#2E7D77);display:block;border-radius:999px;"></i></div>' +
     '<div style="font-size:10px;font-weight:700;color:#667085;">اكتمال السياق</div></div>' +
     (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#98A2B3;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
