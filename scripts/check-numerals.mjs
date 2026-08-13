@@ -90,4 +90,4 @@ if (hits.length) {
   console.error("Wrap the value in fmtN(). Rendered-DOM audits miss state-gated cards; this does not.");
   process.exit(1);
 }
-console.log(`numerals consistent: every number in ${FILE} routes through fmtN()`);
+console.log(`numeral regression-lock clear: ${FILE} has none of the shapes this check knows.\nNOTE: this is a regression lock, not a property check — it catches the defect shapes prior\nreview rounds named (raw concat of .length/.count/.score/Math.*/LIST_CAP, Latin % in markup,\nnon-existent Math methods). It does NOT prove every number routes through fmtN(); a review\nwrote 21 mutations and 18 passed. Treat a clean run as "no known regression", not "correct".`);

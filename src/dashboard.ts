@@ -297,12 +297,12 @@ const PRODUCTS_FULL = [
   { n: "تكامل الأنظمة (HIS/ERP)", pitch: "مكّن منشأتكم من استخدام خدمات لِين داخل أنظمتها، عبر تكامل يُنفّذ خلال أسبوعين.", eff: ["لا إدخال مزدوج", "تنفيذ خلال أسبوعين"], best: ["مستشفيات", "مجمعات كبيرة"], pricing: "مشروع تكامل واشتراك سنوي — يحدده المختص" },
 ];
 const PRODUCTS = [
-  { n: "الإجازات المرضية", sc: 92, gaps: [] },
-  { n: "فحص الموظفين", sc: 74, gaps: ["أسئلة شائعة", "مواد معتمدة"] },
-  { n: "التقارير الطبية", sc: 71, gaps: ["مقارنة المنافسين"] },
-  { n: "خدمات التطعيمات", sc: 55, gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
-  { n: "الشهادات الصحية", sc: 55, gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
-  { n: "تكامل الأنظمة (HIS/ERP)", sc: 63, gaps: ["التسعير التفصيلي"] },
+  { n: "الإجازات المرضية", gaps: [] },
+  { n: "فحص الموظفين", gaps: ["أسئلة شائعة", "مواد معتمدة"] },
+  { n: "التقارير الطبية", gaps: ["مقارنة المنافسين"] },
+  { n: "خدمات التطعيمات", gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
+  { n: "الشهادات الصحية", gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
+  { n: "تكامل الأنظمة (HIS/ERP)", gaps: ["التسعير التفصيلي"] },
 ];
 
 function nav() {
@@ -1011,7 +1011,7 @@ window.kbUpload = async (input) => {
 
 function kbRegistry() {
   const hubByName = new Map(kbDocs.map((d) => [d.product, d]));
-  const reg = PRODUCTS.map((p) => ({ name: p.n, sc: p.sc, hub: hubByName.get(p.n) || null, seed: true }));
+  const reg = PRODUCTS.map((p) => ({ name: p.n, sc: null, hub: hubByName.get(p.n) || null, seed: true }));
   kbDocs.forEach((d) => { if (d.product !== "__skill__" && !reg.some((r) => r.name === d.product)) reg.push({ name: d.product, sc: null, hub: d, seed: false }); });
   return reg;
 }
@@ -1236,12 +1236,12 @@ window.entFileUpload = async (input) => {
     if (!r.ok) { st.innerHTML = '<span class="chip c-bad">تعذّر: ' + esc(d.error || r.status) + "</span>"; return; }
     let msg = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> ";
     if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> ";
-    if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + d.skippedCount + "</span> ";
+    if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + fmtN(d.skippedCount) + "</span> ";
     msg += '<div style="font-size:11px;color:#667085;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
     if (d.skippedRows && d.skippedRows.length) {
       msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
-        d.skippedRows.map((s) => "صف " + s.row + ": " + esc(s.reason)).join(" · ") + "</div>";
+        d.skippedRows.map((s) => "صف " + fmtN(s.row) + ": " + esc(s.reason)).join(" · ") + "</div>";
     }
     entImportSummary = msg;   // survives the re-render (the status div is rebuilt by vCustomers)
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
@@ -1719,7 +1719,11 @@ function countUp() {
     if (_countedValues.get(el.parentElement ? el.parentElement.textContent.trim() : raw) === raw) return;
     const m = raw.match(/^[\d,٠-٩]+/);
     if (!m) return;
-    const target = parseInt(m[0].replace(/[^\d]/g, ""), 10);
+    // The values are Arabic-Indic now, and /[^\d]/ strips ٠-٩ to "" → parseInt NaN → every
+    // element returned early and the animation had been silently dead. Fold the digits first.
+    const AR0 = 0x0660;
+    const latin = m[0].replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - AR0)).replace(/[^\d]/g, "");
+    const target = parseInt(latin, 10);
     if (!isFinite(target) || target <= 0 || target > 100000) return;
     const rest = raw.slice(m[0].length);
     const t0 = performance.now();
@@ -1730,7 +1734,7 @@ function countUp() {
       if (k < 1) requestAnimationFrame(step);
     };
     _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
-    el.textContent = "0" + rest;
+    el.textContent = fmtN(0) + rest;
     requestAnimationFrame(step);
   });
 }
