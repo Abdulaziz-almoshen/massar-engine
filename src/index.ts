@@ -180,12 +180,23 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   const isRehearsal = typeof (req.body as any)?.test === "boolean" ? Boolean((req.body as any).test) : allSandbox;
   const campaignId = await db.createCampaign(campName, (product || "").trim(), message, targets.map(t => ({
     phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })), isRehearsal);
-  const results: { phone: string; ok: boolean; error?: string }[] = [];
+  const results: { phone: string; ok: boolean; error?: string; reason?: string }[] = [];
   for (const t of targets) {
     const phone = String(t.phone || "").replace(/\D/g, "");
     if (!phone) { results.push({ phone: String(t.phone), ok: false, error: "invalid phone" }); continue; }
     const contact = tracker.getContact(phone, t.name);
     if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); continue; }
+    // REFUSE rather than fail. WhatsApp accepts a free-form message only inside 24h of the
+    // customer's own last message; outside it, only a Meta-approved template — and this path sends
+    // session messages. The founder launched to two contacts who had last written 33h earlier, both
+    // sends failed with «Re-engagement message», and the screen had told him nothing beforehand.
+    // Predicting it costs one comparison; discovering it costs a burnt send and a wrong number.
+    const win = insights.windowState(contact);
+    if (win.state !== "open") {
+      results.push({ phone, ok: false, error: win.state === "closed" ? "outside_window" : "no_inbound_ever", reason: win.reason });
+      tracker.recordSystem(phone, `[لم تُرسل: ${win.state === "closed" ? "خارج نافذة ٢٤ ساعة" : "لم يراسلنا من قبل"}]`);
+      continue;
+    }
     // {{1}} is the service variable in the founder's Meta template shape. Resolved here as well as
     // in the wizard: a literal «{{1}}» reaching a customer is the worst failure this screen has,
     // and it must not depend on the client having done the substitution.

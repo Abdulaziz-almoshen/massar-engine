@@ -387,6 +387,9 @@ function campWin(camp) {
   const str = String(raw).trim();
   if (!/^\d{4}-\d{2}/.test(str) && !/\d{2}:\d{2}/.test(str)) return Infinity;
   const parsed = Date.parse(str);                              // ISO fallback
+  // Shape is not sanity: "1970-01" parses to 0 and "0000-01" to a negative, both of which would
+  // open the window on all history through the fallback meant to close it.
+  if (!(parsed > 0)) return Infinity;
   // FAIL CLOSED. An unreadable launch time must show nothing, never everything — the whole defect
   // was a screen that reported success it could not substantiate.
   return Number.isFinite(parsed) ? parsed : Infinity;

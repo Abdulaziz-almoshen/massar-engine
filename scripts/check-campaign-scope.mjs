@@ -95,7 +95,9 @@ const asContact = (text) => ({ phone: "r", tags: [], statusTimes: {},
 const isRefusal = (text) => ins.interactionRead(asContact(text), () => false).state === "refused";
 
 for (const t of ["لسنا مهتمين", "ماني مهتم شكرا", "لست مهتم بهذا", "ماني مهتم لا تتصل علي",
-                 "مو مهتم", "غير مهتمة", "لا تراسلني"])
+                 "مو مهتم", "غير مهتمة", "لا تراسلني",
+                 // adversarial review found these under-detected — real forms people type
+                 "مو مهتمه", "غير مهتم نهائيا", "مو مهتم ابد"])
   check(`«${t}» IS a refusal`, isRefusal(t), true);
 
 for (const t of ["ما نبغى نتأخر", "لا نحتاج وقت طويل", "مو مهتم بالسعر بقدر الجودة",

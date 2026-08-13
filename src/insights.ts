@@ -217,11 +217,14 @@ export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean
   // a plural suffix, so «مهتم» was not at end-of-clause. Arabic inflects — the anchor must sit after
   // the suffix, not after the stem. Same family as the «لم» inside «الملف» trap.
   const EOC = "(?=\\s*($|[.،؛!؟]))";
-  const MUHTAM = "مهتم(ين|ون|ة|ات|ًا|ا)?";
+  // «ه» for «ة» is ordinary Saudi typing, and an intensifier commonly follows («نهائيا», «ابد»).
+  // Found by adversarial review, not by imagination — these are forms real people type.
+  const MUHTAM = "مهتم(ين|ون|ة|ه|ات|ًا|ا)?";
+  const INTENSIFIER = "(نهائيا|نهائيًا|ابد|أبدًا|أبدا|خالص|مرة)?";
   const REFUSAL = new RegExp(
     // A short demonstrative may follow («لست مهتم بهذا»), but not a comparative clause
     // («مو مهتم بالسعر بقدر الجودة» — a buying signal, not a refusal).
-    "(ما\\s?ني|ماني|مو|لست|لسنا|لسنَا|غير)\\s*" + MUHTAM + "\\s*(شكرا|شكرًا|بهذا|بهذه|بذلك|فيه|فيها)?" + EOC +
+    "(ما\\s?ني|ماني|مو|لست|لسنا|لسنَا|غير)\\s*" + MUHTAM + "\\s*" + INTENSIFIER + "\\s*(شكرا|شكرًا|بهذا|بهذه|بذلك|فيه|فيها)?" + EOC +
     "|لا\\s*(تتصل|تراسل|ترسل|تكلم)" +
     "|(ما|لا)\\s*(نبغى|نحتاج|نبي)" + EOC);
   const refusal = typed.some((t) => REFUSAL.test(t.text));
