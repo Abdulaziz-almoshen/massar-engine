@@ -400,6 +400,7 @@ app.get("/admin/segments/presets", async (req, reply) => {
   // Same 20k bound as /preview, and for the same reason: this runs FIVE full scans per page load,
   // synchronously, in the process that also serves the Gupshup webhook — which carries «إيقاف».
   const pool = tracker.listContacts().filter((c: any) => !c.test).slice(0, 20000);
+  const oldestDays = pool.reduce((m: number, c: any) => Math.max(m, (Date.now() - (c.firstSeenAt || Date.now())) / 86_400_000), 0);
   // Report the same three numbers the preview does. A preset reading «٠» while three contacts
   // are merely cooling down is the silent zero this feature exists to prevent.
   return segments.presets(win).map((p) => {
@@ -411,6 +412,8 @@ app.get("/admin/segments/presets", async (req, reply) => {
       suppressed: r.suppressed.length,
       tooNew: r.tooNew.length,
       requiredDays: segments.requiredTenureDays(p.def),
+      // A zero with a date is a working product; a zero with an excuse is a broken one (CO-1).
+      entersInDays: Math.max(0, segments.requiredTenureDays(p.def) - Math.floor(oldestDays)),
     };
   });
 });
