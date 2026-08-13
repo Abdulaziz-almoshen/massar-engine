@@ -219,7 +219,14 @@ function systemPrompt(contact: Contact): string {
     if (/(نظام|منصة)\s*صحة/.test(v)) return false;
     return true;
   });
-  const said = statements.join(" · ");
+  // TWO strings, because they answer opposed questions. `disclosed` is what the customer TOLD us —
+  // questions stripped, since a question is not a disclosure. `asked` is everything they said, raw,
+  // because INTENT («كم السعر؟») lives in exactly the sentences the disclosure filter removes.
+  // Reading intent off the filtered string is what made the \b fix strip «كم السعر؟» before the
+  // commercial escape could see it — the founder's «asks before answering» complaint, regressed.
+  const disclosed = statements.join(" · ");
+  const asked = since.filter((t) => t.role === "customer").map((t) => t.text).join(" · ");
+  const said = disclosed;
   const MINE = "(?:عندنا|لدينا|نملك|نستخدم|نشتغل|نعمل|فروعنا|نظامنا|منشأتنا|عندي|لدي)";
   const knowsSize = new RegExp(`${MINE}[^·]{0,25}(فرع|فروع|موقع|مواقع)|\\d+\\s*(فرع|فروع|موقع|مواقع)`).test(said);
   const knowsSystem = new RegExp(`\\b(HIS|ERP)\\b|${MINE}[^·]{0,25}(نظام|برنامج)|(ورقي|يدوي|يدويًا)`, "i").test(said);
@@ -251,14 +258,22 @@ function systemPrompt(contact: Contact): string {
   // ونستخدم HIS ونبغى NVR وكم السعر؟» still scored «ask what kind of facility», because «فرع» is
   // not in the type list. Two escapes: an explicit commercial ask outranks discovery, and enough
   // disclosed facts make the remaining gap something to CONFIRM in passing, not to interrogate.
-  const wantsCommercial = /(كم\s*(السعر|التكلفة|يكلف)|السعر|التسعير|عرض\s*سعر|التكلفة|نبغى\s*نبدأ|كيف\s*نبدأ|اشترك)/.test(said);
+  const wantsCommercial = /(كم\s*(السعر|التكلفة|يكلف)|السعر|التسعير|عرض\s*سعر|التكلفة|نبغى\s*نبدأ|كيف\s*نبدأ|متى\s*نبدأ|اشترك)/.test(asked);
   const known = [knowsType, knowsSystem, knowsService, knowsSize].filter(Boolean).length;
+  // MUST-3: an objective already ASKED is not a live objective. On the founder's own contact the
+  // entity-type question was asked at 14:22 and 14:29 and dodged both times; a third asking is the
+  // «repeating a question already answered» he rejected. Track what we asked, and stop re-asking.
+  const agentSaid = since.filter((t) => t.role === "agent").map((t) => t.text).join(" · ");
+  const askedType = /(منشأة صحية|مزوّد نظام|مزود نظام|أي وصف يناسبكم|نوع الجهة)/.test(agentSaid);
+  const askedSystem = /(نظام HIS|هل تستخدمون|النظام القائم|HIS أو ERP)/i.test(agentSaid);
   const nextObjective =
     wantsCommercial
       ? "طلب العميل الجانب التجاري. لا تبدأ استجوابًا جديدًا: أعطِ ما تسمح به المعرفة المعتمدة عن التسعير، وإن لم يكن مذكورًا نصًا فقل إن المختص يحدده حسب نطاق التكامل، واعرض الخطوة التجارية مباشرة."
     : known >= 3
       ? "لديك أغلب الصورة. أوصِ بنموذج التكامل الأنسب بناءً على ما ذكره، وأكمل الناقص بسؤال واحد داخل التوصية لا كاستجواب منفصل."
-    : !knowsType ? "حدّد نوع الجهة: منشأة صحية تستخدم نظامًا، أم مزوّد نظام يخدم منشآت. اسأل هذا بأزرار."
+    : !knowsType && !askedType ? "حدّد نوع الجهة: منشأة صحية تستخدم نظامًا، أم مزوّد نظام يخدم منشآت. اسأل هذا بأزرار."
+    : !knowsType && askedType ? "سبق أن سألت عن نوع الجهة ولم يُجب. لا تكرّر السؤال — أعطِ قيمة ملموسة للحالتين معًا (منشأة أو مزوّد نظام) ثم اعرض خطوة عملية."
+    : !knowsSystem && askedSystem ? "سبق أن سألت عن النظام ولم يُجب. لا تكرّر السؤال — انتقل إلى الخدمة التي تهمّه أو إلى الخطوة التجارية."
     : !knowsSystem ? "اعرف النظام القائم لديهم (HIS أو ERP أو إجراء يدوي)."
     : !knowsService ? "اعرف أي خدمة تهمهم: سجل التطعيمات، الإجازات المرضية، أو كلاهما. اسأل هذا بأزرار."
     : !knowsSize ? "اعرف حجم التشغيل: كم منشأة أو كم إصدارًا شهريًا تقريبًا."
@@ -675,6 +690,18 @@ function isOptOut(text: string): boolean {
 // ------------------------------ main turn loop ------------------------------
 
 const MAX_AGENT_TURNS = 12;
+const RUNG_ONE_SENT = new Set<string>();
+
+// RUNG ONE, emitted from code rather than composed. When the objective is «identify the entity»,
+// nothing the customer has said can change this message — the content is invariant, so leaving it
+// to the model is pure downside variance on the highest-stakes turn of the conversation. Rungs 2+
+// stay model-composed, because there the value sentence must reflect what THIS customer said.
+const RUNG_ONE = [
+  "يتيح التكامل للممارسين تنفيذ خدمة السجل الوطني للتطعيمات من داخل نظام المنشأة نفسه، دون التنقل بين الأنظمة ودون إدخال مزدوج.",
+  "الربط يتم عبر واجهات برمجية، وندعم فريقكم التقني في المتطلبات والاختبار وحتى التفعيل.",
+  "ولأوجّهكم إلى نموذج التكامل الأنسب: أي وصف يناسبكم؟",
+].join("\n");
+const RUNG_ONE_BUTTONS = [{ title: "منشأة صحية" }, { title: "مزوّد نظام HIS" }, { title: "العرض التجاري" }];
 
 // Gupshup's sandbox makes every new person send «proxy <botname>» to activate the bot, after
 // an English boilerplate about bot-building and anagram puzzles. That phrase is platform
@@ -702,6 +729,26 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
 
   // A human driving the chat must not be interrupted by an automated opener.
   if (contact.human) return;
+
+  // Deliver → Reinforce → Qualify, emitted rather than requested, for rung one only. The model
+  // was asked three times to compose this turn and produced «الملف يوضح…» each time; the content
+  // does not depend on anything the customer said, so composing it adds variance and no value.
+  const wantsInfo = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)(\s*)$/.test(text.trim());
+  if (wantsInfo && !RUNG_ONE_SENT.has(contact.phone)) {
+    RUNG_ONE_SENT.add(contact.phone);
+    const pa = productAssets.find((x) => /تطعيم/.test(x.product));
+    if (pa && !(contact.transcript || []).some((t) => t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`))) {
+      await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
+      tracker.recordAgentReply(contact.phone, `[مرفق في نفس الرسالة: ${pa.product}]`);
+    }
+    try {
+      await gupshup.sendQuickReply(contact.phone, RUNG_ONE, RUNG_ONE_BUTTONS);
+      tracker.recordAgentReply(contact.phone, `${RUNG_ONE} [أزرار: ${RUNG_ONE_BUTTONS.map((b) => b.title).join(" | ")}]`);
+    } catch (e) {
+      await safeSend(contact.phone, RUNG_ONE);
+    }
+    return;
+  }
 
   // Only the very first turn can be platform plumbing; after that «proxy …» is the customer talking.
   if (SANDBOX_ACTIVATION.test(text) && (contact.transcript || []).filter((t) => t.role === "customer").length <= 1) {
@@ -795,7 +842,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
       const lastToolResult = [...messages].reverse().find((m: any) => m.role === "tool" && typeof m.content === "string");
       const fallback = lastToolResult && /^أُشعر|^أُرسل/.test(String((lastToolResult as any).content))
         ? String((lastToolResult as any).content)
-        : "التكامل مع سجل التطعيمات الوطني يتيح تنفيذ الخدمة من داخل نظام المنشأة عبر واجهات برمجية، وندعمكم في المتطلبات التقنية والاختبار والتفعيل. أي وصف يناسبكم: منشأة صحية، أم مزوّد نظام؟";
+        : RUNG_ONE;
       await safeSend(contact.phone, fallback);
     } else if (finalText && sentOwnBubble) {
       console.log(JSON.stringify({ at: "agent", msg: "suppressed trailing bubble after self-contained tool send", phone: contact.phone, dropped: finalText.slice(0, 80) }));
