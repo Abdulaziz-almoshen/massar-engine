@@ -1,0 +1,317 @@
+
+> massar-engine@0.1.0 check
+> npm run check:catalogue && npm run check:numerals && npm run check:buttons
+
+
+> massar-engine@0.1.0 check:catalogue
+> node scripts/check-catalogue.mjs
+
+catalogue in step: 6 services, 0 drift
+
+> massar-engine@0.1.0 check:numerals
+> node scripts/check-numerals.mjs
+
+numeral regression-lock clear: src/dashboard.ts has none of the shapes this check knows.
+NOTE: this is a regression lock, not a property check — it catches the defect shapes prior
+review rounds named (raw concat of .length/.count/.score/Math.*/LIST_CAP, Latin % in markup,
+non-existent Math methods). It does NOT prove every number routes through fmtN(); a review
+wrote 21 mutations and 18 passed. Treat a clean run as "no known regression", not "correct".
+
+> massar-engine@0.1.0 check:buttons
+> npm run build && node scripts/check-buttons.mjs
+
+
+> massar-engine@0.1.0 build
+> tsc
+
+ok   [contract] shipped buttons all handled — measured: null
+ok   [contract] unhandled button rejected — measured: true
+ok   [contract] 21-char title rejected (real cause of 131009) — measured: true
+ok   [contract] «الملف التعريفي» routes — measured: true
+ok   [contract] «الملف التعريفي» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «أرسلوا التفاصيل» routes — measured: true
+ok   [contract] «أرسلوا التفاصيل» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «ليس الآن» routes — measured: true
+ok   [contract] «ليس الآن» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «تفاصيل التكامل» routes — measured: true
+ok   [contract] «تفاصيل التكامل» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «أود مناقشة التكامل» routes — measured: true
+ok   [contract] «أود مناقشة التكامل» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «منشأة صحية» routes — measured: true
+ok   [contract] «منشأة صحية» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «مزوّد نظام HIS» routes — measured: true
+ok   [contract] «مزوّد نظام HIS» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «العرض التجاري» routes — measured: true
+ok   [contract] «العرض التجاري» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «فريقنا التقني» routes — measured: true
+ok   [contract] «فريقنا التقني» within WhatsApp cap (both measures) — measured: true
+ok   [contract] «مزوّد النظام» routes — measured: true
+ok   [contract] «مزوّد النظام» within WhatsApp cap (both measures) — measured: true
+ok   [render] intro_integration: no unresolved variable — measured: false
+ok   [render] intro_integration: buttons are 1..3 — measured: true
+ok   [render] high_usage_upsell: no unresolved variable — measured: false
+ok   [render] high_usage_upsell: buttons are 1..3 — measured: true
+ok   [render] unknown id resolves to undefined — measured: undefined
+ok   [marker] «[حملة]» is recognised as a campaign turn — measured: true
+ok   [marker] «[حملة]» reads back its opener — measured: undefined
+ok   [marker] «[حملة:intro_integration]» is recognised as a campaign turn — measured: true
+ok   [marker] «[حملة:intro_integration]» reads back its opener — measured: "intro_integration"
+ok   [marker] «[حملة:high_usage_upsell]» is recognised as a campaign turn — measured: true
+ok   [marker] «[حملة:high_usage_upsell]» reads back its opener — measured: "high_usage_upsell"
+ok   [marker] a plain agent line is not a campaign turn — measured: false
+ok   [intent] tapping «العرض التجاري» routes commercial — measured: true
+ok   [intent] tapping «أود مناقشة التكامل» routes commercial — measured: true
+ok   [intent] typing «كم السعر؟» routes commercial — measured: true
+ok   [intent] typing «كم التكلفة؟» routes commercial — measured: true
+ok   [intent] typing «كيف نبدأ؟» routes commercial — measured: true
+ok   [intent] typing «متى نبدأ؟» routes commercial — measured: true
+ok   [intent] typing «هل عندكم تسعير؟» routes commercial — measured: true
+ok   [intent] tapping «منشأة صحية» does NOT route commercial — measured: false
+ok   [intent] tapping «مزوّد نظام HIS» does NOT route commercial — measured: false
+ok   [intent] tapping «تفاصيل التكامل» does NOT route commercial — measured: false
+ok   [intent] tapping «ليس الآن» does NOT route commercial — measured: false
+ok   [intent] tapping «الملف التعريفي» does NOT route commercial — measured: false
+ok   [intent] tapping «فريقنا التقني» does NOT route commercial — measured: false
+ok   [intent] disclosure «عندنا ٢٠ فرع» is not a price ask — measured: false
+ok   [intent] disclosure «نستخدم نظام HIS» is not a price ask — measured: false
+ok   [intent] disclosure «نحن مجمع طبي» is not a price ask — measured: false
+ok   [intent] disclosure «المستشفى فيه ٣ فروع» is not a price ask — measured: false
+ok   [turn-two] upsell rung one does NOT re-ask identity — measured: false
+ok   [turn-two] intro rung one still asks identity — measured: true
+ok   [turn-two] upsell qualifies on implementation instead — measured: true
+ok   [turn-two] upsell names the service — measured: true
+ok   [turn-two] upsell buttons differ from intro's — measured: true
+ok   [turn-two] no service resolved → neutral wording, never a hole — measured: false
+ok   [turn-two] rung-one button «فريقنا التقني» (opener=high_usage_upsell) routes — measured: true
+ok   [turn-two] rung-one button «مزوّد النظام» (opener=high_usage_upsell) routes — measured: true
+ok   [turn-two] rung-one button «العرض التجاري» (opener=high_usage_upsell) routes — measured: true
+ok   [turn-two] rung-one button «منشأة صحية» (opener=intro_integration) routes — measured: true
+ok   [turn-two] rung-one button «مزوّد نظام HIS» (opener=intro_integration) routes — measured: true
+ok   [turn-two] rung-one button «العرض التجاري» (opener=intro_integration) routes — measured: true
+ok   [turn-two] rung-one button «منشأة صحية» (opener=undefined) routes — measured: true
+ok   [turn-two] rung-one button «مزوّد نظام HIS» (opener=undefined) routes — measured: true
+ok   [turn-two] rung-one button «العرض التجاري» (opener=undefined) routes — measured: true
+ok   [model-buttons] prompt's own «أريد العرض التجاري» routes — measured: "commercial"
+ok   [model-buttons] «أريد العرض التجاري» canonicalises — measured: "أريد العرض التجاري"
+ok   [model-buttons] a wordier proposal maps to the approved title — measured: "العرض التجاري"
+ok   [model-buttons] an unmappable proposal is rejected, not silently sent — measured: undefined
+ok   [fidelity] at most one BUTTON_INTENT key doubles as a benign affix — measured: true
+ok   [model-buttons] «من فضلكم العرض التجاري» MUST map (coverage floor — fails if canonicalTitle refuses all) — measured: "العرض التجاري"
+ok   [model-buttons] «نعم أرسلوا التفاصيل» MUST map (coverage floor — fails if canonicalTitle refuses all) — measured: "أرسلوا التفاصيل"
+ok   [model-buttons] «أريد العرض التجاري» MUST map (coverage floor — fails if canonicalTitle refuses all) — measured: "أريد العرض التجاري"
+ok   [model-buttons] «صباحًا» MUST map (coverage floor — fails if canonicalTitle refuses all) — measured: "صباحًا"
+ok   [model-buttons] canonical(«أريد العرض التجاري») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«من فضلكم العرض التجاري») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«نعم أرسلوا التفاصيل») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«ليس الآن شكرًا») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«اضغط هنا») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«توصيل مجاني») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«صباحًا») is routable-or-undefined — measured: true
+ok   [model-buttons] canonical(«تكامل صحة») is routable-or-undefined — measured: true
+ok   [model-buttons] prompt-prescribed «منشأة صحية» survives emit — measured: "منشأة صحية"
+ok   [model-buttons] prompt-prescribed «مزوّد نظام HIS» survives emit — measured: "مزوّد نظام HIS"
+ok   [model-buttons] prompt-prescribed «أريد العرض التجاري» survives emit — measured: "أريد العرض التجاري"
+ok   [model-buttons] case discriminates the two measures — measured: true
+ok   [model-buttons] surrogate title rejected on UTF-16 length — measured: true
+ok   [fidelity] negated «لا أريد العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «لا نحتاج تفاصيل التكامل» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «غير منشأة صحية» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «لسنا بحاجة العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «بدون تفاصيل التكامل» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «مو محتاجين العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «ولا نريد العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «كلا، العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «نرفض العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «ألغوا العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «أجّلوا العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «توقفوا عن العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «ليسوا مهتمين بالعرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] negated «أبدًا العرض التجاري» is refused, not inverted — measured: undefined
+ok   [fidelity] ambiguous proposal is refused — measured: undefined
+ok   [fidelity] nested titles still resolve (exercises the maximal filter) — measured: "أريد العرض التجاري"
+ok   [fidelity] a whole sentence around the title is refused — measured: undefined
+ok   [fidelity] prototype key is not an intent — measured: undefined
+ok   [fidelity] prototype key rejected by the boot contract — measured: true
+ok   [prompt-buttons] prescribed «صباحًا» survives emit — measured: "صباحًا"
+ok   [prompt-buttons] prescribed «بعد الظهر» survives emit — measured: "بعد الظهر"
+ok   [prompt-buttons] prescribed «تكامل صحة» survives emit — measured: "تكامل صحة"
+ok   [prompt-buttons] prescribed «إجراء بالمنصة» survives emit — measured: "إجراء بالمنصة"
+ok   [prompt-buttons] prescribed «استفسار آخر» survives emit — measured: "استفسار آخر"
+ok   [prompt-buttons] prescribed «لدينا نظام حالي» survives emit — measured: "لدينا نظام حالي"
+ok   [prompt-buttons] prescribed «أرسلوا الملف التعريفي» survives emit — measured: "أرسلوا الملف التعريفي"
+ok   [prompt-buttons] prescribed «أرسلوا معلومات» survives emit — measured: "أرسلوا معلومات"
+ok   [prompt-buttons] prescribed «لسنا مهتمين» survives emit — measured: "لسنا مهتمين"
+ok   [info-gate] «الملف» does not self-match the objection stem («لم» inside «الـمـلـف») — measured: false
+ok   [info-gate] the stem still catches a real objection — measured: true
+ok   [info-gate] anchored commercial stem does not fire on a substring — measured: false
+ok   [info-gate] but does fire on the real word — measured: true
+ok   [info-gate] «الملف التعريفي» is a pure info request — measured: true
+ok   [info-gate] «أرسلوا التفاصيل» is a pure info request — measured: true
+ok   [info-gate] «الملف التعريفي للإجازات المرضية» is a pure info request — measured: true
+ok   [info-gate] «أرسلوا التفاصيل عن التطعيمات» is a pure info request — measured: true
+ok   [info-gate] «التفاصيل والسعر لو سمحتم» does NOT short-circuit (price must reach the model) — measured: false
+ok   [info-gate] «أرسلوا التفاصيل وكم السعر» does NOT short-circuit (price must reach the model) — measured: false
+ok   [info-gate] «التفاصيل وكيف نبدأ» does NOT short-circuit (price must reach the model) — measured: false
+ok   [info-gate] «الملف التعريفي والتسعير» does NOT short-circuit (price must reach the model) — measured: false
+ok   [info-gate] objection «التفاصيل التي أرسلتموها غير واضحة» does NOT short-circuit — measured: false
+ok   [info-gate] objection «الملف التعريفي لم يفتح معنا» does NOT short-circuit — measured: false
+ok   [info-gate] objection «أرسلوا التفاصيل إلى المدير المالي وليس لي» does NOT short-circuit — measured: false
+ok   [rung-one] «الملف التعريفي» (intro_integration) is an info request — measured: "info"
+ok   [rung-one] «أرسلوا التفاصيل» (intro_integration) is an info request — measured: "info"
+ok   [rung-one] «تفاصيل التكامل» (high_usage_upsell) is an info request — measured: "info"
+
+135 checks · 0 failures
+NOTE: this gate proves routing and the emitted-button contract on real source. It does
+NOT prove wire behaviour — no WhatsApp message is sent by this or any check.
+ok   [consumers] «الملف التعريفي» → info has a declared consumer row — measured: true
+ok   [consumers] «الملف التعريفي»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الملف التعريفي» survives canonicalTitle — measured: "الملف التعريفي"
+ok   [consumers] «أرسلوا التفاصيل» → info has a declared consumer row — measured: true
+ok   [consumers] «أرسلوا التفاصيل»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أرسلوا التفاصيل» survives canonicalTitle — measured: "أرسلوا التفاصيل"
+ok   [consumers] «تفاصيل التكامل» → info has a declared consumer row — measured: true
+ok   [consumers] «تفاصيل التكامل»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «تفاصيل التكامل» survives canonicalTitle — measured: "تفاصيل التكامل"
+ok   [consumers] «العرض التجاري» → commercial has a declared consumer row — measured: true
+ok   [consumers] «العرض التجاري»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «العرض التجاري» survives canonicalTitle — measured: "العرض التجاري"
+ok   [consumers] «أريد العرض التجاري» → commercial has a declared consumer row — measured: true
+ok   [consumers] «أريد العرض التجاري»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أريد العرض التجاري» survives canonicalTitle — measured: "أريد العرض التجاري"
+ok   [consumers] «أود مناقشة التكامل» → commercial has a declared consumer row — measured: true
+ok   [consumers] «أود مناقشة التكامل»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أود مناقشة التكامل» survives canonicalTitle — measured: "أود مناقشة التكامل"
+ok   [consumers] «احجز اجتماعًا» → commercial has a declared consumer row — measured: true
+ok   [consumers] «احجز اجتماعًا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «احجز اجتماعًا» survives canonicalTitle — measured: "احجز اجتماعًا"
+ok   [consumers] «منشأة صحية» → qualify has a declared consumer row — measured: true
+ok   [consumers] «منشأة صحية»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «منشأة صحية» survives canonicalTitle — measured: "منشأة صحية"
+ok   [consumers] «مزوّد نظام HIS» → qualify has a declared consumer row — measured: true
+ok   [consumers] «مزوّد نظام HIS»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «مزوّد نظام HIS» survives canonicalTitle — measured: "مزوّد نظام HIS"
+ok   [consumers] «فريقنا التقني» → qualify has a declared consumer row — measured: true
+ok   [consumers] «فريقنا التقني»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «فريقنا التقني» survives canonicalTitle — measured: "فريقنا التقني"
+ok   [consumers] «مزوّد النظام» → qualify has a declared consumer row — measured: true
+ok   [consumers] «مزوّد النظام»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «مزوّد النظام» survives canonicalTitle — measured: "مزوّد النظام"
+ok   [consumers] «ليس الآن» → decline has a declared consumer row — measured: true
+ok   [consumers] «ليس الآن»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «ليس الآن» survives canonicalTitle — measured: "ليس الآن"
+ok   [consumers] «لاحقًا» → decline has a declared consumer row — measured: true
+ok   [consumers] «لاحقًا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لاحقًا» survives canonicalTitle — measured: "لاحقًا"
+ok   [consumers] «لا، شكرًا» → decline has a declared consumer row — measured: true
+ok   [consumers] «لا، شكرًا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لا، شكرًا» survives canonicalTitle — measured: "لا، شكرًا"
+ok   [consumers] «لسنا مهتمين» → decline has a declared consumer row — measured: true
+ok   [consumers] «لسنا مهتمين»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لسنا مهتمين» survives canonicalTitle — measured: "لسنا مهتمين"
+ok   [consumers] «صباحًا» → schedule has a declared consumer row — measured: true
+ok   [consumers] «صباحًا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «صباحًا» survives canonicalTitle — measured: "صباحًا"
+ok   [consumers] «مساءً» → schedule has a declared consumer row — measured: true
+ok   [consumers] «مساءً»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «مساءً» survives canonicalTitle — measured: "مساءً"
+ok   [consumers] «بعد الظهر» → schedule has a declared consumer row — measured: true
+ok   [consumers] «بعد الظهر»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «بعد الظهر» survives canonicalTitle — measured: "بعد الظهر"
+ok   [consumers] «مكالمة قصيرة» → schedule has a declared consumer row — measured: true
+ok   [consumers] «مكالمة قصيرة»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «مكالمة قصيرة» survives canonicalTitle — measured: "مكالمة قصيرة"
+ok   [consumers] «الأحد» → schedule has a declared consumer row — measured: true
+ok   [consumers] «الأحد»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الأحد» survives canonicalTitle — measured: "الأحد"
+ok   [consumers] «الاثنين» → schedule has a declared consumer row — measured: true
+ok   [consumers] «الاثنين»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الاثنين» survives canonicalTitle — measured: "الاثنين"
+ok   [consumers] «الثلاثاء» → schedule has a declared consumer row — measured: true
+ok   [consumers] «الثلاثاء»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الثلاثاء» survives canonicalTitle — measured: "الثلاثاء"
+ok   [consumers] «الأربعاء» → schedule has a declared consumer row — measured: true
+ok   [consumers] «الأربعاء»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الأربعاء» survives canonicalTitle — measured: "الأربعاء"
+ok   [consumers] «الخميس» → schedule has a declared consumer row — measured: true
+ok   [consumers] «الخميس»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «الخميس» survives canonicalTitle — measured: "الخميس"
+ok   [consumers] «نعم» → qualify has a declared consumer row — measured: true
+ok   [consumers] «نعم»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «نعم» survives canonicalTitle — measured: "نعم"
+ok   [consumers] «لا» → decline has a declared consumer row — measured: true
+ok   [consumers] «لا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لا» survives canonicalTitle — measured: "لا"
+ok   [consumers] «موافق على العرض» → commercial has a declared consumer row — measured: true
+ok   [consumers] «موافق على العرض»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «موافق على العرض» survives canonicalTitle — measured: "موافق على العرض"
+ok   [consumers] «تكامل صحة» → qualify has a declared consumer row — measured: true
+ok   [consumers] «تكامل صحة»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «تكامل صحة» survives canonicalTitle — measured: "تكامل صحة"
+ok   [consumers] «إجراء بالمنصة» → qualify has a declared consumer row — measured: true
+ok   [consumers] «إجراء بالمنصة»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «إجراء بالمنصة» survives canonicalTitle — measured: "إجراء بالمنصة"
+ok   [consumers] «استفسار آخر» → qualify has a declared consumer row — measured: true
+ok   [consumers] «استفسار آخر»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «استفسار آخر» survives canonicalTitle — measured: "استفسار آخر"
+ok   [consumers] «لدينا نظام حالي» → qualify has a declared consumer row — measured: true
+ok   [consumers] «لدينا نظام حالي»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لدينا نظام حالي» survives canonicalTitle — measured: "لدينا نظام حالي"
+ok   [consumers] «أرسلوا الملف التعريفي» → info has a declared consumer row — measured: true
+ok   [consumers] «أرسلوا الملف التعريفي»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أرسلوا الملف التعريفي» survives canonicalTitle — measured: "أرسلوا الملف التعريفي"
+ok   [consumers] «أرسل الملف» → info has a declared consumer row — measured: true
+ok   [consumers] «أرسل الملف»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أرسل الملف» survives canonicalTitle — measured: "أرسل الملف"
+ok   [consumers] «إرسال الملف» → info has a declared consumer row — measured: true
+ok   [consumers] «إرسال الملف»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «إرسال الملف» survives canonicalTitle — measured: "إرسال الملف"
+ok   [consumers] «أرسل تفاصيل الباقة» → info has a declared consumer row — measured: true
+ok   [consumers] «أرسل تفاصيل الباقة»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أرسل تفاصيل الباقة» survives canonicalTitle — measured: "أرسل تفاصيل الباقة"
+ok   [consumers] «أريد العرض التعريفي» → info has a declared consumer row — measured: true
+ok   [consumers] «أريد العرض التعريفي»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أريد العرض التعريفي» survives canonicalTitle — measured: "أريد العرض التعريفي"
+ok   [consumers] «طلب عرض تعريفي» → info has a declared consumer row — measured: true
+ok   [consumers] «طلب عرض تعريفي»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «طلب عرض تعريفي» survives canonicalTitle — measured: "طلب عرض تعريفي"
+ok   [consumers] «تفاصيل الربط» → info has a declared consumer row — measured: true
+ok   [consumers] «تفاصيل الربط»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «تفاصيل الربط» survives canonicalTitle — measured: "تفاصيل الربط"
+ok   [consumers] «ترتيب عرض» → commercial has a declared consumer row — measured: true
+ok   [consumers] «ترتيب عرض»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «ترتيب عرض» survives canonicalTitle — measured: "ترتيب عرض"
+ok   [consumers] «تنسيق عرض موجز» → commercial has a declared consumer row — measured: true
+ok   [consumers] «تنسيق عرض موجز»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «تنسيق عرض موجز» survives canonicalTitle — measured: "تنسيق عرض موجز"
+ok   [consumers] «أبغى التجربة» → commercial has a declared consumer row — measured: true
+ok   [consumers] «أبغى التجربة»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أبغى التجربة» survives canonicalTitle — measured: "أبغى التجربة"
+ok   [consumers] «مكالمة ١٠ دقائق» → schedule has a declared consumer row — measured: true
+ok   [consumers] «مكالمة ١٠ دقائق»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «مكالمة ١٠ دقائق» survives canonicalTitle — measured: "مكالمة ١٠ دقائق"
+ok   [consumers] «لدي سؤال تقني» → qualify has a declared consumer row — measured: true
+ok   [consumers] «لدي سؤال تقني»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لدي سؤال تقني» survives canonicalTitle — measured: "لدي سؤال تقني"
+ok   [consumers] «نعم، نحتاجها» → qualify has a declared consumer row — measured: true
+ok   [consumers] «نعم، نحتاجها»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «نعم، نحتاجها» survives canonicalTitle — measured: "نعم، نحتاجها"
+ok   [consumers] «خدمة أخرى» → qualify has a declared consumer row — measured: true
+ok   [consumers] «خدمة أخرى»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «خدمة أخرى» survives canonicalTitle — measured: "خدمة أخرى"
+ok   [consumers] «لا أحتاج الآن» → decline has a declared consumer row — measured: true
+ok   [consumers] «لا أحتاج الآن»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لا أحتاج الآن» survives canonicalTitle — measured: "لا أحتاج الآن"
+ok   [consumers] «لا تناسبنا» → decline has a declared consumer row — measured: true
+ok   [consumers] «لا تناسبنا»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «لا تناسبنا» survives canonicalTitle — measured: "لا تناسبنا"
+ok   [consumers] «أرسلوا معلومات» → info has a declared consumer row — measured: true
+ok   [consumers] «أرسلوا معلومات»: bare word ⇒ must not drive a ledger write — measured: true
+ok   [consumers] «أرسلوا معلومات» survives canonicalTitle — measured: "أرسلوا معلومات"
+ok   [consumers] commercial «العرض التجاري» is not a bare typeable word — measured: true
+ok   [consumers] commercial «أريد العرض التجاري» is not a bare typeable word — measured: true
+ok   [consumers] commercial «أود مناقشة التكامل» is not a bare typeable word — measured: true
+ok   [consumers] commercial «احجز اجتماعًا» is not a bare typeable word — measured: true
+ok   [consumers] commercial «موافق على العرض» is not a bare typeable word — measured: true
+ok   [consumers] commercial «ترتيب عرض» is not a bare typeable word — measured: true
+ok   [consumers] commercial «تنسيق عرض موجز» is not a bare typeable word — measured: true
+ok   [consumers] commercial «أبغى التجربة» is not a bare typeable word — measured: true

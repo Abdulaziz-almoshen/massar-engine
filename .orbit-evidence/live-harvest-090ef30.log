@@ -1,0 +1,39 @@
+# live-transcript button harvest @090ef30 — 2026-08-13T17:48:26Z
+# source: GET https://massar-engine.fly.dev/admin/state (read-only, admin token). HTTP 200, 48981 bytes.
+# NO WhatsApp message sent: only GET was issued; no /send, /launch or gupshup URL was contacted.
+
+harvested titles (unique, from contacts[].transcript[].text '[أزرار: …]'):
+  أبغى التجربة
+  أرسل الملف
+  أرسل تفاصيل الباقة
+  أرسلوا التفاصيل
+  أرسلوا الملف التعريفي
+  أريد العرض التعريفي
+  إرسال الملف
+  استفسار آخر
+  الملف التعريفي
+  بعد الظهر
+  ترتيب عرض
+  تفاصيل التكامل
+  تفاصيل الربط
+  تنسيق عرض موجز
+  خدمة أخرى
+  صباحًا
+  طلب عرض تعريفي
+  لا أحتاج الآن
+  لا تناسبنا
+  لاحقًا
+  لدي سؤال تقني
+  ليس الآن
+  مكالمة ١٠ دقائق
+  نعم، نحتاجها
+
+harvested_unique = 24
+harvested_with_intent = 24
+unmapped = []
+new_count = 15
+max_utf16 = 19  max_codepoints = 19
+overlength = []
+roundtrip_failures = []
+new_intents = [["أرسل الملف","info"],["إرسال الملف","info"],["أرسل تفاصيل الباقة","info"],["أريد العرض التعريفي","info"],["طلب عرض تعريفي","info"],["تفاصيل الربط","info"],["ترتيب عرض","commercial"],["تنسيق عرض موجز","commercial"],["أبغى التجربة","commercial"],["مكالمة ١٠ دقائق","schedule"],["لدي سؤال تقني","qualify"],["نعم، نحتاجها","qualify"],["خدمة أخرى","qualify"],["لا أحتاج الآن","decline"],["لا تناسبنا","decline"]]
+longest_new = أريد العرض التعريفي(u16=19,cp=19)
