@@ -212,6 +212,12 @@ export const DASHBOARD_HTML = `<!doctype html>
     .lbar .lsub { display: none; }
     .lbar .btn { padding: 10px 16px !important; font-size: 12.5px !important; }
   }
+  /* The conversation ledger is a side column on desktop; below 900 it must become a block, not an
+     orphaned 210px strip with a floating vertical hairline. */
+  @media (max-width: 900px) {
+    .convled { width: 100% !important; border-inline-start: 0 !important; padding-inline-start: 0 !important;
+               border-top: 1px solid #F2F4F7; padding-top: 14px; }
+  }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 </style>
 </head>
@@ -375,7 +381,12 @@ function campWin(camp) {
   if (raw === undefined || raw === null || raw === "") return Infinity;
   const asNum = Number(raw);
   if (Number.isFinite(asNum) && asNum > 0) return asNum;      // epoch millis, number or digit-string
-  const parsed = Date.parse(String(raw));                      // ISO fallback
+  // Only an ISO-looking string may reach Date.parse. A bare "0" or "-1" parses as the year 2000,
+  // which would open the window on every past event — the exact failure this function exists to
+  // prevent, arriving through the fallback. Numbers that are not positive epoch millis fail closed.
+  const str = String(raw).trim();
+  if (!/^\d{4}-\d{2}/.test(str) && !/\d{2}:\d{2}/.test(str)) return Infinity;
+  const parsed = Date.parse(str);                              // ISO fallback
   // FAIL CLOSED. An unreadable launch time must show nothing, never everything — the whole defect
   // was a screen that reported success it could not substantiate.
   return Number.isFinite(parsed) ? parsed : Infinity;
@@ -1883,7 +1894,8 @@ function vCustomer(ph) {
         '<i style="flex:1;background:rgba(31,68,112,.22);"></i></div>' +
         '<div><span style="font-size:22px;font-weight:700;color:' + (it.customerTurns ? "#101828" : "#98A2B3") + ';">' + head +
         '</span> <span style="font-size:12px;color:#667085;">كلمة من العميل</span></div>' +
-        '<div><span class="chip" style="background:' + (it.state === "reciprocal" ? "rgba(63,182,176,.14);color:#1F7A73" :
+        '<div><span class="chip" style="background:' + (it.state === "refused" ? "rgba(217,45,32,.10);color:#B42318" :
+          it.state === "reciprocal" ? "rgba(63,182,176,.14);color:#1F7A73" :
           it.state === "no_reply" ? "#F2F4F7;color:#667085" : "rgba(201,162,39,.16);color:#8a6d10") + ';">' + esc(it.stateLabel) + "</span></div>" +
         '<div style="font-size:11px;color:#667085;line-height:1.85;">' + esc(it.stateReason) + "</div>" +
         (it.voice

@@ -69,7 +69,9 @@ check("an older campaign still counts its own replies", older.replied, 2);
 check("…and its own interest", older.interested, 1);
 
 // FAIL CLOSED: an unreadable launch time must show nothing, never everything.
-for (const bad of [undefined, null, "", "not-a-date"]) {
+// safety-gate advisory: "0" and "-1" reached Date.parse and resolved to the year 2000, opening the
+// window on every past event through the very fallback meant to close it.
+for (const bad of [undefined, null, "", "not-a-date", "0", 0, "-1", -1, "  ", {}]) {
   const r = stats({ targets, created_at: bad });
   check(`unreadable created_at (${JSON.stringify(bad)}) shows zero, not everything`,
     [r.replied, r.seen, r.delivered, r.interested], [0, 0, 0, 0]);
@@ -81,7 +83,30 @@ vm.runInContext(`cache = ${JSON.stringify({ contacts: noStatus })};`, ctx);
 const empty = stats({ targets: [{ phone: "3" }], created_at: String(LAUNCH) });
 check("a contact with no status counts as nothing", [empty.delivered, empty.seen, empty.replied], [0, 0, 0]);
 
-console.log(`\n${failures ? failures + " FAILURES" : "campaign scoping: all green"}`);
+
+// --- the refusal reading -----------------------------------------------------
+// No gate covered this regex, and it broke twice in opposite directions in one day: first it called
+// «مو مهتم بالسعر بقدر الجودة» — a BUYING signal — an explicit refusal; then anchoring it to
+// end-of-clause made «لسنا مهتمين» invisible, because Arabic inflects and the anchor sat after the
+// stem instead of after the suffix. Both directions are pinned here.
+const ins = await import(join(root, "dist/insights.js"));
+const asContact = (text) => ({ phone: "r", tags: [], statusTimes: {},
+  transcript: [{ role: "customer", text, ts: Date.now() }] });
+const isRefusal = (text) => ins.interactionRead(asContact(text), () => false).state === "refused";
+
+for (const t of ["لسنا مهتمين", "ماني مهتم شكرا", "لست مهتم بهذا", "ماني مهتم لا تتصل علي",
+                 "مو مهتم", "غير مهتمة", "لا تراسلني"])
+  check(`«${t}» IS a refusal`, isRefusal(t), true);
+
+for (const t of ["ما نبغى نتأخر", "لا نحتاج وقت طويل", "مو مهتم بالسعر بقدر الجودة",
+                 "مهتمين جدًا بالتكامل", "كم السعر", "الملف التعريفي"])
+  check(`«${t}» is NOT a refusal`, isRefusal(t), false);
+
+// The platform's own boilerplate must never be quoted back as the customer's words.
+const proxy = ins.interactionRead(asContact("proxy Massar"), () => false);
+check("sandbox activation is not surfaced as the customer's voice", proxy.voice, null);
+
+console.log(`\n${failures ? failures + " FAILURES" : "campaign scoping + refusal reading: all green"}`);
 if (failures) process.exit(1);
 console.log("NOTE: fixtures use the REAL created_at shape (int8 as a digit string). A gate that");
 console.log("asserts campaign numbers with an ISO string it invented is how the no-op shipped clean.");

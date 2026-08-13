@@ -109,6 +109,58 @@ const SYSTEM = [
   'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","stage":"واحدة من المراحل الست","stage_reason":"سبب قصير","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
+/** Can we legally message this contact RIGHT NOW, and if not, why?
+ *
+ *  WhatsApp accepts a free-form (session) message only inside 24 hours of the customer's own last
+ *  message. Outside it, only a Meta-approved template. The launch path sends session messages, so
+ *  the founder's campaign to two contacts who had last written 33h earlier failed with
+ *  «Re-engagement message» — and the screen had told him nothing beforehand.
+ *
+ *  Every comparable tool discovers this at SEND time (Twilio 63016, WATI campaign errors,
+ *  respond.io has it as an open feature request). Gupshup's own Campaign Manager designs it out by
+ *  building campaigns from approved templates. We can at least refuse to fire into a closed window.
+ *
+ *  UNKNOWN is deliberately NOT merged into CLOSED: "never wrote to us" and "wrote 30 hours ago" are
+ *  different problems with different fixes, and collapsing them hides the consent question. */
+export type WindowState = "open" | "closed" | "unknown";
+export const SESSION_WINDOW_MS = 24 * 3600e3;
+
+export function windowState(c: Contact | undefined, now = Date.now()): {
+  state: WindowState; lastInboundAt: number | null; hoursLeft: number | null; reason: string;
+} {
+  // Only the CUSTOMER's own turns open the window — an agent or system turn never does.
+  const inbound = (c?.transcript || []).filter((t) => t.role === "customer");
+  if (!inbound.length) {
+    return { state: "unknown", lastInboundAt: null, hoursLeft: null,
+      reason: "لم يراسلنا من قبل — لا نافذة مفتوحة ولا تأكيد على رغبته في التواصل." };
+  }
+  const last = inbound.reduce((m, t) => Math.max(m, t.ts), 0);
+  const age = now - last;
+  if (age < SESSION_WINDOW_MS) {
+    return { state: "open", lastInboundAt: last, hoursLeft: Math.floor((SESSION_WINDOW_MS - age) / 3600e3),
+      reason: "راسلَنا خلال ٢٤ ساعة — الرسالة الحرة مسموحة الآن." };
+  }
+  return { state: "closed", lastInboundAt: last, hoursLeft: 0,
+    reason: "آخر رسالة منه تجاوزت ٢٤ ساعة — واتساب لا يقبل إلا قالبًا معتمدًا." };
+}
+
+/** Split a target list into what can actually be sent now. Arithmetic over the ledger: no network,
+ *  no send, and it produces the exact «needs a template» cohort that prices the WABA migration. */
+export function reachability(contacts: (Contact | undefined)[], now = Date.now()) {
+  const open: string[] = [], closed: string[] = [], unknown: string[] = [];
+  let soonestExpiryHours: number | null = null;
+  for (const c of contacts) {
+    const w = windowState(c, now);
+    const phone = c?.phone ?? "";
+    if (w.state === "open") {
+      open.push(phone);
+      if (w.hoursLeft !== null && (soonestExpiryHours === null || w.hoursLeft < soonestExpiryHours)) soonestExpiryHours = w.hoursLeft;
+    } else if (w.state === "closed") closed.push(phone);
+    else unknown.push(phone);
+  }
+  return { open, closed, unknown, soonestExpiryHours, sendable: open.length, total: contacts.length };
+}
+
 /** What the CONVERSATION actually was — not what we hold on file about the person.
  *
  *  The founder's words on seeing «١٠٠٪ اكتمال السياق»: «this doesnt represent the real interaction
@@ -161,9 +213,15 @@ export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean
   // «لا نحتاج وقت طويل» (we don't need long) and — worst — «مو مهتم بالسعر بقدر الجودة» (not
   // interested in price so much as quality), a BUYING signal, all labelled «رفض صريح». A bare
   // negation plus a verb is not a refusal; a refusal ends the thought.
+  // Anchoring alone was wrong in the other direction: «لسنا مهتمين» failed because «مهتمين» carries
+  // a plural suffix, so «مهتم» was not at end-of-clause. Arabic inflects — the anchor must sit after
+  // the suffix, not after the stem. Same family as the «لم» inside «الملف» trap.
   const EOC = "(?=\\s*($|[.،؛!؟]))";
+  const MUHTAM = "مهتم(ين|ون|ة|ات|ًا|ا)?";
   const REFUSAL = new RegExp(
-    "(ما\\s?ني|ماني|مو|لست|لسنا|غير)\\s*مهتم" + EOC +
+    // A short demonstrative may follow («لست مهتم بهذا»), but not a comparative clause
+    // («مو مهتم بالسعر بقدر الجودة» — a buying signal, not a refusal).
+    "(ما\\s?ني|ماني|مو|لست|لسنا|لسنَا|غير)\\s*" + MUHTAM + "\\s*(شكرا|شكرًا|بهذا|بهذه|بذلك|فيه|فيها)?" + EOC +
     "|لا\\s*(تتصل|تراسل|ترسل|تكلم)" +
     "|(ما|لا)\\s*(نبغى|نحتاج|نبي)" + EOC);
   const refusal = typed.some((t) => REFUSAL.test(t.text));
