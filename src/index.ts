@@ -364,9 +364,14 @@ app.post("/admin/segments/preview", async (req, reply) => {
   return {
     describe: segments.describeSegment(def),
     matched: r.matched.length,
+    // `sample` is for DISPLAY only. The send list is `targets`, capped at the same 50-recipient
+    // limit /admin/campaign/launch enforces — building a launch from a 12-row preview sample
+    // would silently drop everyone past the twelfth match.
     sample: r.matched.slice(0, 12).map((c) => ({
       phone: c.phone, name: c.waName || c.phone, daysSilent: segments.daysSilent(c),
     })),
+    targets: r.matched.slice(0, 50).map((c) => ({ phone: c.phone, name: c.waName || c.phone })),
+    overLaunchCap: r.matched.length > 50,
     suppressed: r.suppressed,
     tooNew: r.tooNew,
     oldestContactDays: Math.floor(oldest / 86_400_000),

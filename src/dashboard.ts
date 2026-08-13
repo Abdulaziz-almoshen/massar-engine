@@ -915,6 +915,7 @@ function vSegBuilder() {
     if ((pv.suppressed || []).length) notes.push("مستبعد بالتبريد: " + fmtN(pv.suppressed.length) + " (رُوسلوا حديثًا)");
     if ((pv.tooNew || []).length) notes.push("أحدث من النافذة: " + fmtN(pv.tooNew.length));
     if (pv.scanTruncated) notes.push("فُحصت أحدث " + fmtN(pv.poolSize) + " جهة فقط");
+    if (pv.overLaunchCap) notes.push("حد الدفعة الواحدة ٥٠ جهة — سترسل لأول " + fmtN(50) + " والباقي في دفعة تالية");
     if (notes.length) h += '<div style="font-size:11.5px;color:#B54708;margin-top:8px;line-height:1.9;">' + esc(notes.join(" · ")) + "</div>";
     h += "</div>";
     // The tenure state: a book younger than the window is a not-yet audience, not an empty one.
@@ -938,7 +939,7 @@ function launchTargets() {
   if (retargetCohort) return retargetCohort.targets;
   // In behavioural mode the audience IS the segment's matched set — suppressed and too-new
   // contacts are shown to the user but never silently included in a send.
-  if (audMode === "behaviour") return ((segPreview && segPreview.sample) || []).map((x) => ({ phone: x.phone, name: x.name }));
+  if (audMode === "behaviour") return (segPreview && segPreview.targets) || [];
   return entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
 }
 window.openLaunch = () => { if (!launchTargets().length || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
