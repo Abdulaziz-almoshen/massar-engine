@@ -102,6 +102,27 @@ try {
   hits.push([0, `could not load dist/dashboard.js to parse-check it (run npm run build first): ${e.message}`, ""]);
 }
 
+// A dangling string literal inside an `h +=` chain terminates the statement via ASI: every line
+// after it becomes a discarded expression and the emitted HTML loses its closing tags. tsc cannot
+// see it (client JS inside a template literal), the client script still PARSES, and smoke passes
+// when its landmark happens to sit above the break. Only counting tags catches it.
+try {
+  const { DASHBOARD_HTML } = await import("../dist/dashboard.js");
+  const scriptSrc = (DASHBOARD_HTML.match(/<script>([\s\S]*)<\/script>/) || [])[1] || "";
+  // A string literal on its own line, not followed by + or , or ) — i.e. orphaned in a concat chain.
+  // Report the SOURCE line, not the emitted-script line — they differ, and a wrong number sends
+  // the reader to an unrelated statement.
+  src.forEach((ln, i) => {
+    if (!/^\s*["'][^"']*["']\s*$/.test(ln)) return;
+    // A literal alone on a line is fine only if the expression CONTINUES after it. Checking the
+    // previous line was the wrong test: in the real defect the previous line ended with «+», which
+    // made the check skip the exact break it exists to catch.
+    const next = (src[i + 1] || "").trimStart();
+    if (/^[+,)\]:?}]/.test(next)) return;   // + , ) ] : ? } all continue the expression
+    hits.push([i + 1, "orphaned string literal in a concat chain — ASI will truncate the statement", ln.trim().slice(0, 70)]);
+  });
+} catch (e) { /* the import-failure case is already reported by the parse check above */ }
+
 if (hits.length) {
   console.error(`numeral-consistency check failed — ${hits.length} site(s) in ${FILE}:\n`);
   for (const [ln, why, text] of hits) console.error(`  ${FILE}:${ln}  ${why}\n     ${text}\n`);

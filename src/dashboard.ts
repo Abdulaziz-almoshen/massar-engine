@@ -1084,9 +1084,7 @@ function vAimkt() {
     '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
-    // The opener no longer carries the file — it offers it. Drawing an attachment here would
-    // promise a bubble the send does not produce.
-    ""
+    // The opener no longer carries the file — it offers it, so no attachment is drawn here.
     '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName)) + "</div></div>" +
     '<div style="font-size:10.5px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
