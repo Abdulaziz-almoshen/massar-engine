@@ -930,8 +930,12 @@ function vSegBuilder() {
     }
   }
   // The constraint that makes this different from an email tool.
-  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#EFF4FB;border:1px solid #D6E2F1;border-radius:12px;padding:12px 15px;font-size:12px;color:#2F5F94;line-height:1.9;">' +
-    ic("send", 16, "#2F5F94") + "<div>هذه الفئة خارج نافذة الـ٢٤ ساعة. الإرسال إليها يتم بقالب معتمد فقط.</div></div>";
+  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#FBF3DC;border:1px solid #F0DFB4;border-radius:12px;padding:12px 15px;font-size:12px;color:#8a6d10;line-height:1.9;">' +
+    ic("clock", 16, "#8a6d10") +
+    "<div><b>الإطلاق من هذه الشريحة غير متاح بعد.</b><br>" +
+    "الجهة التي لم تردّ منذ أيام تقع خارج نافذة الـ٢٤ ساعة، ولا يصلها إلا قالب معتمد من Meta. " +
+    "مسار الإطلاق الحالي يرسل رسائل جلسة، فلو أُتيح الزر هنا لرفضت واتساب الإرسال. " +
+    "الشريحة جاهزة ومحسوبة، وينتظر ربطها بقوالب الرقم الإنتاجي.</div></div>";
   return h;
 }
 
@@ -939,7 +943,10 @@ function launchTargets() {
   if (retargetCohort) return retargetCohort.targets;
   // In behavioural mode the audience IS the segment's matched set — suppressed and too-new
   // contacts are shown to the user but never silently included in a send.
-  if (audMode === "behaviour") return (segPreview && segPreview.targets) || [];
+  // Behaviour mode deliberately yields NO launch targets: the audience is outside the 24h window
+  // by construction and the launch path sends session messages only. Returning targets here would
+  // enable a button whose send WhatsApp refuses. The segment is still fully computed and shown.
+  if (audMode === "behaviour") return [];
   return entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
 }
 window.openLaunch = () => { if (!launchTargets().length || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
