@@ -201,10 +201,27 @@ function systemPrompt(contact: Contact): string {
   // categories — size, current system, pain. The model treated «send me the file» as
   // qualification and asked for an appointment on the first message; a discovery fact is the
   // objective test of whether it has earned that ask.
-  const said = since.filter((t) => t.role === "customer").map((t) => t.text).join(" ");
-  const knowsSize = /فرع|فروع|عدد|موقع|مواقع|\d+\s*(فرع|موقع)/.test(said);
-  const knowsSystem = /HIS|ERP|نظام|برنامج|ورقي|يدوي|يدويًا/i.test(said);
-  const knowsPain = /مشكلة|تأخير|بطيء|صعوبة|شكوى|إدخال|مزدوج|وقت|خطأ|أخطاء/.test(said);
+  // A fact is something the customer DISCLOSED about their own operation. Matching bare keywords
+  // counted questions as disclosures: «وش النظام اللي تشتغلون عليه؟» and «كم عدد خدماتكم؟» both
+  // opened the gate, and «عندي مشكلة في نظام صحة» — a complaint about the platform, not a
+  // disclosure — scored two. So: drop interrogative sentences first, then require a first-person
+  // marker («عندنا», «لدينا», «نستخدم») or a bare number next to the noun.
+  const sentences = since.filter((t) => t.role === "customer").flatMap((t) => t.text.split(/[.؟?!\n]+/));
+  // Drop interrogatives, and drop anything about منصة صحة itself: «عندي مشكلة في نظام صحة» is a
+  // platform complaint, which §10 routes to a human — it is not a disclosure about how this
+  // facility operates, and must not earn the right to ask for a meeting.
+  const statements = sentences.filter((x) => {
+    const v = x.trim();
+    if (!v) return false;
+    if (/^\s*(وش|كم|هل|متى|أي|ما|مين|كيف|ليه|لماذا)\b/.test(v)) return false;
+    if (/(نظام|منصة)\s*صحة/.test(v)) return false;
+    return true;
+  });
+  const said = statements.join(" · ");
+  const MINE = "(?:عندنا|لدينا|نملك|نستخدم|نشتغل|نعمل|فروعنا|نظامنا|منشأتنا|عندي|لدي)";
+  const knowsSize = new RegExp(`${MINE}[^·]{0,25}(فرع|فروع|موقع|مواقع)|\\d+\\s*(فرع|فروع|موقع|مواقع)`).test(said);
+  const knowsSystem = new RegExp(`\\b(HIS|ERP)\\b|${MINE}[^·]{0,25}(نظام|برنامج)|(ورقي|يدوي|يدويًا)`, "i").test(said);
+  const knowsPain = new RegExp(`${MINE}[^·]{0,30}(تأخير|مشكلة|بطء|بطيء|صعوبة|أخطاء|خطأ)|(إدخال\\s*مزدوج|مزدوج|إعادة\\s*الإدخال)`).test(said);
   const discoveryFacts = [knowsSize, knowsSystem, knowsPain].filter(Boolean).length;
   return [
     // ---------------------------------------------------------------- 1. الهدف
