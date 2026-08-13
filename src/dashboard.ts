@@ -862,7 +862,6 @@ function wizProducts() { return kbRegistry(); }
 function vAimkt() {
   const reg = wizProducts();
   if (selProd >= reg.length) selProd = 0;
-  const tone = (sc) => sc >= 80 ? ["#1f8a52", "جاهز للاستخدام", "c-ok"] : sc >= 60 ? ["#b5810f", "جاهز جزئيًا", "c-warn"] : ["#c43d3d", "غير جاهز", "c-bad"];
   const m = entMatches();
   const selN = launchTargets().length;
   const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));
@@ -873,9 +872,12 @@ function vAimkt() {
 
   let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمات المدمجة.</div></div></div><div class="prods">' +
     reg.map((x, i) => {
-      const inner = x.sc !== null
-        ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + fmtN(x.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
-        : '<div style="height:6px;"></div><span class="chip c-teal">معرفة من Product Hub ✓</span>';
+      // Say which knowledge this service actually has. Removing the invented scores collapsed
+      // every card onto the «Product Hub» branch, which claimed uploaded knowledge for six
+      // services that have none — a new false claim in place of the old one.
+      const inner = '<div style="height:6px;"></div>' + (x.hub
+        ? '<span class="chip c-teal">معرفة من Product Hub ✓</span>'
+        : '<span class="chip c-grey">معرفة مدمجة</span>');
       const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
       return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
