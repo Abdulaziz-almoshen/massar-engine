@@ -1081,10 +1081,12 @@ function vAimkt() {
     '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
     '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
-    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة: الملف مضمّن مع النص والأزرار</div>' +
+    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
-    (selAsset ? '<div style="display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.05);padding:11px 12px;"><span style="width:30px;height:36px;flex:none;border-radius:5px;background:#d85151;color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">PDF</span><span style="font-size:11px;color:#2b3648;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(selAsset.filename) + "</span></div>" : "") +
+    // The opener no longer carries the file — it offers it. Drawing an attachment here would
+    // promise a bubble the send does not produce.
+    ""
     '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName)) + "</div></div>" +
     '<div style="font-size:10.5px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +

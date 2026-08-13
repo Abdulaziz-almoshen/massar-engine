@@ -184,6 +184,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // both a cleaner first impression and a real interest signal we can act on.
       const BTNS = [{ title: "أرسلوا الملف التعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
+      const campMark = " [حملة]";
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
       // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
       // guaranteed single bubble — that is the primary shape for asset launches now.
@@ -196,7 +197,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // give both, and that needs the production WABA. `buttons` picks which cost to pay.
       if (asset && !wantButtons) {
         await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
-        tracker.recordAgentReply(phone, `${personalized} [مرفق في نفس الرسالة: ${asset.filename}]`);
+        tracker.recordAgentReply(phone, `${personalized} [مرفق في نفس الرسالة: ${asset.filename}]${campMark}`);
       } else {
         try {
           // ONE bubble, with the header and footer WhatsApp gives interactive messages, and the
@@ -207,11 +208,11 @@ app.post("/admin/campaign/launch", async (req, reply) => {
           // header exists on WhatsApp interactive messages but wants a typed object this
           // Gupshup v1 shape does not expose; an approved template carries it properly.
           await gupshup.sendQuickReply(phone, personalized, BTNS, CAMPAIGN_FOOTER);
-          tracker.recordAgentReply(phone, `${personalized}${btnNote}`);
+          tracker.recordAgentReply(phone, `${personalized}${btnNote}${campMark}`);
         } catch (e) {
           if (!rejectedShape(e)) throw e;
           await gupshup.sendText(phone, personalized);
-          tracker.recordAgentReply(phone, personalized);
+          tracker.recordAgentReply(phone, `${personalized}${campMark}`);
         }
       }
       results.push({ phone, ok: true });

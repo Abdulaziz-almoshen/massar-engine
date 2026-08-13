@@ -612,7 +612,10 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // founder tapped «أرغب بعرض تعريفي» on a new campaign and got nothing back. A new campaign is a
   // new conversation; the cap still protects against a runaway loop inside one.
   const lastCampaignAt = (contact.transcript || [])
-    .filter((t) => t.role === "agent" && (t.text.includes("[أزرار:") || t.text.includes("[مرفق في نفس الرسالة")))
+    // Match ONLY the campaign marker. «[أزرار:» and «[مرفق في نفس الرسالة» are written by the
+    // agent's own send_buttons/send_asset tools too, so matching those would let the agent reset
+    // its own turn cap by using a tool — which is exactly the runaway loop the cap exists to stop.
+    .filter((t) => t.role === "agent" && t.text.includes("[حملة]"))
     .reduce((m, t) => Math.max(m, t.ts), 0);
   const convTurns = (contact.transcript || [])
     .filter((t) => t.role === "customer" && t.ts >= lastCampaignAt).length;
