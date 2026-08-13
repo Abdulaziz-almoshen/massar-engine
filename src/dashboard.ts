@@ -722,7 +722,7 @@ function vHome(d) {
   h += vHomeCharts(cs);
   h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + interestedList.length + "</span>" + testToggleChip(nTest) + "</span></div>" +
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + fmtN(interestedList.length) + "</span>" + testToggleChip(nTest) + "</span></div>" +
     (interestedList.length
       ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
           const tg = hotOf(c) || (c.tags || [])[0];
