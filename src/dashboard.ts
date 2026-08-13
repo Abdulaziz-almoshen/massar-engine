@@ -745,7 +745,7 @@ function vHome(d) {
           return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F2F4F7;">' +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
             '<div style="font-size:10.5px;color:#98A2B3;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
-            '<span class="chip c-blue">' + st.targeted + ' مستهدف</span><span class="chip c-teal">شوهدت ' + st.seen + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + st.replied + "</span></a>";
+            '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
       : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
   h += "</div>";
@@ -885,7 +885,7 @@ function vAimkt() {
   let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمةات المدمجة.</div></div></div><div class="prods">' +
     reg.map((x, i) => {
       const inner = x.sc !== null
-        ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + x.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
+        ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + fmtN(x.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
         : '<div style="height:6px;"></div><span class="chip c-teal">معرفة من Product Hub ✓</span>';
       const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
       return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
@@ -1050,7 +1050,7 @@ function vKb() {
     const inner =
       '<div class="pn">' + esc(r.name) + "</div>" +
       (r.sc !== null
-        ? '<span class="sc" style="color:' + tone(r.sc) + '">' + r.sc + '%</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + r.sc + '%;background:' + tone(r.sc) + ';"></i></div>'
+        ? '<span class="sc" style="color:' + tone(r.sc) + '">' + fmtN(r.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + r.sc + '%;background:' + tone(r.sc) + ';"></i></div>'
         : '<div style="height:6px;"></div>') +
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
       (r.hub ? '<span class="chip c-ok">معرفة ✓</span>' : '<span class="chip c-grey">لا معرفة بعد</span>') +
@@ -1488,7 +1488,7 @@ function vWinLoss() {
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">' +
     '<h3 style="margin:0;">لماذا نكسب — ولماذا نخسر</h3>' +
     '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
-    ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + (t[k] || 0) + "</span>").join("") + "</div></div>" +
+    ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + fmtN(t[k] || 0) + "</span>").join("") + "</div></div>" +
     '<div style="font-size:11px;color:#98a2b3;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
   if (!judged && !(t.active || 0)) {
     h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
