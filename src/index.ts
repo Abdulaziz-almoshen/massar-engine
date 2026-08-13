@@ -384,9 +384,19 @@ app.get("/admin/segments/presets", async (req, reply) => {
   const w = Number((req.query as any)?.window) || segments.DEFAULT_WINDOW_DAYS;
   const win = Math.min(segments.WINDOW_MAX, Math.max(segments.WINDOW_MIN, w));
   const pool = tracker.listContacts().filter((c: any) => !c.test);
-  return segments.presets(win).map((p) => ({
-    ...p, describe: segments.describeSegment(p.def), matched: segments.evaluate(p.def, pool).matched.length,
-  }));
+  // Report the same three numbers the preview does. A preset reading «٠» while three contacts
+  // are merely cooling down is the silent zero this feature exists to prevent.
+  return segments.presets(win).map((p) => {
+    const r = segments.evaluate(p.def, pool);
+    return {
+      ...p,
+      describe: segments.describeSegment(p.def),
+      matched: r.matched.length,
+      suppressed: r.suppressed.length,
+      tooNew: r.tooNew.length,
+      requiredDays: segments.requiredTenureDays(p.def),
+    };
+  });
 });
 
 // Sandbox separation for a whole launch: a rehearsal sent to real numbers is still a rehearsal,
