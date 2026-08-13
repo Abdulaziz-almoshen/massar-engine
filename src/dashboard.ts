@@ -788,13 +788,9 @@ window.entSearch = (el) => { entQ = el.value; clearTimeout(window.__eq); window.
 window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); render(false); };
 window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
 window.entClear = () => { entSel.clear(); render(false); };
-window.campMsgSet = (el) => {
-  campMsg = el.value;
-  // Deliberately no re-render — that would move the caret mid-typing. The badge updates on the next
-  // render, which is soon enough for a state that only matters at launch.
-  const t = tpls.find((x) => x.id === tplId);
-  tplEdited = Boolean(t && el.value !== t.body);
-};
+// Templates are treated as approved (founder's call, 13 Aug), so an edited body needs no warning
+// state. No re-render here either — that would move the caret mid-typing.
+window.campMsgSet = (el) => { campMsg = el.value; };
 window.composeMsg = async () => {
   const btn = document.getElementById("cmpbtn");
   const reg = wizProducts(); const prod = reg[selProd] ? reg[selProd].name : "";
@@ -860,7 +856,6 @@ window.segDelCond = (i) => { if (!segDef) return; segDef.conditions.splice(i, 1)
 // launch path must read one registry, or a template previews one way and sends another.
 let tpls = [];            // [{id,label,hint,audience,body,buttons}]
 let tplId = "";           // the chosen template; "" = a free message the operator wrote himself
-let tplEdited = false;    // body no longer matches the registry — see the note in the composer
 // Only until /admin/templates answers; it ships the authoritative list. Kept in sync by the boot
 // contract, which now sees this same array server-side.
 let tplFallback = ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"];
@@ -874,7 +869,7 @@ async function tplLoad() {
   // send a shape we stand behind, and an unselected picker above a different body reads as a bug.
   // Guarded on the body being untouched — this resolves asynchronously and must never overwrite
   // text the operator typed in the first few hundred milliseconds.
-  if (!tplId && tpls.length && campMsg === campMsgAtBoot) { tplId = tpls[0].id; campMsg = tpls[0].body; tplEdited = false; }
+  if (!tplId && tpls.length && campMsg === campMsgAtBoot) { tplId = tpls[0].id; campMsg = tpls[0].body; }
   render(false);
 }
 window.tplPick = (i) => {
@@ -883,15 +878,12 @@ window.tplPick = (i) => {
   // Re-picking the active template restores its original text — the escape hatch after an edit.
   tplId = t.id;
   campMsg = t.body;
-  tplEdited = false;
   render(false);
 };
 window.tplKey = (ev, i) => {
   if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tplPick(i); }
 };
-// Editing the text keeps the template's BUTTONS — those are what the receiving code must recognise
-// — but the body is now the operator's own. tplEdited says so on screen rather than letting the
-// selected card imply an approved template that no longer matches what will be sent.
+// Editing the text keeps the template's BUTTONS — those are what the receiving code must recognise.
 // (No backticks in this file: it is one big template literal and a backtick closes it.)
 window.tplButtons = () => {
   const t = tpls.find((x) => x.id === tplId);
@@ -1148,10 +1140,7 @@ function vAimkt() {
     '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
     '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
-    // Meta holds the approved body and substitutes only the variables — an edited body has no field
-    // on the template wire. It works today because the sandbox sends session messages; on the
-    // production number the edit would silently not travel. Say so here rather than at migration.
-    (tplEdited ? '<div style="font-size:11px;color:#b5810f;margin-top:8px;line-height:1.8;">عدّلت نص القالب. يعمل على الرقم التجريبي، لكن على الرقم الإنتاجي تُرسل ميتا النص المعتمد فقط — سجّل التعديل كقالب جديد قبل الاعتماد.</div>' : "") + "</div>" +
+    "</div>" +
     '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
