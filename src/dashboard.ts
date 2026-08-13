@@ -1696,7 +1696,6 @@ function render(fetchNew) {
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
-  countUp();
   // The current stage must be what you see first, even when the path overflows.
   // Deferred a frame: at innerHTML-assignment time the strip has no layout yet.
   requestAnimationFrame(() => {
@@ -1710,34 +1709,12 @@ function render(fetchNew) {
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
   }
 }
+// The count-up animation was removed. It shipped a runtime TypeError (Math.roundfmtN), then sat
+// dead for a day because the values became Arabic-Indic and its parseInt stripped ٠-٩ to NaN.
+// The parse was fixed and it still could not be demonstrated running under a browser with motion
+// enabled, so it is gone rather than carried as decoration nobody can verify. The .rise entrance
+// transitions remain and are CSS-only.
 
-const _countedValues = new Map();   // label+value signature → animated once per real change
-function countUp() {
-  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  document.querySelectorAll(".kpi .v, .statc .v").forEach((el) => {
-    const raw = el.textContent.trim();
-    if (_countedValues.get(el.parentElement ? el.parentElement.textContent.trim() : raw) === raw) return;
-    const m = raw.match(/^[\d,٠-٩]+/);
-    if (!m) return;
-    // The values are Arabic-Indic now, and /[^\d]/ strips ٠-٩ to "" → parseInt NaN → every
-    // element returned early and the animation had been silently dead. Fold the digits first.
-    const AR0 = 0x0660;
-    const latin = m[0].replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - AR0)).replace(/[^\d]/g, "");
-    const target = parseInt(latin, 10);
-    if (!isFinite(target) || target <= 0 || target > 100000) return;
-    const rest = raw.slice(m[0].length);
-    const t0 = performance.now();
-    const step = (t) => {
-      const k = Math.min(1, (t - t0) / 620);
-      const eased = 1 - Math.pow(1 - k, 3);
-      el.textContent = fmtN(Math.round(target * eased)) + rest;
-      if (k < 1) requestAnimationFrame(step);
-    };
-    _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
-    el.textContent = fmtN(0) + rest;
-    requestAnimationFrame(step);
-  });
-}
 async function refresh(force) {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (TOKEN) {
