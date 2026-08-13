@@ -71,7 +71,13 @@ def main() -> int:
             errors: list[str] = []
             page = browser.new_page(viewport={"width": 1440, "height": 900})
             page.on("pageerror", lambda e, acc=errors: acc.append(f"pageerror: {e}"))
-            page.on("console", lambda m, acc=errors: acc.append(f"console: {m.text[:120]}") if m.type == "error" else None)
+            # A third-party CDN 404 is not a broken deploy. Google's font CDN failed on 3 of 6 runs,
+            # and a gate that fails half the time for a reason outside the repo teaches its operator
+            # to re-run it — which is how the blank-page class this guard exists to catch comes back.
+            THIRD_PARTY = ("fonts.gstatic.com", "fonts.googleapis.com")
+            page.on("console", lambda m, acc=errors: (
+                None if (m.type != "error" or any(h in m.text for h in THIRD_PARTY))
+                else acc.append(f"console: {m.text[:120]}")))
             page.goto(f"{BASE}/dashboard?token={tok}{route}")
             page.wait_for_timeout(4000)
 

@@ -18,7 +18,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
-  body { font-family: 'Cairo', 'IBM Plex Sans Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
+  body { font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
   .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
