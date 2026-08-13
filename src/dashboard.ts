@@ -338,15 +338,21 @@ function nav() {
   document.getElementById("live").style.display = (cur === "kmon" || cur === "home") ? "" : "none";
 }
 
-function chipRow(c) {
+// win scopes the delivery chip to a campaign. On a campaign screen the row chip read «ردّ» from
+// lifetime state while the counter beside it correctly read «ردّوا ٠» — the same screen
+// contradicting itself, which is precisely what the founder catches. Default 0 keeps every
+// contact-centric caller lifetime-scoped, explicitly.
+function chipRow(c, win) {
   if (!c) return "";
+  const w = Number(win) || 0;
+  const at = (ts) => { const n = Number(ts); return Number.isFinite(n) && n > 0 && n >= w; };
   const st = c.statusTimes || {};
   const out = [];
-  if (st.failed && !st.delivered) out.push('<span class="chip c-bad">فشل الإرسال</span>');
-  else if (st.replied) out.push('<span class="chip c-ok">ردّ</span>');
-  else if (st.read) out.push('<span class="chip c-teal">شوهدت</span>');
-  else if (st.delivered) out.push('<span class="chip c-blue">وصلت</span>');
-  else if (st.sent || st.enqueued) out.push('<span class="chip c-grey">أُرسلت</span>');
+  if (at(st.failed) && !at(st.delivered)) out.push('<span class="chip c-bad">فشل الإرسال</span>');
+  else if (w ? repliedIn(c, w) : at(st.replied)) out.push('<span class="chip c-ok">ردّ</span>');
+  else if (at(st.read)) out.push('<span class="chip c-teal">شوهدت</span>');
+  else if (at(st.delivered)) out.push('<span class="chip c-blue">وصلت</span>');
+  else if (at(st.sent) || at(st.enqueued)) out.push('<span class="chip c-grey">أُرسلت</span>');
   if (c.outcome === "handoff") out.push('<span class="chip c-warn">مع مختص المبيعات</span>');
   if (c.human) out.push('<span class="chip c-warn">بيد البشر</span>');
   if (c.optedOut) out.push('<span class="chip c-bad">أوقف التواصل</span>');
@@ -385,7 +391,9 @@ function campWin(camp) {
   // which would open the window on every past event — the exact failure this function exists to
   // prevent, arriving through the fallback. Numbers that are not positive epoch millis fail closed.
   const str = String(raw).trim();
-  if (!/^\d{4}-\d{2}/.test(str) && !/\d{2}:\d{2}/.test(str)) return Infinity;
+  // NOTE: this file is a TS template literal, so a single backslash is consumed before the browser
+  // sees it — /^\d{4}/ shipped as /^d{4}/ and matched nothing. Escapes must be DOUBLED here.
+  if (!/^\\d{4}-\\d{2}/.test(str) && !/\\d{2}:\\d{2}/.test(str)) return Infinity;
   const parsed = Date.parse(str);                              // ISO fallback
   // Shape is not sanity: "1970-01" parses to 0 and "0000-01" to a negative, both of which would
   // open the window on all history through the fallback meant to close it.
@@ -457,7 +465,7 @@ function interestChips(c) {
   return '<span style="color:#D0D5DD;">—</span>';
 }
 function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
-function contactRowsHtml(rows) {
+function contactRowsHtml(rows, win) {
   let h = "";
   rows.forEach((r) => {
     const c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
@@ -466,7 +474,7 @@ function contactRowsHtml(rows) {
     const ci = insCache[c.phone];
     h += '<div class="trow" onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'">' +
       '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
-      '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + "</div>" +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c, win) + "</div>" +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
       '<div class="lastm">' + (ci && ci.next_action ? '<span style="color:#2E7D77;font-weight:600;">← ' + esc(ci.next_action) + "</span>" : esc(last ? last.text : "—")) + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
@@ -745,7 +753,7 @@ function vKmonDetail(id, d) {
     '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EAECF0;border-radius:999px;padding:7px 13px;background:#F9FAFB;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown) : '<div style="padding:30px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج</div>') + "</div>";
+    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
