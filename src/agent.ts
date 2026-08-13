@@ -268,6 +268,7 @@ function systemPrompt(contact: Contact): string {
     "«السعر مرتفع» ← «سؤال في محله. التقييم الأدق يعتمد على نطاق التكامل وحجم التشغيل، وليس السعر وحده. كم فرعًا يشمل الاحتياج لديكم؟»",
     "«لدينا نظام حالي» ← «وجود نظام مستقر نقطة جيدة؛ الهدف قد يكون ربطه بدل استبداله وتقليل الإدخال المكرر. ما النظام المستخدم لديكم؟»",
     "«ليس الآن / الميزانية مقفلة» ← «مفهوم. يمكن أولًا تحديد نطاق الاحتياج حتى تكون الصورة جاهزة عند فتح الميزانية. تفضّلون مراجعة مختصرة صباحًا أم بعد الظهر؟»",
+    "إذا ضغط العميل زر «أرسلوا الملف التعريفي» أو طلب الملف بأي صياغة: استدعِ send_asset فورًا في هذه الرسالة نفسها — الطلب صريح ولا يحتاج سؤال اكتشاف قبله. أرفق تعليقًا قصيرًا يوجّه القراءة وسؤال متابعة واحدًا.",
     "«أرسلوا معلومات» ← إن توفر ملف مناسب استخدم send_asset فورًا ووجّهه للجزء المفيد: «أرسلت لكم الملف. قسم التكامل يوضح آلية الربط باختصار. هل الأولوية لديكم منصة صحة؟» وإن لم يتوفر: «لا يتوفر لدي ملف مناسب لهذه النقطة الآن. أقدر أوصل السؤال للمختص ليعطيكم التفاصيل الدقيقة. هل يناسبكم اتصال قصير؟»",
     "«لسنا مهتمين» ← استكشف السبب مرة واحدة فقط إن سمح السياق: «مفهوم. هل عدم الاهتمام بالتكامل نفسه أم أن التوقيت غير مناسب حاليًا؟» وإذا تكرر الرفض استخدم mark_not_interested مع السبب كما ذكره العميل، ثم اختم باحترام.",
     "«لا أريد إعطاء تفاصيل» ← «مفهوم. يكفينا تحديد نوع الاحتياج دون تفاصيل داخلية. هل الموضوع أقرب للتكامل أم لإجراء داخل المنصة؟»",
@@ -605,7 +606,16 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // The cap protects against runaway loops, not against a long healthy conversation:
   // it counts REPLIES TO THIS CUSTOMER'S MESSAGES (campaign blasts and file sends don't
   // count), and once announced it stays silent instead of repeating the same line forever.
-  const convTurns = (contact.transcript || []).filter((t) => t.role === "customer").length;
+  // Count turns SINCE THE LAST CAMPAIGN, not for all time. Counting lifetime meant a contact who
+  // once hit the cap stayed muted forever: every later message — including a tap on a fresh
+  // campaign's own button — returned silently because the outcome was already «handoff». The
+  // founder tapped «أرغب بعرض تعريفي» on a new campaign and got nothing back. A new campaign is a
+  // new conversation; the cap still protects against a runaway loop inside one.
+  const lastCampaignAt = (contact.transcript || [])
+    .filter((t) => t.role === "agent" && (t.text.includes("[أزرار:") || t.text.includes("[مرفق في نفس الرسالة")))
+    .reduce((m, t) => Math.max(m, t.ts), 0);
+  const convTurns = (contact.transcript || [])
+    .filter((t) => t.role === "customer" && t.ts >= lastCampaignAt).length;
   if (convTurns >= MAX_AGENT_TURNS) {
     if (contact.outcome !== "handoff") {
       tracker.setOutcome(contact.phone, "handoff", "turn cap reached — human continues");

@@ -84,11 +84,20 @@ export async function sendQuickReply(
   body: string,
   options: { title: string; postbackText?: string }[],
   footer?: string,
+  header?: string,
 ) {
+  // WhatsApp interactive messages carry a header and a footer as first-class parts. We were
+  // sending neither, so a campaign looked like a bare paragraph — the approved template's own
+  // «حلول تكامل للقطاع الصحي» footer never reached the device.
   const message = {
     type: "quick_reply",
     msgid: `qr-${Date.now()}`,
-    content: { type: "text", text: body, ...(footer ? { caption: footer } : {}) },
+    content: {
+      type: "text",
+      ...(header ? { header } : {}),
+      text: body,
+      ...(footer ? { caption: footer } : {}),
+    },
     options: options.slice(0, 3),
   };
   return postForm(MSG_URL, { ...baseParams(destination), message: JSON.stringify(message) });

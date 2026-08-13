@@ -153,6 +153,9 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   if (!Array.isArray(targets) || !targets.length || !message?.trim())
     return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
+  // From the founder's own approved template (VOICE-REFERENCE.md).
+  const CAMPAIGN_HEADER = "لِين لخدمات الأعمال";
+  const CAMPAIGN_FOOTER = "حلول تكامل للقطاع الصحي";
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
   const assets = await db.listAssets();
@@ -177,7 +180,10 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     try {
       // One bubble: opener as the document caption + reply buttons (falls back down the
       // capability ladder if the richer shapes are rejected).
-      const BTNS = [{ title: "أرغب بعرض تعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
+      // The founder's design (13 Aug): the opener does NOT carry the file. It offers it. The first
+      // button asks for the profile, so the PDF arrives because the customer chose it — which is
+      // both a cleaner first impression and a real interest signal we can act on.
+      const BTNS = [{ title: "أرسلوا الملف التعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
       // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
@@ -192,22 +198,12 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       if (asset && !wantButtons) {
         await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
         tracker.recordAgentReply(phone, `${personalized} [مرفق في نفس الرسالة: ${asset.filename}]`);
-      } else if (asset) {
-        // Buttons requested WITH a file: send the file first, then the message carrying the
-        // buttons. Two bubbles by construction — the alternative shape silently splits anyway,
-        // so this at least controls the order the customer sees.
-        await gupshup.sendDocument(phone, asset.url, asset.filename, "");
-        try {
-          await gupshup.sendQuickReply(phone, personalized, BTNS);
-          tracker.recordAgentReply(phone, `${personalized}${btnNote} [الملف في رسالة سابقة: ${asset.filename}]`);
-        } catch (e) {
-          if (!rejectedShape(e)) throw e;
-          await gupshup.sendText(phone, personalized);
-          tracker.recordAgentReply(phone, `${personalized} [الملف في رسالة سابقة: ${asset.filename}]`);
-        }
       } else {
         try {
-          await gupshup.sendQuickReply(phone, personalized, BTNS);
+          // ONE bubble, with the header and footer WhatsApp gives interactive messages, and the
+          // file offered rather than attached. The approved template's own footer now reaches
+          // the device instead of living only in the portal preview.
+          await gupshup.sendQuickReply(phone, personalized, BTNS, CAMPAIGN_FOOTER, CAMPAIGN_HEADER);
           tracker.recordAgentReply(phone, `${personalized}${btnNote}`);
         } catch (e) {
           if (!rejectedShape(e)) throw e;
