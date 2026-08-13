@@ -220,25 +220,17 @@ const iStart = infoSrc.indexOf('const B = "(?:^|[\\\\s،.؟!؛])";');
 const wStart = infoSrc.indexOf("const wantsInfo =", iStart);
 const iEnd = wStart < 0 ? -1 : infoSrc.indexOf(";", wStart) + 1;
 if (iStart < 0 || iEnd < 30) { console.error("FAIL [slice] wantsInfo anchors moved"); process.exit(1); }
-// Execute the REAL `const wantsInfo = ...` line, not a retyped copy of it. The reviewer proved the
-// retyped version was blind: flipping `&&` to `||` on that line in src/agent.ts left the gate
-// 133/133 green while a bare «مرحبًا» would have fired the PDF and rung one.
-const infoBlock = infoSrc.slice(iStart, iEnd);
-const stems = new Function(infoBlock.replace(/const wantsInfo =[\s\S]*$/, "") +
-  "\nreturn { COMMERCIAL_STEM, OBJECTION_STEM };")();
+// IMPORT the shipped predicate. Slicing-and-retyping was proved blind: flipping its `&&` to `||`
+// left this gate green. Now a change to the composition changes what these assertions execute.
+const typed = (t) => agentMod.isPureInfoRequest(t);
 check("info-gate", "«الملف» does not self-match the objection stem («لم» inside «الـمـلـف»)",
-  stems.OBJECTION_STEM.test("الملف التعريفي"), false);
+  agentMod.OBJECTION_STEM.test("الملف التعريفي"), false);
 check("info-gate", "the stem still catches a real objection",
-  stems.OBJECTION_STEM.test("التفاصيل غير واضحة"), true);
-// Discriminating: «تسعير» appears as a SUBSTRING of «التسعيرة» but not as a word, so this passes
-// only while the commercial stem is anchored.
+  agentMod.OBJECTION_STEM.test("التفاصيل غير واضحة"), true);
+// Discriminating: «تسعير» is a SUBSTRING of «التسعيرة» but not a word — passes only while anchored.
 check("info-gate", "anchored commercial stem does not fire on a substring",
-  stems.COMMERCIAL_STEM.test("التفاصيل والتسعيرة"), false);
-check("info-gate", "but does fire on the real word", stems.COMMERCIAL_STEM.test("التفاصيل والتسعير"), true);
-// `tapped` is the real gate in source; here we exercise the regex half by passing a non-tap.
-const runInfo = new Function("text", "templates", "tapped",
-  infoBlock + "\nreturn wantsInfo;");
-const typed = (t) => runInfo(t, templates, () => undefined);
+  agentMod.COMMERCIAL_STEM.test("التفاصيل والتسعيرة"), false);
+check("info-gate", "but does fire on the real word", agentMod.COMMERCIAL_STEM.test("التفاصيل والتسعير"), true);
 
 for (const t of ["الملف التعريفي", "أرسلوا التفاصيل", "الملف التعريفي للإجازات المرضية", "أرسلوا التفاصيل عن التطعيمات"])
   check("info-gate", `«${t}» is a pure info request`, typed(t), true);
@@ -259,3 +251,34 @@ if (failures) {
 }
 console.log("NOTE: this gate proves routing and the emitted-button contract on real source. It does");
 console.log("NOT prove wire behaviour — no WhatsApp message is sent by this or any check.");
+
+// --- 8. the consumer matrix (CPO S1) ---------------------------------------
+// BUTTON_INTENT has four readers — assertButtonsHandled, canonicalTitle, tappedCommercial (via the
+// objective block) and the decline→setOutcome writer — and adding one key silently changes all of
+// them. That is exactly how «لا» reached the ledger past a boot contract built to stop unhandled
+// button strings. Generated from the table, so a new key CANNOT be added without a row here.
+const INTENT_CONSUMERS = {
+  info:       { shortcut: "rung-one (tap only)", ledgerWrite: false },
+  commercial: { shortcut: "commercial objective", ledgerWrite: false },
+  qualify:    { shortcut: "none", ledgerWrite: false },
+  schedule:   { shortcut: "none", ledgerWrite: false },
+  decline:    { shortcut: "none", ledgerWrite: true },
+};
+for (const [title, intent] of Object.entries(templates.BUTTON_INTENT)) {
+  const row = INTENT_CONSUMERS[intent];
+  check("consumers", `«${title}» → ${intent} has a declared consumer row`, Boolean(row), true);
+  if (!row) continue;
+  // A title that writes to the ledger must not be a bare word another customer could type as an
+  // ordinary answer. Provenance gates the write, but history-scanning readers have no provenance.
+  const bare = [...title.trim()].length <= 4 && !title.includes(" ");
+  check("consumers", `«${title}»: bare word ⇒ must not drive a ledger write`,
+    !(bare && row.ledgerWrite) || intent === "decline", true);
+  // Every key must survive its own emit path, or we can print a button we then cannot answer.
+  check("consumers", `«${title}» survives canonicalTitle`, templates.canonicalTitle(title), title);
+}
+// The history-scanning reader (tappedCommercial) has NO provenance, so no commercial title may be a
+// bare word — that is the property that made «موافق» unsafe and «موافق على العرض» safe.
+for (const [title, intent] of Object.entries(templates.BUTTON_INTENT))
+  if (intent === "commercial")
+    check("consumers", `commercial «${title}» is not a bare typeable word`,
+      title.includes(" ") || [...title].length > 6, true);

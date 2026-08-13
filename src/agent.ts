@@ -802,6 +802,28 @@ export const EMITTED_BUTTONS = [...RUNG_ONE_BUTTONS_DEFAULT, ...RUNG_ONE_BUTTONS
 // letters — JS \w is ASCII-only — so the Arabic spelling carries its own anchor there.)
 const SANDBOX_ACTIVATION = SANDBOX_ACTIVATION_RE;
 
+/** Is this text a PURE request for the profile/details — no price ask, no objection attached?
+ *
+ *  Exported because a gate that RE-TYPES a predicate does not test it: the reviewer proved that
+ *  flipping this expression's `&&` to `||` in source left the button gate 133/133 green, because the
+ *  gate sliced the regexes out and hand-wrote the composition back. Anything that must be asserted
+ *  is imported from here now.
+ *
+ *  Anchored on both sides. An unanchored «لم» matches inside «الـمـلـف», so «الملف التعريفي
+ *  للإجازات المرضية» read as an objection — the Arabic-substring trap that JS `\b` cannot express
+ *  because it needs an ASCII word char on one side. */
+const B = "(?:^|[\\s،.؟!؛])";
+const E = "(?=$|[\\s،.؟!؛])";
+export const COMMERCIAL_STEM = new RegExp(
+  `${B}(?:و)?(?:ال)?(سعر|تسعير|تكلفة|ميزانية|فاتورة|نبدأ|اشترك|عقد)${E}|كم\\s*(يكلف|السعر|التكلفة)`);
+export const OBJECTION_STEM = new RegExp(
+  `${B}(?:و)?(غير|لم|ليست|ليس|لست|لسنا|مو|ما|مشكلة|متأخر|خطأ|واضحة|واضح)${E}`);
+export const INFO_PHRASE = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/;
+
+export function isPureInfoRequest(text: string): boolean {
+  return INFO_PHRASE.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text);
+}
+
 export async function handleInbound(contact: Contact, text: string, wasTap = false): Promise<void> {
   // An intent shortcut may only fire on a real button TAP. «لا» and «موافق» are button titles AND
   // ordinary Arabic words; matching them as intents on typed text recorded a customer answering
@@ -834,8 +856,20 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   // the one signal we least want to lose. The conversation still continues — the model gets its
   // turn to respond gracefully; only the RECORD is made deterministic here.
   if (tapped(text) === "decline") {
-    const firm = /لسنا مهتمين|لا،\s*شكرًا|^لا$/.test(text.trim());
-    tracker.setOutcome(contact.phone, firm ? "not_interested" : "later", `ضغط زر: ${text.trim()}`);
+    // Anchored: an unanchored «لا» matched inside «لاحقًا» and read a soft "later" as a firm no.
+    const firm = /^(لسنا مهتمين|لا،\s*شكرًا|لا)$/.test(text.trim());
+    // Never silently downgrade a stronger outcome. A contact already at handoff or interested has
+    // a human or a real signal behind it; a tap on «ليس الآن» in a later campaign must not erase
+    // that. The turn-cap path at the bottom of this file already guards its write the same way.
+    const stronger = contact.outcome === "handoff" || contact.outcome === "interested";
+    if (stronger) {
+      console.log(JSON.stringify({ at: "agent", msg: "decline tap not applied — stronger outcome held", phone: contact.phone, held: contact.outcome, tapped: text.trim() }));
+    } else {
+      // The reason states what actually happened. `tapped()` returns non-undefined only on a proven
+      // button tap, so «ضغط زر» is now a fact rather than an assumption — it used to be written for
+      // typed text too, fabricating a button press in the audit trail.
+      tracker.setOutcome(contact.phone, firm ? "not_interested" : "later", `ضغط زر: ${text.trim()}`);
+    }
   }
 
   // The trailing service phrase is allowed: «الملف التعريفي للإجازات المرضية» is how a real person
@@ -843,20 +877,9 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   //   «التفاصيل والسعر لو سمحتم» — a price ask that short-circuits here never reaches the model, so
   //   the buyer got the PDF and «أي وصف يناسبكم؟». That is complaint #1, re-opened by this regex.
   //   «التفاصيل التي أرسلتموها غير واضحة» — an objection, answered with the same file again.
-  // So the trailing span must carry no commercial stem and no objection stem. A tap on an approved
-  // info button still wins outright: its text is exactly the title, with nothing trailing.
-  // Anchored on both sides. An unanchored «لم» matches inside «الـمـلـف», so «الملف التعريفي
-  // للإجازات المرضية» read as an objection — the same Arabic-substring trap as the `\b` bug, which
-  // JS cannot express with \b because it needs an ASCII word char on one side.
-  const B = "(?:^|[\\s،.؟!؛])";
-  const E = "(?=$|[\\s،.؟!؛])";
-  const COMMERCIAL_STEM = new RegExp(
-    `${B}(?:و)?(?:ال)?(سعر|تسعير|تكلفة|ميزانية|فاتورة|نبدأ|اشترك|عقد)${E}|كم\\s*(يكلف|السعر|التكلفة)`);
-  const OBJECTION_STEM = new RegExp(
-    `${B}(?:و)?(غير|لم|ليست|ليس|لست|لسنا|مو|ما|مشكلة|متأخر|خطأ|واضحة|واضح)${E}`);
-  const infoPhrase = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/;
-  const wantsInfo = tapped(text) === "info" ||
-    (infoPhrase.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text));
+  // So the trailing span must carry no commercial stem and no objection stem — see isPureInfoRequest
+  // below, which the gate IMPORTS rather than reconstructs.
+  const wantsInfo = tapped(text) === "info" || isPureInfoRequest(text);
   // Whether rung one already went out is read from the TRANSCRIPT, not from process memory. An
   // in-memory Set forgets on every deploy — and there were 45 deploys in one day — so the founder
   // could be handed the same opener twice. The transcript survives the restart; the Set did not.
@@ -871,8 +894,14 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       ?? productAssets.find((x) => x.product && convo.includes(x.product))
       ?? (productAssets.length === 1 ? productAssets[0] : undefined);
     if (pa && !(contact.transcript || []).some((t) => t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`))) {
-      await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
-      tracker.recordAgentReply(contact.phone, `[مرفق في نفس الرسالة: ${pa.product}]`);
+      // ONE bubble: the file WITH its value sentence as the caption. It was sent captionless, so a
+      // customer who tapped «تفاصيل التكامل» got a wordless PDF and then a separate paragraph —
+      // against the founder's stated requirement to use WhatsApp's richness in one message.
+      const caption = pa.product
+        ? `ملف ${pa.product}: يوضّح آلية الربط والمتطلبات وخطوات التفعيل.`
+        : "الملف التعريفي: آلية الربط والمتطلبات وخطوات التفعيل.";
+      await gupshup.sendDocument(contact.phone, pa.url, pa.filename, caption);
+      tracker.recordAgentReply(contact.phone, `${caption} [مرفق في نفس الرسالة: ${pa.product}]`);
     }
     // Which opener started this conversation — the most recent campaign turn carries its id.
     const opener = [...(contact.transcript || [])]

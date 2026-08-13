@@ -206,6 +206,12 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
   .skel { background: linear-gradient(90deg, #F2F4F7 25%, #EAECF0 37%, #F2F4F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
   .sec .meta { font-size: 11.5px; font-weight: 600; color: #98a2b3; margin-inline-start: 8px; }
+  /* The launch bar is docked chrome; on a phone it must not eat the step it sits under. */
+  @media (max-width: 430px) {
+    .lbar { gap: 8px !important; padding: 12px 14px !important; }
+    .lbar .lsub { display: none; }
+    .lbar .btn { padding: 10px 16px !important; font-size: 12.5px !important; }
+  }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 </style>
 </head>
@@ -1153,7 +1159,7 @@ function vAimkt() {
     // the launch route reads. It used to draw three hardcoded titles that no template used.
     tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة الخدمة ليُضمَّن.</div>') +
+    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
@@ -1161,15 +1167,24 @@ function vAimkt() {
     '<label style="font-size:12.5px;font-weight:700;color:#101828;flex:none;">اسم الحملة</label>' +
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
     "</div>";
-  h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
+  // Docked, not floating, and compact on a phone. He reviews on his own device and briefs by
+  // screenshot: at 390px this bar was three lines tall, occupied about a quarter of the viewport,
+  // and sat directly over the template cards — the feature he asked for, hidden by the chrome.
+  // The lbar class (see the stylesheet) drops the padding and the secondary line under 430px.
+  // NO BACKTICKS ANYWHERE IN THIS FILE — it is one template literal and a backtick closes it.
+  h += '<div class="step lbar" style="position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
     // In behaviour mode there is nothing to launch and the reason is not «you picked nobody» —
     // it is that this audience needs an approved template the send path does not yet use. Saying
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
       ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#8a6d10;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
         '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
-      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
-        '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
+    // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
+    // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
+    // State what will actually be sent, next to the button that sends it.
+    (selAsset ? " · الملف يُرسَل عند الطلب 📎" : "") + "</div>" +
+        '<div class="lsub" style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
