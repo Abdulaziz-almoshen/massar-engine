@@ -145,8 +145,11 @@ app.post("/admin/entities/delete", async (req, reply) => {
 
 app.post("/admin/campaign/launch", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const { targets, message, name, product } = (req.body ?? {}) as
-    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string };
+  const { targets, message, name, product, buttons } = (req.body ?? {}) as
+    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string; buttons?: boolean };
+  // Default ON per the founder's instruction of 13 Aug, overriding the single-bubble rule he set
+  // on 12 Aug. Pass buttons:false to get the one-bubble shape back.
+  const wantButtons = buttons !== false;
   if (!Array.isArray(targets) || !targets.length || !message?.trim())
     return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
@@ -181,9 +184,27 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // guaranteed single bubble — that is the primary shape for asset launches now.
       const rejectedShape = (e: unknown) => /gupshup 4\d\d:/.test(String(e));
       const asset = introAsset;
-      if (asset) {
+      // The trade-off, made explicit instead of hardcoded. On the sandbox number the two cannot be
+      // combined: document+caption is ONE bubble but carries no buttons; quick_reply with a
+      // document reports API success and then arrives as TWO messages on the device (measured on
+      // the founder's own phone, 12 Aug). Only a Meta-approved template with a document header can
+      // give both, and that needs the production WABA. `buttons` picks which cost to pay.
+      if (asset && !wantButtons) {
         await gupshup.sendDocument(phone, asset.url, asset.filename, personalized);
         tracker.recordAgentReply(phone, `${personalized} [مرفق في نفس الرسالة: ${asset.filename}]`);
+      } else if (asset) {
+        // Buttons requested WITH a file: send the file first, then the message carrying the
+        // buttons. Two bubbles by construction — the alternative shape silently splits anyway,
+        // so this at least controls the order the customer sees.
+        await gupshup.sendDocument(phone, asset.url, asset.filename, "");
+        try {
+          await gupshup.sendQuickReply(phone, personalized, BTNS);
+          tracker.recordAgentReply(phone, `${personalized}${btnNote} [الملف في رسالة سابقة: ${asset.filename}]`);
+        } catch (e) {
+          if (!rejectedShape(e)) throw e;
+          await gupshup.sendText(phone, personalized);
+          tracker.recordAgentReply(phone, `${personalized} [الملف في رسالة سابقة: ${asset.filename}]`);
+        }
       } else {
         try {
           await gupshup.sendQuickReply(phone, personalized, BTNS);
