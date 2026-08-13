@@ -5,6 +5,7 @@ import * as tracker from "./tracker.js";
 import * as db from "./db.js";
 import type { Contact } from "./tracker.js";
 import { SANDBOX_ACTIVATION_RE, SERVICE_CATALOGUE } from "./insights.js";
+import * as templates from "./templates.js";
 
 // ---------------------------------------------------------------------------
 // The Arabic AI salesperson — full-capability edition.
@@ -258,7 +259,14 @@ function systemPrompt(contact: Contact): string {
   // ونستخدم HIS ونبغى NVR وكم السعر؟» still scored «ask what kind of facility», because «فرع» is
   // not in the type list. Two escapes: an explicit commercial ask outranks discovery, and enough
   // disclosed facts make the remaining gap something to CONFIRM in passing, not to interrogate.
-  const wantsCommercial = /(كم\s*(السعر|التكلفة|يكلف)|السعر|التسعير|عرض\s*سعر|التكلفة|نبغى\s*نبدأ|كيف\s*نبدأ|متى\s*نبدأ|اشترك)/.test(asked);
+  // Two ways to ask for the commercial track: type it, or tap the button we ourselves offered.
+  // The button path was missing — «العرض التجاري» is a title this code emits, and the pattern below
+  // did not match it, so the tap fell through to discovery. Buttons route by the shared table.
+  const tappedCommercial = since.some((t) => t.role === "customer" && templates.buttonIntent(t.text) === "commercial");
+  // «تسعير» without the article is how it is usually typed («هل عندكم تسعير؟»); the anchored
+  // «التسعير» missed it. Match the stem.
+  const wantsCommercial = tappedCommercial ||
+    /(كم\s*(السعر|التكلفة|يكلف)|السعر|تسعير|عرض\s*سعر|التكلفة|نبغى\s*نبدأ|كيف\s*نبدأ|متى\s*نبدأ|اشترك)/.test(asked);
   const known = [knowsType, knowsSystem, knowsService, knowsSize].filter(Boolean).length;
   // MUST-3: an objective already ASKED is not a live objective. On the founder's own contact the
   // entity-type question was asked at 14:22 and 14:29 and dodged both times; a third asking is the
@@ -690,18 +698,24 @@ function isOptOut(text: string): boolean {
 // ------------------------------ main turn loop ------------------------------
 
 const MAX_AGENT_TURNS = 12;
-const RUNG_ONE_SENT = new Set<string>();
+/** Written into the transcript when rung one goes out, so "already sent" survives a deploy. */
+const RUNG_ONE_MARK = " [سُلّمت الدرجة الأولى]";
 
 // RUNG ONE, emitted from code rather than composed. When the objective is «identify the entity»,
 // nothing the customer has said can change this message — the content is invariant, so leaving it
 // to the model is pure downside variance on the highest-stakes turn of the conversation. Rungs 2+
 // stay model-composed, because there the value sentence must reflect what THIS customer said.
-const RUNG_ONE = [
-  "يتيح التكامل للممارسين تنفيذ خدمة السجل الوطني للتطعيمات من داخل نظام المنشأة نفسه، دون التنقل بين الأنظمة ودون إدخال مزدوج.",
+// Parameterised by service: it used to name «السجل الوطني للتطعيمات» unconditionally, so a contact
+// asking about الإجازات المرضية was answered about vaccinations. The shape is invariant; the noun
+// is not. With no service resolved it falls back to the neutral «الخدمة», which is never wrong.
+const rungOne = (service?: string) => [
+  `يتيح التكامل للممارسين تنفيذ ${service ? `خدمة ${service}` : "الخدمة"} من داخل نظام المنشأة نفسه، دون التنقل بين الأنظمة ودون إدخال مزدوج.`,
   "الربط يتم عبر واجهات برمجية، وندعم فريقكم التقني في المتطلبات والاختبار وحتى التفعيل.",
   "ولأوجّهكم إلى نموذج التكامل الأنسب: أي وصف يناسبكم؟",
 ].join("\n");
 const RUNG_ONE_BUTTONS = [{ title: "منشأة صحية" }, { title: "مزوّد نظام HIS" }, { title: "العرض التجاري" }];
+/** Buttons this module emits, for the boot-time contract check in index.ts. */
+export const EMITTED_BUTTONS = RUNG_ONE_BUTTONS.map((b) => b.title);
 
 // Gupshup's sandbox makes every new person send «proxy <botname>» to activate the bot, after
 // an English boilerplate about bot-building and anagram puzzles. That phrase is platform
@@ -733,19 +747,33 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // Deliver → Reinforce → Qualify, emitted rather than requested, for rung one only. The model
   // was asked three times to compose this turn and produced «الملف يوضح…» each time; the content
   // does not depend on anything the customer said, so composing it adds variance and no value.
-  const wantsInfo = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)(\s*)$/.test(text.trim());
-  if (wantsInfo && !RUNG_ONE_SENT.has(contact.phone)) {
-    RUNG_ONE_SENT.add(contact.phone);
-    const pa = productAssets.find((x) => /تطعيم/.test(x.product));
+  const wantsInfo = templates.buttonIntent(text) === "info" ||
+    /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)(\s*)$/.test(text.trim());
+  // Whether rung one already went out is read from the TRANSCRIPT, not from process memory. An
+  // in-memory Set forgets on every deploy — and there were 45 deploys in one day — so the founder
+  // could be handed the same opener twice. The transcript survives the restart; the Set did not.
+  const rungOneSent = (contact.transcript || []).some((t) => t.text.includes(RUNG_ONE_MARK));
+  if (wantsInfo && !rungOneSent) {
+    // Which service's file? The one the conversation is actually about. This was hardcoded to
+    // «تطعيم», so a contact asking «الملف التعريفي للإجازات المرضية» was sent the wrong document.
+    // Read the customer's own words first, then what this conversation has already been about.
+    const convo = [text, ...(contact.transcript || []).map((t) => t.text)].join(" · ");
+    const pa = productAssets.find((x) => x.product && text.includes(x.product))
+      ?? productAssets.find((x) => x.product && convo.includes(x.product))
+      ?? (productAssets.length === 1 ? productAssets[0] : undefined);
     if (pa && !(contact.transcript || []).some((t) => t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`))) {
       await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
       tracker.recordAgentReply(contact.phone, `[مرفق في نفس الرسالة: ${pa.product}]`);
     }
+    const body = rungOne(pa?.product);
     try {
-      await gupshup.sendQuickReply(contact.phone, RUNG_ONE, RUNG_ONE_BUTTONS);
-      tracker.recordAgentReply(contact.phone, `${RUNG_ONE} [أزرار: ${RUNG_ONE_BUTTONS.map((b) => b.title).join(" | ")}]`);
+      await gupshup.sendQuickReply(contact.phone, body, RUNG_ONE_BUTTONS);
+      tracker.recordAgentReply(contact.phone, `${body} [أزرار: ${RUNG_ONE_BUTTONS.map((b) => b.title).join(" | ")}]${RUNG_ONE_MARK}`);
     } catch (e) {
-      await safeSend(contact.phone, RUNG_ONE);
+      await safeSend(contact.phone, body);
+      // The marker records that rung one was DELIVERED, so the fallback must carry it too —
+      // otherwise a text-only fallback leaves the contact eligible to receive rung one again.
+      tracker.recordSystem(contact.phone, RUNG_ONE_MARK);
     }
     return;
   }
@@ -842,7 +870,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
       const lastToolResult = [...messages].reverse().find((m: any) => m.role === "tool" && typeof m.content === "string");
       const fallback = lastToolResult && /^أُشعر|^أُرسل/.test(String((lastToolResult as any).content))
         ? String((lastToolResult as any).content)
-        : RUNG_ONE;
+        : rungOne();
       await safeSend(contact.phone, fallback);
     } else if (finalText && sentOwnBubble) {
       console.log(JSON.stringify({ at: "agent", msg: "suppressed trailing bubble after self-contained tool send", phone: contact.phone, dropped: finalText.slice(0, 80) }));

@@ -10,6 +10,7 @@ import * as kb from "./kb.js";
 import * as audience from "./audience.js";
 import * as insights from "./insights.js";
 import * as segments from "./segments.js";
+import * as templates from "./templates.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -145,14 +146,21 @@ app.post("/admin/entities/delete", async (req, reply) => {
 
 app.post("/admin/campaign/launch", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const { targets, message, name, product, buttons } = (req.body ?? {}) as
-    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string; buttons?: boolean };
+  const { targets, message, name, product, buttons, templateId } = (req.body ?? {}) as
+    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string; buttons?: boolean; templateId?: string };
+  // Buttons come from the REGISTRY by id, never from the request body. The operator edits the
+  // message text freely, but the reply buttons are an approved shape — resolving them server-side
+  // keeps the wizard's preview and the wire in agreement and blocks arbitrary titles.
+  const tpl = templateId ? templates.byId(templateId) : undefined;
   // Default ON per the founder's instruction of 13 Aug, overriding the single-bubble rule he set
   // on 12 Aug. Pass buttons:false to get the one-bubble shape back.
   const wantButtons = buttons !== false;
   if (!Array.isArray(targets) || !targets.length || !message?.trim())
     return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
+  // A template whose service variable cannot be resolved must not go out with an empty hole in it.
+  if (/\{\{1\}\}/.test(message) && !(product || "").trim())
+    return reply.code(400).send({ error: "القالب يحتوي {{1}} ولم تُحدَّد الخدمة — اختر الخدمة قبل الإطلاق" });
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
   const assets = await db.listAssets();
@@ -173,14 +181,18 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     if (!phone) { results.push({ phone: String(t.phone), ok: false, error: "invalid phone" }); continue; }
     const contact = tracker.getContact(phone, t.name);
     if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); continue; }
-    const personalized = message.replaceAll("{name}", t.name || "").replaceAll("{الاسم}", t.name || "").replace(/\s+([،.!؟])/g, "$1");
+    // {{1}} is the service variable in the founder's Meta template shape. Resolved here as well as
+    // in the wizard: a literal «{{1}}» reaching a customer is the worst failure this screen has,
+    // and it must not depend on the client having done the substitution.
+    const personalized = templates.render(message, (product || "").trim())
+      .replaceAll("{name}", t.name || "").replaceAll("{الاسم}", t.name || "").replace(/\s+([،.!؟])/g, "$1");
     try {
       // One bubble: opener as the document caption + reply buttons (falls back down the
       // capability ladder if the richer shapes are rejected).
       // The founder's design (13 Aug): the opener does NOT carry the file. It offers it. The first
       // button asks for the profile, so the PDF arrives because the customer chose it — which is
       // both a cleaner first impression and a real interest signal we can act on.
-      const BTNS = [{ title: "الملف التعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
+      const BTNS = (tpl?.buttons ?? ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"]).map((title) => ({ title }));
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
       const campMark = " [حملة]";
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
@@ -413,6 +425,14 @@ app.post("/admin/segments/preview", async (req, reply) => {
   };
 });
 
+// The approved campaign templates. Served rather than duplicated into the client script, so the
+// wizard and the launch path read the SAME registry — a template can never render one way in the
+// preview and go out another way on the wire.
+app.get("/admin/templates", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return reply.send({ templates: templates.TEMPLATES });
+});
+
 app.get("/admin/segments/presets", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const w = Number((req.query as any)?.window) || segments.DEFAULT_WINDOW_DAYS;
@@ -514,6 +534,10 @@ app.post("/admin/send-template", async (req, reply) => {
 
 const main = async () => {
   log({ at: "boot", config: configReport() });
+  // Refuse to start with a button we cannot answer, or a title WhatsApp will reject. Both have
+  // already shipped once: a 21-char title failed three sends, and «العرض التجاري» dead-ended the
+  // customer who tapped it. Crashing at boot is loud; a dead-end button is silent.
+  templates.assertButtonsHandled(agent.EMITTED_BUTTONS);
   tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
   if (db.isConnected()) await tracker.hydrate();

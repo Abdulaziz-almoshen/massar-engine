@@ -849,6 +849,37 @@ window.segAddCond = () => { if (!segDef) segDef = { match: "all", conditions: []
   if (segDef.conditions.length >= 8) return;
   segDef.conditions.push({ signal: "replied", comparator: "never_happened", withinDays: segWindow }); segRun(); };
 window.segDelCond = (i) => { if (!segDef) return; segDef.conditions.splice(i, 1); if (!segDef.conditions.length) { segDef = null; segPreview = null; render(false); return; } segRun(); };
+// ---- القوالب المعتمدة -------------------------------------------------------
+// Fetched from /admin/templates rather than copied into this script: the wizard preview and the
+// launch path must read one registry, or a template previews one way and sends another.
+let tpls = [];            // [{id,label,hint,audience,body,buttons}]
+let tplId = "";           // the chosen template; "" = a free message the operator wrote himself
+let tplLoaded = false;
+async function tplLoad() {
+  try {
+    const r = await fetch("/admin/templates", { headers: { "x-admin-token": TOKEN } });
+    if (r.ok) { const d = await r.json(); tpls = (d && d.templates) || []; }
+  } catch (e) { tpls = []; }
+  tplLoaded = true;
+  // Open on an approved template rather than the legacy free-text default: the wizard's job is to
+  // send a shape we stand behind, and an unselected picker above a different body reads as a bug.
+  if (!tplId && tpls.length) { tplId = tpls[0].id; campMsg = tpls[0].body; }
+  render(false);
+}
+window.tplPick = (i) => {
+  const t = tpls[i];
+  if (!t) return;
+  // Re-picking the active template restores its original text — the escape hatch after an edit.
+  tplId = t.id;
+  campMsg = t.body;
+  render(false);
+};
+// Editing the text keeps the template's BUTTONS but marks the body as the operator's own, so the
+// picker does not claim an approved template that no longer matches what will be sent.
+window.tplButtons = () => {
+  const t = tpls.find((x) => x.id === tplId);
+  return t ? t.buttons : ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"];
+};
 let segPresets = null;
 async function segLoadPresets() {
   try {
@@ -974,12 +1005,12 @@ window.confirmLaunch = async () => {
     const reg = wizProducts();
     const prod = reg[selProd] ? reg[selProd].name : "";
     // Resolve the service variable in the founder's template before sending.
-    const msgOut = campMsg.replaceAll("{product}", prod);
+    const msgOut = campMsg.replaceAll("{product}", prod).replaceAll("{{1}}", prod);
     if (!targets.length) throw new Error("لم تُحدَّد أي جهة استهداف");
     if (!msgOut.trim()) throw new Error("نص الرسالة فارغ");
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: msgOut, name: campName, product: prod }) });
+      body: JSON.stringify({ targets, message: msgOut, name: campName, product: prod, templateId: tplId }) });
     const d = await r.json().catch(() => ({}));
     closeLaunch();
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
@@ -1076,7 +1107,25 @@ function vAimkt() {
   }
   h += "</div>";
 
-  h += '<div class="step"><div class="hd"><span class="num">٣</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">استخدم {name} ليضع المساعد اسم الجهة تلقائيًا. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num">٣</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">اختر قالبًا معتمدًا، أو اكتب رسالتك. استخدم {name} لاسم الجهة و{{1}} لاسم الخدمة. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+    // The template picker. Each card states WHO it is for, because the two templates open on
+    // different premises — one on a pain we assume, one on usage we already observed. Sending the
+    // «استخدام مرتفع» opener to a facility that has never used the service is a visible lie.
+    (tpls.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin-bottom:16px;">' +
+      tpls.map((t, i) => {
+        const on = tplId === t.id;
+        return '<div onclick="tplPick(' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#1F7A73" : "#EAECF0") +
+          ";background:" + (on ? "#F2F9F8" : "#fff") + ';border-radius:13px;padding:13px 15px;transition:.12s;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
+          '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#1F7A73" : "#D0D5DD") +
+          ";background:" + (on ? "#1F7A73" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
+          '<span style="font-size:12.5px;font-weight:800;color:#101828;">' + esc(t.label) + "</span></div>" +
+          '<div style="font-size:11px;color:#667085;line-height:1.75;">' + esc(t.hint) + "</div>" +
+          '<div style="font-size:10.5px;color:#98A2B3;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
+          '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;">' +
+          t.buttons.map((b) => '<span style="font-size:10px;font-weight:700;color:#2F5F94;background:#EEF4FB;border-radius:5px;padding:3px 7px;">' + esc(b) + "</span>").join("") +
+          "</div></div>";
+      }).join("") + "</div>" : "") +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
     '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
@@ -1085,11 +1134,13 @@ function vAimkt() {
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
     // The opener no longer carries the file — it offers it, so no attachment is drawn here.
-    '<div style="padding:12px 14px;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName)) + "</div></div>" +
+    '<div style="padding:12px 14px;white-space:pre-wrap;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName).replaceAll("{{1}}", selName)) + "</div></div>" +
     '<div style="font-size:10.5px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
-    ["تنسيق عرض تعريفي", "إرسال التفاصيل", "ليس الآن"].map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + b + "</div>").join("") +
+    // The preview draws the buttons that will actually be sent — resolved from the same registry
+    // the launch route reads. It used to draw three hardcoded titles that no template used.
+    tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
     (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — الرسالة ستصل نصًا بأزرار. أضف الملف من معرفة الخدمة ليُضمَّن.</div>') +
     "</div></div></div>";
@@ -1942,6 +1993,7 @@ window.addEventListener("hashchange", () => {
 });
 if (!location.hash) location.hash = "kmon";
 refresh();
+tplLoad();
 setInterval(async () => {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (cur === "kmon" || cur === "home") { refresh(); }
