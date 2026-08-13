@@ -223,6 +223,25 @@ function systemPrompt(contact: Contact): string {
   const knowsSystem = new RegExp(`\\b(HIS|ERP)\\b|${MINE}[^·]{0,25}(نظام|برنامج)|(ورقي|يدوي|يدويًا)`, "i").test(said);
   const knowsPain = new RegExp(`${MINE}[^·]{0,30}(تأخير|مشكلة|بطء|بطيء|صعوبة|أخطاء|خطأ)|(إدخال\\s*مزدوج|مزدوج|إعادة\\s*الإدخال)`).test(said);
   const discoveryFacts = [knowsSize, knowsSystem, knowsPain].filter(Boolean).length;
+
+  // WHAT HAS ALREADY BEEN SENT. Without this the agent re-sent the same PDF and asked a slightly
+  // different question — it had no idea it had already delivered. Read from its own record.
+  const sentAssets = [...new Set((contact.transcript || [])
+    .filter((t) => t.role === "agent" && t.text.includes("[مرفق في نفس الرسالة:"))
+    .map((t) => (t.text.match(/\[مرفق في نفس الرسالة:\s*([^\]]+)\]/) || [])[1] || "")
+    .filter(Boolean))];
+
+  // WHAT THIS TURN IS FOR. «Every message must move the lead one step forward» — so the objective
+  // is derived from what is still unknown, in the founder's own priority order, rather than left
+  // to the model to pick (it kept picking «do you use HIS?» twice).
+  const knowsType = /منشأة|مستشفى|مجمع|عيادة|مركز|صيدلية|مزود|مزوّد|شركة\s*نظام|vendor/i.test(said);
+  const knowsService = /(تطعيم|NVR|السجل الوطني)|(إجاز|مرضي)/i.test(said);
+  const nextObjective =
+    !knowsType ? "حدّد نوع الجهة: منشأة صحية تستخدم نظامًا، أم مزوّد نظام يخدم منشآت. اسأل هذا بأزرار."
+    : !knowsSystem ? "اعرف النظام القائم لديهم (HIS أو ERP أو إجراء يدوي)."
+    : !knowsService ? "اعرف أي خدمة تهمهم: سجل التطعيمات، الإجازات المرضية، أو كلاهما. اسأل هذا بأزرار."
+    : !knowsSize ? "اعرف حجم التشغيل: كم منشأة أو كم إصدارًا شهريًا تقريبًا."
+    : "لديك ما يكفي — أوصِ بنموذج التكامل الأنسب واعرض الخطوة التجارية (عرض تعريفي أو جلسة تقنية).";
   return [
     // ---------------------------------------------------------------- 1. الهدف
     "# ١) الهدف",
@@ -291,14 +310,20 @@ function systemPrompt(contact: Contact): string {
     // question, and it produced exactly what the founder rated 3/10: «أرسلوا التفاصيل» answered
     // with «هل لديكم نظام HIS؟», then «أبي التفاصيل» answered with «أُحيل طلبكم للمختص». A customer
     // who asks for information and receives an interrogation has been interrogated, not sold to.
-    "- ترتيب إلزامي في كل رسالة: اشرح ← ثم أهّل. لا ترسل أبدًا رسالة سؤالٍ فقط. أعطِ أولًا مضمونًا حقيقيًا من المعرفة المعتمدة (ماذا يفعل التكامل عمليًا، كيف يعمل، ما الذي ندعمكم فيه)، ثم — في الرسالة نفسها — اطرح سؤال التأهيل.",
+    "- ترتيب إلزامي في كل رسالة: سلّم ← ثبّت القيمة ← أهّل. لا ترسل أبدًا رسالة سؤالٍ فقط، ولا ترسل ملفًا ثم سؤالًا مباشرة.",
+    "  · سلّم: أرسل ما طُلب منك فعلًا.",
+    "  · ثبّت القيمة: اذكر في سطر أو سطرين ما الذي يعنيه هذا الملف أو هذه الخدمة عمليًا للمنشأة — «يتيح للممارسين استخدام سجل التطعيمات من داخل نظامهم القائم، دون تنقّل بين الأنظمة ودون إدخال مزدوج». لا تكتفِ بالقول «الملف يوضح…»؛ لخّص ما يوضحه.",
+    "  · أهّل: اطرح سؤالًا واحدًا يخدم هدف هذه الرسالة المذكور أدناه، بأزرار متى أمكن.",
+    "- لكل رسالة هدف واحد يقدّم الصفقة خطوة. لا ترسل رسالة لا تحرّك شيئًا، ولا تسأل سؤالًا سبق أن أجاب عنه.",
     "- إذا طلب العميل «التفاصيل» أو «الملف» أو «المعلومات»: أعطِه التفاصيل فورًا من المعرفة المعتمدة. هذا طلب شراء لا طلب دعم. ممنوع منعًا باتًا الردّ على طلب معلومات بـ«أُحيل طلبكم للمختص» — الإحالة تُستخدم للسعر النهائي أو التفاوض أو متطلبات تقنية معقدة أو حجز اجتماع تجاري، لا لتجنّب الإجابة.",
     "- سؤال التأهيل الأول يكون بأزرار وبصياغة تُعرّف المتحدث، لا استجوابًا: «لأزوّدكم بالأنسب — أي وصف يناسبكم؟» مع «منشأة صحية» · «مزوّد نظام HIS» · «أريد العرض التجاري». هذه الأزرار تكشف نوع الجهة والاحتياج في خطوة واحدة.",
+    `- هدف هذه الرسالة تحديدًا: ${nextObjective}`,
+    sentAssets.length
+      ? `- سبق أن أرسلت لهذه الجهة: ${sentAssets.join("، ")}. لا تعد إرسال الملف نفسه ولا تعرضه مرة أخرى. إن طلبه ثانية فقل إنه أُرسل، ولخّص أهم ما فيه في سطرين، ثم انتقل مباشرة إلى هدف هذه الرسالة.`
+      : "",
     discoveryFacts === 0 && inbound <= 2
-      ? "- حالة هذه المحادثة: لم نعرف بعد نوع الجهة ولا حجمها ولا نظامها. لذلك: اشرح القيمة بمضمون، ثم اطرح سؤال التعريف بالأزرار. ويُمنع في هذه الرسالة عرض موعد أو مكالمة أو إحالة إلى مختص. طلب الملف ليس تأهيلًا، لكنه أيضًا ليس سببًا لحجب المعلومة."
-      : discoveryFacts === 0
-        ? "- ما زلنا لا نعرف نوع الجهة. أعطِ المضمون، ثم اطرح سؤال التعريف بالأزرار قبل أي عرض موعد."
-        : `- نعرف عن تشغيله ${discoveryFacts} من ثلاث (الحجم/النظام/الألم). أكمل: اشرح ← أوصِ بالخدمة الأنسب ← ثم اعرض الخطوة التجارية.`,
+      ? "- لا نعرف بعد نوع الجهة ولا نظامها. يُمنع في هذه الرسالة عرض موعد أو مكالمة أو إحالة إلى مختص. طلب الملف ليس تأهيلًا، لكنه أيضًا ليس سببًا لحجب المعلومة."
+      : "",
     // Buttons: the model wrote «صباحًا أم بعد الظهر؟» as prose instead of two taps.
     "- قاعدة الأزرار: إذا كانت رسالتك تعرض خيارين أو ثلاثة — أوقاتًا، أو خدمتين، أو نعم/لا — فاستدعِ send_buttons ولا تكتب الخيارات نصًا. الزر يرفع الرد لأنه يلغي الكتابة، وكل عنوان كلمتان أو ثلاث بحد أقصى ٢٠ حرفًا.",
     "# ٨) الاكتشاف",
@@ -551,6 +576,15 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       const key = String(args.asset_id ?? args.product ?? "").trim();
       const cap = String(args.caption ?? "").slice(0, 500);
       const pa = productAssets.find((x) => x.product === key || x.product.includes(key));
+      // Never send the same asset twice. The founder tapped «الملف التعريفي» after already
+      // receiving it and got the identical PDF back with a slightly reworded question — the agent
+      // had no idea it had already delivered. The prompt now says so too, but a rule that matters
+      // this much should not depend on the model reading it.
+      const already = pa && (contact.transcript || []).some((t) =>
+        t.role === "agent" && t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`));
+      if (already) {
+        return `سبق أن أُرسل ملف «${pa!.product}» إلى هذه الجهة. لا ترسله ثانية. أخبرهم أنه أُرسل، ولخّص في سطرين ما الذي يتيحه التكامل عمليًا، ثم انتقل إلى هدف هذه الرسالة.`;
+      }
       if (pa) {
         await gupshup.sendDocument(contact.phone, pa.url, pa.filename, cap || undefined);
         tracker.recordAgentReply(contact.phone, `${cap ? cap + " " : ""}[مرفق في نفس الرسالة: ${pa.product}]`);
