@@ -206,7 +206,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
   .skel { background: linear-gradient(90deg, #F2F4F7 25%, #EAECF0 37%, #F2F4F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
   .sec .meta { font-size: 11.5px; font-weight: 600; color: #98a2b3; margin-inline-start: 8px; }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow > div:nth-child(4), .thead div:nth-child(5), .trow > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+  @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 </style>
 </head>
 <body>
@@ -547,7 +547,7 @@ function vKmon(d) {
       ? '<span class="chip c-warn"><span style="width:6px;height:6px;border-radius:999px;background:#B54708;"></span>تجريبية</span>'
       : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
         : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
-    h += '<div class="trow" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
+    h += '<div class="trow km" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
       '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
       '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
@@ -625,18 +625,18 @@ function vKmonDetail(id, d) {
   h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
     '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
     '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
-    (st.replied ? "وصلت إلى " + st.delivered + " جهة، ردّ " + st.replied + " منهم" + (st.interested ? " وأبدى " + st.interested + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
+    (st.replied ? "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" + (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
     [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
-      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + x[1] + '<span style="font-size:14px;color:#9FC0E4;">%</span></div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + "</div></div>").join("") +
+      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#9FC0E4;">٪</span></div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + "</div></div>").join("") +
     "</div></div>";
   const cards = [
     ["جهات الاستهداف", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
     ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["جهات مهتمة", st.interested, "#1f8a52"],
   ];
   h += '<div class="statgrid">' + cards.map((c, i) =>
-    '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + c[1] + "</div>" +
-    '<div class="p">' + (i === 0 ? "&nbsp;" : pct(c[1]) + "% من جهات الاستهداف") + "</div>" +
+    '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + fmtN(c[1]) + "</div>" +
+    '<div class="p">' + (i === 0 ? "&nbsp;" : fmtN(pct(c[1])) + "٪ من جهات الاستهداف") + "</div>" +
     '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
   const seenSilent = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied);
@@ -651,7 +651,7 @@ function vKmonDetail(id, d) {
   // human outcomes, this one also trusts a high-intent reading with no tag yet. Two numbers that
   // legitimately differ must not share a word — the counter says «مهتمة», this says «تستحق المتابعة».
   if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#027A48", "#ECFDF3"]);
-  if (seenSilent.length) moves.push(["أعد استهداف " + seenSilent.length + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
   if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
   if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB"]);
   if (moves.length) {
@@ -680,7 +680,7 @@ function vKmonDetail(id, d) {
   };
   h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EAECF0;background:#fff;">' +
     '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#98A2B3;flex:none;">' + shown.length + " من " + rows.length + "</span>" +
+    '<span style="font-size:11px;color:#98A2B3;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
@@ -714,7 +714,7 @@ function vHome(d) {
     // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
     // reached (4), while this counts the whole imported book (15). One label, two numbers, one
     // screen is exactly the contradiction the funnel fix just removed.
-    kpi("users", "جهات في قوائمك", entities.length.toLocaleString("ar-SA-u-nu-latn"), ["#EFF4FB", "#2F5F94"]) +
+    kpi("users", "جهات في قوائمك", entities.length.toLocaleString("ar-SA"), ["#EFF4FB", "#2F5F94"]) +
     kpi("check", "وصلت الرسائل إلى الجهات", delivered, ["#E9F7F6", "#1F7A73"]) +
     kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
     kpi("flame", "جهات مهتمة ومؤهلة", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
@@ -850,7 +850,7 @@ window.confirmLaunch = async () => {
     const d = await r.json().catch(() => ({}));
     closeLaunch();
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
-    alertBar("أُرسلت " + d.sent + " من " + d.requested + " — فتحنا لك لوحة الحملة", false);
+    alertBar("أُرسلت " + fmtN(d.sent) + " من " + fmtN(d.requested) + ". فتحنا لك لوحة الحملة.", false);
     entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) {
@@ -910,7 +910,7 @@ function vAimkt() {
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#F9FAFB;">' +
-      '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + m.length + ")") + '</button>' +
+      '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
       (selN ? '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     const shown = m.slice(0, LIST_CAP);
     if (m.length > LIST_CAP) {
@@ -1318,7 +1318,7 @@ function stageBars(rows) {
     const drop = prev > 0 && i > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
     return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
       '<span style="font-size:12.5px;font-weight:600;color:#344054;">' + esc(r[0]) + "</span>" +
-      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA-u-nu-latn") +
+      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA") +
       (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + drop + "%</span>" : "") + "</span></div>" +
       '<div style="height:10px;background:#F2F4F7;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
   }).join("") + "</div>";
@@ -1353,7 +1353,7 @@ function treemapTiles(rows) {
   const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#101828"], ["#AFC6DE", "#101828"], ["#D6E2F1", "#101828"], ["#EFF4FB", "#101828"], ["#F9FAFB", "#101828"]];
   return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
     rows.map((r, i) => { const tn = tones[i % tones.length]; return '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:78px;border-radius:12px;background:' + tn[0] + ';color:' + tn[1] + ';padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">' +
-      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA-u-nu-latn") + "</div></div>"; }).join("") + "</div>";
+      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA") + "</div></div>"; }).join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#98A2B3;">' + sub + "</span></div>" + inner + "</div>";
@@ -1719,7 +1719,7 @@ function countUp() {
     const step = (t) => {
       const k = Math.min(1, (t - t0) / 620);
       const eased = 1 - Math.pow(1 - k, 3);
-      el.textContent = Math.round(target * eased).toLocaleString("ar-SA-u-nu-latn") + rest;
+      el.textContent = Math.round(target * eased).toLocaleString("ar-SA") + rest;
       if (k < 1) requestAnimationFrame(step);
     };
     _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
