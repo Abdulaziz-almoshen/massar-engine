@@ -136,6 +136,12 @@ check("model-buttons", "an unmappable proposal is rejected, not silently sent",
   templates.canonicalTitle("اضغط هنا"), undefined);
 // Whatever canonicalTitle returns must itself be routable — otherwise we'd emit an unanswerable
 // button through the very function meant to prevent that.
+// The BENIGN_AFFIX exclusion in canonicalTitle is safe only while at most one BUTTON_INTENT key is
+// also a courtesy affix («نعم»). A second one would silently stop being a candidate. Pin it.
+const benignAlsoKeys = Object.keys(templates.BUTTON_INTENT)
+  .filter((k) => templates.canonicalTitle(k + " العرض التجاري") === "العرض التجاري");
+check("fidelity", "at most one BUTTON_INTENT key doubles as a benign affix", benignAlsoKeys.length <= 1, true);
+
 // SAFETY property plus a COVERAGE floor. QA proved the safety property alone is vacuous: force
 // canonicalTitle to always return undefined and it still passes 4/4, because "undefined is allowed"
 // is satisfied by refusing everything. The floor below fails under exactly that mutation.
@@ -208,30 +214,38 @@ for (const t of ["صباحًا", "بعد الظهر", "تكامل صحة", "إج
 // the model ran — PDF plus «أي وصف يناسبكم؟». Complaint #1, re-opened by a nice-to-have.
 const infoSrc = readFileSync(join(root, "src/agent.ts"), "utf8");
 const iStart = infoSrc.indexOf('const B = "(?:^|[\\\\s،.؟!؛])";');
-const iEnd = infoSrc.indexOf("&& !OBJECTION_STEM.test(text));") + "&& !OBJECTION_STEM.test(text));".length;
+// End the slice at the terminator of the `const wantsInfo = …` statement, found structurally.
+// Anchoring on the literal text of the expression made this gate crash instead of failing when the
+// expression changed — a mutation must produce a red FAIL line, not a stack trace.
+const wStart = infoSrc.indexOf("const wantsInfo =", iStart);
+const iEnd = wStart < 0 ? -1 : infoSrc.indexOf(";", wStart) + 1;
 if (iStart < 0 || iEnd < 30) { console.error("FAIL [slice] wantsInfo anchors moved"); process.exit(1); }
-const infoBlock = infoSrc.slice(iStart, iEnd).replace(/^\s*const wantsInfo =[\s\S]*$/m, "");
-const runInfo = new Function("text", "templates",
-  infoBlock + "\nreturn templates.buttonIntent(text) === 'info' || (infoPhrase.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text));");
-// Guard the guard: «الملف» contains «لم» and «التفاصيل» contains none of the stems — if the
-// anchoring ever regresses to unanchored, these two canaries fail loudly rather than silently
-// turning every info request into an "objection".
-// The canary must test the REGEX, not the exact-key fast path. runInfo("الملف التعريفي") returns
-// true on `buttonIntent === "info"` and never reaches the stems, so it could not catch the
-// anchoring regression it exists for. Test the stem directly, on the string that broke it.
-const stems = new Function("return { COMMERCIAL_STEM, OBJECTION_STEM };\n".replace(/^/, infoBlock + "\n"))();
+// Execute the REAL `const wantsInfo = ...` line, not a retyped copy of it. The reviewer proved the
+// retyped version was blind: flipping `&&` to `||` on that line in src/agent.ts left the gate
+// 133/133 green while a bare «مرحبًا» would have fired the PDF and rung one.
+const infoBlock = infoSrc.slice(iStart, iEnd);
+const stems = new Function(infoBlock.replace(/const wantsInfo =[\s\S]*$/, "") +
+  "\nreturn { COMMERCIAL_STEM, OBJECTION_STEM };")();
 check("info-gate", "«الملف» does not self-match the objection stem («لم» inside «الـمـلـف»)",
   stems.OBJECTION_STEM.test("الملف التعريفي"), false);
 check("info-gate", "the stem still catches a real objection",
   stems.OBJECTION_STEM.test("التفاصيل غير واضحة"), true);
-check("info-gate", "«التفاصيل» does not self-match the commercial stem",
-  stems.COMMERCIAL_STEM.test("أرسلوا التفاصيل"), false);
+// Discriminating: «تسعير» appears as a SUBSTRING of «التسعيرة» but not as a word, so this passes
+// only while the commercial stem is anchored.
+check("info-gate", "anchored commercial stem does not fire on a substring",
+  stems.COMMERCIAL_STEM.test("التفاصيل والتسعيرة"), false);
+check("info-gate", "but does fire on the real word", stems.COMMERCIAL_STEM.test("التفاصيل والتسعير"), true);
+// `tapped` is the real gate in source; here we exercise the regex half by passing a non-tap.
+const runInfo = new Function("text", "templates", "tapped",
+  infoBlock + "\nreturn wantsInfo;");
+const typed = (t) => runInfo(t, templates, () => undefined);
+
 for (const t of ["الملف التعريفي", "أرسلوا التفاصيل", "الملف التعريفي للإجازات المرضية", "أرسلوا التفاصيل عن التطعيمات"])
-  check("info-gate", `«${t}» is a pure info request`, runInfo(t, templates), true);
+  check("info-gate", `«${t}» is a pure info request`, typed(t), true);
 for (const t of ["التفاصيل والسعر لو سمحتم", "أرسلوا التفاصيل وكم السعر", "التفاصيل وكيف نبدأ", "الملف التعريفي والتسعير"])
-  check("info-gate", `«${t}» does NOT short-circuit (price must reach the model)`, runInfo(t, templates), false);
+  check("info-gate", `«${t}» does NOT short-circuit (price must reach the model)`, typed(t), false);
 for (const t of ["التفاصيل التي أرسلتموها غير واضحة", "الملف التعريفي لم يفتح معنا", "أرسلوا التفاصيل إلى المدير المالي وليس لي"])
-  check("info-gate", `objection «${t}» does NOT short-circuit`, runInfo(t, templates), false);
+  check("info-gate", `objection «${t}» does NOT short-circuit`, typed(t), false);
 
 // --- 7. the info buttons all reach rung one ---------------------------------
 for (const t of templates.TEMPLATES)

@@ -41,7 +41,9 @@ app.post("/webhooks/gupshup", async (req, reply) => {
     if (ev.kind === "message") {
       if (!ev.from) continue;
       const contact = tracker.recordInbound(ev);
-      enqueue(ev.from, () => agent.handleInbound(contact, ev.text));
+      // Pass the tap-vs-typed provenance, not just the text. Without it the agent cannot tell a
+      // customer who TAPPED «لا» from one who wrote it as an answer to a question.
+      enqueue(ev.from, () => agent.handleInbound(contact, ev.text, gupshup.isButtonTap(ev)));
     } else if (ev.kind === "status") {
       tracker.recordStatus(ev);
     } else {

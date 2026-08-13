@@ -163,6 +163,18 @@ export type InboundMessage = {
   raw: unknown;
 };
 
+/** Did the customer TAP a button, or type these words themselves?
+ *
+ *  This provenance was captured by both parsers and then dropped at the webhook call site — nothing
+ *  read `msgType`. That cost us: «لا» and «موافق» are legitimate button titles AND ordinary words, so
+ *  an exact-match intent lookup recorded a customer answering «لا» to «هل تستخدمون نظام HIS؟» as
+ *  NOT INTERESTED, with a reason string claiming a button press that never happened. Intent lookups
+ *  must therefore be gated on this. Unknown/absent type is treated as TYPED — the safe default,
+ *  because mistaking a tap for typing only forgoes a shortcut, while the reverse corrupts the ledger. */
+export function isButtonTap(m: { msgType?: string }): boolean {
+  return /^(button|interactive|quick_reply|list_reply|button_reply)$/i.test(String(m.msgType ?? ""));
+}
+
 export type StatusEvent = {
   kind: "status";
   status: "enqueued" | "sent" | "delivered" | "read" | "failed" | "deleted" | string;

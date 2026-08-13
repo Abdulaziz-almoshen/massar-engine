@@ -648,12 +648,12 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       // earlier title lost it silently. A customer must always be able to decline.
       const seen = new Set<string>();
       const deduped = options.filter((o) => !seen.has(o.title) && seen.add(o.title));
-      const lostDecline = options.some((o) => templates.buttonIntent(o.title) === "decline") &&
-        !deduped.some((o) => templates.buttonIntent(o.title) === "decline");
-      if (lostDecline) {
-        const decline = options.find((o) => templates.buttonIntent(o.title) === "decline");
-        if (decline) deduped.push(decline);
-      }
+      // NOTE: no decline-preservation step here, deliberately. Dedupe keeps the first occurrence of
+      // each distinct title, so a removed item always duplicates one already kept, and identical
+      // titles carry identical intent — a decline is unlosable. A reviewer proved this exhaustively
+      // over all 729 three-option sets (0 occurrences). The collapse guard below is what actually
+      // protects the customer's «no». An earlier version of this comment claimed a preservation
+      // rule the code never implemented; it is gone rather than left to mislead the next reader.
       // A set that collapsed to one option is not a choice. Better to send the question as text than
       // to present a single button that reads as the only available answer.
       if (deduped.length < 2 && proposed.length >= 2) {
@@ -802,7 +802,13 @@ export const EMITTED_BUTTONS = [...RUNG_ONE_BUTTONS_DEFAULT, ...RUNG_ONE_BUTTONS
 // letters — JS \w is ASCII-only — so the Arabic spelling carries its own anchor there.)
 const SANDBOX_ACTIVATION = SANDBOX_ACTIVATION_RE;
 
-export async function handleInbound(contact: Contact, text: string): Promise<void> {
+export async function handleInbound(contact: Contact, text: string, wasTap = false): Promise<void> {
+  // An intent shortcut may only fire on a real button TAP. «لا» and «موافق» are button titles AND
+  // ordinary Arabic words; matching them as intents on typed text recorded a customer answering
+  // «لا» to «هل تستخدمون نظام HIS؟» as not-interested. Defaults to false, so any caller or webhook
+  // shape that cannot prove a tap gets the safe behaviour: treat it as words and let the model read
+  // them. This is the project's own recurring defect class — a value captured and never threaded.
+  const tapped = (t: string) => (wasTap ? templates.buttonIntent(t) : undefined);
   turnTextSends.delete(contact.phone);   // new turn, new one-bubble budget for the drop path
   if (contact.optedOut) return;
 
@@ -827,7 +833,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // outcome depend on an LLM turn is the same "hard rules live in code" rule §4 states, applied to
   // the one signal we least want to lose. The conversation still continues — the model gets its
   // turn to respond gracefully; only the RECORD is made deterministic here.
-  if (templates.buttonIntent(text) === "decline") {
+  if (tapped(text) === "decline") {
     const firm = /لسنا مهتمين|لا،\s*شكرًا|^لا$/.test(text.trim());
     tracker.setOutcome(contact.phone, firm ? "not_interested" : "later", `ضغط زر: ${text.trim()}`);
   }
@@ -849,7 +855,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   const OBJECTION_STEM = new RegExp(
     `${B}(?:و)?(غير|لم|ليست|ليس|لست|لسنا|مو|ما|مشكلة|متأخر|خطأ|واضحة|واضح)${E}`);
   const infoPhrase = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/;
-  const wantsInfo = templates.buttonIntent(text) === "info" ||
+  const wantsInfo = tapped(text) === "info" ||
     (infoPhrase.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text));
   // Whether rung one already went out is read from the TRANSCRIPT, not from process memory. An
   // in-memory Set forgets on every deploy — and there were 45 deploys in one day — so the founder

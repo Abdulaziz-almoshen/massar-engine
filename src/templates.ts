@@ -100,9 +100,13 @@ export const BUTTON_INTENT: Record<string, ButtonIntent> = Object.assign(Object.
   "الأربعاء": "schedule", "الخميس": "schedule",
   // §372's third prescribed case is a plain yes/no. Without these the model composes them and the
   // emit path drops both, leaving the turn with no buttons at all.
+  // Bare words are only safe for intents with NO consumer that reads conversation history.
+  // `commercial` and `info` are read from the transcript (tappedCommercial, sentAssets), where tap
+  // provenance is not recorded — so a bare-word commercial title would flip the objective for any
+  // customer who happened to type it. «موافق» was exactly that; it carries its object now.
   "نعم": "qualify",
   "لا": "decline",
-  "موافق": "commercial",
+  "موافق على العرض": "commercial",
   // the opening classifier the prompt prescribes for منصة صحة conversations
   "تكامل صحة": "qualify",
   "إجراء بالمنصة": "qualify",
