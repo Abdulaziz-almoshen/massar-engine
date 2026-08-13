@@ -14,7 +14,8 @@
     "smoke:setup": "python3 -m venv .venv && ./.venv/bin/pip -q install playwright && ./.venv/bin/python -m playwright install chromium",
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
-    "check": "npm run check:catalogue && npm run check:numerals"
+    "check:buttons": "npm run build && node scripts/check-buttons.mjs",
+    "check": "npm run check:catalogue && npm run check:numerals && npm run check:buttons"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",

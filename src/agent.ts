@@ -192,7 +192,7 @@ export async function refreshKb(): Promise<number> {
 function systemPrompt(contact: Contact): string {
   // Count within THIS campaign conversation, not for all time — the same reason the turn cap does.
   const campaignAt = (contact.transcript || [])
-    .filter((t) => t.role === "agent" && t.text.includes("[حملة]"))
+    .filter((t) => t.role === "agent" && templates.isCampaignTurn(t.text))
     .reduce((m, t) => Math.max(m, t.ts), 0);
   const since = (contact.transcript || []).filter((t) => t.ts >= campaignAt);
   const inbound = since.filter((t) => t.role === "customer").length;
@@ -610,8 +610,24 @@ async function notifyLead(contact: Contact, kind: "hot" | "handoff", product: st
 async function execTool(contact: Contact, name: string, args: any): Promise<string> {
   switch (name) {
     case "send_buttons": {
-      const options = (Array.isArray(args.options) ? args.options : []).slice(0, 3).map((t: unknown) => ({ title: String(t).slice(0, 20) }));
-      if (!options.length || !args.body) return "تعذّر استخدام الأزرار. أرسل نصًا موجزًا يتضمن سؤالًا واحدًا.";
+      // Whatever the model proposes, what goes on the wire must be a title we can read back when the
+      // customer taps it. Unmappable titles are DROPPED rather than sent: an unanswerable button is
+      // the defect this contract exists to prevent, and plain text is always answerable.
+      const proposed = (Array.isArray(args.options) ? args.options : []).slice(0, 3).map((t: unknown) => String(t));
+      const options: { title: string }[] = [];
+      for (const p of proposed) {
+        const title = templates.canonicalTitle(p);
+        if (title) options.push({ title });
+        else console.error(JSON.stringify({ at: "agent", level: "error", msg: "model proposed an unroutable button — dropped", phone: contact.phone, proposed: p }));
+      }
+      if (!options.length || !args.body) {
+        // No routable button left: send the body as text so the turn still moves, never silence.
+        if (args.body) {
+          await safeSend(contact.phone, String(args.body));
+          return "أُرسل النص بدون أزرار (لم تكن الخيارات قابلة للتوجيه). لا تكرر نص الرسالة.";
+        }
+        return "تعذّر استخدام الأزرار. أرسل نصًا موجزًا يتضمن سؤالًا واحدًا.";
+      }
       await gupshup.sendQuickReply(contact.phone, String(args.body), options, args.footer ? String(args.footer) : undefined);
       tracker.recordAgentReply(contact.phone, `${args.body} [أزرار: ${options.map((o: { title: string }) => o.title).join(" | ")}]`);
       return "أُرسلت الأزرار. لا تكرر نص الرسالة — إن لم تكن بحاجة لإضافة شيء أرجِع نصًا فارغًا.";
@@ -708,14 +724,33 @@ const RUNG_ONE_MARK = " [سُلّمت الدرجة الأولى]";
 // Parameterised by service: it used to name «السجل الوطني للتطعيمات» unconditionally, so a contact
 // asking about الإجازات المرضية was answered about vaccinations. The shape is invariant; the noun
 // is not. With no service resolved it falls back to the neutral «الخدمة», which is never wrong.
-const rungOne = (service?: string) => [
-  `يتيح التكامل للممارسين تنفيذ ${service ? `خدمة ${service}` : "الخدمة"} من داخل نظام المنشأة نفسه، دون التنقل بين الأنظمة ودون إدخال مزدوج.`,
-  "الربط يتم عبر واجهات برمجية، وندعم فريقكم التقني في المتطلبات والاختبار وحتى التفعيل.",
-  "ولأوجّهكم إلى نموذج التكامل الأنسب: أي وصف يناسبكم؟",
-].join("\n");
-const RUNG_ONE_BUTTONS = [{ title: "منشأة صحية" }, { title: "مزوّد نظام HIS" }, { title: "العرض التجاري" }];
-/** Buttons this module emits, for the boot-time contract check in index.ts. */
-export const EMITTED_BUTTONS = RUNG_ONE_BUTTONS.map((b) => b.title);
+// …and by OPENER. The upsell opens with «لاحظنا أن لديكم استخدامًا مرتفعًا» — we have just told the
+// customer we know who they are and what they use. Answering their next tap with «أي وصف يناسبكم؟»
+// contradicts our own opening sentence and re-asks identity, which is the founder's complaint #1
+// arriving by a new route. So the upsell's rung one qualifies on the IMPLEMENTATION, never identity.
+export const rungOne = (service?: string, opener?: string) => {
+  const svc = service ? `خدمة ${service}` : "الخدمة";
+  if (opener === "high_usage_upsell") {
+    return [
+      `الربط يتم عبر واجهات برمجية تُنفَّذ ${svc} من خلالها داخل نظامكم مباشرة، فتتوقف إعادة إدخال البيانات ويقل زمن المعاملة.`,
+      "نبدأ بمراجعة تقنية قصيرة، ثم اختبار على بيئة تجريبية، ثم التفعيل — وفريقنا يرافق فريقكم في الثلاث.",
+      "لنحدد نقطة البدء: من يتولى الربط لديكم؟",
+    ].join("\n");
+  }
+  return [
+    `يتيح التكامل للممارسين تنفيذ ${svc} من داخل نظام المنشأة نفسه، دون التنقل بين الأنظمة ودون إدخال مزدوج.`,
+    "الربط يتم عبر واجهات برمجية، وندعم فريقكم التقني في المتطلبات والاختبار وحتى التفعيل.",
+    "ولأوجّهكم إلى نموذج التكامل الأنسب: أي وصف يناسبكم؟",
+  ].join("\n");
+};
+const RUNG_ONE_BUTTONS_DEFAULT = [{ title: "منشأة صحية" }, { title: "مزوّد نظام HIS" }, { title: "العرض التجاري" }];
+// An existing heavy user is not asked who they are; they are asked who does the work.
+const RUNG_ONE_BUTTONS_UPSELL = [{ title: "فريقنا التقني" }, { title: "مزوّد النظام" }, { title: "العرض التجاري" }];
+export const rungOneButtons = (opener?: string) =>
+  opener === "high_usage_upsell" ? RUNG_ONE_BUTTONS_UPSELL : RUNG_ONE_BUTTONS_DEFAULT;
+/** Buttons this module emits, for the boot-time contract check in index.ts. Every variant, or the
+ *  check certifies a subset and the uncovered one dead-ends exactly as before. */
+export const EMITTED_BUTTONS = [...RUNG_ONE_BUTTONS_DEFAULT, ...RUNG_ONE_BUTTONS_UPSELL].map((b) => b.title);
 
 // Gupshup's sandbox makes every new person send «proxy <botname>» to activate the bot, after
 // an English boilerplate about bot-building and anagram puzzles. That phrase is platform
@@ -747,12 +782,15 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // Deliver → Reinforce → Qualify, emitted rather than requested, for rung one only. The model
   // was asked three times to compose this turn and produced «الملف يوضح…» each time; the content
   // does not depend on anything the customer said, so composing it adds variance and no value.
+  // The trailing service phrase is allowed: «الملف التعريفي للإجازات المرضية» is how a real person
+  // asks. Anchored to ≤ 40 trailing chars so a sentence that merely mentions the file is not caught.
   const wantsInfo = templates.buttonIntent(text) === "info" ||
-    /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)(\s*)$/.test(text.trim());
+    /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/.test(text.trim());
   // Whether rung one already went out is read from the TRANSCRIPT, not from process memory. An
   // in-memory Set forgets on every deploy — and there were 45 deploys in one day — so the founder
   // could be handed the same opener twice. The transcript survives the restart; the Set did not.
-  const rungOneSent = (contact.transcript || []).some((t) => t.text.includes(RUNG_ONE_MARK));
+  // Role-filtered, matching the sentAssets guard above: a marker is something WE wrote.
+  const rungOneSent = (contact.transcript || []).some((t) => t.role !== "customer" && t.text.includes(RUNG_ONE_MARK));
   if (wantsInfo && !rungOneSent) {
     // Which service's file? The one the conversation is actually about. This was hardcoded to
     // «تطعيم», so a contact asking «الملف التعريفي للإجازات المرضية» was sent the wrong document.
@@ -765,10 +803,16 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
       await gupshup.sendDocument(contact.phone, pa.url, pa.filename);
       tracker.recordAgentReply(contact.phone, `[مرفق في نفس الرسالة: ${pa.product}]`);
     }
-    const body = rungOne(pa?.product);
+    // Which opener started this conversation — the most recent campaign turn carries its id.
+    const opener = [...(contact.transcript || [])]
+      .filter((t) => t.role === "agent" && templates.isCampaignTurn(t.text))
+      .sort((a, b) => b.ts - a.ts)
+      .map((t) => templates.openerOf(t.text))[0];
+    const body = rungOne(pa?.product, opener);
+    const btns = rungOneButtons(opener);
     try {
-      await gupshup.sendQuickReply(contact.phone, body, RUNG_ONE_BUTTONS);
-      tracker.recordAgentReply(contact.phone, `${body} [أزرار: ${RUNG_ONE_BUTTONS.map((b) => b.title).join(" | ")}]${RUNG_ONE_MARK}`);
+      await gupshup.sendQuickReply(contact.phone, body, btns);
+      tracker.recordAgentReply(contact.phone, `${body} [أزرار: ${btns.map((b) => b.title).join(" | ")}]${RUNG_ONE_MARK}`);
     } catch (e) {
       await safeSend(contact.phone, body);
       // The marker records that rung one was DELIVERED, so the fallback must carry it too —
@@ -802,7 +846,7 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
     // Match ONLY the campaign marker. «[أزرار:» and «[مرفق في نفس الرسالة» are written by the
     // agent's own send_buttons/send_asset tools too, so matching those would let the agent reset
     // its own turn cap by using a tool — which is exactly the runaway loop the cap exists to stop.
-    .filter((t) => t.role === "agent" && t.text.includes("[حملة]"))
+    .filter((t) => t.role === "agent" && templates.isCampaignTurn(t.text))
     .reduce((m, t) => Math.max(m, t.ts), 0);
   const convTurns = (contact.transcript || [])
     .filter((t) => t.role === "customer" && t.ts >= lastCampaignAt).length;

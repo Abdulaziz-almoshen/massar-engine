@@ -788,7 +788,13 @@ window.entSearch = (el) => { entQ = el.value; clearTimeout(window.__eq); window.
 window.entTog = (id) => { entSel.has(id) ? entSel.delete(id) : entSel.add(id); render(false); };
 window.entAllMatching = () => { const m = entMatches(); const all = m.every(e => entSel.has(e.id)); m.forEach(e => all ? entSel.delete(e.id) : entSel.add(e.id)); render(false); };
 window.entClear = () => { entSel.clear(); render(false); };
-window.campMsgSet = (el) => { campMsg = el.value; };
+window.campMsgSet = (el) => {
+  campMsg = el.value;
+  // Deliberately no re-render — that would move the caret mid-typing. The badge updates on the next
+  // render, which is soon enough for a state that only matters at launch.
+  const t = tpls.find((x) => x.id === tplId);
+  tplEdited = Boolean(t && el.value !== t.body);
+};
 window.composeMsg = async () => {
   const btn = document.getElementById("cmpbtn");
   const reg = wizProducts(); const prod = reg[selProd] ? reg[selProd].name : "";
@@ -854,16 +860,21 @@ window.segDelCond = (i) => { if (!segDef) return; segDef.conditions.splice(i, 1)
 // launch path must read one registry, or a template previews one way and sends another.
 let tpls = [];            // [{id,label,hint,audience,body,buttons}]
 let tplId = "";           // the chosen template; "" = a free message the operator wrote himself
-let tplLoaded = false;
+let tplEdited = false;    // body no longer matches the registry — see the note in the composer
+// Only until /admin/templates answers; it ships the authoritative list. Kept in sync by the boot
+// contract, which now sees this same array server-side.
+let tplFallback = ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"];
+const campMsgAtBoot = campMsg;   // the legacy default; used to tell "untouched" from "operator typed"
 async function tplLoad() {
   try {
     const r = await fetch("/admin/templates", { headers: { "x-admin-token": TOKEN } });
-    if (r.ok) { const d = await r.json(); tpls = (d && d.templates) || []; }
+    if (r.ok) { const d = await r.json(); tpls = (d && d.templates) || []; tplFallback = (d && d.fallbackButtons) || tplFallback; }
   } catch (e) { tpls = []; }
-  tplLoaded = true;
   // Open on an approved template rather than the legacy free-text default: the wizard's job is to
   // send a shape we stand behind, and an unselected picker above a different body reads as a bug.
-  if (!tplId && tpls.length) { tplId = tpls[0].id; campMsg = tpls[0].body; }
+  // Guarded on the body being untouched — this resolves asynchronously and must never overwrite
+  // text the operator typed in the first few hundred milliseconds.
+  if (!tplId && tpls.length && campMsg === campMsgAtBoot) { tplId = tpls[0].id; campMsg = tpls[0].body; tplEdited = false; }
   render(false);
 }
 window.tplPick = (i) => {
@@ -872,13 +883,19 @@ window.tplPick = (i) => {
   // Re-picking the active template restores its original text — the escape hatch after an edit.
   tplId = t.id;
   campMsg = t.body;
+  tplEdited = false;
   render(false);
 };
-// Editing the text keeps the template's BUTTONS but marks the body as the operator's own, so the
-// picker does not claim an approved template that no longer matches what will be sent.
+window.tplKey = (ev, i) => {
+  if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tplPick(i); }
+};
+// Editing the text keeps the template's BUTTONS — those are what the receiving code must recognise
+// — but the body is now the operator's own. tplEdited says so on screen rather than letting the
+// selected card imply an approved template that no longer matches what will be sent.
+// (No backticks in this file: it is one big template literal and a backtick closes it.)
 window.tplButtons = () => {
   const t = tpls.find((x) => x.id === tplId);
-  return t ? t.buttons : ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"];
+  return t ? t.buttons : tplFallback;
 };
 let segPresets = null;
 async function segLoadPresets() {
@@ -1111,25 +1128,30 @@ function vAimkt() {
     // The template picker. Each card states WHO it is for, because the two templates open on
     // different premises — one on a pain we assume, one on usage we already observed. Sending the
     // «استخدام مرتفع» opener to a facility that has never used the service is a visible lie.
-    (tpls.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:11px;margin-bottom:16px;">' +
+    (tpls.length ? '<div role="radiogroup" aria-label="القالب المعتمد" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:18px;">' +
       tpls.map((t, i) => {
         const on = tplId === t.id;
-        return '<div onclick="tplPick(' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#1F7A73" : "#EAECF0") +
-          ";background:" + (on ? "#F2F9F8" : "#fff") + ';border-radius:13px;padding:13px 15px;transition:.12s;">' +
+        return '<div role="radio" tabindex="0" aria-checked="' + (on ? "true" : "false") +
+          '" onclick="tplPick(' + i + ')" onkeydown="tplKey(event,' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#3FB6B0" : "#EAECF0") +
+          ";background:" + (on ? "#F6FCFB" : "#fff") + ';border-radius:16px;padding:18px;transition:.18s ease;' + (on ? "box-shadow:0 0 0 3px rgba(63,182,176,.12);" : "") + '">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
           '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#1F7A73" : "#D0D5DD") +
           ";background:" + (on ? "#1F7A73" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
-          '<span style="font-size:12.5px;font-weight:800;color:#101828;">' + esc(t.label) + "</span></div>" +
-          '<div style="font-size:11px;color:#667085;line-height:1.75;">' + esc(t.hint) + "</div>" +
+          '<span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(t.label) + "</span></div>" +
+          '<div style="font-size:11.5px;color:#667085;line-height:1.75;">' + esc(t.hint) + "</div>" +
           '<div style="font-size:10.5px;color:#98A2B3;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
           '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;">' +
-          t.buttons.map((b) => '<span style="font-size:10px;font-weight:700;color:#2F5F94;background:#EEF4FB;border-radius:5px;padding:3px 7px;">' + esc(b) + "</span>").join("") +
+          t.buttons.map((b) => '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;background:#E3ECF8;border-radius:999px;padding:4px 12px;">' + esc(b) + "</span>").join("") +
           "</div></div>";
       }).join("") + "</div>" : "") +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
     '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
-    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea></div>" +
+    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
+    // Meta holds the approved body and substitutes only the variables — an edited body has no field
+    // on the template wire. It works today because the sandbox sends session messages; on the
+    // production number the edit would silently not travel. Say so here rather than at migration.
+    (tplEdited ? '<div style="font-size:11px;color:#b5810f;margin-top:8px;line-height:1.8;">عدّلت نص القالب. يعمل على الرقم التجريبي، لكن على الرقم الإنتاجي تُرسل ميتا النص المعتمد فقط — سجّل التعديل كقالب جديد قبل الاعتماد.</div>' : "") + "</div>" +
     '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +

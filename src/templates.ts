@@ -72,12 +72,17 @@ export const BUTTON_INTENT: Record<string, ButtonIntent> = {
   "الملف التعريفي": "info",
   "أرسلوا التفاصيل": "info",
   "تفاصيل التكامل": "info",
-  // asks to talk business
+  // asks to talk business. «أريد العرض التجاري» is the exact title the system prompt tells the model
+  // to offer — it was absent, so the prompt's own pricing button routed nowhere.
   "العرض التجاري": "commercial",
+  "أريد العرض التجاري": "commercial",
   "أود مناقشة التكامل": "commercial",
-  // answers who they are
+  "احجز اجتماعًا": "commercial",
+  // answers who they are, or who does the integration work
   "منشأة صحية": "qualify",
   "مزوّد نظام HIS": "qualify",
+  "فريقنا التقني": "qualify",
+  "مزوّد النظام": "qualify",
   // says no, for now
   "ليس الآن": "decline",
 };
@@ -88,9 +93,34 @@ export function buttonIntent(text: string): ButtonIntent | undefined {
   return BUTTON_INTENT[text.trim()];
 }
 
+// ---------------------------------------------------------------------------
+// EMIT-TIME canonicalisation — the hole the first version of this contract missed entirely.
+//
+// `assertButtonsHandled()` covers titles written in code. But `send_buttons` lets the MODEL compose
+// button titles at runtime, and the system prompt itself prescribes «أريد العرض التجاري» — which is
+// not «العرض التجاري» and matched nothing, so tapping the pricing button the prompt asks for fell
+// straight back to «أي وصف يناسبكم؟». The largest source of emitted buttons was outside the contract.
+//
+// Fixed at the SOURCE rather than by loosening `buttonIntent`: whatever the model proposes, what
+// goes on the wire is a title this system can read back. Inbound matching stays exact, so a
+// customer's own sentence still cannot be mistaken for a tap.
+// ---------------------------------------------------------------------------
+export function canonicalTitle(proposed: string): string | undefined {
+  const t = proposed.trim();
+  if (BUTTON_INTENT[t]) return t;
+  // Longest approved title contained in the proposal — «أريد العرض التجاري» → «العرض التجاري».
+  return Object.keys(BUTTON_INTENT)
+    .filter((k) => t.includes(k))
+    .sort((a, b) => [...b].length - [...a].length)[0];
+}
+
+/** Used when a launch names no template. Lives here so the boot check can see it — a literal at the
+ *  call site is an emission site the contract is blind to, which is the defect this file exists for. */
+export const LAUNCH_FALLBACK_BUTTONS = ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"];
+
 /** Every button title the system can emit, from every source. */
 export function emittedButtons(extra: string[] = []): string[] {
-  return [...new Set([...TEMPLATES.flatMap((t) => t.buttons), ...extra])];
+  return [...new Set([...TEMPLATES.flatMap((t) => t.buttons), ...LAUNCH_FALLBACK_BUTTONS, ...extra])];
 }
 
 /** Fails loudly for a button we send but cannot answer, and for a title WhatsApp will reject.
@@ -99,9 +129,35 @@ export function assertButtonsHandled(extra: string[] = []): void {
   const problems: string[] = [];
   for (const title of emittedButtons(extra)) {
     if (!BUTTON_INTENT[title]) problems.push(`«${title}» is emitted but has no intent`);
-    if ([...title].length > 20) problems.push(`«${title}» is ${[...title].length} chars — WhatsApp rejects > 20 (131009)`);
+    // Count the SAME units the adapter truncates on (UTF-16, `gupshup.ts` slice(0,20)), or a title
+    // can pass this check and still be silently cut on the wire into a string with no intent.
+    if (title.length > 20 || [...title].length > 20)
+      problems.push(`«${title}» is ${title.length} UTF-16 units / ${[...title].length} chars — WhatsApp rejects > 20 (131009)`);
   }
   if (problems.length) throw new Error(`button contract violated:\n  - ${problems.join("\n  - ")}`);
+}
+
+// ---------------------------------------------------------------------------
+// The campaign marker, written into the transcript when an opener goes out. It carries the
+// TEMPLATE ID because the agent's next turn depends on which opener started the conversation:
+// the upsell asserts «لاحظنا أن لديكم استخدامًا مرتفعًا» — we have just told them we know who they
+// are — so answering their next tap with «أي وصف يناسبكم؟» contradicts the opener and reproduces
+// the founder's complaint #1 by a new route. One regex, exported, so the marker cannot be written
+// in one shape and read in another.
+// ---------------------------------------------------------------------------
+export const CAMPAIGN_MARK_RE = /\[حملة(?::([A-Za-z0-9_]+))?\]/;
+
+export function campaignMark(templateId?: string): string {
+  return ` [حملة${templateId ? `:${templateId}` : ""}]`;
+}
+
+export function isCampaignTurn(text: string): boolean {
+  return CAMPAIGN_MARK_RE.test(text);
+}
+
+/** The template id of the most recent campaign turn, if it carried one. */
+export function openerOf(text: string): string | undefined {
+  return (CAMPAIGN_MARK_RE.exec(text) || [])[1];
 }
 
 export function byId(id: string): CampaignTemplate | undefined {

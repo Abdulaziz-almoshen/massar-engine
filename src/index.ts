@@ -152,6 +152,9 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   // message text freely, but the reply buttons are an approved shape — resolving them server-side
   // keeps the wizard's preview and the wire in agreement and blocks arbitrary titles.
   const tpl = templateId ? templates.byId(templateId) : undefined;
+  // An unknown id used to fall through to the legacy buttons silently — the operator would see one
+  // template in the wizard and the customer would get another template's buttons. Fail instead.
+  if (templateId && !tpl) return reply.code(400).send({ error: `قالب غير معروف: ${templateId}` });
   // Default ON per the founder's instruction of 13 Aug, overriding the single-bubble rule he set
   // on 12 Aug. Pass buttons:false to get the one-bubble shape back.
   const wantButtons = buttons !== false;
@@ -159,7 +162,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     return reply.code(400).send({ error: "body: { targets: [{phone,name}], message, name?, product? }" });
   if (targets.length > 50) return reply.code(400).send({ error: "launch cap: 50 recipients per launch" });
   // A template whose service variable cannot be resolved must not go out with an empty hole in it.
-  if (/\{\{1\}\}/.test(message) && !(product || "").trim())
+  if (/\{\{1\}\}|\{product\}/.test(message) && !(product || "").trim())
     return reply.code(400).send({ error: "القالب يحتوي {{1}} ولم تُحدَّد الخدمة — اختر الخدمة قبل الإطلاق" });
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
@@ -192,9 +195,11 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // The founder's design (13 Aug): the opener does NOT carry the file. It offers it. The first
       // button asks for the profile, so the PDF arrives because the customer chose it — which is
       // both a cleaner first impression and a real interest signal we can act on.
-      const BTNS = (tpl?.buttons ?? ["الملف التعريفي", "أرسلوا التفاصيل", "ليس الآن"]).map((title) => ({ title }));
+      // The fallback comes from the REGISTRY, not a literal here. A literal is a third emission site
+      // that assertButtonsHandled() cannot see — the exact hole this whole contract exists to close.
+      const BTNS = (tpl?.buttons ?? templates.LAUNCH_FALLBACK_BUTTONS).map((title) => ({ title }));
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
-      const campMark = " [حملة]";
+      const campMark = templates.campaignMark(tpl?.id);
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
       // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
       // guaranteed single bubble — that is the primary shape for asset launches now.
@@ -430,7 +435,9 @@ app.post("/admin/segments/preview", async (req, reply) => {
 // preview and go out another way on the wire.
 app.get("/admin/templates", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  return reply.send({ templates: templates.TEMPLATES });
+  // The fallback travels with the registry so the client has no literal copy of its own — a third
+  // copy is a third emission site, and the boot contract can only see the ones it is given.
+  return reply.send({ templates: templates.TEMPLATES, fallbackButtons: templates.LAUNCH_FALLBACK_BUTTONS });
 });
 
 app.get("/admin/segments/presets", async (req, reply) => {
@@ -537,6 +544,13 @@ const main = async () => {
   // Refuse to start with a button we cannot answer, or a title WhatsApp will reject. Both have
   // already shipped once: a 21-char title failed three sends, and «العرض التجاري» dead-ended the
   // customer who tapped it. Crashing at boot is loud; a dead-end button is silent.
+  // SAFETY CONDITION (safety-gate, 13 Aug — the basis of its PASS): this assertion is safe to
+  // fail-closed ONLY because its input is 100% compile-time static, so a given image either always
+  // throws or never does, and it throws before app.listen — never leaving the service half-alive
+  // with outbound working and inbound «إيقاف» dropped. If anyone ever passes a runtime-derived
+  // title here (a DB template, an env var, an operator-typed button), this must degrade to a loud
+  // log plus refuse-to-emit-that-button. A data-dependent boot crash on the webhook receiver is a
+  // real availability hazard for the opt-out path.
   templates.assertButtonsHandled(agent.EMITTED_BUTTONS);
   tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
