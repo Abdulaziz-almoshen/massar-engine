@@ -714,7 +714,7 @@ function vHome(d) {
     // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
     // reached (4), while this counts the whole imported book (15). One label, two numbers, one
     // screen is exactly the contradiction the funnel fix just removed.
-    kpi("users", "جهات في قوائمك", entities.length.toLocaleString("ar-SA"), ["#EFF4FB", "#2F5F94"]) +
+    kpi("users", "جهات في قوائمك", fmtN(entities.length), ["#EFF4FB", "#2F5F94"]) +
     kpi("check", "وصلت الرسائل إلى الجهات", delivered, ["#E9F7F6", "#1F7A73"]) +
     kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
     kpi("flame", "جهات مهتمة ومؤهلة", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
@@ -882,7 +882,7 @@ function vAimkt() {
   const selName = reg[selProd] ? reg[selProd].name : "";
   const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمةات المدمجة.</div></div></div><div class="prods">' +
+  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمات المدمجة.</div></div></div><div class="prods">' +
     reg.map((x, i) => {
       const inner = x.sc !== null
         ? (() => { const t = tone(x.sc); return '<span class="sc" style="color:' + t[0] + '">' + fmtN(x.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + x.sc + '%;background:' + t[0] + ';"></i></div><span class="chip ' + t[2] + '">' + t[1] + "</span>"; })()
@@ -892,11 +892,11 @@ function vAimkt() {
     }).join("") + "</div></div>";
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
-    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + selN.toLocaleString("ar-SA") + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + entities.length.toLocaleString("ar-SA")) + "</span></span></div>";
+    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + fmtN(selN) + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
-      '<div style="font-size:13.5px;font-weight:700;color:#101828;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + retargetCohort.targets.length.toLocaleString("ar-SA") + " جهة</div>" +
+      '<div style="font-size:13.5px;font-weight:700;color:#101828;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
       '<div style="font-size:11.5px;color:#667085;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
       '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
   } else if (!entities.length) {
@@ -915,8 +915,8 @@ function vAimkt() {
     const shown = m.slice(0, LIST_CAP);
     if (m.length > LIST_CAP) {
       h += '<div style="display:flex;align-items:center;gap:12px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:12px;padding:12px 16px;margin-bottom:10px;">' +
-        '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + m.length.toLocaleString("ar-SA") + '</span>' +
-        '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + LIST_CAP + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
+        '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + fmtN(m.length) + '</span>' +
+        '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + fmtN(LIST_CAP) + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
     }
     h += '<div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
       shown.map((e) => {
@@ -927,7 +927,7 @@ function vAimkt() {
           attrChips(e, 3) +
           '<span style="font-size:11px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + (m.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
+      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + fmtN(m.length - LIST_CAP) + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
       (m.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   h += "</div>";
@@ -956,14 +956,14 @@ function vAimkt() {
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + selN.toLocaleString("ar-SA") + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
     '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:17px;font-weight:700;color:#101828;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:13px;color:#475467;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + selN.toLocaleString("ar-SA") + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    '<div style="font-size:13px;color:#475467;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
     (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#475467;background:#F2F4F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
@@ -1088,7 +1088,7 @@ function vKbProduct(name) {
     '<div style="position:relative;width:64px;height:64px;flex:none;">' +
     '<svg viewBox="0 0 36 36" style="width:64px;height:64px;transform:rotate(-90deg);"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#EAECF0" stroke-width="3.2"/>' +
     '<circle cx="18" cy="18" r="15.5" fill="none" stroke="' + readyTone + '" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="' + (ready * 0.974) + ' 100"/></svg>' +
-    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#101828;">' + ready + "%</span></div></div>" +
+    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#101828;">' + fmtN(ready) + "٪</span></div></div>" +
     '<div style="font-size:11px;color:#667085;font-weight:600;line-height:1.6;max-width:78px;">جاهزية<br>معرفة المساعد</div></div>' +
     '<button class="btn btn-teal" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
     "</div>";
@@ -1199,7 +1199,7 @@ window.entManualSave = async () => {
   const st = document.getElementById("entstat");
   if (!rows.length) { if (st) st.innerHTML = '<span class="chip c-warn">أدخل جهة واحدة على الأقل</span>'; return; }
   const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-9٠-٩]/g, "").length < 9);
-  if (bad.length) { if (st) st.innerHTML = '<span class="chip c-bad">تحقّق من الاسم والجوال في ' + bad.length + ' صف</span>'; return; }
+  if (bad.length) { if (st) st.innerHTML = '<span class="chip c-bad">تحقّق من الاسم والجوال في ' + fmtN(bad.length) + ' صف</span>'; return; }
   if (st) st.innerHTML = '<span class="chip c-teal">جارٍ الحفظ…</span>';
   const text = rows.map((r) => [r.name.trim(), r.phone.trim(), r.size.trim(), r.city.trim()].filter(Boolean).join("، ")).join("\\n");
   try {
@@ -1274,7 +1274,7 @@ function vCustomers() {
   const cq = custQ.trim();
   const cm = cq ? entities.filter((e) => e.name.includes(cq) || e.phone.includes(cq)) : entities;
   const cshown = cm.slice(0, LIST_CAP);
-  h += '<div class="sec">جهات الاستهداف <span class="meta">' + entities.length.toLocaleString("ar-SA") + " جهة" +
+  h += '<div class="sec">جهات الاستهداف <span class="meta">' + fmtN(entities.length) + " جهة" +
     (groups.length ? " · شرائح: " + groups.map((g) => esc(g.key)).join("، ") : "") + "</span></div>";
   if (!entities.length) {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
@@ -1289,7 +1289,7 @@ function vCustomers() {
       '<span style="font-size:11.5px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span>" +
       '<button onclick="event.stopPropagation();entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>';
     }).join("") +
-    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + (cm.length - LIST_CAP).toLocaleString("ar-SA") + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
+    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + fmtN(cm.length - LIST_CAP) + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
     (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   return h;
@@ -1318,7 +1318,7 @@ function stageBars(rows) {
     const drop = prev > 0 && i > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
     return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
       '<span style="font-size:12.5px;font-weight:600;color:#344054;">' + esc(r[0]) + "</span>" +
-      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA") +
+      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) +
       (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + fmtN(drop) + "٪</span>" : "") + "</span></div>" +
       '<div style="height:10px;background:#F2F4F7;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
   }).join("") + "</div>";
@@ -1333,7 +1333,7 @@ function funnelSvgUnused(rows) {
     const y = i * (segH + gap);
     const x1t = (W - wTop) / 2, x2t = (W + wTop) / 2, x1b = (W - wBot) / 2, x2b = (W + wBot) / 2;
     shapes += '<polygon points="' + x1t + ',' + y + ' ' + x2t + ',' + y + ' ' + x2b + ',' + (y + segH) + ' ' + x1b + ',' + (y + segH) + '" fill="' + r[2] + '" opacity="0.92"/>' +
-      '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + r[1].toLocaleString("ar-SA") + "</text>";
+      '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + fmtN(r[1]) + "</text>";
   });
   return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
     '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار تحويل الحملات">' + shapes + "</svg></div>" +
@@ -1344,7 +1344,7 @@ function colChart(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
     rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
-      '<div style="font-size:11px;font-weight:700;color:#101828;">' + r[1].toLocaleString("ar-SA") + "</div>" +
+      '<div style="font-size:11px;font-weight:700;color:#101828;">' + fmtN(r[1]) + "</div>" +
       '<div style="width:100%;max-width:44px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:4px 4px 2px 2px;"></div>' +
       '<div style="font-size:10px;color:#667085;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
 }
@@ -1353,7 +1353,7 @@ function treemapTiles(rows) {
   const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#101828"], ["#AFC6DE", "#101828"], ["#D6E2F1", "#101828"], ["#EFF4FB", "#101828"], ["#F9FAFB", "#101828"]];
   return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
     rows.map((r, i) => { const tn = tones[i % tones.length]; return '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:78px;border-radius:12px;background:' + tn[0] + ';color:' + tn[1] + ';padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">' +
-      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA") + "</div></div>"; }).join("") + "</div>";
+      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) + "</div></div>"; }).join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#98A2B3;">' + sub + "</span></div>" + inner + "</div>";
@@ -1361,7 +1361,7 @@ function chartCard(title, sub, inner) {
 function hbarRows(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">' + rows.map((r) =>
-    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#344054;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#101828;">' + r[1].toLocaleString("ar-SA") + "</span></div>" +
+    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#344054;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#101828;">' + fmtN(r[1]) + "</span></div>" +
     '<div style="height:8px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
 }
 function dailyActivitySvg(cs) {
@@ -1428,7 +1428,7 @@ function vHomeCharts(cs) {
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("مسار التحويل التسويقي", camps.length.toLocaleString("ar-SA") + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
@@ -1436,7 +1436,7 @@ function vHomeCharts(cs) {
       '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
     : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
   h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("جهات الاستهداف حسب المدينة", entities.length.toLocaleString("ar-SA") + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
 }
@@ -1457,7 +1457,7 @@ function vActionQueue(cs) {
   const items = [];
   hotIdle.slice(0, 3).forEach((c) => {
     const ins = insCache[c.phone] || {};
-    items.push(["call", "تواصل الآن مع الفرصة المؤهلة", (c.waName || c.phone) + " · " + Math.round((now - (c.lastEventAt || 0)) / 3600e3) + " ساعة بلا متابعة",
+    items.push(["call", "تواصل الآن مع الفرصة المؤهلة", (c.waName || c.phone) + " · " + fmtN(Math.round((now - (c.lastEventAt || 0)) / 3600e3)) + " ساعة بلا متابعة",
       ins.next_action || "تواصل مباشرة لاستكمال الاهتمام", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
   });
   if (seenNoReply.length) {
@@ -1501,7 +1501,7 @@ function vWinLoss() {
       : '<div style="font-size:12px;color:#98a2b3;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
   h += '<div><div style="font-size:11.5px;font-weight:700;color:#B42318;margin-bottom:9px;">✕ ما يخسّرنا الصفقات</div>' +
     ((winloss.loss_causes || []).length
-      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F2F4F7;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + c.count + "</span></div>" +
+      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F2F4F7;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + fmtN(c.count) + "</span></div>" +
         (c.example ? '<div style="font-size:11.5px;color:#667085;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("")
       : '<div style="font-size:12px;color:#98a2b3;">لا خسائر محكومة بعد — وهذا خبر جيد.</div>') + "</div>";
   h += "</div>";
@@ -1719,7 +1719,7 @@ function countUp() {
     const step = (t) => {
       const k = Math.min(1, (t - t0) / 620);
       const eased = 1 - Math.pow(1 - k, 3);
-      el.textContent = Math.round(target * eased).toLocaleString("ar-SA") + rest;
+      el.textContent = Math.roundfmtN(target * eased) + rest;
       if (k < 1) requestAnimationFrame(step);
     };
     _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
