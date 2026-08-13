@@ -458,13 +458,18 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           body: { type: "string", description: "نص موجز يوضح القيمة فوق الأزرار" },
-          // ENUM-CONSTRAINED, built from BUTTON_INTENT at module load. Three roles independently
-          // reached the same conclusion: a hand-maintained allowlist re-harvested from production is
-          // a treadmill — the model's title space is open, so every prompt edit, product, or dialect
-          // shift re-opens the gap, and the failure degrades silently (drop → plain text) so we only
-          // learn by harvesting again. An enum makes an unroutable title UNREPRESENTABLE rather than
-          // droppable: the provider enforces it during sampling. canonicalTitle() stays as a
-          // belt-and-braces fallback for any path that bypasses the schema.
+          // Enum built from BUTTON_INTENT at module load. Three roles reached the same conclusion:
+          // a hand-maintained allowlist re-harvested from production is a treadmill — the model's
+          // title space is open, so every prompt edit, product or dialect shift re-opens the gap.
+          //
+          // CORRECTION (CPO round 27): this is GUIDANCE, not enforcement. Without `strict: true` on
+          // chat.completions the provider treats `enum` as a hint, not a grammar, so an off-table
+          // title is still producible. The earlier claim that it was "unrepresentable" was false.
+          // The thing actually preventing an unroutable button reaching a customer remains
+          // canonicalTitle() at the emit site — unchanged, and still the load-bearing guard.
+          // Making the enum real needs `strict: true` + `additionalProperties: false` + every
+          // property in `required` (today `footer` is optional, which strict rejects). Filed, not
+          // done here: it changes the wire contract with the model and deserves its own increment.
           options: {
             type: "array",
             items: { type: "string", enum: Object.keys(templates.BUTTON_INTENT) },
