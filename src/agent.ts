@@ -213,7 +213,9 @@ function systemPrompt(contact: Contact): string {
   const statements = sentences.filter((x) => {
     const v = x.trim();
     if (!v) return false;
-    if (/^\s*(وش|كم|هل|متى|أي|ما|مين|كيف|ليه|لماذا)\b/.test(v)) return false;
+    // NOT \b — JS word boundaries need an ASCII word char, so «وش » never matched and every
+    // question survived into the disclosure set. Same trap as SANDBOX_ACTIVATION_RE.
+    if (/^\s*(وش|كم|هل|متى|أي|ما|مين|كيف|ليه|لماذا|ايش|إيش)(?=\s|$)/.test(v)) return false;
     if (/(نظام|منصة)\s*صحة/.test(v)) return false;
     return true;
   });
@@ -226,10 +228,19 @@ function systemPrompt(contact: Contact): string {
 
   // WHAT HAS ALREADY BEEN SENT. Without this the agent re-sent the same PDF and asked a slightly
   // different question — it had no idea it had already delivered. Read from its own record.
+  // Both marker shapes: the current «[مرفق في نفس الرسالة: X]» and the older
+  // «[أُرسل الملف التعريفي: X]» still present in live transcripts. Recognising only the current
+  // one meant an asset sent yesterday could be sent again today.
   const sentAssets = [...new Set((contact.transcript || [])
-    .filter((t) => t.role === "agent" && t.text.includes("[مرفق في نفس الرسالة:"))
-    .map((t) => (t.text.match(/\[مرفق في نفس الرسالة:\s*([^\]]+)\]/) || [])[1] || "")
-    .filter(Boolean))];
+    .filter((t) => t.role === "agent")
+    .flatMap((t) => [
+      (t.text.match(/\[مرفق في نفس الرسالة:\s*([^\]]+)\]/) || [])[1],
+      (t.text.match(/\[أُرسل الملف التعريفي:\s*([^\]]+)\]/) || [])[1],
+    ])
+    .map((x) => (x || "").trim())
+    .filter(Boolean)
+    // Filenames are an implementation detail; the model should reason about the SERVICE.
+    .map((x) => x.replace(/\.(pdf|docx?|pptx?)$/i, "").replace(/^_+/, "")))];
 
   // WHAT THIS TURN IS FOR. «Every message must move the lead one step forward» — so the objective
   // is derived from what is still unknown, in the founder's own priority order, rather than left
@@ -591,7 +602,8 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       // had no idea it had already delivered. The prompt now says so too, but a rule that matters
       // this much should not depend on the model reading it.
       const already = pa && (contact.transcript || []).some((t) =>
-        t.role === "agent" && t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`));
+        t.role === "agent" && (t.text.includes(`[مرفق في نفس الرسالة: ${pa.product}]`)
+          || t.text.includes(`[أُرسل الملف التعريفي: ${pa.product}]`)));
       if (already) {
         return `سبق أن أُرسل ملف «${pa!.product}» إلى هذه الجهة. لا ترسله ثانية. أخبرهم أنه أُرسل، ولخّص في سطرين ما الذي يتيحه التكامل عمليًا، ثم انتقل إلى هدف هذه الرسالة.`;
       }
