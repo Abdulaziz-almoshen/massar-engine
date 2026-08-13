@@ -1720,9 +1720,12 @@ function vHomeCharts(cs) {
     targeted: reached.length,
     sent: reached.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
     delivered: reached.filter((c) => (c.statusTimes || {}).delivered).length,
-    seen: reached.filter(seenOf).length,
+    // Explicit window 0 — these charts are deliberately lifetime. Passing the bare function handed
+    // Array.filter's INDEX to win (0,1,2,3…), so every real timestamp passed and the numbers were
+    // right only by accident. Fail-open by typo is the exact shape this whole series set out to kill.
+    seen: reached.filter((c) => seenOf(c, 0)).length,
     replied: reached.filter((c) => (c.statusTimes || {}).replied).length,
-    interested: reached.filter(interestedOf).length,
+    interested: reached.filter((c) => interestedOf(c, 0)).length,
   };
   const funnel = [["جهات الاستهداف", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["جهات مهتمة", agg.interested, "#1f8a52"]];
   const byProd = new Map();
