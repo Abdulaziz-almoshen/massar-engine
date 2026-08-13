@@ -729,7 +729,19 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
       break;
     }
 
-    if (finalText && sentOwnBubble) {
+    // NEVER SILENCE. The send was conditional on finalText, so a turn spent entirely on tool
+    // calls — or a model returning empty content — produced no message at all. That is what the
+    // founder saw: he tapped «أرسلوا التفاصيل» and the conversation simply stopped. A tool like
+    // request_human_handoff records state without sending anything, so banning the handoff TEXT
+    // made silence the likeliest outcome of the very case it was meant to fix.
+    if (!finalText && !sentOwnBubble) {
+      console.error(JSON.stringify({ at: "agent", level: "error", msg: "model produced no text and no tool bubble — sending fallback", phone: contact.phone }));
+      const lastToolResult = [...messages].reverse().find((m: any) => m.role === "tool" && typeof m.content === "string");
+      const fallback = lastToolResult && /^أُشعر|^أُرسل/.test(String((lastToolResult as any).content))
+        ? String((lastToolResult as any).content)
+        : "التكامل مع سجل التطعيمات الوطني يتيح تنفيذ الخدمة من داخل نظام المنشأة عبر واجهات برمجية، وندعمكم في المتطلبات التقنية والاختبار والتفعيل. أي وصف يناسبكم: منشأة صحية، أم مزوّد نظام؟";
+      await safeSend(contact.phone, fallback);
+    } else if (finalText && sentOwnBubble) {
       console.log(JSON.stringify({ at: "agent", msg: "suppressed trailing bubble after self-contained tool send", phone: contact.phone, dropped: finalText.slice(0, 80) }));
     } else if (finalText) {
       await safeSend(contact.phone, finalText);
