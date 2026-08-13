@@ -17,6 +17,19 @@ const FILES = ["src/dashboard.ts", "src/segments.ts"];
 const FILE = FILES[0];
 const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 
+// GUARD, added after the FOURTH occurrence: src/dashboard.ts is ONE template literal, so a backtick
+// anywhere except the two delimiters terminates it early and ships a broken or blank page. tsc
+// catches it only when the truncation happens to be invalid TypeScript — twice it did not.
+{
+  const dash = readFileSync("src/dashboard.ts", "utf8");
+  const n = (dash.match(/`/g) || []).length;
+  if (n !== 2) {
+    console.error("check-numerals: src/dashboard.ts has " + n + " backticks; exactly 2 are allowed");
+    console.error("  (the template-literal delimiters). One in a comment or string closes it early.");
+    process.exit(1);
+  }
+}
+
 // A numeric-looking expression concatenated straight into a quoted string.
 const NUMERIC = String.raw`(?:Math\.(?:round|floor|ceil|abs)\(.*?\)|[\w$]+(?:\.[\w$]+)*\.(?:length|count|score)\b|\bLIST_CAP\b)`;
 // Only unambiguously-numeric shapes. Array indexing (m2[0], r[1]) is deliberately NOT here:

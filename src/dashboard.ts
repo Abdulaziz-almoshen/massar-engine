@@ -361,18 +361,43 @@ function funnelData(d) {
 }
 
 function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((c) => c.phone === phone); }
-function seenOf(c) { const st = (c && c.statusTimes) || {}; return Boolean(st.read || st.replied); }
-function interestedOf(c) { return Boolean(c && (c.outcome === "interested" || (c.tags || []).some((t) => t.level === "hot" || t.level === "warm"))); }
+// EVERY campaign number is windowed to that campaign's launch. Without this a campaign inherits the
+// contact's whole history: two contacts who had replied hours earlier made a campaign sent minutes
+// ago report «ردّوا ٢ · شوهدت ٢ · مهتم» before the customers had even opened it. statusTimes holds
+// ONE latest timestamp per status, and tags/outcome are lifetime — none of them are per-campaign,
+// so reading them raw attributes every past success to the newest send.
+function campWin(camp) {
+  const raw = camp && (camp.launched_at || camp.created_at);
+  const n = typeof raw === "number" ? raw : Date.parse(raw || "");
+  return Number.isFinite(n) ? n : 0;
+}
+function atOrAfter(ts, win) { return Number(ts || 0) >= win; }
+function repliedIn(c, win) {
+  return (c && (c.transcript || []).some((t) => t.role === "customer" && atOrAfter(t.ts, win))) || false;
+}
+function seenOf(c, win) {
+  const st = (c && c.statusTimes) || {};
+  return atOrAfter(st.read, win) || atOrAfter(st.replied, win) || repliedIn(c, win);
+}
+function interestedOf(c, win) {
+  // Interest must have been expressed IN this campaign. outcome carries no timestamp, so it is
+  // only credited when the contact actually spoke after the send — otherwise a lead marked
+  // «interested» last week would make every future campaign look like it converted on arrival.
+  if (!c) return false;
+  const tagged = (c.tags || []).some((t) => (t.level === "hot" || t.level === "warm") && atOrAfter(t.ts, win));
+  return tagged || (c.outcome === "interested" && repliedIn(c, win));
+}
 function campStats(camp) {
+  const win = campWin(camp);
   const cs = camp.targets.map((t) => contactByPhone(t.phone)).filter(Boolean);
   return {
     targeted: camp.targets.length,
-    sent: cs.filter((c) => (c.statusTimes || {}).sent || (c.transcript || []).some((t) => t.role === "agent")).length,
-    delivered: cs.filter((c) => (c.statusTimes || {}).delivered).length,
-    seen: cs.filter(seenOf).length,
-    replied: cs.filter((c) => (c.statusTimes || {}).replied).length,
-    interested: cs.filter(interestedOf).length,
-    failed: cs.filter((c) => (c.statusTimes || {}).failed && !(c.statusTimes || {}).delivered).length,
+    sent: cs.filter((c) => atOrAfter((c.statusTimes || {}).sent, win) || (c.transcript || []).some((t) => t.role === "agent" && atOrAfter(t.ts, win))).length,
+    delivered: cs.filter((c) => atOrAfter((c.statusTimes || {}).delivered, win)).length,
+    seen: cs.filter((c) => seenOf(c, win)).length,
+    replied: cs.filter((c) => repliedIn(c, win)).length,
+    interested: cs.filter((c) => interestedOf(c, win)).length,
+    failed: cs.filter((c) => atOrAfter((c.statusTimes || {}).failed, win) && !atOrAfter((c.statusTimes || {}).delivered, win)).length,
   };
 }
 function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
@@ -614,6 +639,7 @@ function vKmonDetail(id, d) {
   const camp = campaigns.find((x) => String(x.id) === String(id));
   if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#2E7D77;font-weight:700;">→ كل الحملات</a></div></div>';
   const st = campStats(camp);
+  const cwin = campWin(camp);   // every number on this screen is scoped to THIS campaign
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
   const base = Math.max(1, st.targeted);
   const pct = (v) => Math.round(v / base * 100);
@@ -640,7 +666,7 @@ function vKmonDetail(id, d) {
     '<div class="p">' + (i === 0 ? "&nbsp;" : fmtN(pct(c[1])) + "٪ من جهات الاستهداف") + "</div>" +
     '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
-  const seenSilent = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied);
+  const seenSilent = rows.filter((r) => r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin));
   const notDelivered = rows.filter((r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered);
   const hotHere = rows.filter((r) => r.contact && ((r.contact.tags || []).some((t) => t.level === "hot") || (insCache[r.phone] || {}).intent === "high"));
   const lostHere = rows.map((r) => insCache[r.phone]).filter((i) => i && i.deal_state === "lost" && i.loss_cause);
@@ -665,11 +691,11 @@ function vKmonDetail(id, d) {
   }
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
-    ["seen", "شوهدت", st.seen, (r) => seenOf(r.contact)],
-    ["replied", "ردّوا", st.replied, (r) => r.contact && (r.contact.statusTimes || {}).replied],
-    ["interested", "جهات مهتمة", st.interested, (r) => interestedOf(r.contact)],
-    ["silent", "شوهدت دون ردّ", seenSilent.length, (r) => r.contact && (r.contact.statusTimes || {}).read && !(r.contact.statusTimes || {}).replied],
-    ["failed", "فشل الإرسال", st.failed, (r) => r.contact && (r.contact.statusTimes || {}).failed && !(r.contact.statusTimes || {}).delivered],
+    ["seen", "شوهدت", st.seen, (r) => seenOf(r.contact, cwin)],
+    ["replied", "ردّوا", st.replied, (r) => repliedIn(r.contact, cwin)],
+    ["interested", "جهات مهتمة", st.interested, (r) => interestedOf(r.contact, cwin)],
+    ["silent", "شوهدت دون ردّ", seenSilent.length, (r) => r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin)],
+    ["failed", "فشل الإرسال", st.failed, (r) => r.contact && atOrAfter((r.contact.statusTimes || {}).failed, cwin) && !atOrAfter((r.contact.statusTimes || {}).delivered, cwin)],
   ];
   const active = filters.find((f) => f[0] === campFilter) || filters[0];
   const q = rQ.trim();
@@ -699,7 +725,9 @@ function vHome(d) {
   const cs = showTest ? csAll : csAll.filter((c) => !c.test);
   const nTest = csAll.filter((c) => c.test).length;
   const realCampaigns = campaigns.filter((cp) => !campIsTest(cp));
-  const interestedList = cs.filter((c) => interestedOf(c) || c.outcome === "handoff");
+  // Home is deliberately contact-centric and lifetime-scoped: it answers "who is warm right now",
+  // not "what did this campaign do". Window 0 keeps that meaning explicit rather than accidental.
+  const interestedList = cs.filter((c) => interestedOf(c, 0) || c.outcome === "handoff");
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
   const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
@@ -886,6 +914,16 @@ window.tplPick = (i) => {
   campMsg = t.body;
   render(false);
 };
+// Arabic time agreement: 3-10 take the plural, 11+ the singular accusative.
+function arAgo(h) {
+  if (h < 1) return "أقل من ساعة";
+  if (h === 1) return "ساعة"; if (h === 2) return "ساعتين";
+  if (h < 11) return fmtN(h) + " ساعات";
+  if (h < 48) return fmtN(h) + " ساعة";
+  var d = Math.floor(h / 24);
+  if (d === 1) return "يوم"; if (d === 2) return "يومين";
+  return d < 11 ? fmtN(d) + " أيام" : fmtN(d) + " يومًا";
+}
 window.tplKey = (ev, i) => {
   if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tplPick(i); }
 };
@@ -1788,7 +1826,7 @@ function tlDot(kind) {
 }
 function vCustomer(ph) {
   if (!profileData || profilePhone !== ph) {
-    return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، واكتمال السياق.</div></div>';
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، وقراءة الحوار.</div></div>';
   }
   if (profileData.missing) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
@@ -1809,12 +1847,35 @@ function vCustomer(ph) {
     '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
     ((d.campaigns || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + d.campaigns.map((cp) => '<a href="#kmon/' + cp.id + '" style="text-decoration:none;" class="chip c-blue">' + esc(cp.name.slice(0, 30)) + "</a>").join("") + "</div>" : "") +
     "</div></div>" +
-    '<div style="flex:none;display:flex;gap:12px;align-items:center;border-inline-start:1px solid #F2F4F7;padding-inline-start:18px;">' +
-    '<div style="display:flex;flex-direction:column;align-items:center;gap:6px;">' +
-    '<div style="font-size:22px;font-weight:700;color:#2E7D77;">' + fmtN(ctx.score) + '٪</div>' +
-    '<div style="width:10px;height:110px;background:#EAECF0;border-radius:999px;position:relative;overflow:hidden;"><i style="position:absolute;bottom:0;left:0;right:0;height:' + ctx.score + '%;background:linear-gradient(180deg,#3FB6B0,#2E7D77);display:block;border-radius:999px;"></i></div>' +
-    '<div style="font-size:10px;font-weight:700;color:#667085;">اكتمال السياق</div></div>' +
-    (missing.length ? '<div style="max-width:150px;font-size:10.5px;color:#98A2B3;line-height:1.9;">ينقصه:<br>' + missing.map((m) => "· " + esc(m.label)).join("<br>") + "</div>" : "") +
+    // THE CONVERSATION, not a checklist of fields. The old gauge scored what we hold on file —
+    // a name, an import match, a file we sent — so it read full on a contact whose only real
+    // sentence was «ماني مهتم لا تتصل علي». A percentage also implies a ceiling the conversation can
+    // reach; there is none. This reports counts, whose turn it is, and the customer's own words.
+    '<div class="convled" style="flex:none;width:210px;display:flex;flex-direction:column;gap:9px;border-inline-start:1px solid #F2F4F7;padding-inline-start:18px;">' +
+    (function () {
+      var it = d.interaction;
+      if (!it) return '<div style="font-size:11px;color:#98A2B3;">لا قراءة للحوار بعد</div>';
+      var total = Math.max(1, it.customerTurns + it.agentTurns);
+      var cw = Math.round((it.customerTurns / total) * 100);
+      var head = it.customerTurns ? fmtN(it.customerWords) : "—";
+      return '<div style="font-size:10px;font-weight:700;color:#667085;">العميل ' + fmtN(it.customerTurns) +
+        " · المساعد " + fmtN(it.agentTurns) + "</div>" +
+        '<div style="height:8px;border-radius:999px;overflow:hidden;display:flex;background:#EAECF0;">' +
+        '<i style="width:' + cw + '%;background:#3FB6B0;"></i>' +
+        '<i style="flex:1;background:rgba(31,68,112,.22);"></i></div>' +
+        '<div><span style="font-size:22px;font-weight:700;color:' + (it.customerTurns ? "#101828" : "#98A2B3") + ';">' + head +
+        '</span> <span style="font-size:12px;color:#667085;">كلمة من العميل</span></div>' +
+        '<div><span class="chip" style="background:' + (it.state === "reciprocal" ? "rgba(63,182,176,.14);color:#1F7A73" :
+          it.state === "no_reply" ? "#F2F4F7;color:#667085" : "rgba(201,162,39,.16);color:#8a6d10") + ';">' + esc(it.stateLabel) + "</span></div>" +
+        '<div style="font-size:11px;color:#667085;line-height:1.85;">' + esc(it.stateReason) + "</div>" +
+        (it.voice
+          ? '<div style="font-size:12px;color:#101828;line-height:1.9;background:#F6F8FB;border-radius:10px;border-inline-start:2px solid #3FB6B0;padding:9px 11px;">' +
+            esc(clip(it.voice.text, 120)) + "</div>"
+          : '<div style="font-size:11px;color:#98A2B3;line-height:1.85;">لم يكتب بكلماته بعد — لا نعرف احتياجه منه هو.</div>') +
+        '<div style="font-size:10.5px;color:#98A2B3;">' +
+        (it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "لم يبدأ الحوار") +
+        (it.hoursSinceCustomer !== null ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "") + "</div>";
+    })() +
     "</div></div>";
   const hOut = [...(c.transcript || [])].reverse().find((t) => t.role === "system" && t.text.indexOf("نتيجة موثقة يدويًا") >= 0);
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +

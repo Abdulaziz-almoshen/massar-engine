@@ -109,6 +109,104 @@ const SYSTEM = [
   'أعد JSON فقط: {"summary":"سطر واحد","intent":"high|medium|low|none","signals":["..."],"objections":["..."],"product_interest":[{"product":"...","level":"high|medium|low"}],"next_action":"...","why":"...","best_time":"...","deal_state":"won|lost|stalled|active","stage":"واحدة من المراحل الست","stage_reason":"سبب قصير","loss_cause":"","win_drivers":["..."],"evidence":"اقتباس حرفي","fix_suggestion":""}',
 ].join("\n");
 
+/** What the CONVERSATION actually was — not what we hold on file about the person.
+ *
+ *  The founder's words on seeing «١٠٠٪ اكتمال السياق»: «this doesnt represent the real interaction
+ *  make it reflect the agent and customer feedback». He was right, and the live data proves it: one
+ *  contact scores near-full on context completeness with 14 customer turns and 11 interest tags,
+ *  while the longest thing that customer ever typed is «ماني مهتم لا تتصل علي». A checklist of
+ *  fields we possess cannot see a refusal.
+ *
+ *  Everything here is computed from the transcript — no model call, no estimate, no score out of
+ *  100. It reports counts, a state, and the customer's own most substantive sentence as the
+ *  evidence, per the standing rule that an intelligence surface must justify its reading with the
+ *  customer's own words. */
+export type InteractionRead = {
+  customerTurns: number;
+  agentTurns: number;
+  typedTurns: number;          // customer messages that are NOT a button echo — their own words
+  tappedTurns: number;         // button taps
+  customerWords: number;
+  agentWords: number;
+  state: "no_reply" | "taps_only" | "awaiting_customer" | "reciprocal" | "one_sided" | "refused";
+  stateLabel: string;
+  stateReason: string;
+  voice: { text: string; ts: number } | null;   // longest thing they said in their own words
+  lastSpeaker: "customer" | "agent" | null;
+  hoursSinceCustomer: number | null;
+  openQuestion: boolean;       // the agent's last message ended in a question nobody answered
+};
+
+export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean): InteractionRead {
+  const turns = (c.transcript || []).filter((t) => t.role !== "system");
+  const cust = turns.filter((t) => t.role === "customer");
+  const agent = turns.filter((t) => t.role === "agent");
+  // A tap echoes an approved title verbatim; anything else is the customer speaking for themselves.
+  // Exclude the sandbox activation boilerplate — «Proxy Massar» is the platform talking, not the
+  // customer, and it was being surfaced as one contact's most substantive sentence.
+  const typed = cust.filter((t) => t.text.trim() && !isButtonEcho(t.text) && !SANDBOX_ACTIVATION_RE.test(t.text));
+  const words = (list: typeof turns) => list.reduce((n, t) => n + t.text.trim().split(/\s+/).filter(Boolean).length, 0);
+  // Strip our own bookkeeping markers before measuring what the agent actually said.
+  const clean = (t: string) => t.replace(/\[[^\]]*\]/g, " ").trim();
+  const voiceTurn = [...typed].sort((a, b) => b.text.length - a.text.length)[0] ?? null;
+  const last = turns.length ? turns[turns.length - 1] : null;
+  const lastCust = cust.length ? cust[cust.length - 1] : null;
+  const hoursSinceCustomer = lastCust ? Math.floor((Date.now() - lastCust.ts) / 3600e3) : null;
+  const lastAgent = agent.length ? agent[agent.length - 1] : null;
+  const openQuestion = Boolean(last?.role === "agent" && lastAgent && /؟/.test(clean(lastAgent.text)));
+
+  // An explicit refusal in the customer's OWN words. Deliberately narrow and anchored — these are
+  // statements of disinterest, not the opt-out path (which is handled pre-LLM and is sacred).
+  const REFUSAL = /(ما\s?ني|ماني|مو|لست|لسنا|غير)\s*مهتم|لا\s*(تتصل|تراسل|ترسل|تكلم)|ما\s*نبغى|ما\s*نحتاج|لا\s*نحتاج/;
+  const refusal = typed.some((t) => REFUSAL.test(t.text));
+
+  let state: InteractionRead["state"], stateLabel: string, stateReason: string;
+  if (!cust.length) {
+    state = "no_reply"; stateLabel = "لم يردّ";
+    stateReason = "أُرسلت الرسالة ولم تصل أي استجابة بعد.";
+  } else if (!typed.length) {
+    state = "taps_only"; stateLabel = "ضغط أزرار فقط";
+    stateReason = "تفاعل بالأزرار ولم يكتب بكلماته — لا نعرف احتياجه بعد.";
+  } else if (openQuestion) {
+    state = "awaiting_customer"; stateLabel = "سؤال بلا إجابة";
+    stateReason = "آخر رسالة سؤال من المساعد، ولم يردّ عليه" +
+      (hoursSinceCustomer !== null ? ` منذ ${arHours(hoursSinceCustomer)}.` : ".");
+  } else if (refusal) {
+    // A turn-taking count called one contact «حوار متبادل» in teal directly above their own words:
+    // «ماني مهتم لا تتصل علي». A panel that contradicts the quote beneath it is decoration. What the
+    // customer SAID outranks how many times they said something.
+    state = "refused"; stateLabel = "رفض صريح";
+    stateReason = "العميل رفض بكلماته — اقرأ نصّه أدناه قبل أي متابعة.";
+  } else if (typed.length >= 2 && cust.length >= 3) {
+    state = "reciprocal"; stateLabel = "حوار متبادل";
+    stateReason = "كتب بكلماته أكثر من مرة، والحوار يسير في الاتجاهين.";
+  } else {
+    state = "one_sided"; stateLabel = "من طرف واحد";
+    stateReason = "المساعد يتكلم أكثر مما يتكلم العميل.";
+  }
+
+  return {
+    customerTurns: cust.length, agentTurns: agent.length,
+    typedTurns: typed.length, tappedTurns: cust.length - typed.length,
+    customerWords: words(cust), agentWords: agent.reduce((n, t) => n + clean(t.text).split(/\s+/).filter(Boolean).length, 0),
+    state, stateLabel, stateReason,
+    voice: voiceTurn ? { text: voiceTurn.text, ts: voiceTurn.ts } : null,
+    lastSpeaker: last ? (last.role as "customer" | "agent") : null,
+    hoursSinceCustomer, openQuestion,
+  };
+}
+
+/** Arabic hour agreement: 3–10 take the plural, 11+ the singular accusative. */
+function arHours(h: number): string {
+  if (h < 1) return "أقل من ساعة";
+  if (h === 1) return "ساعة";
+  if (h === 2) return "ساعتين";
+  if (h < 11) return `${h} ساعات`;
+  if (h < 48) return `${h} ساعة`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "يوم" : d === 2 ? "يومين" : d < 11 ? `${d} أيام` : `${d} يومًا`;
+}
+
 /** Deterministic completeness of what the platform knows about this person (0–100). */
 export function contextScore(c: Contact, entity: EntityRow | null): { score: number; parts: { label: string; got: boolean; pts: number }[] } {
   const inbound = (c.transcript || []).filter((t) => t.role === "customer").length;

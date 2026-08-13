@@ -337,6 +337,9 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   return {
     contact, entity, insights: ins,
     context: insights.contextScore(contact, entity),
+    // What the conversation actually WAS. `contextScore` measures fields we hold and can read full
+    // on a contact whose only real sentence was «ماني مهتم لا تتصل علي»; this reads the transcript.
+    interaction: insights.interactionRead(contact, (t) => Boolean(templates.buttonIntent(t))),
     timeline: insights.buildTimeline(contact),
     campaigns: (await db.listCampaigns()).filter((cp: any) => (cp.targets || []).some((t: any) => t.phone === phone)).map((cp: any) => ({ id: cp.id, name: cp.name })),
   };
