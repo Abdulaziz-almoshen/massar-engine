@@ -38,6 +38,10 @@ function blankFormatted(line) {
   while (i < line.length) {
     const at = line.indexOf("fmtN(", i);
     if (at === -1) { out += line.slice(i); break; }
+    // Require a left boundary. Without it "Math.roundfmtN(" blanks to "Math.roundN" and the
+    // check clears a line that throws at runtime — exactly what shipped at aed03a3, concealed
+    // by this very function.
+    if (at > 0 && /[\w$.]/.test(line[at - 1])) { out += line.slice(i, at + 5); i = at + 5; continue; }
     out += line.slice(i, at) + "N";
     let depth = 0, j = at + 4;
     for (; j < line.length; j++) {
@@ -66,6 +70,18 @@ src.forEach((line, i) => {
     return;
   }
   if (LATIN_PCT.test(line)) hits.push([i + 1, "Latin % glyph in UI text (use ٪)", line.trim().slice(0, 96)]);
+});
+
+// A mangled identifier is not a numeral defect, so the rules above cannot see it — and at
+// aed03a3 `Math.round(x).toLocaleString(...)` was rewritten to `Math.roundfmtN(x)`, which is
+// syntactically valid, type-checks, passes node --check, and throws at runtime inside the client
+// template string. Verify every Math.<name> actually exists on Math.
+const MATH_OK = new Set(Object.getOwnPropertyNames(Math));
+src.forEach((line, i) => {
+  if (/^\s*(\/\/|\*)/.test(line)) return;
+  for (const m of line.matchAll(/\bMath\.([A-Za-z_$][\w$]*)/g)) {
+    if (!MATH_OK.has(m[1])) hits.push([i + 1, `Math.${m[1]} does not exist — this throws at runtime`, line.trim().slice(0, 96)]);
+  }
 });
 
 if (hits.length) {

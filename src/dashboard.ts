@@ -304,17 +304,6 @@ const PRODUCTS = [
   { n: "الشهادات الصحية", sc: 55, gaps: ["أسئلة شائعة", "معالجة الاعتراضات"] },
   { n: "تكامل الأنظمة (HIS/ERP)", sc: 63, gaps: ["التسعير التفصيلي"] },
 ];
-const KB_SECTIONS = [
-  ["نظرة عامة على الخدمة", "الوصف وآلية العمل ومدة التنفيذ", "ok", "مكتمل"],
-  ["القيمة التشغيلية", "القيمة التشغيلية: زمن الإصدار ↓70%، دون إدخال مزدوج، وتوثيق فوري", "ok", "مكتمل"],
-  ["جهات الاستهداف", "المجمعات والمراكز والمستشفيات ومراكز الأسنان", "ok", "مكتمل"],
-  ["التسعير والباقات", "القياسية 18,000 ر.س · المؤسسات 95,000 ر.س سنويًا", "ok", "مكتمل"],
-  ["الأسئلة الشائعة", "الاعتماد، مدة الربط (5 أيام)، التجربة (14 يومًا)", "ok", "3 عناصر"],
-  ["معالجة الاعتراضات", "«السعر مرتفع» · «عندنا نظام حالي»", "warn", "2 من 8"],
-  ["مقارنة المنافسين", "لم تُسجّل بعد", "bad", "لم يبدأ"],
-  ["ضوابط المساعد", "لا خصومات أو مواعيد غير معتمدة، وتُحال الشكاوى إلى مختص المبيعات", "ok", "مكتمل"],
-  ["مواد ومرفقات", "لا توجد ملفات. أضف الملفات التعريفية لتفعيل الإرسال.", "warn", "0 ملفات"],
-];
 
 function nav() {
   // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
@@ -964,7 +953,7 @@ function vAimkt() {
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:17px;font-weight:700;color:#101828;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
     '<div style="font-size:13px;color:#475467;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
-    (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
+    (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#475467;background:#F2F4F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
@@ -1104,7 +1093,7 @@ function vKbProduct(name) {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
     cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #EAECF0;" : "") + '">' +
       '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
-      '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + c[1] + "</div></div>").join("") +
+      '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + fmtN(c[1]) + "</div></div>").join("") +
     "</div>" +
     (prodCamps.length || prodCauses.length
       ? '<div style="border-top:1px solid #EAECF0;background:#F9FAFB;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
@@ -1141,11 +1130,29 @@ function vKbProduct(name) {
       [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["ملائم لـ", seedP.best.join("، ")], ["التسعير المعتمد", seedP.pricing]]
         .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
   }
-  if (name === "الإجازات المرضية") {
-    const dot = { ok: "#2e9e6b", warn: "#d6a01f", bad: "#d85151" };
-    const chipm = { ok: ["c-ok", "مكتمل"], warn: ["c-warn", "ناقص"], bad: ["c-bad", "لم يبدأ"] };
-    h += '<div class="card"><h3>جاهزية الأقسام — 92%</h3><div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
-      KB_SECTIONS.map((x) => '<div class="kbrow"><span class="dt" style="background:' + dot[x[2]] + ';"></span><div class="ti"><div class="t1">' + x[0] + '</div><div class="t2">' + x[1] + '</div></div><span class="chip ' + chipm[x[2]][0] + '">' + chipm[x[2]][1] + '</span><span class="ct">' + x[3] + "</span></div>").join("") + "</div></div>";
+  {
+    // Was a hardcoded block asserting «جاهزية الأقسام — 92%», invented pricing, «3 عناصر»,
+    // «2 من 8» and «0 ملفات» — the last one rendered directly beneath the real attached file.
+    // None of it came from data. A readiness figure the founder cannot trace to a source is
+    // worse than no readiness figure, so this is computed from what we actually hold.
+    const kbDoc = kbDocs.find((d) => d.product === name);
+    const asset = prodAssets.find((a) => a.product === name);
+    const camps = campaigns.filter((cp) => (cp.product || "") === name);
+    const rows = [
+      ["المعرفة المعتمدة", kbDoc ? "مستخرجة من ملف معتمد وجاهزة للمساعد" : "لم تُرفع بعد — المساعد يبيع من المعرفة المدمجة فقط", Boolean(kbDoc)],
+      ["الملف التعريفي", asset ? esc(asset.filename) : "لا ملف مرفق — لن يرسل المساعد مرفقًا لهذه الخدمة", Boolean(asset)],
+      ["الحملات المطلقة", camps.length ? fmtN(camps.length) + " حملة تستخدم هذه الخدمة" : "لم تُطلق حملة بهذه الخدمة بعد", camps.length > 0],
+      ["حكم السوق", wlProd && (wlProd.won || wlProd.lost)
+        ? fmtN(wlProd.won || 0) + " مكتسبة · " + fmtN(wlProd.lost || 0) + " غير مكتسبة"
+        : "يتعلّم — لا صفقات محكومة بعد", Boolean(wlProd && (wlProd.won || wlProd.lost))],
+    ];
+    const done = rows.filter((r) => r[2]).length;
+    h += '<div class="card"><h3>جاهزية الخدمة <span class="meta">' + fmtN(done) + " من " + fmtN(rows.length) + " مكتملة</span></h3>" +
+      '<div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
+      rows.map((r) => '<div class="kbrow"><span class="dt" style="background:' + (r[2] ? "#2e9e6b" : "#D0D5DD") + ';"></span>' +
+        '<div class="ti"><div class="t1">' + esc(r[0]) + '</div><div class="t2">' + r[1] + "</div></div>" +
+        '<span class="chip ' + (r[2] ? "c-ok" : "c-grey") + '">' + (r[2] ? "جاهز" : "ناقص") + "</span></div>").join("") +
+      "</div></div>";
   }
   return h;
 }
@@ -1159,7 +1166,7 @@ window.entImport = async () => {
     const r = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text: ta.value }) });
     const d = await r.json();
     if (!r.ok) { st.innerHTML = '<span class="chip c-bad">' + esc(d.error || r.status) + "</span>"; return; }
-    st.innerHTML = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span> " : "") + (d.invalid ? '<span class="chip c-bad">غير صالح ' + d.invalid + "</span>" : "");
+    st.innerHTML = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> " : "") + (d.invalid ? '<span class="chip c-bad">غير صالح ' + fmtN(d.invalid) + "</span>" : "");
     ta.value = "";
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
@@ -1206,7 +1213,7 @@ window.entManualSave = async () => {
     const res = await fetch("/admin/entities", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
     const d = await res.json();
     if (!res.ok) { if (st) st.innerHTML = '<span class="chip c-bad">' + esc(d.error || res.status) + "</span>"; return; }
-    manualStat = '<span class="chip c-ok">أُضيف ' + d.added + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + d.updated + "</span>" : "");
+    manualStat = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> " + (d.updated ? '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span>" : "");
     if (st) st.innerHTML = manualStat;
     manualOpen = true;
     manualRows = [{ name: "", phone: "", size: "", city: "" }];
@@ -1227,8 +1234,8 @@ window.entFileUpload = async (input) => {
     const r = await fetch("/admin/entities/import", { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd });
     const d = await r.json();
     if (!r.ok) { st.innerHTML = '<span class="chip c-bad">تعذّر: ' + esc(d.error || r.status) + "</span>"; return; }
-    let msg = '<span class="chip c-ok">أُضيف ' + d.added + "</span> ";
-    if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + d.updated + "</span> ";
+    let msg = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> ";
+    if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> ";
     if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + d.skippedCount + "</span> ";
     msg += '<div style="font-size:11px;color:#667085;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
@@ -1240,7 +1247,7 @@ window.entFileUpload = async (input) => {
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
     render(false);
-    alertBar("استُورد الملف — " + d.added + " جديد، " + d.updated + " محدّث", false);
+    alertBar("استُورد الملف — " + fmtN(d.added) + " جديد، " + fmtN(d.updated) + " محدّث", false);
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الاستيراد</span>'; }
   input.value = "";
 };
@@ -1719,7 +1726,7 @@ function countUp() {
     const step = (t) => {
       const k = Math.min(1, (t - t0) / 620);
       const eased = 1 - Math.pow(1 - k, 3);
-      el.textContent = Math.roundfmtN(target * eased) + rest;
+      el.textContent = fmtN(Math.round(target * eased)) + rest;
       if (k < 1) requestAnimationFrame(step);
     };
     _countedValues.set(el.parentElement ? el.parentElement.textContent.trim() : raw, raw);
