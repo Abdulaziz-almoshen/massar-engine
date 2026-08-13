@@ -189,8 +189,23 @@ export async function refreshKb(): Promise<number> {
 }
 
 function systemPrompt(contact: Contact): string {
-  const inbound = (contact.transcript || []).filter((t) => t.role === "customer").length;
+  // Count within THIS campaign conversation, not for all time — the same reason the turn cap does.
+  const campaignAt = (contact.transcript || [])
+    .filter((t) => t.role === "agent" && t.text.includes("[حملة]"))
+    .reduce((m, t) => Math.max(m, t.ts), 0);
+  const since = (contact.transcript || []).filter((t) => t.ts >= campaignAt);
+  const inbound = since.filter((t) => t.role === "customer").length;
   const hasSignal = (contact.tags || []).length > 0 || contact.outcome === "interested";
+
+  // Has the customer actually told us anything about their operation yet? §8 names three
+  // categories — size, current system, pain. The model treated «send me the file» as
+  // qualification and asked for an appointment on the first message; a discovery fact is the
+  // objective test of whether it has earned that ask.
+  const said = since.filter((t) => t.role === "customer").map((t) => t.text).join(" ");
+  const knowsSize = /فرع|فروع|عدد|موقع|مواقع|\d+\s*(فرع|موقع)/.test(said);
+  const knowsSystem = /HIS|ERP|نظام|برنامج|ورقي|يدوي|يدويًا/i.test(said);
+  const knowsPain = /مشكلة|تأخير|بطيء|صعوبة|شكوى|إدخال|مزدوج|وقت|خطأ|أخطاء/.test(said);
+  const discoveryFacts = [knowsSize, knowsSystem, knowsPain].filter(Boolean).length;
   return [
     // ---------------------------------------------------------------- 1. الهدف
     "# ١) الهدف",
@@ -245,6 +260,14 @@ function systemPrompt(contact: Contact): string {
     inbound >= 3 && !hasSignal
       ? `- تنبيه إلزامي لهذه الرسالة تحديدًا: العميل أرسل ${inbound} رسائل ولم تُسجَّل إشارة اهتمام ولا خطوة عملية بعد. لا تطرح سؤال اكتشاف جديدًا — اعرض في هذه الرسالة رُقيًا من سلّم الالتزام.`
       : "",
+    // The gate the founder asked for: no appointment before any discovery.
+    discoveryFacts === 0 && inbound <= 2
+      ? "- قيد إلزامي على هذه الرسالة: لا نعرف بعد أي شيء عن تشغيل هذه المنشأة — لا حجمها ولا نظامها ولا موضع التعطل لديها. لذلك يُمنع في هذه الرسالة عرض موعد أو مكالمة أو إحالة إلى مختص أو سؤال عن التوقيت. اطرح سؤال اكتشاف واحدًا فقط من الفئات الثلاث، واجعله في نهاية الرسالة. طلب الملف ليس تأهيلًا."
+      : discoveryFacts === 0
+        ? "- لم يذكر العميل بعد أي معلومة عن حجمه أو نظامه أو ألمه. اربط أي خطوة تعرضها بسؤال اكتشاف واحد في الرسالة نفسها."
+        : `- المعلومات المتاحة عن تشغيله حتى الآن: ${discoveryFacts} من ثلاث (الحجم/النظام/الألم). يمكنك الانتقال لخطوة عملية.`,
+    // Buttons: the model wrote «صباحًا أم بعد الظهر؟» as prose instead of two taps.
+    "- قاعدة الأزرار: إذا كانت رسالتك تعرض خيارين أو ثلاثة — أوقاتًا، أو خدمتين، أو نعم/لا — فاستدعِ send_buttons ولا تكتب الخيارات نصًا. الزر يرفع الرد لأنه يلغي الكتابة، وكل عنوان كلمتان أو ثلاث بحد أقصى ٢٠ حرفًا.",
     "# ٨) الاكتشاف",
     "اعرف ثلاث فئات عندما تحتاجها فعلًا لا كاستبيان: ١) الحجم — عدد الفروع أو حجم العمليات. ٢) الوضع الحالي — النظام المستخدم، وهل الإجراء يدوي أم إلكتروني، وهل يوجد تكامل. ٣) الألم — الوقت أو إعادة الإدخال أو الأخطاء أو الامتثال أو التعطل أو شكاوى المراجعين.",
     "اسأل عن معلومة واحدة في كل رسالة. وإذا أصبح العميل جاهزًا لخطوة تجارية قبل اكتمال الثلاث، انتقل للخطوة ولا تؤخره بأسئلة إضافية.",
