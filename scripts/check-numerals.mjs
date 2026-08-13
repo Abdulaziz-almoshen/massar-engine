@@ -12,8 +12,10 @@
 // Usage:  npm run check:numerals   → exit 1 and print file:line for each raw concat.
 import { readFileSync } from "node:fs";
 
-const FILE = "src/dashboard.ts";
-const src = readFileSync(FILE, "utf8").split("\n");
+// Server-side Arabic reaches the UI verbatim, so segments.ts is subject to the same rule.
+const FILES = ["src/dashboard.ts", "src/segments.ts"];
+const FILE = FILES[0];
+const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 
 // A numeric-looking expression concatenated straight into a quoted string.
 const NUMERIC = String.raw`(?:Math\.(?:round|floor|ceil|abs)\(.*?\)|[\w$]+(?:\.[\w$]+)*\.(?:length|count|score)\b|\bLIST_CAP\b)`;

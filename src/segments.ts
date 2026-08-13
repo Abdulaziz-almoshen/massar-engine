@@ -67,6 +67,14 @@ export const DEFAULT_COOLDOWN_DAYS = 2;
 
 const DAY = 86_400_000;
 
+/** Arabic-Indic digits with correct number agreement — 3-10 take the plural («٥ أيام»), 11+ the
+ *  singular accusative («١٤ يومًا»). Server-side strings reach the UI verbatim, so the portal's
+ *  numeral rule has to hold here too; the source guard only reads dashboard.ts. */
+export function arDays(n: number): string {
+  const d = String(n).replace(/[0-9]/g, (x) => "٠١٢٣٤٥٦٧٨٩"[Number(x)]);
+  return n >= 11 ? `${d} يومًا` : `${d} أيام`;
+}
+
 // --------------------------------------------------------------------------- signals
 
 function lastCustomerTurn(c: Contact): number {
@@ -199,7 +207,7 @@ export function presets(windowDays = DEFAULT_WINDOW_DAYS): Preset[] {
     {
       id: "read_no_reply",
       label: "قُرئت ولم يُردّ عليها",
-      hint: `وصلت الرسالة وفُتحت، ولم يصل ردّ خلال ${windowDays} أيام.`,
+      hint: `قرأ العميل رسالتكم ولم يصل ردّ خلال ${arDays(windowDays)}.`,
       def: { match: "all", conditions: [
         { signal: "read", comparator: "happened", beforeDays: windowDays },
         { signal: "replied", comparator: "never_happened" },
@@ -208,7 +216,7 @@ export function presets(windowDays = DEFAULT_WINDOW_DAYS): Preset[] {
     {
       id: "delivered_no_read",
       label: "وصلت ولم تُقرأ",
-      hint: `سُلّمت الرسالة ولم تُفتح خلال ${windowDays} أيام. راجعوا التوقيت وصياغة السطر الأول.`,
+      hint: `سُلّمت الرسالة ولم تُقرأ خلال ${arDays(windowDays)}. راجعوا التوقيت وصياغة السطر الأول.`,
       def: { match: "all", conditions: [
         { signal: "delivered", comparator: "happened", beforeDays: windowDays },
         { signal: "read", comparator: "never_happened" },
@@ -217,7 +225,7 @@ export function presets(windowDays = DEFAULT_WINDOW_DAYS): Preset[] {
     {
       id: "lapsed",
       label: "ردّ ثم انقطع",
-      hint: `تفاعل معنا سابقًا ثم توقف منذ ${windowDays} أيام أو أكثر.`,
+      hint: `تفاعل معنا سابقًا ثم توقف منذ ${arDays(windowDays)} أو أكثر.`,
       def: { match: "all", conditions: [
         { signal: "replied", comparator: "happened" },
         { signal: "replied", comparator: "never_happened", withinDays: windowDays },
@@ -257,9 +265,8 @@ export function describe(cond: Condition): string {
   const prod = cond.product ? ` عن خدمة ${cond.product}` : "";
   // Arabic number agreement: 3-10 take the plural («٥ أيام»), 11+ the singular accusative
   // («١٤ يومًا»). «14 أيام» is the kind of error the founder reads as carelessness.
-  const days = (n: number) => (n >= 11 ? `${n} يومًا` : `${n} أيام`);
-  const win = cond.withinDays ? ` خلال آخر ${days(cond.withinDays)}`
-    : cond.beforeDays ? ` قبل أكثر من ${days(cond.beforeDays)}` : "";
+  const win = cond.withinDays ? ` خلال آخر ${arDays(cond.withinDays)}`
+    : cond.beforeDays ? ` قبل أكثر من ${arDays(cond.beforeDays)}` : "";
   const times = cond.comparator === "happened" && (cond.atLeast || 1) > 1 ? ` ${cond.atLeast} مرات على الأقل` : "";
   return `${base}${prod}${win}${times}`;
 }
