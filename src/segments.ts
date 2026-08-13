@@ -180,7 +180,8 @@ export function evaluate(def: SegmentDef, contacts: Contact[], now = Date.now())
     const lastOut = Math.max(Number((c.statusTimes || {}).sent || 0), Number((c.statusTimes || {}).delivered || 0));
     if (cooldown > 0 && lastOut && now - lastOut < cooldown * DAY) {
       const hours = Math.round((now - lastOut) / 3_600_000);
-      res.suppressed.push({ phone: c.phone, name, reason: `رُوسلت قبل ${hours} ساعة` });
+      const ar = String(hours).replace(/[0-9]/g, (x) => "٠١٢٣٤٥٦٧٨٩"[Number(x)]);
+      res.suppressed.push({ phone: c.phone, name, reason: `رُوسلت قبل ${ar} ساعة` });
       continue;
     }
     res.matched.push(c);

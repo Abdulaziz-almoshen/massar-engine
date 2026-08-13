@@ -836,7 +836,13 @@ window.segSetField = (i, field, val) => {
   if (!segDef || !segDef.conditions[i]) return;
   const c = segDef.conditions[i];
   if (field === "signal") c.signal = val;
-  if (field === "comparator") { c.comparator = val; if (val === "never_happened") { delete c.beforeDays; } }
+  if (field === "comparator") {
+    c.comparator = val;
+    // Move the bound to the side that carries meaning for this comparator, instead of deleting it:
+    // dropping beforeDays left the row unbounded and made the window chips a silent no-op on it.
+    if (val === "never_happened") { delete c.beforeDays; c.withinDays = c.withinDays || segWindow; }
+    else { delete c.withinDays; c.beforeDays = c.beforeDays || segWindow; }
+  }
   segRun();
 };
 window.segAddCond = () => { if (!segDef) segDef = { match: "all", conditions: [] };
@@ -851,15 +857,22 @@ async function segLoadPresets() {
   } catch (e) { segPresets = []; }
   render(false);
 }
+let segSeq = 0;
 async function segRun() {
   if (!segDef || !segDef.conditions.length) return;
+  // Sequence the previews: a slower earlier request must not overwrite a newer count. Without
+  // this, a fast edit can leave a number on screen that belongs to a different segment.
+  const mySeq = ++segSeq;
   segBusy = true; render(false);
   try {
     const r = await fetch("/admin/segments/preview", { method: "POST",
       headers: { "content-type": "application/json", "x-admin-token": TOKEN },
       body: JSON.stringify({ def: segDef, includeTest: showTest }) });
-    segPreview = r.ok ? await r.json() : { error: (await r.json()).error || "تعذّر الحساب" };
-  } catch (e) { segPreview = { error: "تعذّر الاتصال بالخادم" }; }
+    const body = r.ok ? await r.json() : { error: (await r.json()).error || "تعذّر الحساب" };
+    if (mySeq !== segSeq) return;                 // a newer request already answered
+    segPreview = body;
+  } catch (e) { if (mySeq === segSeq) segPreview = { error: "تعذّر الاتصال بالخادم" }; }
+  if (mySeq !== segSeq) return;
   segBusy = false; render(false);
 }
 function vSegBuilder() {

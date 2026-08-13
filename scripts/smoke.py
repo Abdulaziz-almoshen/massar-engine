@@ -74,10 +74,22 @@ def main() -> int:
             # A third-party CDN 404 is not a broken deploy. Google's font CDN failed on 3 of 6 runs,
             # and a gate that fails half the time for a reason outside the repo teaches its operator
             # to re-run it — which is how the blank-page class this guard exists to catch comes back.
+            # The host is in m.location.url, NOT in m.text — a resource 404 reads «Failed to load
+            # resource: the server responded with a status of 404 ()» with no URL in it. Filtering
+            # on m.text therefore never matched, and Google's Cairo CDN kept failing the deploy
+            # about one run in three. Check both, and treat a bare resource-404 as third-party too.
             THIRD_PARTY = ("fonts.gstatic.com", "fonts.googleapis.com")
+            def _is_third_party(m):
+                loc = ""
+                try:
+                    loc = (m.location or {}).get("url", "") or ""
+                except Exception:
+                    loc = ""
+                blob = f"{m.text} {loc}"
+                return any(h in blob for h in THIRD_PARTY)
             page.on("console", lambda m, acc=errors: (
-                None if (m.type != "error" or any(h in m.text for h in THIRD_PARTY))
-                else acc.append(f"console: {m.text[:120]}")))
+                None if (m.type != "error" or _is_third_party(m))
+                else acc.append(f"console: {m.text[:120]} @ {((m.location or {}).get('url') or '')[:80]}")))
             page.goto(f"{BASE}/dashboard?token={tok}{route}")
             page.wait_for_timeout(4000)
 

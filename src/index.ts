@@ -344,7 +344,16 @@ app.post("/admin/segments/preview", async (req, reply) => {
   // Refuse shapes that would silently evaluate to nobody. A zero the founder cannot distinguish
   // from an unsupported query is the failure this product exists to avoid.
   const SINGLE_SHOT = ["delivered", "read", "failed"];
+  const SIGNALS = ["delivered", "read", "replied", "failed", "interest", "meeting", "opted_out"];
   for (const c of def.conditions) {
+    // Validate the enum BEFORE evaluating: occurrences() has no default branch, so an unknown
+    // signal returned undefined and the next .filter threw a 500 with an internal message.
+    if (!SIGNALS.includes(String(c.signal))) {
+      return reply.code(400).send({ error: `حدث غير معروف: «${String(c.signal).slice(0, 40)}»` });
+    }
+    if (!["happened", "never_happened"].includes(String(c.comparator))) {
+      return reply.code(400).send({ error: "المقارنة يجب أن تكون «حدث» أو «لم يحدث»" });
+    }
     if (c.comparator === "happened" && (c.atLeast || 1) > 1 && SINGLE_SHOT.includes(c.signal)) {
       return reply.code(400).send({ error: `«${c.signal}» يُسجَّل مرة واحدة لكل جهة، فلا يقبل «أكثر من مرة»` });
     }
@@ -388,7 +397,9 @@ app.get("/admin/segments/presets", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const w = Number((req.query as any)?.window) || segments.DEFAULT_WINDOW_DAYS;
   const win = Math.min(segments.WINDOW_MAX, Math.max(segments.WINDOW_MIN, w));
-  const pool = tracker.listContacts().filter((c: any) => !c.test);
+  // Same 20k bound as /preview, and for the same reason: this runs FIVE full scans per page load,
+  // synchronously, in the process that also serves the Gupshup webhook — which carries «إيقاف».
+  const pool = tracker.listContacts().filter((c: any) => !c.test).slice(0, 20000);
   // Report the same three numbers the preview does. A preset reading «٠» while three contacts
   // are merely cooling down is the silent zero this feature exists to prevent.
   return segments.presets(win).map((p) => {
