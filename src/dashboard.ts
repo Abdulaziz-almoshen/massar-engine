@@ -885,7 +885,9 @@ function vSegBuilder() {
       segPresets.map((p) => {
         const extra = [];
         if (p.suppressed) extra.push(fmtN(p.suppressed) + " في التبريد");
-        if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
+        // Forecast rather than excuse: say WHEN the zero becomes a number.
+        if (p.tooNew && p.entersInDays > 0) extra.push(fmtN(p.tooNew) + " جهة تدخل نطاق الفحص بعد " + fmtN(p.entersInDays) + (p.entersInDays >= 11 ? " يومًا" : " أيام"));
+        else if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
         return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EAECF0;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
           '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(p.label) + '</span>' +
           '<span class="chip ' + (p.matched ? "c-ok" : "c-grey") + '">' + fmtN(p.matched) + "</span></div>" +
