@@ -236,8 +236,18 @@ function systemPrompt(contact: Contact): string {
   // to the model to pick (it kept picking «do you use HIS?» twice).
   const knowsType = /منشأة|مستشفى|مجمع|عيادة|مركز|صيدلية|مزود|مزوّد|شركة\s*نظام|vendor/i.test(said);
   const knowsService = /(تطعيم|NVR|السجل الوطني)|(إجاز|مرضي)/i.test(said);
+  // A strict ladder re-interrogates a customer who volunteers everything at once: «عندنا ٢٠ فرع
+  // ونستخدم HIS ونبغى NVR وكم السعر؟» still scored «ask what kind of facility», because «فرع» is
+  // not in the type list. Two escapes: an explicit commercial ask outranks discovery, and enough
+  // disclosed facts make the remaining gap something to CONFIRM in passing, not to interrogate.
+  const wantsCommercial = /(كم\s*(السعر|التكلفة|يكلف)|السعر|التسعير|عرض\s*سعر|التكلفة|نبغى\s*نبدأ|كيف\s*نبدأ|اشترك)/.test(said);
+  const known = [knowsType, knowsSystem, knowsService, knowsSize].filter(Boolean).length;
   const nextObjective =
-    !knowsType ? "حدّد نوع الجهة: منشأة صحية تستخدم نظامًا، أم مزوّد نظام يخدم منشآت. اسأل هذا بأزرار."
+    wantsCommercial
+      ? "طلب العميل الجانب التجاري. لا تبدأ استجوابًا جديدًا: أعطِ ما تسمح به المعرفة المعتمدة عن التسعير، وإن لم يكن مذكورًا نصًا فقل إن المختص يحدده حسب نطاق التكامل، واعرض الخطوة التجارية مباشرة."
+    : known >= 3
+      ? "لديك أغلب الصورة. أوصِ بنموذج التكامل الأنسب بناءً على ما ذكره، وأكمل الناقص بسؤال واحد داخل التوصية لا كاستجواب منفصل."
+    : !knowsType ? "حدّد نوع الجهة: منشأة صحية تستخدم نظامًا، أم مزوّد نظام يخدم منشآت. اسأل هذا بأزرار."
     : !knowsSystem ? "اعرف النظام القائم لديهم (HIS أو ERP أو إجراء يدوي)."
     : !knowsService ? "اعرف أي خدمة تهمهم: سجل التطعيمات، الإجازات المرضية، أو كلاهما. اسأل هذا بأزرار."
     : !knowsSize ? "اعرف حجم التشغيل: كم منشأة أو كم إصدارًا شهريًا تقريبًا."
