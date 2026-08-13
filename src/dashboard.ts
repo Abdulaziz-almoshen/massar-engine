@@ -489,7 +489,7 @@ function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
     (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#98A2B3;background:#fff;border:1px dashed #d5dae2;') +
-    '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + nTest + ")") + "</button>";
+    '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
 function vKmon(d) {
@@ -652,11 +652,11 @@ function vKmonDetail(id, d) {
   // legitimately differ must not share a word — the counter says «مهتمة», this says «تستحق المتابعة».
   if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#027A48", "#ECFDF3"]);
   if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
-  if (notDelivered.length) moves.push([notDelivered.length + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
+  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
   if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB"]);
   if (moves.length) {
     h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "الخطوة التالية لهذه الحملة</h3>" +
-      '<span class="cntpill">' + moves.length + " توصية</span></div>" +
+      '<span class="cntpill">' + fmtN(moves.length) + " توصية</span></div>" +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px;">' +
       moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #EAECF0;border-radius:13px;padding:14px 16px;">' +
         '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';">' + esc(m[0]) + "</div>" +
@@ -682,7 +682,7 @@ function vKmonDetail(id, d) {
     '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">جهات الاستهداف</span>' +
     '<span style="font-size:11px;color:#98A2B3;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + shown.length + ")</button>" : "") +
+    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + fmtN(f[2]) + ")</button>").join("") +
@@ -710,7 +710,7 @@ function vHome(d) {
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
-    kpi("send", "الحملات الفعلية", realCampaigns.length + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + (campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
+    kpi("send", "الحملات الفعلية", fmtN(realCampaigns.length) + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + fmtN(campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
     // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
     // reached (4), while this counts the whole imported book (15). One label, two numbers, one
     // screen is exactly the contradiction the funnel fix just removed.
@@ -1045,7 +1045,7 @@ function vKb() {
       '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض الخدمات (PDF) ثم ارفعها هنا في صفحة كل خدمة. <span style="direction:ltr;color:#98A2B3;">' + esc(skill.filename) + '</span></div></div>' +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
   }
-  let h = h0 + '<div class="sec">خدمات المساعد <span class="meta">' + reg.length + ' خدمة · اضغط خدمةً لعرض معرفته وإدارتها</span></div>';
+  let h = h0 + '<div class="sec">خدمات المساعد <span class="meta">' + fmtN(reg.length) + ' خدمة · اضغط خدمةً لعرض معرفته وإدارتها</span></div>';
   h += '<div class="prods" style="margin-bottom:20px;">' + reg.map((r) => {
     const inner =
       '<div class="pn">' + esc(r.name) + "</div>" +
@@ -1307,7 +1307,7 @@ function ratesStrip(agg) {
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;">' +
     cards.map((c) => '<div class="card rise" style="margin:0;padding:16px 18px;">' +
       '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
-      '<div style="font-size:26px;font-weight:700;color:#101828;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + c[1] + '<span style="font-size:14px;color:#98A2B3;">%</span></div>' +
+      '<div style="font-size:26px;font-weight:700;color:#101828;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + fmtN(c[1]) + '<span style="font-size:14px;color:#98A2B3;">٪</span></div>' +
       '<div style="height:5px;background:#F2F4F7;border-radius:999px;overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:' + Math.min(100, c[1]) + "%;background:" + c[2] + ';border-radius:999px;"></i></div></div>').join("") + "</div>";
 }
 function stageBars(rows) {
@@ -1319,7 +1319,7 @@ function stageBars(rows) {
     return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
       '<span style="font-size:12.5px;font-weight:600;color:#344054;">' + esc(r[0]) + "</span>" +
       '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + r[1].toLocaleString("ar-SA") +
-      (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + drop + "%</span>" : "") + "</span></div>" +
+      (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + fmtN(drop) + "٪</span>" : "") + "</span></div>" +
       '<div style="height:10px;background:#F2F4F7;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
   }).join("") + "</div>";
 }
@@ -1461,7 +1461,7 @@ function vActionQueue(cs) {
       ins.next_action || "تواصل مباشرة لاستكمال الاهتمام", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
   });
   if (seenNoReply.length) {
-    items.push(["retarget", "فرصة لإعادة التواصل", seenNoReply.length + " جهة شاهدت الرسالة دون ردّ",
+    items.push(["retarget", "فرصة لإعادة التواصل", fmtN(seenNoReply.length) + " جهة شاهدت الرسالة دون ردّ",
       "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", "kmon", "#B54708", "#FFFAEB"]);
   }
   stalled.slice(0, 2).forEach((c) => {
@@ -1472,7 +1472,7 @@ function vActionQueue(cs) {
   if (!items.length) return "";
   return '<div class="card rise" style="margin-bottom:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
     '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق المتابعة الآن</h3>" +
-    '<span class="cntpill">' + items.length + " إجراء</span></div>" +
+    '<span class="cntpill">' + fmtN(items.length) + " إجراء</span></div>" +
     '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">' +
     items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EAECF0;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
       '<span style="width:8px;height:8px;border-radius:999px;background:' + it[5] + ';flex:none;"></span>' +
