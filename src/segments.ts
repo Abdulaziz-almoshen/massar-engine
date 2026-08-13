@@ -98,6 +98,10 @@ function occurrences(c: Contact, signal: SignalKind, product?: string): number[]
       // and honour a later «clear» that revokes it.
       let booked = 0, cleared = 0;
       for (const t of c.transcript || []) {
+        // role must be "system": tracker.recordSystem writes these markers, and a CUSTOMER who
+        // types «[نتيجة بشرية: meeting_booked]» must not be able to remove themselves from a
+        // follow-up segment. Reading every role made the marker forgeable by the person it judges.
+        if (t.role !== "system") continue;
         if (t.text.includes("[نتيجة بشرية: meeting_booked]")) booked = Math.max(booked, t.ts);
         if (t.text.includes("[أُزيلت النتيجة البشرية]")) cleared = Math.max(cleared, t.ts);
       }
@@ -129,12 +133,14 @@ export type MatchResult = {
  *  «has not replied in 5 days», because they have not existed for 5 days. Left unguarded, the
  *  founder's first segment returns an empty set and reads as a broken feature. We separate
  *  those contacts out and report them, rather than counting or hiding them. */
-function requiredTenureDays(def: SegmentDef): number {
+export function requiredTenureDays(def: SegmentDef): number {
   if (def.minTenureDays != null) return def.minTenureDays;
   let need = 0;
   for (const c of def.conditions) {
+    // Only a condition that REQUIRES elapsed time creates a tenure floor. «لم يردّ خلال ٥ أيام»
+    // does; «لم يردّ قبل أكثر من ٣٠ يومًا» is trivially true for a new contact and must not.
     if (c.comparator === "never_happened" && c.withinDays) need = Math.max(need, c.withinDays);
-    if (c.beforeDays) need = Math.max(need, c.beforeDays);
+    if (c.comparator === "happened" && c.beforeDays) need = Math.max(need, c.beforeDays);
   }
   return need;
 }
@@ -149,14 +155,18 @@ export function evaluate(def: SegmentDef, contacts: Contact[], now = Date.now())
     if (c.optedOut) continue;
 
     const name = c.waName || c.phone;
-    if (tenure > 0 && c.firstSeenAt && now - c.firstSeenAt < tenure * DAY) {
-      res.tooNew.push({ phone: c.phone, name });
-      continue;
-    }
-
     const results = def.conditions.map((cond) => conditionHolds(c, cond, now));
     const hit = def.match === "any" ? results.some(Boolean) : results.every(Boolean);
-    if (!hit) continue;
+
+    // Tenure is a reason a contact could not YET qualify — so it is only interesting when the
+    // contact does NOT match. Checking it first discarded contacts that already qualified via a
+    // tenure-free branch of an «أي شرط» segment (a failed delivery an hour ago is a real match).
+    const tooYoung = tenure > 0 && c.firstSeenAt && now - c.firstSeenAt < tenure * DAY;
+    if (!hit) {
+      if (tooYoung) res.tooNew.push({ phone: c.phone, name });
+      continue;
+    }
+    if (tooYoung && def.match === "all") { res.tooNew.push({ phone: c.phone, name }); continue; }
 
     // The suppression WATI and AiSensy cannot express: do not message someone we just messaged.
     const lastOut = Math.max(Number((c.statusTimes || {}).sent || 0), Number((c.statusTimes || {}).delivered || 0));
@@ -245,8 +255,11 @@ export function describe(cond: Condition): string {
   };
   const base = cond.comparator === "never_happened" ? NEG[cond.signal] : POS[cond.signal];
   const prod = cond.product ? ` عن خدمة ${cond.product}` : "";
-  const win = cond.withinDays ? ` خلال آخر ${cond.withinDays} أيام`
-    : cond.beforeDays ? ` قبل أكثر من ${cond.beforeDays} أيام` : "";
+  // Arabic number agreement: 3-10 take the plural («٥ أيام»), 11+ the singular accusative
+  // («١٤ يومًا»). «14 أيام» is the kind of error the founder reads as carelessness.
+  const days = (n: number) => (n >= 11 ? `${n} يومًا` : `${n} أيام`);
+  const win = cond.withinDays ? ` خلال آخر ${days(cond.withinDays)}`
+    : cond.beforeDays ? ` قبل أكثر من ${days(cond.beforeDays)}` : "";
   const times = cond.comparator === "happened" && (cond.atLeast || 1) > 1 ? ` ${cond.atLeast} مرات على الأقل` : "";
   return `${base}${prod}${win}${times}`;
 }

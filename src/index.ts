@@ -341,7 +341,24 @@ app.post("/admin/segments/preview", async (req, reply) => {
     return reply.code(400).send({ error: "body: { def: { match, conditions: [...] } }" });
   }
   if (def.conditions.length > 8) return reply.code(400).send({ error: "بحد أقصى ٨ شروط" });
-  const pool = tracker.listContacts().filter((c: any) => (body.includeTest ? true : !c.test));
+  // Refuse shapes that would silently evaluate to nobody. A zero the founder cannot distinguish
+  // from an unsupported query is the failure this product exists to avoid.
+  const SINGLE_SHOT = ["delivered", "read", "failed"];
+  for (const c of def.conditions) {
+    if (c.comparator === "happened" && (c.atLeast || 1) > 1 && SINGLE_SHOT.includes(c.signal)) {
+      return reply.code(400).send({ error: `«${c.signal}» يُسجَّل مرة واحدة لكل جهة، فلا يقبل «أكثر من مرة»` });
+    }
+    if (c.signal === "opted_out") {
+      return reply.code(400).send({ error: "من طلب الإيقاف مستثنى دائمًا ولا يصلح شرطًا للاستهداف" });
+    }
+  }
+  const all = tracker.listContacts();
+  // A preview is synchronous and this process also serves the Gupshup webhook — including the
+  // «إيقاف» path. Measured at 400k contacts an unbounded scan blocks the event loop for ~2.2s,
+  // so an opt-out could queue behind a dashboard click. Bounded until segmentation moves into SQL.
+  const SCAN_CAP = 20000;
+  const pool = all.filter((c: any) => (body.includeTest ? true : !c.test)).slice(0, SCAN_CAP);
+  const truncated = all.length > SCAN_CAP;
   const r = segments.evaluate(def, pool);
   const oldest = pool.reduce((m: number, c: any) => Math.max(m, Date.now() - (c.firstSeenAt || Date.now())), 0);
   return {
@@ -352,19 +369,13 @@ app.post("/admin/segments/preview", async (req, reply) => {
     })),
     suppressed: r.suppressed,
     tooNew: r.tooNew,
-    // The tenure state needs a real forecast, not «no results»: how old the book actually is.
     oldestContactDays: Math.floor(oldest / 86_400_000),
     poolSize: pool.length,
-    // The tenure forecast the market's tools omit: when the book is younger than the window,
-    // «٠ مطابقة» is not an empty audience, it is a not-yet audience. Say when it becomes one.
-    requiredDays: (() => {
-      let n = 0;
-      for (const c of def.conditions) {
-        if (c.beforeDays) n = Math.max(n, c.beforeDays);
-        if (c.comparator === "never_happened" && c.withinDays) n = Math.max(n, c.withinDays);
-      }
-      return n;
-    })(),
+    // Never a silent truncation: say so when the scan was bounded.
+    scanTruncated: truncated,
+    // The tenure forecast the benchmarked tools omit: «٠ مطابقة» on a book younger than the
+    // window is a not-yet audience, not an empty one. One definition, shared with evaluate().
+    requiredDays: segments.requiredTenureDays(def),
   };
 });
 

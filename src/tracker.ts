@@ -158,7 +158,7 @@ export function setTest(phone: string, test: boolean) {
 
 /** Full contacts, untruncated. snapshot() caps each transcript at the last 30 turns for the
  *  portal payload — segmentation counts reply occurrences, so it must not read a truncated one. */
-export function listContacts(): Contact[] {
+export function listContacts(): readonly Contact[] {
   return [...contacts.values()];
 }
 
