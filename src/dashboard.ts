@@ -1172,7 +1172,7 @@ function vAimkt() {
   // and sat directly over the template cards — the feature he asked for, hidden by the chrome.
   // The lbar class (see the stylesheet) drops the padding and the secondary line under 430px.
   // NO BACKTICKS ANYWHERE IN THIS FILE — it is one template literal and a backtick closes it.
-  h += '<div class="step lbar" style="position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
+  h += '<div class="step lbar" style="position:sticky;bottom:0;margin-bottom:-56px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
     // In behaviour mode there is nothing to launch and the reason is not «you picked nobody» —
     // it is that this audience needs an approved template the send path does not yet use. Saying
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
@@ -1183,7 +1183,7 @@ function vAimkt() {
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
     // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
     // State what will actually be sent, next to the button that sends it.
-    (selAsset ? " · الملف يُرسَل عند الطلب 📎" : "") + "</div>" +
+    (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
         '<div class="lsub" style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
