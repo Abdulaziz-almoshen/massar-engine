@@ -873,7 +873,7 @@ function vSegBuilder() {
         const extra = [];
         if (p.suppressed) extra.push(fmtN(p.suppressed) + " في التبريد");
         if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
-        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EAECF0;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\'' + p.id + '\')">' +
+        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EAECF0;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
           '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(p.label) + '</span>' +
           '<span class="chip ' + (p.matched ? "c-ok" : "c-grey") + '">' + fmtN(p.matched) + "</span></div>" +
           '<div style="font-size:11px;color:#667085;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
@@ -883,8 +883,8 @@ function vSegBuilder() {
   }
   h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
     '<span style="font-size:11.5px;font-weight:700;color:#667085;">المطابقة:</span>' +
-    chipBtn("تنطبق كل الشروط", !segDef || segDef.match === "all", "segSetMatch(\'all\')") +
-    chipBtn("ينطبق أي شرط", segDef && segDef.match === "any", "segSetMatch(\'any\')") +
+    chipBtn("تنطبق كل الشروط", !segDef || segDef.match === "all", "segSetMatch(\\'all\\')") +
+    chipBtn("ينطبق أي شرط", segDef && segDef.match === "any", "segSetMatch(\\'any\\')") +
     '<span style="flex:1"></span><span style="font-size:11.5px;font-weight:700;color:#667085;">النافذة:</span>' +
     [3, 5, 7, 14].map((d) => chipBtn(fmtN(d) + (d >= 11 ? " يومًا" : " أيام"), segWindow === d, "segSetWindow(" + d + ")")).join("") + "</div>";
 
@@ -892,9 +892,9 @@ function vSegBuilder() {
   h += conds.map((c, i) =>
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #EAECF0;border-radius:12px;background:#fff;margin-bottom:8px;">' +
     (i ? '<span class="chip c-grey" style="font-size:10.5px;">' + (segDef.match === "any" ? "أو" : "و") + "</span>" : "") +
-    '<select class="inp" style="height:40px;flex:1;min-width:150px;" onchange="segSetField(' + i + ',\'signal\',this.value)">' +
+    '<select class="inp" style="height:40px;flex:1;min-width:150px;" onchange="segSetField(' + i + ',\\'signal\\',this.value)">' +
       SEG_SIGNALS.map((sg) => '<option value="' + sg[0] + '"' + (c.signal === sg[0] ? " selected" : "") + ">" + sg[1] + "</option>").join("") + "</select>" +
-    '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\'comparator\',this.value)">' +
+    '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\\'comparator\\',this.value)">' +
       '<option value="happened"' + (c.comparator === "happened" ? " selected" : "") + ">حدث</option>" +
       '<option value="never_happened"' + (c.comparator === "never_happened" ? " selected" : "") + ">لم يحدث</option></select>" +
     '<span style="font-size:11px;color:#98A2B3;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
@@ -1007,8 +1007,8 @@ function vAimkt() {
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + fmtN(selN) + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
   if (!retargetCohort) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
-      chipBtn("حسب الملف", audMode === "file", "setAudMode(\'file\')") +
-      chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\'behaviour\')") +
+      chipBtn("حسب الملف", audMode === "file", "setAudMode(\\'file\\')") +
+      chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\\'behaviour\\')") +
       '<span style="flex:1"></span><span style="font-size:11.5px;color:#98A2B3;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
   }
   if (!retargetCohort && audMode === "behaviour") {

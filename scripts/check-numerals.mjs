@@ -84,6 +84,22 @@ src.forEach((line, i) => {
   }
 });
 
+// The client script lives inside a template literal, so a single \\' in source is consumed by the
+// literal and reaches the browser as a bare quote that terminates the client's own string. tsc,
+// node --check and the type system all pass it; the page then renders BLANK. Parse what actually
+// ships. (The smoke guard catches this too, but only after a deploy has already gone out.)
+try {
+  const { DASHBOARD_HTML } = await import("../dist/dashboard.js");
+  const m = DASHBOARD_HTML.match(/<script>([\s\S]*)<\/script>/);
+  if (!m) hits.push([0, "no client <script> found in the emitted page", ""]);
+  else {
+    try { new Function(m[1]); }
+    catch (e) { hits.push([0, `the EMITTED client script does not parse: ${e.message}`, "check \\' escaping inside the template literal"]); }
+  }
+} catch (e) {
+  hits.push([0, `could not load dist/dashboard.js to parse-check it (run npm run build first): ${e.message}`, ""]);
+}
+
 if (hits.length) {
   console.error(`numeral-consistency check failed — ${hits.length} site(s) in ${FILE}:\n`);
   for (const [ln, why, text] of hits) console.error(`  ${FILE}:${ln}  ${why}\n     ${text}\n`);
