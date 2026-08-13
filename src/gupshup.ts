@@ -89,6 +89,15 @@ export async function sendQuickReply(
   // WhatsApp interactive messages carry a header and a footer as first-class parts. We were
   // sending neither, so a campaign looked like a bare paragraph — the approved template's own
   // «حلول تكامل للقطاع الصحي» footer never reached the device.
+  // WhatsApp caps a quick-reply title at 20 characters and rejects the whole message with
+  // «131009 Parameter value is not valid» if any title is longer — an error that names no field,
+  // so it reads like a payload problem. «أرسلوا الملف التعريفي» is 21. Truncate rather than fail
+  // a campaign on a copy edit, and log it so the cause is visible instead of guessed at.
+  const opts = options.slice(0, 3).map((o) => {
+    if (o.title.length <= 20) return o;
+    console.warn(JSON.stringify({ at: "gupshup", msg: "quick-reply title over 20 chars — truncated", title: o.title }));
+    return { ...o, title: o.title.slice(0, 20) };
+  });
   const message = {
     type: "quick_reply",
     msgid: `qr-${Date.now()}`,
@@ -98,7 +107,7 @@ export async function sendQuickReply(
       text: body,
       ...(footer ? { caption: footer } : {}),
     },
-    options: options.slice(0, 3),
+    options: opts,
   };
   return postForm(MSG_URL, { ...baseParams(destination), message: JSON.stringify(message) });
 }

@@ -180,7 +180,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // The founder's design (13 Aug): the opener does NOT carry the file. It offers it. The first
       // button asks for the profile, so the PDF arrives because the customer chose it — which is
       // both a cleaner first impression and a real interest signal we can act on.
-      const BTNS = [{ title: "أرسلوا الملف التعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
+      const BTNS = [{ title: "الملف التعريفي" }, { title: "أرسلوا التفاصيل" }, { title: "ليس الآن" }];
       const btnNote = ` [أزرار: ${BTNS.map((b) => b.title).join(" | ")}]`;
       const campMark = " [حملة]";
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
