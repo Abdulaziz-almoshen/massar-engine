@@ -65,9 +65,11 @@ export const TEMPLATES: CampaignTemplate[] = [
 // our own UI. A regex written separately from the buttons will drift again; one table, checked
 // against the emitted set at boot, cannot.
 // ---------------------------------------------------------------------------
-export type ButtonIntent = "info" | "commercial" | "qualify" | "decline";
+export type ButtonIntent = "info" | "commercial" | "qualify" | "decline" | "schedule";
 
-export const BUTTON_INTENT: Record<string, ButtonIntent> = {
+// `Object.create(null)`-backed: a plain literal makes inherited keys truthy, so `BUTTON_INTENT`
+// would have reported an intent for "toString" and `assertButtonsHandled(["toString"])` would pass.
+export const BUTTON_INTENT: Record<string, ButtonIntent> = Object.assign(Object.create(null), {
   // asks for the material
   "الملف التعريفي": "info",
   "أرسلوا التفاصيل": "info",
@@ -85,7 +87,22 @@ export const BUTTON_INTENT: Record<string, ButtonIntent> = {
   "مزوّد النظام": "qualify",
   // says no, for now
   "ليس الآن": "decline",
-};
+  "لاحقًا": "decline",
+  "لا، شكرًا": "decline",
+  "لسنا مهتمين": "decline",
+  // the scheduling close — the prompt orders send_buttons here and forbids writing the options as
+  // text, so these MUST route or the highest-value turn in the ladder ships with no buttons at all
+  "صباحًا": "schedule",
+  "بعد الظهر": "schedule",
+  "مكالمة قصيرة": "schedule",
+  // the opening classifier the prompt prescribes for منصة صحة conversations
+  "تكامل صحة": "qualify",
+  "إجراء بالمنصة": "qualify",
+  "استفسار آخر": "qualify",
+  "لدينا نظام حالي": "qualify",
+  "أرسلوا الملف التعريفي": "info",
+  "أرسلوا معلومات": "info",
+});
 
 /** Exact-match a tapped button to its intent. WhatsApp echoes the title verbatim, so a trim is the
  *  only normalisation needed — and matching loosely would swallow a customer's own typed sentence. */
@@ -105,13 +122,32 @@ export function buttonIntent(text: string): ButtonIntent | undefined {
 // goes on the wire is a title this system can read back. Inbound matching stays exact, so a
 // customer's own sentence still cannot be mistaken for a tap.
 // ---------------------------------------------------------------------------
+// A NEGATED proposal must never be rewritten into its affirmative. «لا أريد العرض التجاري» mapped to
+// «أريد العرض التجاري» — the customer would have read a button that said the opposite of what the
+// model meant, and tapping it would have routed them to a commercial track they had just refused.
+// Rewriting outbound copy demands fidelity, not proximity.
+const NEGATION = /(^|\s)(لا|ليس|ليست|لست|لسنا|غير|بدون|لن|ما|مش|دون)(\s|$)/;
+
 export function canonicalTitle(proposed: string): string | undefined {
   const t = proposed.trim();
   if (BUTTON_INTENT[t]) return t;
-  // Longest approved title contained in the proposal — «أريد العرض التجاري» → «العرض التجاري».
-  return Object.keys(BUTTON_INTENT)
-    .filter((k) => t.includes(k))
-    .sort((a, b) => [...b].length - [...a].length)[0];
+  const keys = Object.keys(BUTTON_INTENT);
+  const contained = keys.filter((k) => t.includes(k));
+  if (!contained.length) return undefined;
+  // Keep only MAXIMAL hits — «أريد العرض التجاري» contains «العرض التجاري», which is nesting, not
+  // ambiguity. Two genuinely distinct titles («ليس الآن، أريد العرض التجاري لاحقًا») cannot be
+  // resolved by length or by any rule that is not guessing intent, so the button is refused.
+  const maximal = contained.filter((k) => !contained.some((o) => o !== k && o.includes(k)));
+  if (maximal.length !== 1) return undefined;
+  const hit = maximal[0];
+  const before = t.slice(0, t.indexOf(hit)).trim();
+  const after = t.slice(t.indexOf(hit) + hit.length).trim();
+  // A negation anywhere around the matched title flips its meaning — refuse rather than rewrite.
+  if (NEGATION.test(` ${before} `) || NEGATION.test(` ${after} `)) return undefined;
+  // What surrounds the title must be a particle («نعم», «من فضلكم»), not a clause carrying meaning
+  // we would be silently discarding from the customer's view.
+  if ([...before].length > 10 || [...after].length > 10) return undefined;
+  return hit;
 }
 
 /** Used when a launch names no template. Lives here so the boot check can see it — a literal at the

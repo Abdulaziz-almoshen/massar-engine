@@ -28,7 +28,15 @@ function check(group, name, actual, expected) {
 }
 
 // --- 1. the boot contract ---------------------------------------------------
-const agentButtons = ["منشأة صحية", "مزوّد نظام HIS", "العرض التجاري", "فريقنا التقني", "مزوّد النظام"];
+// Read the SAME input `src/index.ts` passes to assertButtonsHandled() at boot. A hand-copied list
+// here means the gate can pass green while boot throws — a crash-loop that takes down the webhook
+// receiver carrying «إيقاف». It was already divergent by one title when the reviewer caught it.
+const agentMod = await import(join(root, "dist/agent.js"));
+const agentButtons = agentMod.EMITTED_BUTTONS;
+if (!Array.isArray(agentButtons) || !agentButtons.length) {
+  console.error("FAIL [contract] agent.EMITTED_BUTTONS missing — this gate is not checking what boot checks");
+  process.exit(1);
+}
 let threw = null;
 try { templates.assertButtonsHandled(agentButtons); } catch (e) { threw = e.message; }
 check("contract", "shipped buttons all handled", threw, null);
@@ -45,7 +53,7 @@ check("contract", "21-char title rejected (real cause of 131009)", threw, true);
 // scattered literal copies used to satisfy only by coincidence.
 for (const title of templates.emittedButtons(agentButtons)) {
   check("contract", `«${title}» routes`, Boolean(templates.buttonIntent(title)), true);
-  check("contract", `«${title}» ≤ 20 chars`, [...title].length <= 20, true);
+  check("contract", `«${title}» within WhatsApp cap (both measures)`, title.length <= 20 && [...title].length <= 20, true);
 }
 
 // --- 2. template rendering --------------------------------------------------
@@ -95,9 +103,8 @@ for (const d of ["عندنا ٢٠ فرع", "نستخدم نظام HIS", "نحن 
 // product-discovery's finding on 5f38d56: the upsell says «لاحظنا أن لديكم استخدامًا مرتفعًا» — we
 // have just told them we know who they are — and then rung one asked «أي وصف يناسبكم؟». Every green
 // check tested the opener and the button table; none tested turn two. This one does.
-// Imported from dist rather than sliced: the slice carries TS annotations, and importing the
-// COMPILED function tests the code that actually runs in production.
-const rung = await import(join(root, "dist/agent.js"));
+// The compiled module imported above — testing the code that actually runs in production.
+const rung = agentMod;
 
 const upsell = rung.rungOne("الإجازات المرضية", "high_usage_upsell");
 const intro = rung.rungOne("الإجازات المرضية", "intro_integration");
@@ -129,9 +136,13 @@ check("model-buttons", "an unmappable proposal is rejected, not silently sent",
   templates.canonicalTitle("اضغط هنا"), undefined);
 // Whatever canonicalTitle returns must itself be routable — otherwise we'd emit an unanswerable
 // button through the very function meant to prevent that.
-for (const p of ["أريد العرض التجاري", "من فضلكم العرض التجاري", "نعم أرسلوا التفاصيل", "ليس الآن شكرًا"]) {
+// Property, stated independently of the outcome: for EVERY proposal, canonicalTitle either
+// returns a routable approved title or returns undefined. Never a title we cannot answer.
+for (const p of ["أريد العرض التجاري", "من فضلكم العرض التجاري", "نعم أرسلوا التفاصيل",
+                 "ليس الآن شكرًا", "اضغط هنا", "توصيل مجاني", "صباحًا", "تكامل صحة"]) {
   const c = templates.canonicalTitle(p);
-  check("model-buttons", `canonical(«${p}») is routable`, c ? Boolean(templates.buttonIntent(c)) : "rejected", c ? true : "rejected");
+  check("model-buttons", `canonical(«${p}») is routable-or-undefined`,
+    c === undefined || Boolean(templates.buttonIntent(c)), true);
 }
 // The prompt tells the model to offer these three by name — every one must survive the emit path.
 for (const t of ["منشأة صحية", "مزوّد نظام HIS", "أريد العرض التجاري"])
@@ -139,9 +150,63 @@ for (const t of ["منشأة صحية", "مزوّد نظام HIS", "أريد ا�
 
 // The adapter truncates on UTF-16 units; the contract must count the same way or a title can pass
 // the check and still be cut on the wire into a string with no intent.
+// Discriminating case: 15 code points, 21 UTF-16 units. A code-point-only check PASSES this and
+// the adapter then truncates it on the wire into a string with no intent; the UTF-16 check fails it.
+const surrogate = "ليس الآن 🙏🙏🙏🙏🙏🙏";
+check("model-buttons", "case discriminates the two measures",
+  [...surrogate].length <= 20 && surrogate.length > 20, true);
 threw = null;
-try { templates.assertButtonsHandled(["ليس الآن 🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻🙏🏻"]); } catch (e) { threw = /UTF-16/.test(e.message); }
-check("model-buttons", "surrogate-heavy title rejected on UTF-16 length", threw, true);
+try { templates.assertButtonsHandled([surrogate]); } catch (e) { threw = /UTF-16/.test(e.message); }
+check("model-buttons", "surrogate title rejected on UTF-16 length", threw, true);
+
+// --- 6b. fidelity: a rewrite must never invert what the model meant ---------
+// Re-review finding: «لا أريد العرض التجاري» was rewritten to «أريد العرض التجاري» — the customer
+// would have read a button saying the opposite of what was intended, and tapping it would route
+// them into a commercial track they had just refused.
+for (const neg of ["لا أريد العرض التجاري", "لا نحتاج تفاصيل التكامل", "غير منشأة صحية",
+                   "لسنا بحاجة العرض التجاري", "بدون تفاصيل التكامل"])
+  check("fidelity", `negated «${neg}» is refused, not inverted`, templates.canonicalTitle(neg), undefined);
+// Two genuinely distinct approved titles in one proposal cannot be resolved without guessing.
+check("fidelity", "ambiguous proposal is refused",
+  templates.canonicalTitle("ليس الآن، أريد العرض التجاري لاحقًا"), undefined);
+// Nesting is not ambiguity — «أريد العرض التجاري» contains «العرض التجاري».
+check("fidelity", "nested titles still resolve", templates.canonicalTitle("أريد العرض التجاري"), "أريد العرض التجاري");
+// A clause carrying meaning we would silently drop from the customer's view is refused.
+check("fidelity", "a whole sentence around the title is refused",
+  templates.canonicalTitle("لو تكرمتم نبغى نعرف كل تفاصيل التكامل قبل الاجتماع"), undefined);
+// Prototype keys must not read as approved titles.
+check("fidelity", "prototype key is not an intent", templates.buttonIntent("toString"), undefined);
+threw = null;
+try { templates.assertButtonsHandled(["toString"]); } catch (e) { threw = /no intent/.test(e.message); }
+check("fidelity", "prototype key rejected by the boot contract", threw, true);
+
+// --- 6c. the prompt's OWN prescribed buttons must survive the emit path -----
+// Re-review finding: the scheduling close — the highest-value turn in the ladder — prescribed
+// «صباحًا»/«بعد الظهر» and the prompt forbids writing options as text. Every one was dropped.
+for (const t of ["صباحًا", "بعد الظهر", "تكامل صحة", "إجراء بالمنصة", "استفسار آخر",
+                 "لدينا نظام حالي", "أرسلوا الملف التعريفي", "أرسلوا معلومات", "لسنا مهتمين"])
+  check("prompt-buttons", `prescribed «${t}» survives emit`, templates.canonicalTitle(t), t);
+
+// --- 6d. an info request that also asks price must NOT short-circuit --------
+// Re-review finding: the widened wantsInfo swallowed «التفاصيل والسعر لو سمحتم» and returned before
+// the model ran — PDF plus «أي وصف يناسبكم؟». Complaint #1, re-opened by a nice-to-have.
+const infoSrc = readFileSync(join(root, "src/agent.ts"), "utf8");
+const iStart = infoSrc.indexOf('const B = "(?:^|[\\\\s،.؟!؛])";');
+const iEnd = infoSrc.indexOf("&& !OBJECTION_STEM.test(text));") + "&& !OBJECTION_STEM.test(text));".length;
+if (iStart < 0 || iEnd < 30) { console.error("FAIL [slice] wantsInfo anchors moved"); process.exit(1); }
+const infoBlock = infoSrc.slice(iStart, iEnd).replace(/^\s*const wantsInfo =[\s\S]*$/m, "");
+const runInfo = new Function("text", "templates",
+  infoBlock + "\nreturn templates.buttonIntent(text) === 'info' || (infoPhrase.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text));");
+// Guard the guard: «الملف» contains «لم» and «التفاصيل» contains none of the stems — if the
+// anchoring ever regresses to unanchored, these two canaries fail loudly rather than silently
+// turning every info request into an "objection".
+check("info-gate", "«الملف» does not self-match the objection stem", runInfo("الملف التعريفي", templates), true);
+for (const t of ["الملف التعريفي", "أرسلوا التفاصيل", "الملف التعريفي للإجازات المرضية", "أرسلوا التفاصيل عن التطعيمات"])
+  check("info-gate", `«${t}» is a pure info request`, runInfo(t, templates), true);
+for (const t of ["التفاصيل والسعر لو سمحتم", "أرسلوا التفاصيل وكم السعر", "التفاصيل وكيف نبدأ", "الملف التعريفي والتسعير"])
+  check("info-gate", `«${t}» does NOT short-circuit (price must reach the model)`, runInfo(t, templates), false);
+for (const t of ["التفاصيل التي أرسلتموها غير واضحة", "الملف التعريفي لم يفتح معنا", "أرسلوا التفاصيل إلى المدير المالي وليس لي"])
+  check("info-gate", `objection «${t}» does NOT short-circuit`, runInfo(t, templates), false);
 
 // --- 7. the info buttons all reach rung one ---------------------------------
 for (const t of templates.TEMPLATES)

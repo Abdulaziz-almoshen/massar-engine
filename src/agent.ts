@@ -607,6 +607,10 @@ async function notifyLead(contact: Contact, kind: "hot" | "handoff", product: st
   }
 }
 
+/** Bodies sent by the send_buttons drop path this turn, per phone. Cleared at the top of each
+ *  inbound turn — see handleInbound. Caps the customer at one such bubble per turn. */
+const turnTextSends = new Map<string, number>();
+
 async function execTool(contact: Contact, name: string, args: any): Promise<string> {
   switch (name) {
     case "send_buttons": {
@@ -622,12 +626,22 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       }
       if (!options.length || !args.body) {
         // No routable button left: send the body as text so the turn still moves, never silence.
-        if (args.body) {
+        // ONE such send per turn — the model may call send_buttons on every round of the tool loop,
+        // and four bubbles in one turn is exactly the number-burning §8 exists to prevent. The tool
+        // result deliberately stops inviting a retry after the first.
+        if (args.body && (turnTextSends.get(contact.phone) ?? 0) < 1) {
+          turnTextSends.set(contact.phone, 1);
           await safeSend(contact.phone, String(args.body));
-          return "أُرسل النص بدون أزرار (لم تكن الخيارات قابلة للتوجيه). لا تكرر نص الرسالة.";
+          return "أُرسل النص بدون أزرار (لم تكن الخيارات قابلة للتوجيه). لا تكرر نص الرسالة ولا تستدعِ الأزرار مرة أخرى في هذه النوبة.";
         }
-        return "تعذّر استخدام الأزرار. أرسل نصًا موجزًا يتضمن سؤالًا واحدًا.";
+        return "أُرسلت رسالة هذه النوبة بالفعل. لا ترسل شيئًا آخر — أرجِع نصًا فارغًا.";
       }
+      // Two proposals can canonicalise onto the same approved title; WhatsApp would show the button
+      // twice. Dedupe, and never let the dedupe drop the only way to say no.
+      const seen = new Set<string>();
+      const deduped = options.filter((o) => !seen.has(o.title) && seen.add(o.title));
+      options.length = 0;
+      options.push(...deduped);
       await gupshup.sendQuickReply(contact.phone, String(args.body), options, args.footer ? String(args.footer) : undefined);
       tracker.recordAgentReply(contact.phone, `${args.body} [أزرار: ${options.map((o: { title: string }) => o.title).join(" | ")}]`);
       return "أُرسلت الأزرار. لا تكرر نص الرسالة — إن لم تكن بحاجة لإضافة شيء أرجِع نصًا فارغًا.";
@@ -764,6 +778,7 @@ export const EMITTED_BUTTONS = [...RUNG_ONE_BUTTONS_DEFAULT, ...RUNG_ONE_BUTTONS
 const SANDBOX_ACTIVATION = SANDBOX_ACTIVATION_RE;
 
 export async function handleInbound(contact: Contact, text: string): Promise<void> {
+  turnTextSends.delete(contact.phone);   // new turn, new one-bubble budget for the drop path
   if (contact.optedOut) return;
 
   // OPT-OUT IS CHECKED FIRST, ALWAYS. Nothing may sit above it. The activation branch below
@@ -783,9 +798,24 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // was asked three times to compose this turn and produced «الملف يوضح…» each time; the content
   // does not depend on anything the customer said, so composing it adds variance and no value.
   // The trailing service phrase is allowed: «الملف التعريفي للإجازات المرضية» is how a real person
-  // asks. Anchored to ≤ 40 trailing chars so a sentence that merely mentions the file is not caught.
+  // asks. But the widened window let two other things through, and both matter:
+  //   «التفاصيل والسعر لو سمحتم» — a price ask that short-circuits here never reaches the model, so
+  //   the buyer got the PDF and «أي وصف يناسبكم؟». That is complaint #1, re-opened by this regex.
+  //   «التفاصيل التي أرسلتموها غير واضحة» — an objection, answered with the same file again.
+  // So the trailing span must carry no commercial stem and no objection stem. A tap on an approved
+  // info button still wins outright: its text is exactly the title, with nothing trailing.
+  // Anchored on both sides. An unanchored «لم» matches inside «الـمـلـف», so «الملف التعريفي
+  // للإجازات المرضية» read as an objection — the same Arabic-substring trap as the `\b` bug, which
+  // JS cannot express with \b because it needs an ASCII word char on one side.
+  const B = "(?:^|[\\s،.؟!؛])";
+  const E = "(?=$|[\\s،.؟!؛])";
+  const COMMERCIAL_STEM = new RegExp(
+    `${B}(?:و)?(?:ال)?(سعر|تسعير|تكلفة|ميزانية|فاتورة|نبدأ|اشترك|عقد)${E}|كم\\s*(يكلف|السعر|التكلفة)`);
+  const OBJECTION_STEM = new RegExp(
+    `${B}(?:و)?(غير|لم|ليست|ليس|لست|لسنا|مو|ما|مشكلة|متأخر|خطأ|واضحة|واضح)${E}`);
+  const infoPhrase = /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/;
   const wantsInfo = templates.buttonIntent(text) === "info" ||
-    /^(\s*)(الملف التعريفي|أرسلوا التفاصيل|أبي التفاصيل|ابي التفاصيل|التفاصيل|أرسل الملف)([\s؀-ۿ]{0,40})$/.test(text.trim());
+    (infoPhrase.test(text.trim()) && !COMMERCIAL_STEM.test(text) && !OBJECTION_STEM.test(text));
   // Whether rung one already went out is read from the TRANSCRIPT, not from process memory. An
   // in-memory Set forgets on every deploy — and there were 45 deploys in one day — so the founder
   // could be handed the same opener twice. The transcript survives the restart; the Set did not.
