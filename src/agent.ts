@@ -629,17 +629,42 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
         // ONE such send per turn — the model may call send_buttons on every round of the tool loop,
         // and four bubbles in one turn is exactly the number-burning §8 exists to prevent. The tool
         // result deliberately stops inviting a retry after the first.
-        if (args.body && (turnTextSends.get(contact.phone) ?? 0) < 1) {
+        const alreadySent = (turnTextSends.get(contact.phone) ?? 0) >= 1;
+        if (args.body && !alreadySent) {
           turnTextSends.set(contact.phone, 1);
           await safeSend(contact.phone, String(args.body));
           return "أُرسل النص بدون أزرار (لم تكن الخيارات قابلة للتوجيه). لا تكرر نص الرسالة ولا تستدعِ الأزرار مرة أخرى في هذه النوبة.";
         }
-        return "أُرسلت رسالة هذه النوبة بالفعل. لا ترسل شيئًا آخر — أرجِع نصًا فارغًا.";
+        // ONLY this branch may start with «أُرسل» — the outer loop treats that prefix as proof a
+        // bubble reached the customer and skips the never-silence fallback. Saying it when nothing
+        // was sent (a call with no body) ends the turn in total silence, which is the exact failure
+        // that fallback exists for. The no-body case must therefore NOT claim a send.
+        if (alreadySent) return "أُرسلت رسالة هذه النوبة بالفعل. لا ترسل شيئًا آخر — أرجِع نصًا فارغًا.";
+        return "تعذّر استخدام الأزرار. أرسل نصًا موجزًا يتضمن سؤالًا واحدًا.";
       }
       // Two proposals can canonicalise onto the same approved title; WhatsApp would show the button
-      // twice. Dedupe, and never let the dedupe drop the only way to say no.
+      // twice. Dedupe — and actually keep the decline this time. The previous comment claimed the
+      // rule and the code was a plain first-wins filter, so a set whose only «no» collided with an
+      // earlier title lost it silently. A customer must always be able to decline.
       const seen = new Set<string>();
       const deduped = options.filter((o) => !seen.has(o.title) && seen.add(o.title));
+      const lostDecline = options.some((o) => templates.buttonIntent(o.title) === "decline") &&
+        !deduped.some((o) => templates.buttonIntent(o.title) === "decline");
+      if (lostDecline) {
+        const decline = options.find((o) => templates.buttonIntent(o.title) === "decline");
+        if (decline) deduped.push(decline);
+      }
+      // A set that collapsed to one option is not a choice. Better to send the question as text than
+      // to present a single button that reads as the only available answer.
+      if (deduped.length < 2 && proposed.length >= 2) {
+        console.error(JSON.stringify({ at: "agent", level: "error", msg: "button set collapsed to one option — sending as text", phone: contact.phone, proposed }));
+        if ((turnTextSends.get(contact.phone) ?? 0) < 1) {
+          turnTextSends.set(contact.phone, 1);
+          await safeSend(contact.phone, String(args.body));
+          return "أُرسل النص بدون أزرار (تعذّر تقديم خيارين مختلفين). لا تكرر نص الرسالة.";
+        }
+        return "تعذّر تقديم خيارات صالحة. أرجِع نصًا فارغًا.";
+      }
       options.length = 0;
       options.push(...deduped);
       await gupshup.sendQuickReply(contact.phone, String(args.body), options, args.footer ? String(args.footer) : undefined);
@@ -797,6 +822,16 @@ export async function handleInbound(contact: Contact, text: string): Promise<voi
   // Deliver → Reinforce → Qualify, emitted rather than requested, for rung one only. The model
   // was asked three times to compose this turn and produced «الملف يوضح…» each time; the content
   // does not depend on anything the customer said, so composing it adds variance and no value.
+  // A tap on a decline button is recorded by CODE, not by hoping the model calls
+  // mark_not_interested. A customer who taps «لسنا مهتمين» has said so unambiguously; making that
+  // outcome depend on an LLM turn is the same "hard rules live in code" rule §4 states, applied to
+  // the one signal we least want to lose. The conversation still continues — the model gets its
+  // turn to respond gracefully; only the RECORD is made deterministic here.
+  if (templates.buttonIntent(text) === "decline") {
+    const firm = /لسنا مهتمين|لا،\s*شكرًا|^لا$/.test(text.trim());
+    tracker.setOutcome(contact.phone, firm ? "not_interested" : "later", `ضغط زر: ${text.trim()}`);
+  }
+
   // The trailing service phrase is allowed: «الملف التعريفي للإجازات المرضية» is how a real person
   // asks. But the widened window let two other things through, and both matter:
   //   «التفاصيل والسعر لو سمحتم» — a price ask that short-circuits here never reaches the model, so

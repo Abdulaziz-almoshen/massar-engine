@@ -136,6 +136,14 @@ check("model-buttons", "an unmappable proposal is rejected, not silently sent",
   templates.canonicalTitle("اضغط هنا"), undefined);
 // Whatever canonicalTitle returns must itself be routable — otherwise we'd emit an unanswerable
 // button through the very function meant to prevent that.
+// SAFETY property plus a COVERAGE floor. QA proved the safety property alone is vacuous: force
+// canonicalTitle to always return undefined and it still passes 4/4, because "undefined is allowed"
+// is satisfied by refusing everything. The floor below fails under exactly that mutation.
+const mustMap = [["من فضلكم العرض التجاري", "العرض التجاري"], ["نعم أرسلوا التفاصيل", "أرسلوا التفاصيل"],
+                 ["أريد العرض التجاري", "أريد العرض التجاري"], ["صباحًا", "صباحًا"]];
+for (const [proposal, expected] of mustMap)
+  check("model-buttons", `«${proposal}» MUST map (coverage floor — fails if canonicalTitle refuses all)`,
+    templates.canonicalTitle(proposal), expected);
 // Property, stated independently of the outcome: for EVERY proposal, canonicalTitle either
 // returns a routable approved title or returns undefined. Never a title we cannot answer.
 for (const p of ["أريد العرض التجاري", "من فضلكم العرض التجاري", "نعم أرسلوا التفاصيل",
@@ -163,14 +171,22 @@ check("model-buttons", "surrogate title rejected on UTF-16 length", threw, true)
 // Re-review finding: «لا أريد العرض التجاري» was rewritten to «أريد العرض التجاري» — the customer
 // would have read a button saying the opposite of what was intended, and tapping it would route
 // them into a commercial track they had just refused.
+// Arabic refusal is often a VERB, and a prefixed conjunction hides the particle («ولا»). A denylist
+// missed 10 of these 11; the allowlist-on-surrounding-text refuses all of them by construction.
 for (const neg of ["لا أريد العرض التجاري", "لا نحتاج تفاصيل التكامل", "غير منشأة صحية",
-                   "لسنا بحاجة العرض التجاري", "بدون تفاصيل التكامل"])
+                   "لسنا بحاجة العرض التجاري", "بدون تفاصيل التكامل",
+                   "مو محتاجين العرض التجاري", "ولا نريد العرض التجاري", "كلا، العرض التجاري",
+                   "نرفض العرض التجاري", "ألغوا العرض التجاري", "أجّلوا العرض التجاري",
+                   "توقفوا عن العرض التجاري", "ليسوا مهتمين بالعرض التجاري", "أبدًا العرض التجاري"])
   check("fidelity", `negated «${neg}» is refused, not inverted`, templates.canonicalTitle(neg), undefined);
 // Two genuinely distinct approved titles in one proposal cannot be resolved without guessing.
 check("fidelity", "ambiguous proposal is refused",
   templates.canonicalTitle("ليس الآن، أريد العرض التجاري لاحقًا"), undefined);
 // Nesting is not ambiguity — «أريد العرض التجاري» contains «العرض التجاري».
-check("fidelity", "nested titles still resolve", templates.canonicalTitle("أريد العرض التجاري"), "أريد العرض التجاري");
+// Must NOT be an exact BUTTON_INTENT key, or canonicalTitle returns on line 1 and the
+// maximal/nesting filter is never exercised.
+check("fidelity", "nested titles still resolve (exercises the maximal filter)",
+  templates.canonicalTitle("من فضلكم أريد العرض التجاري"), "أريد العرض التجاري");
 // A clause carrying meaning we would silently drop from the customer's view is refused.
 check("fidelity", "a whole sentence around the title is refused",
   templates.canonicalTitle("لو تكرمتم نبغى نعرف كل تفاصيل التكامل قبل الاجتماع"), undefined);
@@ -200,7 +216,16 @@ const runInfo = new Function("text", "templates",
 // Guard the guard: «الملف» contains «لم» and «التفاصيل» contains none of the stems — if the
 // anchoring ever regresses to unanchored, these two canaries fail loudly rather than silently
 // turning every info request into an "objection".
-check("info-gate", "«الملف» does not self-match the objection stem", runInfo("الملف التعريفي", templates), true);
+// The canary must test the REGEX, not the exact-key fast path. runInfo("الملف التعريفي") returns
+// true on `buttonIntent === "info"` and never reaches the stems, so it could not catch the
+// anchoring regression it exists for. Test the stem directly, on the string that broke it.
+const stems = new Function("return { COMMERCIAL_STEM, OBJECTION_STEM };\n".replace(/^/, infoBlock + "\n"))();
+check("info-gate", "«الملف» does not self-match the objection stem («لم» inside «الـمـلـف»)",
+  stems.OBJECTION_STEM.test("الملف التعريفي"), false);
+check("info-gate", "the stem still catches a real objection",
+  stems.OBJECTION_STEM.test("التفاصيل غير واضحة"), true);
+check("info-gate", "«التفاصيل» does not self-match the commercial stem",
+  stems.COMMERCIAL_STEM.test("أرسلوا التفاصيل"), false);
 for (const t of ["الملف التعريفي", "أرسلوا التفاصيل", "الملف التعريفي للإجازات المرضية", "أرسلوا التفاصيل عن التطعيمات"])
   check("info-gate", `«${t}» is a pure info request`, runInfo(t, templates), true);
 for (const t of ["التفاصيل والسعر لو سمحتم", "أرسلوا التفاصيل وكم السعر", "التفاصيل وكيف نبدأ", "الملف التعريفي والتسعير"])

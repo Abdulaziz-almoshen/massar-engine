@@ -93,8 +93,16 @@ export const BUTTON_INTENT: Record<string, ButtonIntent> = Object.assign(Object.
   // the scheduling close — the prompt orders send_buttons here and forbids writing the options as
   // text, so these MUST route or the highest-value turn in the ladder ships with no buttons at all
   "صباحًا": "schedule",
+  "مساءً": "schedule",
   "بعد الظهر": "schedule",
   "مكالمة قصيرة": "schedule",
+  "الأحد": "schedule", "الاثنين": "schedule", "الثلاثاء": "schedule",
+  "الأربعاء": "schedule", "الخميس": "schedule",
+  // §372's third prescribed case is a plain yes/no. Without these the model composes them and the
+  // emit path drops both, leaving the turn with no buttons at all.
+  "نعم": "qualify",
+  "لا": "decline",
+  "موافق": "commercial",
   // the opening classifier the prompt prescribes for منصة صحة conversations
   "تكامل صحة": "qualify",
   "إجراء بالمنصة": "qualify",
@@ -125,14 +133,30 @@ export function buttonIntent(text: string): ButtonIntent | undefined {
 // A NEGATED proposal must never be rewritten into its affirmative. «لا أريد العرض التجاري» mapped to
 // «أريد العرض التجاري» — the customer would have read a button that said the opposite of what the
 // model meant, and tapping it would have routed them to a commercial track they had just refused.
-// Rewriting outbound copy demands fidelity, not proximity.
-const NEGATION = /(^|\s)(لا|ليس|ليست|لست|لسنا|غير|بدون|لن|ما|مش|دون)(\s|$)/;
+//
+// The first attempt was a denylist of negation particles. That is unfixable in Arabic, and the
+// review proved it: refusal is frequently a VERB («نرفض», «ألغوا», «أجّلوا», «توقفوا عن»), which no
+// particle list contains, and «ولا» hides «لا» behind a prefixed conjunction the same way «الملف»
+// hides «لم». 10 of 11 refusals still inverted.
+//
+// So the rule is inverted. Anything surrounding an approved title must be on a SHORT ALLOWLIST of
+// meaningless courtesy particles; everything else refuses the button. Verb-form refusals become
+// impossible by construction rather than by enumeration, and a proposal carrying real meaning we
+// would silently discard («صباحًا الأحد» → «صباحًا», dropping the day) is refused too.
+const BENIGN_AFFIX = new Set([
+  "", "،", ".", "!", "؟",
+  "نعم", "نعم،", "أجل", "أجل،", "من فضلكم", "لو سمحتم", "رجاءً", "رجاء", "شكرًا", "شكرا",
+  "أرسلوا", "أرسل", "أريد", "نريد", "نبغى", "اختر", "اختاروا",
+]);
 
 export function canonicalTitle(proposed: string): string | undefined {
   const t = proposed.trim();
   if (BUTTON_INTENT[t]) return t;
   const keys = Object.keys(BUTTON_INTENT);
-  const contained = keys.filter((k) => t.includes(k));
+  // A title that is ALSO a benign courtesy particle («نعم») must not compete as a candidate when it
+  // is merely the prefix of a longer proposal — «نعم أرسلوا التفاصيل» means the details, not "yes".
+  // It stays tappable on its own: an exact match returned on the fast path above.
+  const contained = keys.filter((k) => t.includes(k) && !BENIGN_AFFIX.has(k));
   if (!contained.length) return undefined;
   // Keep only MAXIMAL hits — «أريد العرض التجاري» contains «العرض التجاري», which is nesting, not
   // ambiguity. Two genuinely distinct titles («ليس الآن، أريد العرض التجاري لاحقًا») cannot be
@@ -142,11 +166,9 @@ export function canonicalTitle(proposed: string): string | undefined {
   const hit = maximal[0];
   const before = t.slice(0, t.indexOf(hit)).trim();
   const after = t.slice(t.indexOf(hit) + hit.length).trim();
-  // A negation anywhere around the matched title flips its meaning — refuse rather than rewrite.
-  if (NEGATION.test(` ${before} `) || NEGATION.test(` ${after} `)) return undefined;
-  // What surrounds the title must be a particle («نعم», «من فضلكم»), not a clause carrying meaning
-  // we would be silently discarding from the customer's view.
-  if ([...before].length > 10 || [...after].length > 10) return undefined;
+  // Allowlist, not denylist — see the note above. Unknown surrounding text means unknown meaning,
+  // and we do not put words in the customer's mouth on a guess.
+  if (!BENIGN_AFFIX.has(before) || !BENIGN_AFFIX.has(after)) return undefined;
   return hit;
 }
 
