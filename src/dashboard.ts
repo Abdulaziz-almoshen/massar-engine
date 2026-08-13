@@ -1085,9 +1085,16 @@ function vAimkt() {
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   h += '<div class="step" style="position:sticky;bottom:14px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:0 14px 40px rgba(15,37,64,.16);border:1px solid #e2e8f1;">' +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
-    '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>' +
-    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '" style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
+    // In behaviour mode there is nothing to launch and the reason is not «you picked nobody» —
+    // it is that this audience needs an approved template the send path does not yet use. Saying
+    // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
+    (audMode === "behaviour" && !retargetCohort
+      ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#8a6d10;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
+        '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
+      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) + (selAsset ? " · الملف مضمّن 📎" : "") + "</div>" +
+        '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
+      ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
