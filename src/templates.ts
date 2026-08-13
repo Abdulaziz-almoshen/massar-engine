@@ -113,6 +113,26 @@ export const BUTTON_INTENT: Record<string, ButtonIntent> = Object.assign(Object.
   "استفسار آخر": "qualify",
   "لدينا نظام حالي": "qualify",
   "أرسلوا الملف التعريفي": "info",
+  // Harvested from LIVE transcripts (80 agent turns, 24 distinct titles the model actually emitted).
+  // 15 of those 24 had no intent — the model composes far more freely than the table assumed, and
+  // under the emit-time allowlist every one of them would now be DROPPED and the turn degraded to
+  // text. Mapping the real ones keeps the buttons the customer benefits from. Re-harvest whenever
+  // the prompt changes: the table must track what the model actually says, not what we expect.
+  "أرسل الملف": "info",
+  "إرسال الملف": "info",
+  "أرسل تفاصيل الباقة": "info",
+  "أريد العرض التعريفي": "info",
+  "طلب عرض تعريفي": "info",
+  "تفاصيل الربط": "info",
+  "ترتيب عرض": "commercial",
+  "تنسيق عرض موجز": "commercial",
+  "أبغى التجربة": "commercial",
+  "مكالمة ١٠ دقائق": "schedule",
+  "لدي سؤال تقني": "qualify",
+  "نعم، نحتاجها": "qualify",
+  "خدمة أخرى": "qualify",
+  "لا أحتاج الآن": "decline",
+  "لا تناسبنا": "decline",
   "أرسلوا معلومات": "info",
 });
 

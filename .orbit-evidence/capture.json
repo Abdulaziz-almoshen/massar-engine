@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "1440": {
+      "path": "massar-engine/.orbit-evidence/baseline-1440.png",
+      "errors": [],
+      "sha256": "0d00488cd5c6b5f7b307a41365f23965771ca49387219c7eb7a8837ef488513b"
+    },
+    "1024": {
+      "path": "massar-engine/.orbit-evidence/baseline-1024.png",
+      "errors": [],
+      "sha256": "979ead3f31187c91af1c111f69bf03e4bfa2e0d4e62368783693d9378a402e39"
+    },
+    "390": {
+      "path": "massar-engine/.orbit-evidence/baseline-390.png",
+      "errors": [],
+      "sha256": "2190f8257b588dfb4c4816f698d64b0613192b024aaf3fafd3d58aa79ed5d0cd"
+    }
+  },
+  "actual": {
+    "1440": {
+      "path": "massar-engine/.orbit-evidence/actual-1440.png",
+      "errors": [],
+      "sha256": "8cd9fbc9c94bac68aba8ef2d6b2bd05680e6f0229adf9f86dfcedea5dd8dfc15"
+    },
+    "1024": {
+      "path": "massar-engine/.orbit-evidence/actual-1024.png",
+      "errors": [],
+      "sha256": "6b6d6edb0852fe789425d9b0341977ba27b4a46a2e8abe06359f66c2948f3c40"
+    },
+    "390": {
+      "path": "massar-engine/.orbit-evidence/actual-390.png",
+      "errors": [],
+      "sha256": "d5e03f60c30622202b997794de44f807fd450c4fa84100a7458b83bf1284f309"
+    }
+  },
+  "actual_tpl2": {
+    "1440": {
+      "path": "massar-engine/.orbit-evidence/actual-tpl2-1440.png",
+      "errors": [],
+      "sha256": "932d37cbd84cd04407e4b3bc362d404696be89628abd40454c80e78febe57224"
+    },
+    "1024": {
+      "path": "massar-engine/.orbit-evidence/actual-tpl2-1024.png",
+      "errors": [],
+      "sha256": "6b6d6edb0852fe789425d9b0341977ba27b4a46a2e8abe06359f66c2948f3c40"
+    },
+    "390": {
+      "path": "massar-engine/.orbit-evidence/actual-tpl2-390.png",
+      "errors": [],
+      "sha256": "d5e03f60c30622202b997794de44f807fd450c4fa84100a7458b83bf1284f309"
+    }
+  }
+}

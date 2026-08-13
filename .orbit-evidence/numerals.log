@@ -1,0 +1,5 @@
+numeral regression-lock clear: src/dashboard.ts has none of the shapes this check knows.
+NOTE: this is a regression lock, not a property check — it catches the defect shapes prior
+review rounds named (raw concat of .length/.count/.score/Math.*/LIST_CAP, Latin % in markup,
+non-existent Math methods). It does NOT prove every number routes through fmtN(); a review
+wrote 21 mutations and 18 passed. Treat a clean run as "no known regression", not "correct".

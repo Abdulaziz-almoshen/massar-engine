@@ -1,0 +1,33 @@
+{
+  "sha": "d85d037b1f47e9b5704fa4b94340de6d94e6a52d",
+  "commands": [
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "verdict": "PASS",
+      "evidence": "massar-engine/.orbit-evidence/build.log",
+      "measured": "exit=0, 36 bytes of output"
+    },
+    {
+      "command": "node scripts/check-catalogue.mjs",
+      "exit_code": 0,
+      "verdict": "PASS",
+      "evidence": "massar-engine/.orbit-evidence/catalogue.log",
+      "measured": "exit=0, 39 bytes of output"
+    },
+    {
+      "command": "node scripts/check-numerals.mjs",
+      "exit_code": 0,
+      "verdict": "PASS",
+      "evidence": "massar-engine/.orbit-evidence/numerals.log",
+      "measured": "exit=0, 457 bytes of output"
+    },
+    {
+      "command": "node scripts/check-buttons.mjs",
+      "exit_code": 0,
+      "verdict": "PASS",
+      "evidence": "massar-engine/.orbit-evidence/buttons.log",
+      "measured": "exit=0, 20686 bytes of output"
+    }
+  ]
+}
