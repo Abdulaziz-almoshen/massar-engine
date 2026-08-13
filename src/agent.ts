@@ -458,7 +458,18 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: "object",
         properties: {
           body: { type: "string", description: "نص موجز يوضح القيمة فوق الأزرار" },
-          options: { type: "array", items: { type: "string" }, description: "عناوين موجزة، ثلاثة أزرار كحد أقصى، و20 حرفًا لكل زر" },
+          // ENUM-CONSTRAINED, built from BUTTON_INTENT at module load. Three roles independently
+          // reached the same conclusion: a hand-maintained allowlist re-harvested from production is
+          // a treadmill — the model's title space is open, so every prompt edit, product, or dialect
+          // shift re-opens the gap, and the failure degrades silently (drop → plain text) so we only
+          // learn by harvesting again. An enum makes an unroutable title UNREPRESENTABLE rather than
+          // droppable: the provider enforces it during sampling. canonicalTitle() stays as a
+          // belt-and-braces fallback for any path that bypasses the schema.
+          options: {
+            type: "array",
+            items: { type: "string", enum: Object.keys(templates.BUTTON_INTENT) },
+            description: "اختر من القائمة المعتمدة فقط — ثلاثة أزرار كحد أقصى",
+          },
           footer: { type: "string", description: "تذييل اختياري موجز" },
         },
         required: ["body", "options"],
