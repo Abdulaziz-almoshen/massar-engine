@@ -251,6 +251,12 @@ let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0;
+// Behavioural segmentation. audMode «file» keeps the existing column-chip picker; «behaviour»
+// builds a live segment over the ledger. The two are modes of ONE step, not separate screens:
+// a behavioural audience is by definition outside WhatsApp's 24h window, so it can only be
+// reached with an approved template — letting the audience be chosen away from the message is
+// how WATI and AiSensy let you build a list you are not allowed to send to.
+let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = false; let segWindow = 5;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
 let manualOpen = false; let manualStat = ""; let custQ = "";
@@ -817,8 +823,123 @@ window.startRetarget = () => {
   location.hash = "aimkt";
 };
 window.clearRetarget = () => { retargetCohort = null; campName = ""; render(false); };
+const SEG_SIGNALS = [["delivered","وصلت الرسالة"],["read","قُرئت الرسالة"],["replied","ردّ العميل"],
+  ["failed","فشل الإرسال"],["interest","سُجّل اهتمام"],["meeting","حُجز موعد"]];
+window.setAudMode = (m) => { audMode = m; if (m === "behaviour" && !segDef) segLoadPresets(); render(false); };
+window.segSetWindow = (d) => { segWindow = d; if (segDef) { segDef.conditions.forEach((c) => { if (c.beforeDays) c.beforeDays = d; if (c.withinDays) c.withinDays = d; }); segRun(); } else render(false); };
+window.segUsePreset = (id) => {
+  const p = (segPresets || []).find((x) => x.id === id); if (!p) return;
+  segDef = JSON.parse(JSON.stringify(p.def)); segRun();
+};
+window.segSetMatch = (m) => { if (!segDef) return; segDef.match = m; segRun(); };
+window.segSetField = (i, field, val) => {
+  if (!segDef || !segDef.conditions[i]) return;
+  const c = segDef.conditions[i];
+  if (field === "signal") c.signal = val;
+  if (field === "comparator") { c.comparator = val; if (val === "never_happened") { delete c.beforeDays; } }
+  segRun();
+};
+window.segAddCond = () => { if (!segDef) segDef = { match: "all", conditions: [] };
+  if (segDef.conditions.length >= 8) return;
+  segDef.conditions.push({ signal: "replied", comparator: "never_happened", withinDays: segWindow }); segRun(); };
+window.segDelCond = (i) => { if (!segDef) return; segDef.conditions.splice(i, 1); if (!segDef.conditions.length) { segDef = null; segPreview = null; render(false); return; } segRun(); };
+let segPresets = null;
+async function segLoadPresets() {
+  try {
+    const r = await fetch("/admin/segments/presets?window=" + segWindow, { headers: { "x-admin-token": TOKEN } });
+    if (r.ok) segPresets = await r.json();
+  } catch (e) { segPresets = []; }
+  render(false);
+}
+async function segRun() {
+  if (!segDef || !segDef.conditions.length) return;
+  segBusy = true; render(false);
+  try {
+    const r = await fetch("/admin/segments/preview", { method: "POST",
+      headers: { "content-type": "application/json", "x-admin-token": TOKEN },
+      body: JSON.stringify({ def: segDef, includeTest: showTest }) });
+    segPreview = r.ok ? await r.json() : { error: (await r.json()).error || "تعذّر الحساب" };
+  } catch (e) { segPreview = { error: "تعذّر الاتصال بالخادم" }; }
+  segBusy = false; render(false);
+}
+function vSegBuilder() {
+  let h = "";
+  // Presets FILL the rows rather than hiding behind a label — a segment the founder cannot read
+  // is a segment he cannot trust, and every benchmarked tool that hides it gets distrusted.
+  if (segPresets && segPresets.length) {
+    h += '<div style="font-size:11.5px;color:#667085;margin-bottom:9px;">اختيار الفئة يملأ الشروط أدناه، ويمكنكم تعديلها.</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:18px;">' +
+      segPresets.map((p) => {
+        const extra = [];
+        if (p.suppressed) extra.push(fmtN(p.suppressed) + " في التبريد");
+        if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
+        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EAECF0;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\'' + p.id + '\')">' +
+          '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(p.label) + '</span>' +
+          '<span class="chip ' + (p.matched ? "c-ok" : "c-grey") + '">' + fmtN(p.matched) + "</span></div>" +
+          '<div style="font-size:11px;color:#667085;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
+          (extra.length ? '<div style="font-size:10.5px;color:#B54708;margin-top:5px;">' + esc(extra.join(" · ")) + "</div>" : "") +
+          "</button>";
+      }).join("") + "</div>";
+  }
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
+    '<span style="font-size:11.5px;font-weight:700;color:#667085;">المطابقة:</span>' +
+    chipBtn("تنطبق كل الشروط", !segDef || segDef.match === "all", "segSetMatch(\'all\')") +
+    chipBtn("ينطبق أي شرط", segDef && segDef.match === "any", "segSetMatch(\'any\')") +
+    '<span style="flex:1"></span><span style="font-size:11.5px;font-weight:700;color:#667085;">النافذة:</span>' +
+    [3, 5, 7, 14].map((d) => chipBtn(fmtN(d) + (d >= 11 ? " يومًا" : " أيام"), segWindow === d, "segSetWindow(" + d + ")")).join("") + "</div>";
+
+  const conds = (segDef && segDef.conditions) || [];
+  h += conds.map((c, i) =>
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #EAECF0;border-radius:12px;background:#fff;margin-bottom:8px;">' +
+    (i ? '<span class="chip c-grey" style="font-size:10.5px;">' + (segDef.match === "any" ? "أو" : "و") + "</span>" : "") +
+    '<select class="inp" style="height:40px;flex:1;min-width:150px;" onchange="segSetField(' + i + ',\'signal\',this.value)">' +
+      SEG_SIGNALS.map((sg) => '<option value="' + sg[0] + '"' + (c.signal === sg[0] ? " selected" : "") + ">" + sg[1] + "</option>").join("") + "</select>" +
+    '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\'comparator\',this.value)">' +
+      '<option value="happened"' + (c.comparator === "happened" ? " selected" : "") + ">حدث</option>" +
+      '<option value="never_happened"' + (c.comparator === "never_happened" ? " selected" : "") + ">لم يحدث</option></select>" +
+    '<span style="font-size:11px;color:#98A2B3;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
+    '<button class="btn" style="height:36px;padding:0 12px;color:#B42318;background:#fff;border:1px solid #F7D4D1;" onclick="segDelCond(' + i + ')">حذف</button></div>').join("");
+  h += '<button class="btn" style="font-size:12px;color:#1F7A73;background:#E9F7F6;border:1px solid #C4E8E5;margin-bottom:14px;" onclick="segAddCond()">+ أضف شرطًا</button>';
+
+  // The result. Every zero explains itself — that distinction is the whole feature.
+  if (segBusy) h += '<div style="font-size:12.5px;color:#667085;padding:10px 0;">جارٍ الحساب…</div>';
+  else if (segPreview && segPreview.error) h += '<div class="sparse" style="border-inline-start-color:#B42318;">' + ic("eye", 16, "#B42318") + "<div>" + esc(segPreview.error) + "</div></div>";
+  else if (segPreview) {
+    const pv = segPreview;
+    h += '<div style="background:#F4FBFA;border:1px solid #B9E4E0;border-radius:13px;padding:14px 16px;margin-bottom:12px;">' +
+      '<div style="font-size:12.5px;color:#2E7D77;line-height:1.9;">' + esc(pv.describe) + "</div>" +
+      '<div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;"><span style="font-size:24px;font-weight:700;color:#2E7D77;">' + fmtN(pv.matched) + "</span>" +
+      '<span style="font-size:12px;font-weight:600;color:#2E7D77;">جهة تطابق الآن</span>' +
+      '<span style="font-size:11px;color:#7FA9A5;">العضوية تُحدَّث تلقائيًا</span></div>';
+    const notes = [];
+    if ((pv.suppressed || []).length) notes.push("مستبعد بالتبريد: " + fmtN(pv.suppressed.length) + " (رُوسلوا حديثًا)");
+    if ((pv.tooNew || []).length) notes.push("أحدث من النافذة: " + fmtN(pv.tooNew.length));
+    if (pv.scanTruncated) notes.push("فُحصت أحدث " + fmtN(pv.poolSize) + " جهة فقط");
+    if (notes.length) h += '<div style="font-size:11.5px;color:#B54708;margin-top:8px;line-height:1.9;">' + esc(notes.join(" · ")) + "</div>";
+    h += "</div>";
+    // The tenure state: a book younger than the window is a not-yet audience, not an empty one.
+    if (!pv.matched && (pv.tooNew || []).length && pv.requiredDays > pv.oldestContactDays) {
+      h += '<div class="sparse" style="border-inline-start-color:#B54708;">' + ic("clock", 16, "#B54708") +
+        "<div><b>لا تطابق بعد — البيانات أحدث من النافذة.</b><br>أقدم جهة لديكم مضى عليها " + fmtN(pv.oldestContactDays) +
+        " يومًا، والشرط يطلب " + fmtN(pv.requiredDays) + (pv.requiredDays >= 11 ? " يومًا" : " أيام") +
+        ". أول تطابق متوقع بعد " + fmtN(Math.max(0, pv.requiredDays - pv.oldestContactDays)) + " أيام. " +
+        '<span class="lnk" onclick="segSetWindow(3)">اضبط النافذة إلى ٣ أيام</span></div></div>';
+    } else if (!pv.matched && !(pv.suppressed || []).length) {
+      h += '<div class="sparse">' + ic("eye", 16, "#667085") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
+    }
+  }
+  // The constraint that makes this different from an email tool.
+  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#EFF4FB;border:1px solid #D6E2F1;border-radius:12px;padding:12px 15px;font-size:12px;color:#2F5F94;line-height:1.9;">' +
+    ic("send", 16, "#2F5F94") + "<div>هذه الفئة خارج نافذة الـ٢٤ ساعة. الإرسال إليها يتم بقالب معتمد فقط.</div></div>";
+  return h;
+}
+
 function launchTargets() {
-  return retargetCohort ? retargetCohort.targets : entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
+  if (retargetCohort) return retargetCohort.targets;
+  // In behavioural mode the audience IS the segment's matched set — suppressed and too-new
+  // contacts are shown to the user but never silently included in a send.
+  if (audMode === "behaviour") return ((segPreview && segPreview.sample) || []).map((x) => ({ phone: x.phone, name: x.name }));
+  return entities.filter(e => entSel.has(e.id)).map(e => ({ phone: e.phone, name: e.name }));
 }
 window.openLaunch = () => { if (!launchTargets().length || !campMsg.trim() || launching) return; document.getElementById("lmodal").style.display = "flex"; };
 window.closeLaunch = () => { const m = document.getElementById("lmodal"); if (m) m.style.display = "none"; };
@@ -884,6 +1005,15 @@ function vAimkt() {
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + fmtN(selN) + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
+  if (!retargetCohort) {
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
+      chipBtn("حسب الملف", audMode === "file", "setAudMode(\'file\')") +
+      chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\'behaviour\')") +
+      '<span style="flex:1"></span><span style="font-size:11.5px;color:#98A2B3;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
+  }
+  if (!retargetCohort && audMode === "behaviour") {
+    h += vSegBuilder();
+  } else
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
