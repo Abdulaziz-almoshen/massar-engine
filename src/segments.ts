@@ -233,18 +233,25 @@ export function presets(windowDays = DEFAULT_WINDOW_DAYS): Preset[] {
 
 /** Human-readable Arabic for one condition — the builder shows this, never JSON. */
 export function describe(cond: Condition): string {
-  const S: Record<SignalKind, string> = {
+  // Arabic negation is not a prefix. «لم» takes the jussive, so «لم وصل ردّ» is wrong —
+  // each signal carries both forms rather than being assembled from one.
+  const POS: Record<SignalKind, string> = {
     delivered: "وصلت الرسالة", read: "قُرئت الرسالة", replied: "وصل ردّ",
-    failed: "فشل التسليم", interest: "سُجّل اهتمام", meeting: "حُجز اجتماع", opted_out: "طلب الإيقاف",
+    failed: "فشل التسليم", interest: "سُجّل اهتمام", meeting: "حُجز موعد", opted_out: "طلب الإيقاف",
   };
-  const base = S[cond.signal];
+  const NEG: Record<SignalKind, string> = {
+    delivered: "لم تصل الرسالة", read: "لم تُقرأ الرسالة", replied: "لم يصل ردّ",
+    failed: "لم يفشل التسليم", interest: "لم يُسجَّل اهتمام", meeting: "لم يُحجز موعد", opted_out: "لم يطلب الإيقاف",
+  };
+  const base = cond.comparator === "never_happened" ? NEG[cond.signal] : POS[cond.signal];
+  const prod = cond.product ? ` عن خدمة ${cond.product}` : "";
   const win = cond.withinDays ? ` خلال آخر ${cond.withinDays} أيام`
     : cond.beforeDays ? ` قبل أكثر من ${cond.beforeDays} أيام` : "";
-  const prod = cond.product ? ` بخدمة ${cond.product}` : "";
-  return cond.comparator === "never_happened" ? `لم ${base}${prod}${win}` : `${base}${prod}${win}`;
+  const times = cond.comparator === "happened" && (cond.atLeast || 1) > 1 ? ` ${cond.atLeast} مرات على الأقل` : "";
+  return `${base}${prod}${win}${times}`;
 }
 
 export function describeSegment(def: SegmentDef): string {
-  const joiner = def.match === "any" ? " أو " : " و";
+  const joiner = def.match === "any" ? " أو " : "، و";
   return def.conditions.map(describe).join(joiner);
 }

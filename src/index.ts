@@ -355,6 +355,16 @@ app.post("/admin/segments/preview", async (req, reply) => {
     // The tenure state needs a real forecast, not «no results»: how old the book actually is.
     oldestContactDays: Math.floor(oldest / 86_400_000),
     poolSize: pool.length,
+    // The tenure forecast the market's tools omit: when the book is younger than the window,
+    // «٠ مطابقة» is not an empty audience, it is a not-yet audience. Say when it becomes one.
+    requiredDays: (() => {
+      let n = 0;
+      for (const c of def.conditions) {
+        if (c.beforeDays) n = Math.max(n, c.beforeDays);
+        if (c.comparator === "never_happened" && c.withinDays) n = Math.max(n, c.withinDays);
+      }
+      return n;
+    })(),
   };
 });
 
