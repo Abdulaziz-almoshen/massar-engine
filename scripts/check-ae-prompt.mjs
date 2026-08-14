@@ -78,3 +78,21 @@ console.log(`\n${failures ? failures + " FAILURES" : "AE prompt: all green"}`);
 if (failures) process.exit(1);
 console.log("NOTE: asserts prompt CONTENT, not model behaviour. It cannot prove the model obeys");
 console.log("      the strategies — only that the instructions and guards are present.");
+
+// --- the live failure of 2026-08-14 02:09 ------------------------------------
+// On his own number, «العرض التجاري» was answered with «تم إشعار المختص بطلب العرض التجاري
+// لـ٩٩ فرعًا…» — no price, no next step, no question. That breaks Strategy 9, Strategy 13,
+// Rule 6 and Rule 10 at once. Pinned so the dead-end cannot come back.
+const commercial = systemPrompt({
+  ...contact("966500000999"),
+  transcript: [{ role: "customer", text: "العرض التجاري", ts: Date.now() }],
+});
+let f2 = 0;
+const c2 = (name, cond) => { if (!cond) f2++; console.log(`${cond ? "ok  " : "FAIL"} ${name}`); };
+c2("commercial ask: bare escalation is banned", commercial.includes("تم إشعار المختص") && commercial.includes("ممنوع"));
+c2("commercial ask: must end with the conditional-commitment question",
+  commercial.includes("هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟"));
+c2("commercial ask: treated as a buying signal, not support", commercial.includes("إشارة شراء، لا حالة دعم"));
+c2("handoff message must carry scope + next step + question", commercial.includes("تبقى مالك المحادثة بعد الإحالة"));
+if (f2) { console.log(`\n${f2} FAILURES (commercial path)`); process.exit(1); }
+console.log("commercial dead-end guard: green");
