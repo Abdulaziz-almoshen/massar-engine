@@ -10,5 +10,7 @@ scripts/__pycache__/
 
 # Symlink to ../.orbit so the independent-QA runner reads ONE config (--repo here,
 # because this is where the code and its history live). Never committed.
-.orbit
+.orbit/loop.config.json
 .orbit-evidence/
+.orbit/locks/
+.orbit/activity.jsonl
