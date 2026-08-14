@@ -96,3 +96,24 @@ c2("commercial ask: treated as a buying signal, not support", commercial.include
 c2("handoff message must carry scope + next step + question", commercial.includes("تبقى مالك المحادثة بعد الإحالة"));
 if (f2) { console.log(`\n${f2} FAILURES (commercial path)`); process.exit(1); }
 console.log("commercial dead-end guard: green");
+
+// --- one motion, not two -----------------------------------------------------
+// The whole point of the §١-٩ rewrite. The old inbound-qualifier ladder (اشرح ← أهّل ← اكتشف
+// and the COLD/INTERESTED/QUALIFIED stage names) competed with the spec's own motion in the
+// same prompt, and the live conversation drifted into feature-listing before dead-ending.
+// If either comes back, there are two motions again.
+let f3 = 0;
+const c3 = (name, cond) => { if (!cond) f3++; console.log(`${cond ? "ok  " : "FAIL"} ${name}`); };
+for (const [label, p] of [["known", known], ["cold", cold]]) {
+  c3(`${label}: old explain→qualify→discover ladder removed`, !p.includes("رحلة البيع — اشرح"));
+  c3(`${label}: old COLD/INTERESTED stage names removed`, !p.includes("COLD ← INTERESTED"));
+  c3(`${label}: runs the spec's 10 opportunity states`, p.includes("موضع الفرصة"));
+  c3(`${label}: internal decision engine is the spec's five steps`, p.includes("المجهول الواحد الأهم"));
+  c3(`${label}: discovery gated on changing a sales decision`, p.includes("الاكتشاف — بشرط واحد"));
+  c3(`${label}: message design is 1 idea + 1 next step`, p.includes("فكرة مفيدة واحدة + خطوة تالية واحدة"));
+  c3(`${label}: success metric present`, p.includes("معيار النجاح لكل رد"));
+  c3(`${label}: no bullet lists unless asked`, p.includes("لا تستخدم النقاط والقوائم إلا"));
+}
+c3("known: told to use account facts in speech", known.includes("لا تسأل عنه ولا تطلب تأكيده"));
+if (f3) { console.log(`\n${f3} FAILURES (single motion)`); process.exit(1); }
+console.log("single-motion guard: green");
