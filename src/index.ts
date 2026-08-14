@@ -10,6 +10,7 @@ import * as kb from "./kb.js";
 import * as audience from "./audience.js";
 import * as insights from "./insights.js";
 import * as segments from "./segments.js";
+import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
@@ -541,6 +542,8 @@ app.post("/admin/send-test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { to, text } = (req.body ?? {}) as { to?: string; text?: string };
   if (!to) return reply.code(400).send({ error: "body: { to, text? }" });
+  const blocked = checkOutbound(to, "session");
+  if (blocked) return reply.code(409).send({ status: "refused", ...blocked });
   const res = await gupshup.sendText(to, text || "رسالة تجريبية من مَسار ✅");
   tracker.recordAgentReply(to, text || "(test message)");
   return res;
@@ -550,6 +553,8 @@ app.post("/admin/send-template", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { to, templateId, params } = (req.body ?? {}) as { to?: string; templateId?: string; params?: string[] };
   if (!to || !templateId) return reply.code(400).send({ error: "body: { to, templateId, params[] }" });
+  const blocked = checkOutbound(to, "template");
+  if (blocked) return reply.code(409).send({ status: "refused", ...blocked });
   return gupshup.sendTemplate(to, templateId, params ?? []);
 });
 
