@@ -14,3 +14,4 @@ scripts/__pycache__/
 .orbit-evidence/
 .orbit/locks/
 .orbit/activity.jsonl
+.orbit/reviews/
