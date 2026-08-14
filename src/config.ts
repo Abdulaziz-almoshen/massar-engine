@@ -32,6 +32,12 @@ export const cfg = {
   // Sales assets the agent may send (images/PDFs). JSON array:
   // [{"id":"sickleave-onepager","type":"document","url":"https://…/x.pdf","filename":"الإجازات-المرضية.pdf","caption":"…"}]
   assetsJson: process.env.ASSETS_JSON || "[]",
+
+  // Known accounts for the usage-led expansion motion. JSON array keyed by phone:
+  // [{"phone":"9665...","customerName":"…","branches":10,"hisName":"…",
+  //   "transactionVolume":"≈1,400 إجازة شهريًا","currentProducts":["الإجازات المرضية"]}]
+  // Absent facts stay absent — the agent asks rather than guessing. See src/accounts.ts.
+  accountsJson: process.env.ACCOUNTS_JSON || "[]",
 };
 
 export function configReport() {
