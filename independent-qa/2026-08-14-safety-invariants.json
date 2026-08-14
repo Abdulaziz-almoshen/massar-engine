@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "id": "safety-invariants-2026-08-14",
+  "goal": "Independently verify that Massar's four hard safety invariants hold in the committed engine: the customer opt-out path cannot be swallowed, the Gupshup webhook authenticates, no secret literal is committed, and no outbound WhatsApp send can bypass the send guard. These are CLAUDE.md §3's safety booleans — all must hold.",
+  "baseline_commit": "6c64991c2be9b1f31afd42424a0244ab3b383069",
+  "scope": {
+    "include": ["src/agent.ts", "src/index.ts", "src/gupshup.ts", "src/config.ts", "src/queue.ts"],
+    "note": "Server-side only. The dashboard template literal (src/dashboard.ts) is out of scope for this manifest — it carries no send path and no auth."
+  },
+  "rubric_files": ["../CLAUDE.md"],
+  "acceptance_criteria": [
+    {
+      "id": "AC1-optout",
+      "text": "A bare customer opt-out ('إيقاف', 'ايقاف', 'STOP', 'unsubscribe', …) short-circuits every other turn handling: it is matched before any model call, it cannot be consumed by an earlier branch, and it terminates further outbound messaging for that contact. Anchor: OPT_OUT_BARE at src/agent.ts:756 and its handler at :859.",
+      "required": true,
+      "evidence": "Quote the matching branch and show, by reading the control flow above it, that no earlier return or condition can swallow an opt-out message."
+    },
+    {
+      "id": "AC2-webhook-auth",
+      "text": "The Gupshup webhook rejects unauthenticated requests. Assess src/index.ts:32 — 'if (cfg.webhookToken && token !== cfg.webhookToken)' — specifically for its behaviour when WEBHOOK_TOKEN is unset or empty, and state plainly whether the route then accepts unauthenticated POSTs.",
+      "required": true,
+      "evidence": "Quote the guard and the config default it reads (src/config.ts:20), then state the outcome for an empty token."
+    },
+    {
+      "id": "AC3-no-secrets",
+      "text": "No API key, token, or credential literal appears in the committed tree. Values must come from process.env only.",
+      "required": true,
+      "evidence": "Name every file that reads a secret and confirm each reads it from process.env rather than a literal."
+    },
+    {
+      "id": "AC4-send-guard",
+      "text": "Every outbound WhatsApp path runs through the single guarded send function; no call site reaches the Gupshup wire directly, bypassing opt-out, window, and turn-cap checks.",
+      "required": true,
+      "evidence": "Enumerate all call sites that reach the Gupshup send wire and show each passes the guard."
+    }
+  ],
+  "armed": {
+    "approved": true,
+    "approved_by": "abdulaziz",
+    "approved_at": "2026-08-14T00:45:00Z"
+  }
+}
