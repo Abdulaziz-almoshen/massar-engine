@@ -7,7 +7,12 @@
   "properties": {
     "schema_version": { "type": "integer", "const": 1 },
     "verdict": { "type": "string", "enum": ["PASS", "CHANGES_REQUIRED", "BLOCKED"] },
-    "score": { "type": "number" },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "description": "Overall quality on a 0-10 scale, where 10 is flawless. NOT a percentage - a value above 10 is invalid and the review will be rejected."
+    },
     "summary": { "type": "string" },
     "findings": {
       "type": "array",
