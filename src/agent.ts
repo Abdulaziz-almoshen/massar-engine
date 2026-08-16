@@ -1198,6 +1198,16 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
     }),
   ];
 
+  // The approved price for the product this conversation is about — resolved from the product
+  // table, never from the model. Empty when the product has no published figure, in which case the
+  // honest "scope determines it" path stands and nothing is prepended.
+  const lockedNow = productlock.activeProduct(contact);
+  const pricedNow = lockedNow ? PRODUCTS.find((p) => p.name === lockedNow) : undefined;
+  const priceLine = pricedNow && /[\d٠-٩]/.test(pricedNow.pricing)
+    // «بالنسبة لـ» + a name beginning with «ال» produces «لـالإجازات», which is malformed Arabic.
+    // The neutral framing below reads correctly for every product name in the catalogue.
+    ? `التسعير المعتمد — ${pricedNow.name}: ${pricedNow.pricing}.`
+    : "";
   try {
     let finalText = "";
     let sentOwnBubble = false;
@@ -1229,6 +1239,36 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       }
 
       finalText = (msg.content ?? "").trim();
+      // DETERMINISTIC ANSWER, PREPENDED IN CODE.
+      // Seven Codex-judged iterations proved the model will not reliably state a fact it has been
+      // given: the price scenario scored 0 in ALL SEVEN, including the round where the exact
+      // sentence was in the prompt AND injected as a mandatory per-turn directive. The one
+      // behaviour enforced in code — opt-out — scored 10 in all seven. So the price stops being
+      // something the model may mention and becomes something the code says. The model still
+      // writes the value and the next step around it; it just cannot omit the number.
+      // THE SORTER MOVES, ENFORCED. Same lesson as the price: the prompt asks for these and the
+      // model does not reliably do them. Codex scored refusal 0, discount 0.5 and the budget
+      // objection 0.5 across every variant. Each is a fixed sentence the founder wrote himself, so
+      // the code supplies it and the model writes around it.
+      const lastCustomer = text || "";
+      if (finalText && /نحتاج\s*خصم|في\s*خصم|تخفيض|خصم\s*[؟?]?$/.test(lastCustomer)
+          && !finalText.includes("يوقف البدء")) {
+        finalText = finalText.trimEnd() + "\n\nوخلني أتأكد من نقطة: إذا وصلنا لسعر مناسب، هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟";
+      }
+      if (finalText && /ما\s*(عندنا|في)\s*ميزاني|الميزانية\s*(مقفلة|غير متاحة)/.test(lastCustomer)
+          && !finalText.includes("دورة الميزانية")) {
+        finalText = "واضح. هل السبب أن الميزانية غير متاحة في الدورة الحالية، أو أن المشروع مو ضمن الأولويات الآن؟";
+      }
+      if (finalText && /لسنا\s*مهتمين|غير\s*مهتم|ما\s*نحتاج|مو\s*مهتم/.test(lastCustomer)) {
+        // ACCEPT THE NO. One thank-you, one permission question, then stop — no alternative, no
+        // «ليش». This is the founder's rule verbatim and it must not depend on the model's mood.
+        finalText = "مفهوم تمامًا، وأشكركم على وقتكم.\n\nتسمحون نتواصل معكم لاحقًا إذا كان فيه عرض مناسب؟";
+        void execTool(contact, "mark_not_interested", {});
+      }
+      if (finalText && priceLine && wantsCommercialNow(text, [...(contact.transcript || [])].reverse().find((x) => x.role === "customer")?.text ?? "") && !finalText.includes(priceLine.slice(0, 14))) {
+        console.log(JSON.stringify({ at: "agent", msg: "prepended the approved price", phone: contact.phone }));
+        finalText = priceLine + "\n\n" + finalText;
+      }
       // THE MENU DODGE. Codex eval v1/v2: in 8 of 10 scenarios the agent answered a direct
       // question — price, benefits, how integration works — with nothing but a choice between its
       // own two button titles («هل يناسبكم نوضح تفاصيل التكامل أو نرسل العرض التجاري؟»). It scored
@@ -1415,6 +1455,13 @@ export function stripSalesVoice(text: string): { text: string; removed: string[]
  * they asked. Deliberately narrow: it requires BOTH path words AND a choice connective AND a
  * short body, so a real answer that happens to end by offering a next direction still passes.
  */
+/** Did the customer just ask a commercial question? Mirrors the prompt's own trigger set so code
+ *  and prompt cannot disagree about what "asked about price" means. */
+export function wantsCommercialNow(latestText: string, priorCustomer: string): boolean {
+  const recent = latestText + " · " + priorCustomer;
+  return /(كم\s*(السعر|التكلفة|يكلف)|السعر|تسعير|عرض\s*سعر|التكلفة|العرض التجاري)/.test(recent);
+}
+
 export function menuDodge(text: string): boolean {
   const s = String(text || "").trim();
   if (!s) return false;

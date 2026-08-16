@@ -1957,9 +1957,13 @@ function vCustomer(ph) {
     '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
-    '<span class="chip c-teal">واتساب ✓</span>' + (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
+    // «واتساب ✓» deleted: every contact on this screen arrived by WhatsApp, so the chip carries no
+    // information. Designer's call.
+    (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
     '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
-    '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
+    // «أول ظهور» deleted — it never changed a decision. Last activity stays: it tells you whether
+    // this person is warm right now.
+    '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
     // PROVENANCE, not analytics. These used to be a row of identical blue chips in arbitrary
     // order, so the founder could not say which campaign started the conversation in front of him.
     // The payload now arrives newest-first with launch times: the most recent is stated as a
@@ -2054,7 +2058,7 @@ function vCustomer(ph) {
     '<span style="flex:1"></span>' +
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
-      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;background:" + o[2] + "0d;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
+      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;border-radius:999px;' + (o[0] === "meeting_booked" ? "color:#fff;background:" + o[2] + ";border:1px solid " + o[2] + ";font-weight:700;" : "color:" + o[2] + ";background:#fff;border:1px solid #EAECF0;") + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "55;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   if (!ins.learning) h += vSalesPath(ins);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد

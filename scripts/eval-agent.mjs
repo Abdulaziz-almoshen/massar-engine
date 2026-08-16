@@ -120,13 +120,21 @@ const SCENARIOS = [
     turns: ["مهتمين", "إيقاف"] },
 ];
 
+// REPEATS. A single run per scenario is not a measurement — earlier variants scored 1.1 to 3.3
+// with much of that spread being sampling noise, and this product is being prepared for ~18,000
+// clients. Each scenario runs REPEATS times so the report can state a mean AND a spread instead of
+// a point estimate that cannot be defended.
+const REPEATS = Number(process.env.EVAL_REPEATS || 3);
 const stamp = process.env.EVAL_STAMP || "run";
 const outDir = join(root, "..", ".orbit", "artifacts", "agent-eval", stamp);
 mkdirSync(outDir, { recursive: true });
 
 const results = [];
 for (const [i, sc] of SCENARIOS.entries()) {
-  const phone = "9665000" + String(90000 + i);
+ for (let rep = 0; rep < REPEATS; rep++) {
+  // A distinct phone per repeat: the same contact would carry state between runs and the second
+  // repeat would be measuring a conversation that already happened.
+  const phone = "9665000" + String(90000 + i * 10 + rep);
   const contact = tracker.getContact(phone, "تقييم");
   contact.test = true;
   // Real conversations BEGIN with a campaign template — that turn carries the campaign marker the
@@ -147,8 +155,9 @@ for (const [i, sc] of SCENARIOS.entries()) {
     for (const s of sent.slice(before)) convo.push({ role: "agent", text: s.message });
     if (sent.length === before) convo.push({ role: "agent", text: "(لا رد — صمت)" });
   }
-  results.push({ id: sc.id, product: sc.product, why: sc.why, convo });
-  console.log(`  ${sc.id.padEnd(20)} ${convo.filter((t) => t.role === "agent").length} agent turns`);
+  results.push({ id: sc.id, run: rep + 1, product: sc.product, why: sc.why, convo });
+  console.log(`  ${sc.id.padEnd(20)} run ${rep + 1}/${REPEATS}  ${convo.filter((t) => t.role === "agent").length} agent turns`);
+ }
 }
 
 if (escaped.length) {
