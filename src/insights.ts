@@ -121,6 +121,17 @@ export function normalizeCached<T extends { product_interest?: { product: string
     const v = (d as Record<string, unknown>)[k];
     if (typeof v === "string") scrubbed[k] = scrubInventedIntent(v);
   }
+  // ARRAYS TOO. The first version of this scrub covered only the string fields and the live
+  // fabrication was sitting in `signals[]` — «أفاد بأن «السعر هو العائق الوحيد المتبقي»» — so it
+  // kept rendering while seven offline tests passed against string fixtures I had written myself.
+  // A whole signal is dropped rather than trimmed: a bullet is one claim, and half a claim is worse
+  // than none.
+  for (const k of ["signals", "objections", "win_drivers"]) {
+    const v = (d as Record<string, unknown>)[k];
+    if (Array.isArray(v)) {
+      scrubbed[k] = v.filter((item) => typeof item !== "string" || scrubInventedIntent(item) === item);
+    }
+  }
   return { ...d, ...scrubbed, product_interest: [...best.values()] as typeof d.product_interest };
 }
 

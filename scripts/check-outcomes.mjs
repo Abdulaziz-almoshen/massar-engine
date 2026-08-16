@@ -86,6 +86,16 @@ c2("a factual reading survives untouched", ins2.scrubInventedIntent(FACT) === FA
 const mixed = ins2.scrubInventedIntent("المنشأة تناقش تكامل سجل التطعيمات. " + FAB);
 c2("mixed text keeps the real half", mixed.includes("تناقش تكامل سجل التطعيمات"));
 c2("…and drops the invented half", !mixed.includes("العائق الوحيد"));
+// ARRAYS. The live fabrication was in signals[] and the first scrub only covered strings, so it
+// kept rendering while string-fixture tests passed. This uses the REAL sentence from the ledger.
+const LIVE = "أفاد بأن «السعر هو العائق الوحيد المتبقي قبل البدء» ثم اختار «سنوي».";
+const KEPT = "أفاد بأن لديهم ٧ فروع وأنها تعمل على نفس بيئة HIS.";
+const arr = ins2.normalizeCached({ product_interest: [], signals: [KEPT, LIVE] });
+c2("a fabricated SIGNAL is dropped", !JSON.stringify(arr.signals).includes("العائق الوحيد"));
+c2("…and the factual signal beside it survives", arr.signals.includes(KEPT));
+c2("objections arrays are scrubbed too",
+  !JSON.stringify(ins2.normalizeCached({ product_interest: [], objections: [LIVE] }).objections).includes("العائق"));
+
 // Every rendered free-text field goes through the same scrub, in one place.
 for (const f of ["summary", "why", "stage_reason", "next_action"])
   c2(`normalizeCached scrubs ${f}`, ins2.normalizeCached({ product_interest: [], [f]: FAB })[f] === "");
