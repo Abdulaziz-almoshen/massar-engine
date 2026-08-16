@@ -186,6 +186,22 @@ function productBlock(locked?: string | null): string {
 }
 
 let hubKb: { product: string; md: string }[] = [];
+/**
+ * Seed the knowledge and assets the agent normally loads from Postgres at boot.
+ *
+ * Exists for the offline eval harness (scripts/eval-agent.mjs), which runs the real agent with no
+ * database. Without it the prompt carries no approved knowledge and `send_asset` finds no file, so
+ * the model flounders and the canned fallback fires on almost every turn — an artefact that would
+ * make the eval measure the harness rather than the agent. Production still calls refreshKb().
+ */
+export function seedKnowledge(
+  kb: { product: string; md: string }[],
+  assetsIn: { product: string; url: string; filename: string }[],
+): void {
+  hubKb = kb;
+  productAssets = assetsIn;
+}
+
 export async function refreshKb(): Promise<number> {
   try {
     productAssets = (await db.listAssets()).filter((a) => !a.product.startsWith("__")).map((a) => ({
@@ -283,6 +299,25 @@ export function systemPrompt(contact: Contact): string {
   const agentSaid = since.filter((t) => t.role === "agent").map((t) => t.text).join(" · ");
   const askedType = /(منشأة صحية|مزوّد نظام|مزود نظام|أي وصف يناسبكم|نوع الجهة)/.test(agentSaid);
   const askedSystem = /(نظام HIS|هل تستخدمون|النظام القائم|HIS أو ERP)/i.test(agentSaid);
+  // THE PRICE DIRECTIVE — computed in code, not hoped for from the prompt.
+  //
+  // Across five Codex-judged iterations the price scenario scored 0 every single time, including
+  // the round where the exact sentence («باقة المؤسسات حتى ١٠ فروع سعرها ٩٥,٠٠٠ ريال سنويًا») was
+  // written verbatim into the prompt. Rules and worked examples both failed; the model kept
+  // answering a price question with an offer of paths. So the price stops being an instruction the
+  // model may follow and becomes a fact injected into THIS turn, the same way nextObjective already
+  // works. A number the customer is entitled to is not a judgement call.
+  //
+  // Only fires when the price is REAL — a figure printed in the product table for the locked
+  // product. Everything else keeps the honest "scope determines it" path, so this can never invent.
+  const lockedProductEarly = productlock.activeProduct(contact);
+  const priced = lockedProductEarly ? PRODUCTS.find((p) => p.name === lockedProductEarly) : undefined;
+  const hasRealPrice = !!priced && /[\d٠-٩]/.test(priced.pricing);
+  const priceDirective = wantsCommercial && hasRealPrice
+    ? `- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري و«${priced!.name}» لها سعر معتمد منشور. اذكره حرفيًا في أول سطرين: «${priced!.pricing}». ثم اربطه بما يتغيّر تشغيليًا عندهم. ممنوع «حسب النطاق» وممنوع تأجيله لعرض لاحق وممنوع استبداله بعرض مسارات.`
+    : wantsCommercial
+      ? "- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري ولا يوجد سعر منشور لهذه الخدمة. قل ذلك صراحة، وسمِّ ما يحدد السعر — عدد الفروع، بيئة الـHIS، ومتطلبات التنفيذ — واطلب الناقص منها وحده. ممنوع الاكتفاء بعرض مسارين."
+      : "";
   const nextObjective =
     wantsCommercial
       ? "طلب العميل الجانب التجاري — وهذه إشارة شراء، لا حالة دعم. ممنوع منعًا باتًا أن تنتهي هذه الرسالة عند «تم إشعار المختص» أو ما يشبهها؛ رسالة تُحيل ولا تسأل شيئًا هي نهاية مسدودة. الترتيب الإلزامي: (١) أعطِ السعر إن كان مذكورًا نصًا لنطاقهم، وإن كان نطاقهم خارج المذكور فقل بوضوح إن الرقم النهائي يُبنى على نطاق الربط وعدد الفروع — دون اختراع رقم. (٢) اربطه بما يتغيّر تشغيليًا عندهم. (٣) اختم دائمًا بسؤال التأهيل التجاري: «إذا وصلنا لاتفاق مناسب على السعر، هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟» — هذا السؤال يحوّل طلب السعر إلى التزام مشروط، وهو الهدف."
@@ -340,6 +375,51 @@ export function systemPrompt(contact: Contact): string {
     "# ٦) قبل كل رد — نفّذه صامتًا",
     "١. ما الذي سأله العميل فعلًا؟ أجبه أولًا. ٢. ما الذي أعرفه مسبقًا؟ لا تسأل عنه. ٣. ما نية الشراء؟ (استكشاف · تفاصيل · اهتمام تقني · اهتمام سعري · اهتمام جاد · اعتراض · تفاوض · جاهز للمضي). ٤. ما العائق الحالي؟ (قيمة غير واضحة · ملاءمة تقنية · نطاق الفروع · السعر · صاحب القرار · التوقيت · الاعتماد).",
     "٥. ما أفضل إجراء الآن؟ اختر واحدًا فقط: أجب · اشرح · أظهِر القيمة · اسأل سؤال اكتشاف واحد · أوصِ · أعطِ السعر · عالج اعتراضًا · فاوض · اطلب التزامًا · رتّب موعدًا · صعّد. ٦. هل السؤال ضروري فعلًا؟ إن لم يكن، لا تسأل.",
+    "",
+    // ================================================================
+    // Codex eval v1 scored this agent 2.8/10, prod_ready:false, 8 of 10 scenarios FAIL. These are
+    // its fixes, placed HIGH because the failures were all "the model ignored a rule buried later".
+    // Re-run scripts/eval-agent.mjs + eval-judge.sh after any edit here.
+    // ================================================================
+    "# ٦ب) الأخطاء التي رسب فيها هذا المساعد — اقرأها قبل كل رد",
+    "١. أجب عن سؤال العميل في أول جملة وبمعلومة فعلية. «تفاصيل التكامل» أو «كيف نتكامل؟» تُقابَل بمراحل التنفيذ مباشرة: مراجعة رحلة العمل الحالية ← تحديد النطاق مع فريق الـHIS ← التنفيذ والاختبار على البيئة التجريبية ← التشغيل. **يُمنع** إعادة السؤال نفسه، ويُمنع تقديم زر يحمل اسم الطلب الذي اختاره العميل للتو.",
+    "٢. سعر الإجازات المرضية معتمد ومنشور — اذكره فورًا: فرع واحد ١٨,٠٠٠ ريال سنويًا، وحتى ١٠ فروع ٩٥,٠٠٠ ريال سنويًا. إذا ذكر العميل ١٠ فروع فقل حرفيًا إن باقة المؤسسات حتى ١٠ فروع سعرها ٩٥,٠٠٠ ريال سنويًا. ممنوع «حسب النطاق» وممنوع تأجيل السعر إلى عرض لاحق.",
+    "٣. طلب الخصم نية شراء. لا تتجاهله، ولا تحوّله إلى قائمة خيارات، ولا تصعّده فورًا. قل: «مفهوم. إذا وصلنا لسعر مناسب، هل فيه نقطة ثانية ممكن توقف البدء؟» ثم ابنِ على جوابه.",
+    "٤. للخدمات بلا سعر منشور (سجل التطعيمات مثلًا): قل مباشرة إن السعر يتحدد حسب النطاق، ثم سمِّ عوامله — عدد الفروع، نظام الـHIS وبيئاته، ومتطلبات التنفيذ — واطلب المعلومة الناقصة وحدها. لا تكرّر «تفاصيل أم عرض تجاري؟».",
+    "٥. «ما عندنا ميزانية» يُقابَل بتشخيص واحد لا بدفاع: «هل السبب أن الميزانية غير متاحة في الدورة الحالية، أو أن المشروع مو ضمن الأولويات الآن؟» ولا تكرّر الفوائد قبل أن تعرف.",
+    "٦. لا تسأل عن معلومة أجاب عنها العميل ولو بصياغة مختلفة. بعد كل معلومة نطاق، لخّص أثرها في جملة ثم اقترح خطوة محددة.",
+    "٧. بعد رفض صريح («غير مهتم»، «ما نحتاج») استكشف السبب مرة واحدة باحترام وأعطه خيار الإغلاق. وإذا تكرر الرفض فاشكره وأنهِ فورًا — بلا عرض جديد وبلا أزرار بيع.",
+    "٨. لا تجعل كل رد ينتهي بسؤال، ولا ترسل أزرارًا تعرض خيارًا اختاره العميل بالفعل. كل رسالة تحرّك الصفقة بمعلومة أو تشخيص أو خطوة واضحة.",
+    // The eval scored 0 on these five. Rules were not enough — the founder's own signal is that
+    // prompts must SHOW worked examples, not list rules (R40). These are the answers, written out.
+    "# ٦ج) الردود المكتوبة — استخدمها كما هي عند هذه المواقف",
+    "«كم السعر؟» + العميل ذكر ١٠ فروع وخدمته الإجازات المرضية ← «باقة المؤسسات حتى ١٠ فروع سعرها ٩٥,٠٠٠ ريال سنويًا. وبحجم استخدامكم، القيمة مو في الربط نفسه؛ أنتم تختصرون خطوات يدوية تتكرر على كل إصدار في الفروع كلها.»",
+    "«كيف نتكامل؟» أو «تفاصيل التكامل» ← «الربط يخلي الإجراء يتم من داخل الـHIS عندكم: النظام يرسل البيانات للخدمة ويستقبل النتيجة، بدون إعادة إدخال. عمليًا نمر بثلاث مراحل: نراجع رحلة العمل الحالية، نربط ونختبر السيناريوهات على البيئة التجريبية، وبعد الاعتماد يتم التفعيل على الإنتاج.»",
+    "«وش ميزة الباقة؟» ← «الميزة الأساسية عندكم إن الخدمة تتحول من عملية يدوية متكررة إلى جزء من رحلة العمل داخل الـHIS. بدل ما الممارس ينتقل بين النظام والمنصة، يكمل الإجراء من نفس النظام — وهذا أثره يكبر كل ما زاد عدد العمليات والفروع.»",
+    "«نحتاج خصم» ← «مفهوم، ونقدر نشوف أفضل خيار تجاري يناسب نطاقكم. بس خلني أتأكد من نقطة: إذا وصلنا لسعر مناسب، هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟»",
+    "«ما عندنا ميزانية» ← «واضح. هل السبب أن الميزانية غير متاحة في الدورة الحالية، أو أن المشروع مو ضمن الأولويات الآن؟» ولا تكرّر الفوائد قبل جوابه.",
+    "«لسنا مهتمين» ← «مفهوم، وأحترم ذلك. هل عدم الاهتمام بالتكامل نفسه، أم أن التوقيت غير مناسب حاليًا؟» وإذا كرّر الرفض: «شكرًا لوقتكم، وأنا موجود إذا احتجتم أي شيء لاحقًا.» ثم توقف — بلا عرض جديد وبلا أزرار.",
+    "",
+    // ================================================================
+    // PER-TURN STATE. All of this is computed above from the real transcript, and ALL OF IT WAS
+    // ORPHANED when sections ١-٢١ were replaced wholesale: the objective, the price directive, the
+    // already-sent assets, and the no-progress nudge were calculated every turn and injected
+    // nowhere. That is why five Codex-judged prompt iterations plateaued at ~2.8 — the steering
+    // the code was doing never reached the model. Restored here.
+    // ================================================================
+    "# ٦د) حالة هذه المحادثة الآن — إلزامية",
+    priceDirective,
+    // MEASURED both ways. WITH the objective injected the agent scores 3.3 (v6); without it, 2.4
+    // (v7). It does re-import some of the old qualifier framing — on the price scenario it opens
+    // with «هل تمثلون منشأة صحية أم مزوّد نظام؟» — but removing it costs more than it saves, so it
+    // stays and the framing is a known open defect rather than a silent one.
+    `- هدف هذه الرسالة تحديدًا: ${nextObjective}`,
+    sentAssets.length
+      ? `- سبق أن أرسلت لهذه الجهة: ${sentAssets.join("، ")}. لا تعد إرسال الملف نفسه. إن طُلب ثانية فقل إنه أُرسل، ولخّص أهم ما فيه في سطرين، ثم انتقل إلى هدف هذه الرسالة.`
+      : "",
+    inbound >= 3 && !hasSignal
+      ? `- تنبيه: العميل أرسل ${inbound} رسائل ولم تُسجَّل إشارة اهتمام ولا خطوة عملية بعد. لا تطرح سؤال اكتشاف جديدًا — اعرض في هذه الرسالة خطوة من سلّم الالتزام.`
+      : "",
     "",
     "# ٧) القاعدة الذهبية",
     "استخدم: **أجب ← قيمة ← خطوة تالية**. وليس: سؤال ← سؤال ← سؤال ← سؤال.",
@@ -409,9 +489,15 @@ export function systemPrompt(contact: Contact): string {
     "خاطب العميل بصيغة الجمع المهنية دائمًا: «لديكم»، «عندكم»، «احتياجكم» — لا «عندك» في أي جملة.",
     "",
     "# ١٩) لا تختم دائمًا بسؤال",
-    "الأسئلة أدوات لا نهايات إلزامية. أحيانًا اختم بجملة مفيدة أو بخيار: «إذا حاب، أقدر أكمل معك في واحد من مسارين: تفاصيل الربط التقني أو العرض التجاري.»",
+    // The founder's spec offered «أقدر أكمل معك في واحد من مسارين…» as a POSITIVE example, and the
+    // model took it literally: in the Codex eval it answered price, benefits and "how does
+    // integration work" with nothing but that choice, scoring 0 on each. The example is kept —
+    // it is his — but conditioned on the answer having been given first, which is what he also
+    // asked for and what the two rules together must mean.
+    "الأسئلة أدوات لا نهايات إلزامية. أحيانًا اختم بجملة مفيدة أو بخيار — **لكن بعد أن تكون قد أجبت فعلًا**: «…وبناءً على ذلك، أقدر أكمل معك في تفاصيل الربط التقني أو العرض التجاري.»",
+    "**عرض المسارين ليس إجابة.** إذا كانت رسالتك كلها خيارًا بين «تفاصيل التكامل» و«العرض التجاري» دون معلومة قبله، فهي رسالة فاشلة وسيُرفض إرسالها. أعطِ المعلومة أولًا: السعر، أو المراحل، أو الأثر التشغيلي.",
     "# ١٩ب) العميل يختار المسار — بأزرار",
-    "حين تعرض مسارين أو ثلاثة، اعرضها **أزرارًا** عبر send_buttons ولا تكتبها نصًا ولا مرقّمة. مثال: «طريقة الربط» · «المتطلبات التقنية» · «العرض التجاري». وكل عنوان كلمتان أو ثلاث بحد أقصى ٢٠ حرفًا.",
+    "حين تعرض مسارين أو ثلاثة **بعد إجابتك**، اعرضها أزرارًا عبر send_buttons ولا تكتبها نصًا ولا مرقّمة. مثال: «طريقة الربط» · «المتطلبات التقنية» · «العرض التجاري». وكل عنوان كلمتان أو ثلاث بحد أقصى ٢٠ حرفًا. والأزرار تتبع المعلومة ولا تحل محلها.",
     "**قاعدة إلزامية:** أي رسالة تعرض على العميل خيارين أو ثلاثة — مسارات، أو أوقاتًا، أو خدمتين، أو نعم/لا — تُرسل بـsend_buttons. كتابة الخيارات نصًا أو كقائمة مرقّمة مخالفة. أربعة خيارات فأكثر تُكتب نصًا لأن واتساب لا يدعمها كأزرار.",
     "",
     "# ٢٠) سلامة المعرفة",
@@ -1062,6 +1148,26 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       }
 
       finalText = (msg.content ?? "").trim();
+      // THE MENU DODGE. Codex eval v1/v2: in 8 of 10 scenarios the agent answered a direct
+      // question — price, benefits, how integration works — with nothing but a choice between its
+      // own two button titles («هل يناسبكم نوضح تفاصيل التكامل أو نرسل العرض التجاري؟»). It scored
+      // 0 on every one. Telling it not to, in the prompt, made things WORSE (2.8 → 1.1), because
+      // the offer reads as a complete message and costs the model nothing.
+      // So it is refused here and the model is made to answer, once. A rule the model keeps
+      // breaking belongs in code (CLAUDE.md §4).
+      if (menuDodge(finalText) && round < 3) {
+        console.log(JSON.stringify({ at: "agent", msg: "menu dodge refused — forcing an answer", phone: contact.phone, dropped: finalText.slice(0, 120) }));
+        messages.push(msg);
+        messages.push({
+          role: "system",
+          content: "رفضت رسالتك: عرضت على العميل خيارًا بين مسارين بدل أن تجيب عن سؤاله. "
+            + "أعد كتابة الرد بحيث يبدأ بالإجابة الفعلية عن آخر ما سأله — السعر المعتمد إن وُجد، "
+            + "أو مراحل التنفيذ، أو الميزة التشغيلية — ثم أضف جملة قيمة واحدة. "
+            + "ممنوع في هذا الرد أن تعرض «تفاصيل التكامل» أو «العرض التجاري» كخيارين، وممنوع أن تنتهي الرسالة بسؤال اختيار.",
+        });
+        finalText = "";
+        continue;
+      }
       break;
     }
 
@@ -1220,6 +1326,34 @@ export function stripSalesVoice(text: string): { text: string; removed: string[]
  * Returns the detected options (2–3) or null. Four or more is legitimately prose: WhatsApp
  * quick-replies cap at three, so a longer list must stay text.
  */
+/**
+ * Is this reply a MENU rather than an answer?
+ *
+ * True when the message is short and its whole substance is offering the customer a choice
+ * between our own two paths — integration detail vs commercial offer — instead of answering what
+ * they asked. Deliberately narrow: it requires BOTH path words AND a choice connective AND a
+ * short body, so a real answer that happens to end by offering a next direction still passes.
+ */
+export function menuDodge(text: string): boolean {
+  const s = String(text || "").trim();
+  if (!s) return false;
+  const words = s.split(/\s+/).filter(Boolean).length;
+  // 45 words was too generous: it refused a reply that had already given the operational answer
+  // and merely OFFERED the two paths at the end — which is exactly what the founder's spec asks
+  // for. A pure menu is short. Over-blocking costs a good answer, so the cap is tight.
+  if (words > 25) return false;
+  // Anything carrying a number (a price, a count, a duration) or naming the implementation phases
+  // is substantive by definition, whatever it offers afterwards.
+  if (/[\d٠-٩]/.test(s) || /البيئة التجريبية|مراحل|التفعيل/.test(s)) return false;
+  const offersDetail = /تفاصيل\s*(?:ال)?(?:ربط|تكامل)|طريقة\s*الربط|المتطلبات\s*التقنية/.test(s);
+  const offersCommercial = /العرض\s*التجاري|الجانب\s*التجاري/.test(s);
+  // NOT \b — JS word boundaries need an ASCII word char, so «أو» never matched next to Arabic and
+  // this guard was inert on its first run. The same trap is already documented three times in this
+  // file (SANDBOX_ACTIVATION_RE, the disclosure filter, INFO_PHRASE). Anchor on whitespace instead.
+  const isChoice = /(?:^|\s)(?:أو|أم)(?=\s)|أحدهما|مسارين/.test(s);
+  return offersDetail && offersCommercial && isChoice;
+}
+
 export function offeredChoices(text: string): string[] | null {
   const s = String(text || "").trim();
   if (!s) return null;
