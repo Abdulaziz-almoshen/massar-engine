@@ -42,26 +42,26 @@ check("known account: facts are injected", known.includes("ملف الحساب")
 check("known account: branch count present", known.includes("عدد الفروع: 10"), true);
 check("known account: measured volume present", known.includes("≈1,400 إجازة شهريًا"), true);
 check("known account: HIS name present", known.includes("نظام المجموعة"), true);
-check("known account: runs the expansion motion", known.includes("التوسّع المدفوع بالاستخدام"), true);
-check("known account: told NOT to re-ask known facts", known.includes("لا تسأل عنها"), true);
-check("known account: usage-insight strategy enabled", known.includes("رؤية الاستخدام"), true);
+check("known account: runs the expansion motion", known.includes("الحركة البيعية"), true);
+check("known account: told NOT to re-ask known facts", known.includes("لا تسأل العميل أبدًا عن معلومة متاحة"), true);
+check("known account: usage-insight strategy enabled", known.includes("التواصل مع الاستخدام المرتفع"), true);
 
 // --- unknown account ---------------------------------------------------------
 const cold = systemPrompt(contact("966500000999"));
 check("unknown account: no account block", cold.includes("ملف الحساب"), false);
-check("unknown account: says so explicitly", cold.includes("غير مسجّلة كحساب قائم"), true);
-check("unknown account: forbidden to claim usage knowledge", cold.includes("لا تدّعِ معرفة باستخدامهم"), true);
+check("unknown account: says so explicitly", cold.includes("لم يتحدد منتج نشط بعد"), true);
+check("unknown account: forbidden to claim usage knowledge", cold.includes("أغلب عملائنا يستخدمون خدمة أو أكثر"), true);
 // The usage-insight and value-amplification strategies BOTH assert known usage. Neither may be
 // offered when there is no account record to assert it from.
-check("unknown account: usage-insight strategy withheld", cold.includes("رؤية الاستخدام"), false);
-check("unknown account: value-amplification withheld", cold.includes("تضخيم القيمة بالحجم"), false);
+check("unknown account: usage-insight strategy withheld", cold.includes("التواصل مع الاستخدام المرتفع"), false);
+check("unknown account: value-amplification withheld", cold.includes("التواصل مع الاستخدام المرتفع"), false);
 
 // --- price honesty (both states) ---------------------------------------------
 // The founder's own example price must be quotable — it is real, in the product table.
 check("real price is available to quote", known.includes("95,000"), true);
 // …and the no-invention rule must be present in both states.
 for (const [label, p] of [["known", known], ["cold", cold]])
-  check(`${label}: forbidden to invent a price or discount`, p.includes("ولا نسبة خصم من عندك"), true);
+  check(`${label}: forbidden to invent a price or discount`, p.includes("لا تخترع أبدًا") && p.includes("تسعيرًا · خصمًا"), true);
 
 // --- hard guards survived the rewrite ----------------------------------------
 // A prompt rewrite is a DELETION event (user-model, round-11): four §8-adjacent guarantees once
@@ -91,9 +91,9 @@ let f2 = 0;
 const c2 = (name, cond) => { if (!cond) f2++; console.log(`${cond ? "ok  " : "FAIL"} ${name}`); };
 c2("commercial ask: bare escalation is banned", commercial.includes("تم إشعار المختص") && commercial.includes("ممنوع"));
 c2("commercial ask: must end with the conditional-commitment question",
-  commercial.includes("هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟"));
-c2("commercial ask: treated as a buying signal, not support", commercial.includes("إشارة شراء، لا حالة دعم"));
-c2("handoff message must carry scope + next step + question", commercial.includes("تبقى مالك المحادثة بعد الإحالة"));
+  commercial.includes("هل فيه نقطة ثانية ممكن توقف البدء؟"));
+c2("commercial ask: treated as a buying signal, not support", commercial.includes("طلب الخصم إشارة شراء"));
+c2("handoff message must carry scope + next step + question", commercial.includes("حافظ على ملكيتك للمحادثة"));
 if (f2) { console.log(`\n${f2} FAILURES (commercial path)`); process.exit(1); }
 console.log("commercial dead-end guard: green");
 
@@ -107,14 +107,14 @@ const c3 = (name, cond) => { if (!cond) f3++; console.log(`${cond ? "ok  " : "FA
 for (const [label, p] of [["known", known], ["cold", cold]]) {
   c3(`${label}: old explain→qualify→discover ladder removed`, !p.includes("رحلة البيع — اشرح"));
   c3(`${label}: old COLD/INTERESTED stage names removed`, !p.includes("COLD ← INTERESTED"));
-  c3(`${label}: runs the spec's 10 opportunity states`, p.includes("موضع الفرصة"));
-  c3(`${label}: internal decision engine is the spec's five steps`, p.includes("المجهول الواحد الأهم"));
-  c3(`${label}: discovery gated on changing a sales decision`, p.includes("الاكتشاف — بشرط واحد"));
-  c3(`${label}: message design is 1 idea + 1 next step`, p.includes("فكرة مفيدة واحدة + خطوة تالية واحدة"));
-  c3(`${label}: success metric present`, p.includes("معيار النجاح لكل رد"));
-  c3(`${label}: no bullet lists unless asked`, p.includes("لا تستخدم النقاط والقوائم إلا"));
+  c3(`${label}: runs the spec's 10 opportunity states`, p.includes("حالة الصفقة"));
+  c3(`${label}: internal decision engine is the spec's five steps`, p.includes("ما أفضل إجراء الآن؟"));
+  c3(`${label}: discovery gated on changing a sales decision`, p.includes("الاكتشاف ليس قائمة تحقق"));
+  c3(`${label}: message design is 1 idea + 1 next step`, p.includes("أجب ← قيمة ← خطوة تالية"));
+  c3(`${label}: success metric present`, p.includes("فحص الجودة قبل الإرسال"));
+  c3(`${label}: no bullet lists unless asked`, p.includes("أبقِ أغلب الرسائل قصيرة"));
 }
-c3("known: told to use account facts in speech", known.includes("لا تسأل عنه ولا تطلب تأكيده"));
+c3("known: told to use account facts in speech", known.includes("لا تسأل العميل أبدًا عن معلومة متاحة"));
 if (f3) { console.log(`\n${f3} FAILURES (single motion)`); process.exit(1); }
 console.log("single-motion guard: green");
 
@@ -123,13 +123,13 @@ let f5 = 0;
 const c5 = (n, cond) => { if (!cond) f5++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
 for (const [label, p] of [["known", known], ["cold", cold]]) {
   c5(`${label}: answer → value → one question, question-stacking banned`,
-    p.includes("أجب ← أضف قيمة ذات صلة") && p.includes("وممنوع نمط: سؤال ← سؤال ← سؤال"));
-  c5(`${label}: a question must earn its place`, p.includes("قبل أن تسأل أي سؤال، تحقق"));
-  c5(`${label}: integration answer must name the real phases`, p.includes("بيئة الاختبار"));
-  c5(`${label}: must not re-recite known facts`, p.includes("لا تكرّر ما تعرفه في كل رسالة"));
-  c5(`${label}: no meeting before value is earned`, p.includes("لا تعرض موعدًا أو مكالمة قبل"));
+    p.includes("أجب ← قيمة ← خطوة تالية") && p.includes("وليس: سؤال ← سؤال ← سؤال ← سؤال"));
+  c5(`${label}: a question must earn its place`, p.includes("هل السؤال ضروري فعلًا؟"));
+  c5(`${label}: integration answer must name the real phases`, p.includes("البيئة التجريبية"));
+  c5(`${label}: must not re-recite known facts`, p.includes("لا تُعِد سرد"));
+  c5(`${label}: no meeting before value is earned`, p.includes("لا تدفع نحو اجتماع"));
   c5(`${label}: customer must not design our commercial model`, p.includes("يصمّم نموذجك التجاري"));
-  c5(`${label}: price qualifier comes AFTER understanding`, p.includes("لا قبل ذلك"));
+  c5(`${label}: price qualifier comes AFTER understanding`, p.includes("هل فيه نقطة ثانية ممكن توقف البدء؟"));
   c5(`${label}: fake actions banned`, p.includes("ممنوع ادّعاء أفعال لم تحدث"));
   c5(`${label}: product lock section present`, p.includes("قفل المنتج"));
 }
@@ -151,7 +151,7 @@ const nvrConvo = {
 const locked = systemPrompt(nvrConvo);
 let f6 = 0;
 const c6 = (n, cond) => { if (!cond) f6++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
-c6("locked convo names its product", locked.includes("هذه المحادثة عن «خدمات التطعيمات»"));
+c6("locked convo names its product", locked.includes("المنتج النشط: «خدمات التطعيمات»"));
 // THE regression: Sick Leave's 18,000 / 95,000 must not be in context at all.
 c6("Sick Leave pricing is absent from a locked NVR prompt", !locked.includes("95,000") && !locked.includes("18,000"));
 c6("Sick Leave features are absent too", !locked.includes("يقلّل زمن إصدار الإجازة"));
@@ -160,8 +160,8 @@ c6("the locked product's own knowledge IS present", locked.includes("خدمات 
 c6("unlocked prompt still carries the full catalogue (control)", cold.includes("95,000") && cold.includes("فحص الموظفين"));
 // Question order.
 for (const [label, p] of [["known", known], ["cold", cold]]) {
-  c6(`${label}: branches asked before the HIS vendor name`, p.includes("اسم نظام الـHIS يأتي لاحقًا"));
-  c6(`${label}: shared environment → central integration is explained`, p.includes("ربطًا مركزيًا واحدًا"));
+  c6(`${label}: branches asked before the HIS vendor name`, p.includes("هل على نفس بيئة الـHIS؟"));
+  c6(`${label}: shared environment → central integration is explained`, p.includes("هل الربط مركزي؟"));
 }
 if (f6) { console.log(`\n${f6} FAILURES (price scoping / question order)`); process.exit(1); }
 console.log("price scoping + question order: green");
@@ -171,7 +171,7 @@ let f7 = 0;
 const c7 = (n, cond) => { if (!cond) f7++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
 for (const [label, p] of [["known", known], ["cold", cold]]) {
   c7(`${label}: scope questions are asked together, not across turns`,
-    p.includes("لا تُنفق دورين على معلومتين تُجمعان في سطر"));
+    p.includes("اسأل سؤالًا واحدًا ذا معنى في كل مرة"));
 }
 if (f7) { console.log(`\n${f7} FAILURES (turn economy)`); process.exit(1); }
 console.log("turn economy: green");
