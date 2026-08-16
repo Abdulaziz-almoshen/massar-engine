@@ -410,6 +410,10 @@ export function systemPrompt(contact: Contact): string {
     // Founder review: «7 branches + same HIS environment are more commercially important than
     // asking the HIS product name immediately.» Scope drives the price; the vendor name does not.
     "ترتيب الأسئلة حين تحتاجها فعلًا — الأهم تجاريًا أولًا: (١) كم فرعًا يشمله التكامل؟ (٢) هل الفروع كلها على نفس بيئة الـHIS؟ هذان يحددان نطاق الربط والتسعير. اسم نظام الـHIS يأتي لاحقًا وعند الحاجة التقنية فقط — لا تفتح به.",
+    // Measured on his thread 09:12→09:13: «كم فرع؟» then «نفس بيئة HIS؟» as two consecutive turns,
+    // two minutes apart, with nothing delivered between them. Asking both at once costs one turn
+    // instead of two and reads like someone who has done this before.
+    "واسألهما معًا في رسالة واحدة حين يلزمان: «عشان أحدد النطاق بدقة — كم فرعًا يشمله التكامل، وهل كلها على نفس بيئة الـHIS؟» لا تُنفق دورين على معلومتين تُجمعان في سطر.",
     "بعد أن تعرف العدد والبيئة، اذكر ما يعنيه ذلك: بيئة موحّدة تعني ربطًا مركزيًا واحدًا يخدم الفروع كلها بدل تكامل مستقل لكل فرع.",
     "إذا سألك العميل «كيف نتكامل؟» فأعطِ المراحل الفعلية بوضوح — مراجعة الرحلة الحالية في الـHIS، ثم الربط والاختبار على بيئة الاختبار، ثم التفعيل على الإنتاج — لا جملة عامة مثل «نربط النظام».",
     "لا تكرّر ما تعرفه في كل رسالة. إذا ذكر العميل عدد الفروع أو بيئة الـHIS مرة واحدة فهي معلومة محفوظة: ابنِ عليها ولا تُعِد سردها.",
@@ -1149,7 +1153,49 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   }
 }
 
+/**
+ * Is this text fit to send to a customer, or is it the model thinking out loud?
+ *
+ * 2026-08-16, on the founder's own thread: the model emitted its PLANNING as message content
+ * instead of calling the tool it was planning — «We need respond Arabic, need human handoff for
+ * commercial pricing? … Let's invoke.» — and it went to WhatsApp verbatim, because the send path
+ * ships `msg.content` with no check on what that content is.
+ *
+ * Two independent tests, because they fail in different ways:
+ *   SCRIPT — this agent writes Arabic to Saudi healthcare buyers. Always. A reply with more Latin
+ *     letters than Arabic is never a valid customer message for this product, whatever it says.
+ *     That single property catches the whole class without trying to enumerate English phrasings.
+ *   INTENT — reasoning can leak in Arabic too, so a short list of unmistakable
+ *     thinking-out-loud markers is checked regardless of script.
+ *
+ * Returns the reason it is unsendable, or null when it is fine.
+ */
+export function unsendableReason(text: string): string | null {
+  const s = String(text || "");
+  if (!s.trim()) return "empty";
+  const arabic = (s.match(/[؀-ۿ]/g) || []).length;
+  const latin = (s.match(/[A-Za-z]/g) || []).length;
+  // Technical tokens (HIS, ERP, API, PDF, NVR) are legitimately Latin inside an Arabic sentence,
+  // so this compares MASS, not presence: Arabic must lead. A genuinely Arabic reply that names
+  // three systems still passes; a paragraph of English never does.
+  if (latin > arabic) return `latin-dominant (${latin} latin vs ${arabic} arabic)`;
+  if (/\b(let'?s invoke|let'?s call|i should|we need to|need tool|tool call|i'?ll call the tool)\b/i.test(s))
+    return "reasoning marker";
+  if (/^\s*(?:okay|ok|so|hmm|right)[,.\s]/i.test(s) && latin > 12) return "thinking-aloud opener";
+  return null;
+}
+
+/** What we say instead, when the model hands us something unsendable. Never silence — that is the
+ *  failure mode this file already learned once. */
+const SAFE_FALLBACK = "عذرًا على التأخير. لأكمل معكم بدقة: هل يشمل التكامل فرعًا واحدًا أم عدة فروع؟";
+
 async function safeSend(phone: string, text: string) {
+  const bad = unsendableReason(text);
+  if (bad) {
+    console.error(JSON.stringify({ at: "agent", level: "error", msg: "BLOCKED unsendable model output", phone, reason: bad, dropped: String(text).slice(0, 200) }));
+    tracker.recordSystem(phone, `[حُجبت رسالة غير صالحة: ${bad}]`);
+    text = SAFE_FALLBACK;
+  }
   try {
     await gupshup.sendText(phone, text);
     tracker.recordAgentReply(phone, text);

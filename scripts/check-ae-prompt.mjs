@@ -165,3 +165,13 @@ for (const [label, p] of [["known", known], ["cold", cold]]) {
 }
 if (f6) { console.log(`\n${f6} FAILURES (price scoping / question order)`); process.exit(1); }
 console.log("price scoping + question order: green");
+
+// --- measured on his thread 09:12→09:13 --------------------------------------
+let f7 = 0;
+const c7 = (n, cond) => { if (!cond) f7++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+for (const [label, p] of [["known", known], ["cold", cold]]) {
+  c7(`${label}: scope questions are asked together, not across turns`,
+    p.includes("لا تُنفق دورين على معلومتين تُجمعان في سطر"));
+}
+if (f7) { console.log(`\n${f7} FAILURES (turn economy)`); process.exit(1); }
+console.log("turn economy: green");
