@@ -189,8 +189,38 @@ export type InteractionRead = {
   openQuestion: boolean;       // the agent's last message ended in a question nobody answered
 };
 
-export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean): InteractionRead {
-  const turns = (c.transcript || []).filter((t) => t.role !== "system");
+/**
+ * The window of a campaign episode, server-side twin of `campWin` in dashboard.ts.
+ *
+ * `campaigns.created_at` is BIGINT and node-pg returns int8 as a STRING of digits, so
+ * `Date.parse` on it is NaN — that exact trap made the first version of the campaign-side fix a
+ * silent no-op in production, with every past reply credited to the newest campaign. Both are
+ * kept in step deliberately; a customer page scoped by different rules than the campaign page is
+ * the same defect wearing a different hat.
+ *
+ * FAILS CLOSED. An unreadable timestamp returns a window that admits nothing, because the failure
+ * we are preventing is crediting history to an event that did not produce it.
+ */
+export function campaignWindow(rawCreatedAt: unknown): { from: number; to: number } {
+  const CLOSED = { from: Infinity, to: Infinity };
+  if (rawCreatedAt === undefined || rawCreatedAt === null || rawCreatedAt === "") return CLOSED;
+  const asNum = Number(rawCreatedAt);
+  if (Number.isFinite(asNum) && asNum > 0) return { from: asNum, to: Infinity };
+  const str = String(rawCreatedAt).trim();
+  // Only an ISO-looking string may reach Date.parse. A bare "0" or "-1" parses to the year 2000
+  // or earlier, which would open the window on all history through the fallback meant to close it.
+  if (!/^\d{4}-\d{2}/.test(str) && !/\d{2}:\d{2}/.test(str)) return CLOSED;
+  const parsed = Date.parse(str);
+  return parsed > 0 ? { from: parsed, to: Infinity } : CLOSED;
+}
+
+export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean, win?: { from: number; to: number }): InteractionRead {
+  // WINDOW. Without it this function reports a LIFETIME, which is the customer-page half of the
+  // defect `campWin` fixed on the campaign page: open a contact from a campaign launched minutes
+  // ago and every reply they ever sent is credited to it. A campaign episode reads only the turns
+  // spoken inside its own window; `win` omitted keeps the lifetime read the profile header uses.
+  const inWin = (ts: number) => !win || (Number.isFinite(ts) && ts >= win.from && ts < win.to);
+  const turns = (c.transcript || []).filter((t) => t.role !== "system" && inWin(t.ts));
   const cust = turns.filter((t) => t.role === "customer");
   const agent = turns.filter((t) => t.role === "agent");
   // A tap echoes an approved title verbatim; anything else is the customer speaking for themselves.

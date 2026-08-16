@@ -345,13 +345,25 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   if (!contact) return reply.code(404).send({ error: "لا محادثة لهذا الرقم بعد" });
   const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
   const force = String((req.query as any)?.refresh ?? "") === "1";
+  const campaignId = String((req.query as any)?.campaign ?? "").trim();
   const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
   return {
     contact, entity, insights: ins,
     context: insights.contextScore(contact, entity),
     // What the conversation actually WAS. `contextScore` measures fields we hold and can read full
     // on a contact whose only real sentence was «ماني مهتم لا تتصل علي»; this reads the transcript.
-    interaction: insights.interactionRead(contact, (t) => Boolean(templates.buttonIntent(t))),
+    // Scoped to a campaign episode when the caller names one (?campaign=<id>), lifetime otherwise.
+    // Opening a contact FROM a campaign launched minutes ago and reading every reply they ever
+    // sent as that campaign's result is the customer-page half of the defect campWin fixed on the
+    // campaign page. An unknown or unreadable campaign yields a window that admits nothing rather
+    // than falling back to lifetime — the whole point is not to credit history to an event.
+    interaction: insights.interactionRead(
+      contact,
+      (t) => Boolean(templates.buttonIntent(t)),
+      campaignId
+        ? insights.campaignWindow(((await db.listCampaigns()).find((cp: any) => String(cp.id) === campaignId) || {}).created_at)
+        : undefined,
+    ),
     timeline: insights.buildTimeline(contact),
     campaigns: (await db.listCampaigns()).filter((cp: any) => (cp.targets || []).some((t: any) => t.phone === phone)).map((cp: any) => ({ id: cp.id, name: cp.name })),
   };
