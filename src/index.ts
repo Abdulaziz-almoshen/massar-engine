@@ -346,6 +346,12 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   const entity = (await db.listEntities()).find((e) => e.phone === phone) ?? null;
   const force = String((req.query as any)?.refresh ?? "") === "1";
   const campaignId = String((req.query as any)?.campaign ?? "").trim();
+  /** Sortable launch instant: a readable epoch, or 0 so unreadable campaigns sink to the bottom
+   *  instead of poisoning the comparator with NaN. */
+  const launchedAt = (cp: any) => {
+    const w = insights.campaignWindow(cp?.created_at).from;
+    return Number.isFinite(w) ? w : 0;
+  };
   const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
   return {
     contact, entity, insights: ins,
@@ -365,7 +371,17 @@ app.get("/admin/customer/:phone", async (req, reply) => {
         : undefined,
     ),
     timeline: insights.buildTimeline(contact),
-    campaigns: (await db.listCampaigns()).filter((cp: any) => (cp.targets || []).some((t: any) => t.phone === phone)).map((cp: any) => ({ id: cp.id, name: cp.name })),
+    // Newest FIRST, and carrying the launch time. Without a date and an order these rendered as a
+    // row of identical blue chips, so the founder could not tell which campaign started the
+    // conversation he was looking at — his words: «not sure which one is related to the last one».
+    // `created_at` is BIGINT and node-pg returns int8 as a digit STRING; it is passed through raw
+    // and normalised by campaignWindow / fmtD rather than being parsed here.
+    campaigns: (await db.listCampaigns())
+      .filter((cp: any) => (cp.targets || []).some((t: any) => t.phone === phone))
+      .map((cp: any) => ({ id: cp.id, name: cp.name, product: cp.product, created_at: cp.created_at, test: cp.test }))
+      // campaignWindow returns Infinity for an unreadable launch time (it fails closed), and
+      // Infinity - Infinity is NaN, which leaves the order undefined. Unreadable sorts LAST.
+      .sort((a: any, b: any) => launchedAt(b) - launchedAt(a)),
   };
 });
 

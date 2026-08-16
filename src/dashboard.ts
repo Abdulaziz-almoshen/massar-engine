@@ -1901,7 +1901,36 @@ function vCustomer(ph) {
     '<span class="chip c-teal">واتساب ✓</span>' + (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
     '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
     '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">أول ظهور: ' + fmtD(c.firstSeenAt) + " · آخر نشاط: " + fmtT(c.lastEventAt) + "</div>" +
-    ((d.campaigns || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + d.campaigns.map((cp) => '<a href="#kmon/' + cp.id + '" style="text-decoration:none;" class="chip c-blue">' + esc(cp.name.slice(0, 30)) + "</a>").join("") + "</div>" : "") +
+    // PROVENANCE, not analytics. These used to be a row of identical blue chips in arbitrary
+    // order, so the founder could not say which campaign started the conversation in front of him.
+    // The payload now arrives newest-first with launch times: the most recent is stated as a
+    // sentence, and the rest are demoted to history rather than shown as peers. No percentages, no
+    // scope selector — campaign PERFORMANCE lives one screen away at #kmon/<id>, and this line
+    // exists so he can name the source out loud, not so he can compute anything here.
+    ((d.campaigns || []).length ? (function () {
+      const cps = d.campaigns;
+      const scoped = profileCampaign ? cps.filter((x) => String(x.id) === String(profileCampaign))[0] : null;
+      const first = scoped || cps[0];
+      const when = fmtD(campWin({ created_at: first.created_at }));
+      const known = when && when !== "—";
+      const link = (cp, style) =>
+        '<a href="#customer/' + esc(c.phone) + "/" + cp.id + '" style="' + style + '">' + esc(String(cp.name).slice(0, 40)) + "</a>";
+      return '<div style="margin-top:10px;font-size:12.5px;color:#475467;line-height:1.7;">' +
+        (scoped ? "مقصور على حملة: " : "بدأت هذه المحادثة من: ") +
+        link(first, "color:#2E7D77;font-weight:700;text-decoration:none;") +
+        (known ? ' <span style="color:#98A2B3;">· ' + esc(when) + "</span>"
+               : ' <span style="color:#98A2B3;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
+        (first.test ? ' <span class="chip c-warn" style="font-size:10px;">تجريبية</span>' : "") +
+        (scoped
+          ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#98A2B3;text-decoration:underline;">عرض كل التاريخ</a>'
+          : "") +
+        (cps.length > 1
+          ? '<div style="margin-top:6px;font-size:11.5px;color:#98A2B3;">' + (scoped ? "حملات أخرى: " : "وسبقتها: ") +
+            cps.filter((cp) => cp.id !== first.id)
+               .map((cp) => link(cp, "color:#98A2B3;text-decoration:none;")).join("، ") + "</div>"
+          : "") +
+        "</div>";
+    })() : "") +
     "</div></div>" +
     // THE CONVERSATION, not a checklist of fields. The old gauge scored what we hold on file —
     // a name, an import match, a file we sent — so it read full on a contact whose only real
@@ -2103,6 +2132,9 @@ async function refresh(force) {
       try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
       const curR = (location.hash || "").slice(1).split("/")[0];
       if (curR === "customer") {
+        // Read the scope here too: the very first refresh() runs before any hashchange fires, so a
+        // deep link into a scoped profile would otherwise load lifetime and look like the bug.
+        profileCampaign = (location.hash || "").split("/")[2] || "";
         const ph = (location.hash || "").split("/")[1] || "";
         if (ph) {
           // Scope the read to ONE campaign episode when the route names it (#customer/<phone>/<campId>).
@@ -2145,7 +2177,13 @@ window.refreshInsights = async () => {
 window.addEventListener("hashchange", () => {
   if (convoPhone) closeConvo(); rQ = "";
   const cur = (location.hash || "").slice(1).split("/")[0];
-  if (cur === "customer") { profileData = null; render(false); refresh(); }
+  if (cur === "customer") {
+    // #customer/<phone>/<campId> — the third segment is the scope. Without this assignment
+    // profileCampaign stayed "" forever, ?campaign= was never sent, and the server-side window
+    // was dead code: the scoping the profile claimed to support had never once run.
+    profileCampaign = (location.hash || "").split("/")[2] || "";
+    profileData = null; render(false); refresh();
+  }
   else render(false);
 });
 if (!location.hash) location.hash = "kmon";

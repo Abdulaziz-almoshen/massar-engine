@@ -69,3 +69,31 @@ console.log(`\n${f ? f + " FAILURES" : "contact window: all green"}`);
 if (f) process.exit(1);
 console.log("NOTE: scopes the INTERACTION read. contextScore, insights and the timeline on the");
 console.log("      same payload are still lifetime — they were not in scope for this fix.");
+
+// --- provenance: the contact profile must name its campaign source ----------
+// Founder: «I see all campaign details and not sure which one is related to the last one».
+// Measured cause: the payload returned {id,name} only — no date, no order — and the client
+// rendered identical blue chips linking AWAY to #kmon. Discovery's verdict was provenance, not
+// analytics: name the source, make the chips scope in place, keep lifetime as the default.
+const src2 = readFileSync(join(root, "src/index.ts"), "utf8");
+const dash = readFileSync(join(root, "src/dashboard.ts"), "utf8");
+let g = 0;
+const c2 = (n, cond) => { if (!cond) g++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+
+c2("payload carries the launch time", src2.includes("created_at: cp.created_at"));
+c2("payload is sorted newest-first", src2.includes("launchedAt(b) - launchedAt(a)"));
+c2("unreadable launch sorts last, not NaN", src2.includes("Number.isFinite(w) ? w : 0"));
+c2("profile states the campaign source", dash.includes("بدأت هذه المحادثة من"));
+c2("scoped view says so", dash.includes("مقصور على حملة"));
+c2("scoped view offers a way back to lifetime", dash.includes("عرض كل التاريخ"));
+c2("unreadable launch refuses attribution in words", dash.includes("فلا تُنسب أرقام لهذه الحملة"));
+c2("campaign links scope IN PLACE, not away to #kmon",
+  dash.includes("#customer/' + esc(c.phone) + \"/\" + cp.id"));
+c2("hashchange assigns the scope (the dead variable)",
+  dash.includes('profileCampaign = (location.hash || "").split("/")[2]'));
+c2("first refresh reads the scope too, for deep links",
+  (dash.match(/profileCampaign = \(location\.hash/g) || []).length >= 2);
+c2("lifetime remains the default", !dash.includes("profileCampaign = cps[0].id"));
+
+if (g) { console.log(`\n${g} FAILURES (provenance)`); process.exit(1); }
+console.log("campaign provenance: green");
