@@ -281,6 +281,7 @@ let campQ = ""; let campTab = "real"; let campSortKey = "new";   // campaigns li
 let showTestDecided = false;
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
+let profileCampaign = "";     // campaign id the read is scoped to ("" = lifetime)
 let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
 let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
@@ -1878,6 +1879,11 @@ function vCustomer(ph) {
   if (!profileData || profilePhone !== ph) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، وقراءة الحوار.</div></div>';
   }
+  if (profileData.failed) {
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">تعذّر فتح ملف العميل</div>' +
+      '<div class="s">استجابة الخادم: ' + esc(String(profileData.status)) + '. ' +
+      '<a href="javascript:void(0)" onclick="reloadProfile()" style="color:#2E7D77;font-weight:700;">إعادة المحاولة</a></div></div>';
+  }
   if (profileData.missing) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
   }
@@ -1997,6 +2003,7 @@ function gate(msg) {
     (msg ? '<div style="color:#c43d3d;font-size:12px;margin-top:10px;">' + esc(msg) + "</div>" : "") + "</div>";
 }
 window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN); refresh(); };
+window.reloadProfile = () => { profileData = null; render(false); refresh(); };
 
 let _viewSig = "";
 function stamp() {
@@ -2071,7 +2078,11 @@ async function refresh(force) {
   if (TOKEN) {
     try {
       const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } });
-      if (r.status === 401) { if (cur === "kmon" || cur === "home") return gate("رمز غير صحيح"); }
+      // Gate on EVERY route, not just kmon/home. A stale token on a #customer deep link used to
+      // fall through here: the inner condition was false, nothing returned, every later fetch
+      // 401'd, profileData stayed null, and the page sat on «جارٍ تجميع ملف العميل» forever with
+      // no login prompt. Measured 2026-08-16 on #customer/966535106365.
+      if (r.status === 401) return gate("رمز غير صحيح");
       else { cache = await r.json(); }
       if (!showTestDecided && cache && (cache.contacts || []).length) {
         showTestDecided = true;
@@ -2094,9 +2105,17 @@ async function refresh(force) {
       if (curR === "customer") {
         const ph = (location.hash || "").split("/")[1] || "";
         if (ph) {
-          const pr = await fetch("/admin/customer/" + ph, { headers: { "x-admin-token": TOKEN } });
+          // Scope the read to ONE campaign episode when the route names it (#customer/<phone>/<campId>).
+          // Without it the profile reports a LIFETIME, so a contact opened from a campaign launched
+          // minutes ago shows every reply they ever sent as that campaign's result — the founder
+          // could not tell which campaign a number belonged to.
+          const campQ = profileCampaign ? "?campaign=" + encodeURIComponent(profileCampaign) : "";
+          const pr = await fetch("/admin/customer/" + ph + campQ, { headers: { "x-admin-token": TOKEN } });
           if (pr.ok) { profileData = await pr.json(); profilePhone = ph; }
           else if (pr.status === 404) { profileData = { missing: true }; profilePhone = ph; }
+          // EVERY other outcome needs a state. Leaving profileData null made the spinner permanent,
+          // because nothing retries it — the 5s poll skips refresh() on this route.
+          else { profileData = { failed: true, status: pr.status }; profilePhone = ph; }
         }
       }
     } catch (e) { /* keep last view */ }
