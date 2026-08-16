@@ -91,3 +91,32 @@ if (failures) process.exit(1);
 // the independent review. Do not quote this green as "all outbound is guarded".
 console.log("NOTE: covers the 2 admin routes + guard logic. ~13 other call sites reach Gupshup");
 console.log("      directly and are NOT covered here — independent QA AC4 remains FAIL.");
+
+// --- sandbox plumbing must never be answered (2026-08-16) --------------------
+// The activation guard was gated on «customer turns <= 1», on the assumption that a later
+// «proxy …» is the customer talking. False on a SHARED sandbox: the handshake repeats every time
+// the session lapses. Measured — the founder returned after ~50h, re-typed «Proxy massar» with 30
+// turns of history, the guard did not fire, and the model asked whether he had «Proxy باسم Massar
+// ضمن بيئة الـHIS». Pinned by SHAPE, with no turn counter.
+const ins2 = await import("../dist/insights.js");
+const RE = ins2.SANDBOX_ACTIVATION_RE;
+let f4 = 0;
+const c4 = (name, cond) => { if (!cond) f4++; console.log(`${cond ? "ok  " : "FAIL"} ${name}`); };
+
+for (const t of ["Proxy massar", "proxy Massar", "PROXY massar", "بروكسي مسار", " Proxy massar "])
+  c4(`«${t.trim()}» is recognised as plumbing`, RE.test(t));
+
+// Must NOT swallow real customer speech.
+for (const t of ["هل يوجد proxy في الشبكة عندكم؟", "نستخدم proxy server داخلي للربط مع HIS",
+                 "كم السعر", "العرض التجاري"])
+  c4(`«${t.slice(0, 34)}…» is NOT plumbing`, !RE.test(t));
+
+// The turn counter must be gone from the guard — that was the defect itself.
+const src2 = readFileSync(join(root, "src/agent.ts"), "utf8");
+const gi = src2.indexOf("if (SANDBOX_ACTIVATION.test(text))");
+c4("activation guard is not gated on a turn counter", gi >= 0);
+c4("guard replies with the opener only on the first turn", src2.slice(gi, gi + 900).includes("priorCustomerTurns <= 1"));
+c4("guard stays silent on re-activation", src2.slice(gi, gi + 900).includes("sandbox re-activation mid-conversation"));
+
+if (f4) { console.log(`\n${f4} FAILURES (sandbox plumbing)`); process.exit(1); }
+console.log("sandbox plumbing guard: green");

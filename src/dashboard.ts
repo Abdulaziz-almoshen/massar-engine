@@ -524,7 +524,14 @@ function renderConvo() {
     '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#98A2B3;background:#F2F4F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
     '<div style="padding:9px 16px;border-bottom:1px solid #F2F4F7;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
-      '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>").join("") + "</div>" +
+      // Sandbox plumbing is not conversation. The handshake «Proxy massar» and the replies the
+      // model produced when it read that as a product name are shown as a muted note, not as the
+      // customer's words or ours — the founder opens these transcripts in demos. Both tokens are
+      // required so a genuine network-proxy question during an HIS integration still renders
+      // normally. Suppressed at render, never deleted: the ledger keeps what was actually said.
+      (/proxy|بروكسي/i.test(t.text) && /massar|مسار/i.test(t.text)
+        ? '<div class="bub b-s" style="opacity:.55;font-size:11.5px;">تفعيل بيئة Gupshup التجريبية — ليست جزءًا من المحادثة<div class="bt">' + fmtT(t.ts) + "</div></div>"
+        : '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>")).join("") + "</div>" +
     '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12.5px;' +
     (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +

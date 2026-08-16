@@ -986,12 +986,32 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
     return;
   }
 
-  // Only the very first turn can be platform plumbing; after that «proxy …» is the customer talking.
-  if (SANDBOX_ACTIVATION.test(text) && (contact.transcript || []).filter((t) => t.role === "customer").length <= 1) {
-    console.log(JSON.stringify({ at: "agent", msg: "sandbox activation phrase — answered with the real opener", phone: contact.phone }));
-    const opener = "أهلًا بكم. أنا المساعد الرقمي لشركة لِين لخدمات الأعمال، وأساعد المنشآت الصحية على تنفيذ خدمات مثل الإجازات المرضية وسجل التطعيمات الوطني مباشرة من داخل أنظمتها."
-      + "\nكيف يمكنني خدمتكم؟";
-    await safeSend(contact.phone, opener);
+  // The activation phrase is platform plumbing WHENEVER it appears, not only on turn one.
+  //
+  // The previous version required `customer turns <= 1`, on the assumption that «after that
+  // «proxy …» is the customer talking». That assumption is false on a SHARED sandbox: the
+  // handshake has to be repeated every time the session lapses. Measured 2026-08-16 — the founder
+  // last wrote on 14 Aug 06:32, came back 08:27 on the 16th (~50h, session long expired), typed
+  // «Proxy massar» to re-activate, and because he already had 30 turns of history the guard did
+  // not fire and the model answered «هل تقصدون أن لديكم Proxy باسم Massar ضمن بيئة الـHIS؟».
+  // 966535106365 hit the same thing two minutes earlier. The turn counter was the bug.
+  //
+  // The SHAPE is the signal: the regex requires the message to START with proxy/بروكسي and run
+  // under ~45 characters total, which is the handshake and not a sentence a healthcare buyer
+  // types. On turn one we answer with the real opener, because that message is genuinely the
+  // start of the conversation. Later, we answer NOTHING — Gupshup has already replied to its own
+  // command, and re-introducing ourselves mid-deal reads as amnesia.
+  if (SANDBOX_ACTIVATION.test(text)) {
+    const priorCustomerTurns = (contact.transcript || []).filter((t) => t.role === "customer").length;
+    if (priorCustomerTurns <= 1) {
+      console.log(JSON.stringify({ at: "agent", msg: "sandbox activation — answered with the real opener", phone: contact.phone }));
+      const opener = "أهلًا بكم. أنا المساعد الرقمي لشركة لِين لخدمات الأعمال، وأساعد المنشآت الصحية على تنفيذ خدمات مثل الإجازات المرضية وسجل التطعيمات الوطني مباشرة من داخل أنظمتها."
+        + "\nكيف يمكنني خدمتكم؟";
+      await safeSend(contact.phone, opener);
+    } else {
+      console.log(JSON.stringify({ at: "agent", msg: "sandbox re-activation mid-conversation — no reply", phone: contact.phone, priorCustomerTurns }));
+      tracker.recordSystem(contact.phone, "[إعادة تفعيل بيئة Gupshup التجريبية — ليست رسالة من العميل]");
+    }
     return;
   }
 
