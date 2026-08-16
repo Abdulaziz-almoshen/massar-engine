@@ -69,6 +69,38 @@ export const SANDBOX_ACTIVATION_RE = /^\s*(?:proxy\b|بروكسي(?:\s|$))[\s\S]
 /** Apply the clamp on the way OUT of the cache as well. Rows written before it existed still
  *  hold free text, and the portal's chips, filters and boards all read those rows directly —
  *  normalising only at the aggregate left «باقات NVR لتغطية 8 مواقع» on the campaign row. */
+/**
+ * Sentences that assert something about the BUYER'S OWN MIND that the buyer never said.
+ *
+ * The founder caught this in a live reply and it is blocked on the send path — but the same
+ * fabrication was still on his screen, written into a CACHED reading before that guard existed:
+ * «أكد أن السعر هو العائق الوحيد المتبقي قبل البدء» on a contact who said no such thing. Rule 6:
+ * stopping the leak is not wiping the spill. A cached row is read every time the page opens, so
+ * it must be scrubbed on the way OUT, not only prevented on the way in.
+ *
+ * Deliberately narrow — it matches ASSERTIONS about intent, not the topic. A reading that says the
+ * customer ASKED about price is fine; one that says he CONFIRMED price is the only blocker is not.
+ */
+const INVENTED_INTENT: RegExp[] = [
+  /(?:أكّد|أكد|صرّح|صرح|اتفق)[^.،؛\n]{0,40}(?:السعر|التكلفة)[^.،؛\n]{0,30}(?:العائق|النقطة|العقبة)[^.،؛\n]{0,20}(?:الوحيد|المتبقي)/,
+  /(?:العائق|النقطة|العقبة)\s*(?:هي|هو)?\s*الوحيدة?\s*المتبقية?/,
+  /(?:أبدى|أظهر|أكّد|أكد)[^.،؛\n]{0,25}(?:استعداده|جاهزيته|موافقته)\s*(?:للبدء|للتنفيذ|للشراء)/,
+  /(?:وافق|اتفقنا)\s*(?:على)?\s*(?:المضي|البدء|التنفيذ)/,
+];
+
+/** Drop offending SENTENCES from a free-text reading, keeping the rest. Returns the cleaned text,
+ *  or "" when nothing survives — the caller renders nothing rather than a stub. */
+export function scrubInventedIntent(text: unknown): string {
+  const s = String(text ?? "");
+  if (!s.trim()) return "";
+  return s
+    .split(/(?<=[.؟!\n])/)
+    .filter((sentence) => !INVENTED_INTENT.some((re) => re.test(sentence)))
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export function normalizeCached<T extends { product_interest?: { product: string; level: string }[] }>(d: T): T {
   if (!d || !Array.isArray(d.product_interest)) return d;
   // Two readings can collapse onto one service («نظام الإجازات المرضية» low + «إصدار الإجازات
@@ -82,7 +114,14 @@ export function normalizeCached<T extends { product_interest?: { product: string
     const prev = best.get(product);
     if (!prev || (rank[p.level] ?? 0) > (rank[prev.level] ?? 0)) best.set(product, { ...p, product });
   }
-  return { ...d, product_interest: [...best.values()] as typeof d.product_interest };
+  // Scrub the free-text readings too. These are the fields the portal actually renders, and a
+  // fabricated one is read fresh on every page open until the cache is regenerated.
+  const scrubbed: Record<string, unknown> = {};
+  for (const k of ["summary", "why", "stage_reason", "next_action", "evidence", "fix_suggestion"]) {
+    const v = (d as Record<string, unknown>)[k];
+    if (typeof v === "string") scrubbed[k] = scrubInventedIntent(v);
+  }
+  return { ...d, ...scrubbed, product_interest: [...best.values()] as typeof d.product_interest };
 }
 
 /** Map a free-text service mention onto the catalogue; anything unrecognised shares one

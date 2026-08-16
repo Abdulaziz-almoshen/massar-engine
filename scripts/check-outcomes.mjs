@@ -71,3 +71,33 @@ console.log(`\n${f ? f + " FAILURES" : "outcome record: all green"}`);
 if (f) process.exit(1);
 console.log("NOTE: asserts the LEDGER. Whether the agent asks for a time well is a separate");
 console.log("      question, measured by the Codex eval, not by this gate.");
+
+// --- the cached fabrication must not reach the screen ------------------------
+// Founder caught «أكد أن السعر هو العائق الوحيد المتبقي» in a live reply. The send path was
+// guarded, but the same sentence was still on his PORTAL, written into a cached reading before
+// the guard existed. Rule 6: stopping the leak is not wiping the spill.
+const ins2 = await import(join(root, "dist/insights.js"));
+let g = 0;
+const c2 = (n, cond) => { if (!cond) g++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+const FAB = "أكد أن السعر هو العائق الوحيد المتبقي قبل البدء، بعد تحديد نطاق التكامل والفروع.";
+const FACT = "سأل عن السعر بعد أن حدد نطاق التكامل والفروع، وطلب عرضًا تجاريًا.";
+c2("the fabrication is scrubbed", ins2.scrubInventedIntent(FAB) === "");
+c2("a factual reading survives untouched", ins2.scrubInventedIntent(FACT) === FACT);
+const mixed = ins2.scrubInventedIntent("المنشأة تناقش تكامل سجل التطعيمات. " + FAB);
+c2("mixed text keeps the real half", mixed.includes("تناقش تكامل سجل التطعيمات"));
+c2("…and drops the invented half", !mixed.includes("العائق الوحيد"));
+// Every rendered free-text field goes through the same scrub, in one place.
+for (const f of ["summary", "why", "stage_reason", "next_action"])
+  c2(`normalizeCached scrubs ${f}`, ins2.normalizeCached({ product_interest: [], [f]: FAB })[f] === "");
+
+// --- the morning list --------------------------------------------------------
+const dash2 = readFileSync(join(root, "src/dashboard.ts"), "utf8");
+c2("a morning list exists", dash2.includes("function vMorningList"));
+c2("…grouped by the founder's own three questions",
+  dash2.includes("موعد محدد") && dash2.includes("مهتم بلا موعد") && dash2.includes("لا يرغب في التواصل"));
+c2("…showing the customer's own words for the time", dash2.includes("c.scheduledSaid"));
+c2("…with our parse labelled as ours", dash2.includes("قراءتنا"));
+c2("…and an empty group says so rather than hiding", dash2.includes("لا أحد في هذه المجموعة بعد"));
+c2("…and unsorted contacts are counted, not ignored", dash2.includes("لم تُفرز بعد"));
+if (g) { console.log(`\n${g} FAILURES (scrub / morning list)`); process.exit(1); }
+console.log("scrub + morning list: green");

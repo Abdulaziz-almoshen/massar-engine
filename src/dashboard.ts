@@ -1577,6 +1577,65 @@ window.entDel = async (id) => {
   await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
   entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
 };
+/**
+ * THE MORNING LIST. The founder's own definition of what he is buying: "we want to know who are
+ * interested, who are not interested, and if interested, when are we going to schedule them."
+ *
+ * One row per contact, grouped by outcome, actionable before standup. The scheduled group leads
+ * and shows the CUSTOMER'S OWN WORDS for the time — our parse is secondary and labelled as ours.
+ * Counts are real: a group with nothing in it says so rather than being hidden, because an empty
+ * «موعد محدد» column is the honest measure of whether the agent is working.
+ */
+function vMorningList() {
+  const cs = (cache && cache.contacts || []).filter((c) => showTest || !c.test);
+  const GROUPS = [
+    ["scheduled", "موعد محدد", "#027A48", "#ECFDF3", "اتصل بهم اليوم"],
+    ["handoff", "بانتظار المختص", "#B54708", "#FFFAEB", "أجاب المساعد وينتظرون مكالمة"],
+    ["interested", "مهتم بلا موعد", "#2F5F94", "#EFF6FF", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
+    ["later", "مؤجل", "#667085", "#F2F4F7", "طلبوا التأجيل"],
+    ["stopped", "لا يرغب في التواصل", "#B42318", "#FEF3F2", "توقّف الإرسال إليهم"],
+  ];
+  const of = (k) => cs.filter((c) => c.outcome === k || (k === "stopped" && (c.outcome === "not_interested" || c.optedOut)));
+  const unsorted = cs.filter((c) => !c.outcome && !c.optedOut);
+  let h = '<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+    '<h3 style="margin:0;flex:1;min-width:180px;">قائمة الصباح</h3>' +
+    '<span style="font-size:11.5px;color:#98A2B3;">' + fmtN(cs.length) + " جهة" + "</span></div>" +
+    '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;line-height:1.8;">من تتصل به اليوم، ومن توقّف التواصل معه. الوقت معروض بكلمات العميل نفسه.</div>';
+  for (const [key, label, ink, bg, hint] of GROUPS) {
+    const rows = of(key);
+    h += '<div style="margin-top:16px;">' +
+      '<div style="display:flex;align-items:baseline;gap:8px;">' +
+      '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + label + "</span>" +
+      '<span style="font-size:12px;color:#98A2B3;">' + fmtN(rows.length) + "</span>" +
+      '<span style="font-size:11px;color:#98A2B3;">· ' + hint + "</span></div>";
+    if (!rows.length) {
+      h += '<div style="font-size:11.5px;color:#98A2B3;margin-top:6px;">لا أحد في هذه المجموعة بعد.</div></div>';
+      continue;
+    }
+    h += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' + rows.map((c) => {
+      const nm = c.waName || "غير معروف";
+      const when = key === "scheduled" && c.scheduledSaid
+        ? '<span style="font-size:12.5px;font-weight:700;color:#101828;">«' + esc(c.scheduledSaid) + "»</span>" +
+          (c.scheduledAt ? '<span style="font-size:11px;color:#98A2B3;"> · قراءتنا ' + esc(fmtT(c.scheduledAt)) + "</span>"
+                         : '<span style="font-size:11px;color:#98A2B3;"> · لم نقرأ تاريخًا</span>')
+        : c.outcomeReason
+          ? '<span style="font-size:11.5px;color:#667085;">«' + esc(String(c.outcomeReason).slice(0, 70)) + "»</span>"
+          : "";
+      return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="cursor:pointer;background:' + bg +
+        ';border:1px solid #EAECF0;border-inline-start:3px solid ' + ink + ';border-radius:10px;padding:10px 13px;' +
+        'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;">' +
+        '<span style="font-size:13px;font-weight:700;color:#101828;min-width:130px;">' + esc(nm) + "</span>" +
+        '<span style="font-size:11px;color:#98A2B3;direction:ltr;">+' + esc(c.phone) + "</span>" +
+        '<span style="flex:1"></span>' + when + "</div>";
+    }).join("") + "</div></div>";
+  }
+  if (unsorted.length) {
+    h += '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #F2F4F7;font-size:11.5px;color:#98A2B3;">' +
+      fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة." + "</div>";
+  }
+  return h + "</div>";
+}
+
 function vCustomers() {
   let h = '<div class="card">' +
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
@@ -2104,7 +2163,7 @@ function render(fetchNew) {
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
-    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb()) : vCustomers();
+    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb()) : (vMorningList() + vCustomers());
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
