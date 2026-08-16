@@ -345,6 +345,20 @@ export function systemPrompt(contact: Contact): string {
     "استخدم: **أجب ← قيمة ← خطوة تالية**. وليس: سؤال ← سؤال ← سؤال ← سؤال.",
     "ليست كل رسالة من العميل تستوجب سؤالًا في النهاية. أحيانًا أفضل رد بيعي هو إجابة قوية فقط.",
     "",
+    "# ٧أ) القاعدة السلوكية الحاكمة",
+    "**لا تبدُ أبدًا وكأنك تنفّذ عملية بيع. ابدُ وكأنك في محادثة تجارية.** العملية تحدث داخلك؛ العميل يجب أن يشعر أنه يتحدث مع مدير حساب خبير يفهم تشغيله ويساعده على القرار.",
+    "ممنوع أن يسمع العميل لغة الـCRM: «الخطوة التالية هي إعداد العرض التجاري» · «نكمل المراجعة التجارية» · «تم تأهيل الفرصة» · «ننتقل للمرحلة التالية» · «رفعت النطاق التجاري». تحدّث عمّا يفيده هو، لا عمّا تفعله أنت في نظامك.",
+    "# ٧ب) لا تفترض حالة الصفقة",
+    "ممنوع منعًا باتًا أن تنسب إلى العميل نية أو جاهزية أو عائقًا أو التزامًا لم يقله بنفسه. «بما أن السعر هو النقطة الوحيدة المتبقية قبل البدء» — إن لم يقلها هو فهي اختراع لحقيقة عن رأيه، وهو أسوأ من اختراع رقم لأنه يشعر أنها ليست كلامه.",
+    "إن أردت معرفة العائق فاسأل عنه سؤالًا صريحًا؛ ولا تعلنه كأنه ثابت. الفرق بين «هل السعر هو العائق الوحيد؟» و«بما أن السعر هو العائق الوحيد» هو الفرق بين بائع محترف وبائع يضع كلامًا في فم عميله.",
+    "# ٧ج) نمط الرد بعد كل معلومة يعطيها العميل",
+    "**اعترف ← اشرح لماذا هذا مهم لهم ← عزّز القيمة ← اعرض الاتجاه المفيد التالي.** المعلومة التي يعطيك إياها العميل ليست حقلًا تملؤه، بل مادة تصنع بها قيمة.",
+    "مثال — بعد أن يؤكد أن الفروع الثلاثة على نفس الـHIS: «ممتاز، هذا يسهّل الربط بشكل كبير لأننا نقدر نبني التكامل مرة واحدة على البيئة المركزية ويخدم الفروع الثلاثة، بدل التعامل مع كل فرع بشكل منفصل.\nوبحكم حجم استخدامكم، الفائدة الأساسية بتكون تقليل الخطوات اليدوية وتوثيق التطعيم مباشرة من الـHIS.\nإذا مناسب لكم، أقدر أوضح لكم الجانب التجاري أو ندخل أكثر في تفاصيل الربط.»",
+    "لاحظ في المثال: لا سؤال في النهاية، بل اتجاهان مفيدان — وهذان يُرسلان أزرارًا (§١٩ب).",
+    "# ٧د) نبرة عربية طبيعية لا تقريرية",
+    "اكتب كما يتكلم مدير حساب سعودي، لا كما يُكتب تقرير. تقريري: «يمكن بناء التكامل بصورة مركزية لتوحيد توثيق الجرعات وتقليل الإدخال المزدوج عبر الفروع.» — طبيعي: «ممتاز، بما أن الفروع الثلاثة على نفس الـHIS، هذا يسهّل الموضوع كثير. نقدر نخلي الربط مركزي ويخدم الفروع كلها بدل ما يكون لكل فرع ربط منفصل.»",
+    "تجنّب المبني للمجهول والاسمية الثقيلة («يمكن بناء…»، «يتم توحيد…»). استخدم الفعل المباشر ونحن/نقدر: «نقدر نخلي…»، «هذا يسهّل…»، «الفائدة عندكم…».",
+    "",
     "# ٨) الاكتشاف",
     "الاكتشاف ليس قائمة تحقق. اسأل فقط عمّا يغيّر: ملاءمة المنتج · النطاق التقني · النطاق التجاري · التوصية · السعر · التنفيذ · الإجراء التالي.",
     "اسأل سؤالًا واحدًا ذا معنى في كل مرة. ولا تجعل العميل يشعر أنه في مقابلة.",
@@ -1128,6 +1142,73 @@ export function unsendableReason(text: string): string | null {
 }
 
 /**
+ * Sales-process language the customer must never hear, and claims about their own mind that they
+ * never made. Founder review 2026-08-16 (second pass).
+ *
+ * Two classes, both checked on the way out because prose bans had already failed for the
+ * fake-action family:
+ *
+ *   INVENTED STATE — «بما أن السعر هو النقطة الوحيدة المتبقية قبل البدء» when the customer never
+ *     said that. This is Rule 2 (numbers must be real) applied to INTENT: asserting a buyer's
+ *     readiness, blocker or commitment back at them is a fabricated fact about their own mind,
+ *     and it is worse than a fabricated number because they can feel it is wrong.
+ *
+ *   PROCESS NARRATION — «الخطوة التالية إعداد العرض التجاري» · «نكمل المراجعة التجارية» ·
+ *     «تم تأهيل الفرصة». Internal CRM vocabulary. The customer is in a commercial conversation,
+ *     not watching a pipeline advance.
+ *
+ * Returns the offending phrase, or null. Deliberately narrow: it matches the assertive SHAPES,
+ * not the topic — «هل السعر هو العائق الوحيد؟» is a question and stays legal, because asking is
+ * exactly how the agent is supposed to establish it.
+ */
+const INVENTED_STATE: [RegExp, string][] = [
+  [/(?:بما أن|بحكم أن|وبما أن)[^.،؟\n]{0,30}(?:السعر|التكلفة)[^.،؟\n]{0,30}(?:النقطة|العائق|العقبة)[^.،؟\n]{0,20}(?:الوحيد|المتبقي)/, "asserting price is the only blocker"],
+  [/(?:النقطة|العائق|العقبة)\s*(?:هي\s*)?الوحيدة?\s*المتبقية/, "asserting the only remaining blocker"],
+  [/(?:بما أنكم|بحكم أنكم|وبما أنكم)\s*(?:جاهزون|مستعدون|قررتم|موافقون)/, "asserting readiness the customer never stated"],
+  [/(?:اتفقنا|تم الاتفاق)\s*(?:على)?\s*(?:المضي|البدء|التنفيذ)/, "asserting an agreement that was not made"],
+];
+const PROCESS_NARRATION: [RegExp, string][] = [
+  [/تم\s*تأهيل\s*(?:الفرصة|العميل|الحساب)/, "«تم تأهيل الفرصة»"],
+  [/(?:نكمل|نواصل|أكمل|سأكمل|نبدأ|بدأت)\s*(?:الآن\s*)?المراجعة\s*التجارية/, "«المراجعة التجارية» as a process step"],
+  [/الخطوة\s*التالية\s*(?:هي|هو)?\s*إعداد\s*العرض/, "«الخطوة التالية إعداد العرض»"],
+  [/ننتقل\s*(?:إلى|ل)\s*المرحلة\s*(?:التالية|القادمة)/, "«ننتقل للمرحلة التالية»"],
+  [/(?:رفعت|سأرفع|تم رفع)\s*(?:النطاق|الطلب)\s*التجاري/, "raising an internal request at them"],
+];
+
+/** Returns the reason this text narrates process or invents deal state, or null. */
+export function salesVoiceViolation(text: string): string | null {
+  const s = String(text || "");
+  if (!s.trim()) return null;
+  for (const [re, why] of INVENTED_STATE) if (re.test(s)) return `invented state: ${why}`;
+  for (const [re, why] of PROCESS_NARRATION) if (re.test(s)) return `process narration: ${why}`;
+  return null;
+}
+
+/**
+ * Remove offending SENTENCES rather than dropping the whole message.
+ *
+ * Blocking an entire reply because one clause invented a blocker would throw away the good half
+ * and make the agent look broken — the customer would get a generic line instead of a real
+ * answer. Surgical removal keeps the value and deletes the claim. If what survives is too thin to
+ * be a message, the caller falls back.
+ */
+export function stripSalesVoice(text: string): { text: string; removed: string[] } {
+  const removed: string[] = [];
+  const kept = String(text || "")
+    .split(/(?<=[.؟!\n])/)
+    .filter((sentence) => {
+      const why = salesVoiceViolation(sentence);
+      if (why) removed.push(why);
+      return !why;
+    })
+    .join("")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { text: kept, removed };
+}
+
+/**
  * Does this plain-text message present the customer with 2–3 choices that WhatsApp could render
  * as buttons? Founder rule, 2026-08-16: «enforce buttons if the answers are three or less options».
  *
@@ -1159,6 +1240,14 @@ export function offeredChoices(text: string): string[] | null {
 const SAFE_FALLBACK = "عذرًا على التأخير. لأكمل معكم بدقة: هل يشمل التكامل فرعًا واحدًا أم عدة فروع؟";
 
 async function safeSend(phone: string, text: string) {
+  // Surgical first: drop invented deal state and CRM narration, keep the rest of the answer.
+  const cleaned = stripSalesVoice(text);
+  if (cleaned.removed.length) {
+    console.error(JSON.stringify({ at: "agent", level: "error", msg: "stripped sales-voice violation", phone, removed: cleaned.removed, before: String(text).slice(0, 200) }));
+    tracker.recordSystem(phone, `[حُذفت عبارات عملية/افتراض: ${cleaned.removed.join(" · ")}]`);
+    // Too little left to be a message — better a clean short line than a stub.
+    text = cleaned.text.length >= 40 ? cleaned.text : SAFE_FALLBACK;
+  }
   const bad = unsendableReason(text);
   if (bad) {
     console.error(JSON.stringify({ at: "agent", level: "error", msg: "BLOCKED unsendable model output", phone, reason: bad, dropped: String(text).slice(0, 200) }));

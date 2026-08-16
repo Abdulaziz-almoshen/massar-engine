@@ -45,8 +45,8 @@ c("empty text is blocked", unsendableReason("") !== null);
 const src = readFileSync(join(root, "src/agent.ts"), "utf8");
 const i = src.indexOf("async function safeSend");
 c("safeSend consults the guard before the wire",
-  src.slice(i, i + 700).includes("unsendableReason") &&
-  src.slice(i, i + 700).indexOf("unsendableReason") < src.slice(i, i + 700).indexOf("gupshup.sendText"));
+  src.slice(i, i + 1600).includes("unsendableReason") &&
+  src.slice(i, i + 1600).indexOf("unsendableReason") < src.slice(i, i + 1600).indexOf("gupshup.sendText"));
 
 console.log(`\n${f ? f + " FAILURES" : "sendable guard: all green"}`);
 if (f) process.exit(1);

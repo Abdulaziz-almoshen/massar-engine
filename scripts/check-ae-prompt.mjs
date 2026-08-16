@@ -175,3 +175,19 @@ for (const [label, p] of [["known", known], ["cold", cold]]) {
 }
 if (f7) { console.log(`\n${f7} FAILURES (turn economy)`); process.exit(1); }
 console.log("turn economy: green");
+
+// --- founder review, second pass 2026-08-16 ----------------------------------
+let f8 = 0;
+const c8 = (n, cond) => { if (!cond) f8++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+for (const [label, p] of [["known", known], ["cold", cold]]) {
+  c8(`${label}: governing behavioural rule present`, p.includes("لا تبدُ أبدًا وكأنك تنفّذ عملية بيع"));
+  c8(`${label}: CRM vocabulary banned by name`, p.includes("تم تأهيل الفرصة") && p.includes("ممنوع أن يسمع العميل لغة الـCRM"));
+  c8(`${label}: inventing deal state banned`, p.includes("لا تفترض حالة الصفقة"));
+  c8(`${label}: ask-vs-assert distinction taught`, p.includes("يضع كلامًا في فم عميله"));
+  c8(`${label}: acknowledge→why→value→direction pattern`, p.includes("اعترف ← اشرح لماذا هذا مهم لهم ← عزّز القيمة"));
+  c8(`${label}: the worked example is present`, p.includes("هذا يسهّل الربط بشكل كبير"));
+  c8(`${label}: natural-not-report voice taught`, p.includes("اكتب كما يتكلم مدير حساب سعودي، لا كما يُكتب تقرير"));
+  c8(`${label}: passive/nominal style called out`, p.includes("تجنّب المبني للمجهول"));
+}
+if (f8) { console.log(`\n${f8} FAILURES (voice)`); process.exit(1); }
+console.log("voice rules: green");
