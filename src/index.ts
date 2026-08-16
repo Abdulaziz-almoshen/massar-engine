@@ -394,9 +394,20 @@ app.post("/admin/contact/outcome", async (req, reply) => {
     return reply.code(400).send({ error: "body: { phone, outcome: meeting_booked|quote_sent|postponed|not_a_fit|clear }" });
   }
   const p = String(phone).replace(/\D/g, "");
+  // ONE VOCABULARY. These buttons used to write a transcript marker and nothing else, so a human
+  // clicking «اجتماع محجوز» and the agent recording `scheduled` were the same fact stored twice in
+  // two languages, neither aware of the other — and the portal's own "current state" highlight
+  // matched a string («نتيجة موثقة يدويًا») that nothing has ever written. The human decision now
+  // writes the SAME outcome enum the agent writes, and the human is the source of truth.
+  const HUMAN_TO_OUTCOME: Record<string, "scheduled" | "interested" | "later" | "stopped"> = {
+    meeting_booked: "scheduled", quote_sent: "interested", postponed: "later", not_a_fit: "stopped",
+  };
+  const mapped = HUMAN_TO_OUTCOME[String(outcome)];
+  if (mapped) tracker.setOutcome(p, mapped, "قرار بشري من اللوحة");
+  else if (outcome === "clear") tracker.setOutcome(p, undefined, "");
   tracker.recordSystem(p, outcome === "clear" ? "[أُزيلت النتيجة البشرية]" : `[نتيجة بشرية: ${outcome}]`);
   db.insertEvent(p, "human_outcome", String(outcome), Date.now());
-  return { status: "ok" };
+  return { status: "ok", outcome: mapped ?? null };
 });
 
 // Correct a contact's interest tags (removes fabricated or duplicated entries).

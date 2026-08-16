@@ -1909,26 +1909,26 @@ function vCustomer(ph) {
     // exists so he can name the source out loud, not so he can compute anything here.
     ((d.campaigns || []).length ? (function () {
       const cps = d.campaigns;
+      const real = cps.filter((x) => !x.test);
+      const testN = cps.length - real.length;
       const scoped = profileCampaign ? cps.filter((x) => String(x.id) === String(profileCampaign))[0] : null;
-      const first = scoped || cps[0];
+      const first = scoped || real[0] || cps[0];
+      if (!first) return "";
       const when = fmtD(campWin({ created_at: first.created_at }));
       const known = when && when !== "—";
-      const link = (cp, style) =>
-        '<a href="#customer/' + esc(c.phone) + "/" + cp.id + '" style="' + style + '">' + esc(String(cp.name).slice(0, 40)) + "</a>";
+      // ONE campaign is named. Everything else is a COUNT, so the line cannot grow — it read as a
+      // comma-joined wall of 20+ names on any contact used for testing.
+      const others = (scoped ? cps.length : real.length) - 1;
       return '<div style="margin-top:10px;font-size:12.5px;color:#475467;line-height:1.7;">' +
         (scoped ? "مقصور على حملة: " : "بدأت هذه المحادثة من: ") +
-        link(first, "color:#2E7D77;font-weight:700;text-decoration:none;") +
+        '<a href="#customer/' + esc(c.phone) + "/" + first.id + '" style="color:#2E7D77;font-weight:700;text-decoration:none;">' +
+        esc(String(first.name).slice(0, 40)) + "</a>" +
         (known ? ' <span style="color:#98A2B3;">· ' + esc(when) + "</span>"
                : ' <span style="color:#98A2B3;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
-        (first.test ? ' <span class="chip c-warn" style="font-size:10px;">تجريبية</span>' : "") +
-        (scoped
-          ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#98A2B3;text-decoration:underline;">عرض كل التاريخ</a>'
-          : "") +
-        (cps.length > 1
-          ? '<div style="margin-top:6px;font-size:11.5px;color:#98A2B3;">' + (scoped ? "حملات أخرى: " : "وسبقتها: ") +
-            cps.filter((cp) => cp.id !== first.id)
-               .map((cp) => link(cp, "color:#98A2B3;text-decoration:none;")).join("، ") + "</div>"
-          : "") +
+        (others > 0 ? ' <span style="color:#98A2B3;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
+        (testN > 0 && showTest ? ' <span style="color:#98A2B3;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
+        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#98A2B3;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
+        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#98A2B3;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
         "</div>";
     })() : "") +
     "</div></div>" +
@@ -1936,41 +1936,66 @@ function vCustomer(ph) {
     // a name, an import match, a file we sent — so it read full on a contact whose only real
     // sentence was «ماني مهتم لا تتصل علي». A percentage also implies a ceiling the conversation can
     // reach; there is none. This reports counts, whose turn it is, and the customer's own words.
-    '<div class="convled" style="flex:none;width:210px;display:flex;flex-direction:column;gap:9px;border-inline-start:1px solid #F2F4F7;padding-inline-start:18px;">' +
+    // The engagement column is DELETED. «كلمة من العميل» with a progress bar implied a ceiling
+    // that does not exist, «العميل ٢٥ · المساعد ٣٣» is not a sales signal, and the voice field picked the
+    // LONGEST customer message as their representative line — which is why «مافهمت خلاص كنسل», a
+    // complaint, was being displayed as this customer's highlight. The outcome strip above shows a
+    // quote sourced to the DECISION instead of to length. Whose turn it is survives, in one line.
     (function () {
-      var it = d.interaction;
-      if (!it) return '<div style="font-size:11px;color:#98A2B3;">لا قراءة للحوار بعد</div>';
-      var total = Math.max(1, it.customerTurns + it.agentTurns);
-      var cw = Math.round((it.customerTurns / total) * 100);
-      var head = it.customerTurns ? fmtN(it.customerWords) : "—";
-      return '<div style="font-size:10px;font-weight:700;color:#667085;">العميل ' + fmtN(it.customerTurns) +
-        " · المساعد " + fmtN(it.agentTurns) + "</div>" +
-        '<div style="height:8px;border-radius:999px;overflow:hidden;display:flex;background:#EAECF0;">' +
-        '<i style="width:' + cw + '%;background:#3FB6B0;"></i>' +
-        '<i style="flex:1;background:rgba(31,68,112,.22);"></i></div>' +
-        '<div><span style="font-size:22px;font-weight:700;color:' + (it.customerTurns ? "#101828" : "#98A2B3") + ';">' + head +
-        '</span> <span style="font-size:12px;color:#667085;">كلمة من العميل</span></div>' +
-        '<div><span class="chip" style="background:' + (it.state === "refused" ? "rgba(217,45,32,.10);color:#B42318" :
-          it.state === "reciprocal" ? "rgba(63,182,176,.14);color:#1F7A73" :
-          it.state === "no_reply" ? "#F2F4F7;color:#667085" : "rgba(201,162,39,.16);color:#8a6d10") + ';">' + esc(it.stateLabel) + "</span></div>" +
-        '<div style="font-size:11px;color:#667085;line-height:1.85;">' + esc(it.stateReason) + "</div>" +
-        (it.voice
-          ? '<div style="font-size:12px;color:#101828;line-height:1.9;background:#F6F8FB;border-radius:10px;border-inline-start:2px solid #3FB6B0;padding:9px 11px;">' +
-            esc(clip(it.voice.text, 120)) + "</div>"
-          : '<div style="font-size:11px;color:#98A2B3;line-height:1.85;">لم يكتب بكلماته بعد — لا نعرف احتياجه منه هو.</div>') +
-        '<div style="font-size:10.5px;color:#98A2B3;">' +
-        (it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "لم يبدأ الحوار") +
-        (it.hoursSinceCustomer !== null ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "") + "</div>";
+      const it = d.interaction || {};
+      const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
+      const idle = it.hoursSinceCustomer !== null && it.hoursSinceCustomer !== undefined
+        ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "";
+      return turn ? '<div style="font-size:11.5px;color:#98A2B3;margin-top:6px;">' + turn + idle + "</div>" : "";
     })() +
     "</div></div>";
-  const hOut = [...(c.transcript || [])].reverse().find((t) => t.role === "system" && t.text.indexOf("نتيجة موثقة يدويًا") >= 0);
+  // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
+  // had never rendered once. The outcome now lives on the contact in one vocabulary, written by
+  // both the agent and the portal buttons, so read it from there instead of parsing prose.
+  const OUT_TO_BTN = { scheduled: "meeting_booked", interested: "quote_sent", later: "postponed", stopped: "not_a_fit" };
+  const activeBtn = OUT_TO_BTN[c.outcome] || "";
+  // THE FRZ STRIP — the first thing a sales manager needs: is this person sorted, and if a time was
+  // agreed, WHAT DID THEY SAY. The customer's verbatim words lead; our parse is secondary and
+  // labelled as ours, because it is a reading and they may have meant something else.
+  h += (function () {
+    const OUT = {
+      scheduled: ["موعد محدد", "#027A48", "#ECFDF3"],
+      interested: ["مهتم", "#2F5F94", "#EFF6FF"],
+      later: ["مؤجل", "#B54708", "#FFFAEB"],
+      stopped: ["لا يرغب في التواصل", "#B42318", "#FEF3F2"],
+      not_interested: ["لا يرغب في التواصل", "#B42318", "#FEF3F2"],
+      handoff: ["بانتظار المختص", "#B54708", "#FFFAEB"],
+      opted_out: ["أوقف الرسائل", "#B42318", "#FEF3F2"],
+      closed: ["مغلق", "#667085", "#F2F4F7"],
+    };
+    const o = OUT[c.outcome] || null;
+    const label = o ? o[0] : "لم يُفرز بعد";
+    const ink = o ? o[1] : "#667085";
+    const bg = o ? o[2] : "#F9FAFB";
+    let body = "";
+    if (c.outcome === "scheduled" && c.scheduledSaid) {
+      body = '<div style="font-size:18px;font-weight:700;color:#101828;margin-top:4px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
+        '<div style="font-size:11.5px;color:#667085;margin-top:3px;">' +
+        (c.scheduledAt
+          ? "قراءتنا: " + esc(fmtT(c.scheduledAt)) + " · لم تُؤكَّد بعد"
+          : "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل.") + "</div>";
+    } else if (c.outcomeEvidence) {
+      body = '<div style="font-size:13px;color:#475467;margin-top:4px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 140)) + "»</div>";
+    } else if (!o) {
+      body = '<div style="font-size:12px;color:#98A2B3;margin-top:3px;">لم تُسجَّل نتيجة بعد لهذه المحادثة.</div>';
+    }
+    return '<div style="background:' + bg + ';border:1px solid #EAECF0;border-inline-start:3px solid ' + ink +
+      ';border-radius:12px;padding:13px 16px;margin:2px 0 14px;">' +
+      '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:' + ink + ';">' + label + "</div>" +
+      body + "</div>";
+  })();
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
     '<span style="flex:1"></span>' +
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
-      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (hOut && hOut.text.indexOf(o[0]) >= 0 ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
+      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;color:' + o[2] + ';background:#fff;border:1px solid #EAECF0;' + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "33;font-weight:700;background:" + o[2] + "0d;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   if (!ins.learning) h += vSalesPath(ins);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
   // فهم المساعد

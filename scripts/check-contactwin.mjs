@@ -88,7 +88,7 @@ c2("scoped view says so", dash.includes("مقصور على حملة"));
 c2("scoped view offers a way back to lifetime", dash.includes("عرض كل التاريخ"));
 c2("unreadable launch refuses attribution in words", dash.includes("فلا تُنسب أرقام لهذه الحملة"));
 c2("campaign links scope IN PLACE, not away to #kmon",
-  dash.includes("#customer/' + esc(c.phone) + \"/\" + cp.id"));
+  dash.includes("#customer/' + esc(c.phone) + \"/\" + first.id"));
 c2("hashchange assigns the scope (the dead variable)",
   dash.includes('profileCampaign = (location.hash || "").split("/")[2]'));
 c2("first refresh reads the scope too, for deep links",
