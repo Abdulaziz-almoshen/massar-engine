@@ -168,8 +168,13 @@ const PIVOTS = [
   "لا تعرض أكثر من خدمتين بديلتين في المحادثة الواحدة. بعد ذلك، اقترح التنسيق مع مختص المبيعات.",
 ];
 
-function productBlock(): string {
-  return PRODUCTS.map((p) => [
+// When a product is locked, the operational knowledge is NARROWED to it. Founder review
+// 2026-08-16: the prompt-level lock stopped the wrong FILE but left every other product's pricing
+// and features sitting in context, one sentence away from being quoted. A model cannot quote a
+// price it was never given — so scope the knowledge, do not just forbid its use.
+function productBlock(locked?: string | null): string {
+  const list = locked ? PRODUCTS.filter((p) => p.name === locked) : PRODUCTS;
+  return (list.length ? list : PRODUCTS).map((p) => [
     `### ${p.name}`,
     `العرض: ${p.pitch}`,
     `الكفاءة: ${p.efficiency.join(" · ")}`,
@@ -402,6 +407,10 @@ export function systemPrompt(contact: Contact): string {
     "# ٧ج) لا تحوّل المحادثة إلى مقابلة",
     "قبل أن تسأل أي سؤال، تحقق: هل الجواب لازم فعلًا للإجابة على العميل، أو لتحديد ملاءمة المنتج، أو لحساب النطاق والتسعير، أو لتحريك الصفقة؟ إن لم يكن كذلك، لا تسأله.",
     "التسلسل المطلوب: **أجب ← أضف قيمة ذات صلة ← اسأل سؤالًا واحدًا ضروريًا فقط إذا لزم**. وممنوع نمط: سؤال ← سؤال ← سؤال.",
+    // Founder review: «7 branches + same HIS environment are more commercially important than
+    // asking the HIS product name immediately.» Scope drives the price; the vendor name does not.
+    "ترتيب الأسئلة حين تحتاجها فعلًا — الأهم تجاريًا أولًا: (١) كم فرعًا يشمله التكامل؟ (٢) هل الفروع كلها على نفس بيئة الـHIS؟ هذان يحددان نطاق الربط والتسعير. اسم نظام الـHIS يأتي لاحقًا وعند الحاجة التقنية فقط — لا تفتح به.",
+    "بعد أن تعرف العدد والبيئة، اذكر ما يعنيه ذلك: بيئة موحّدة تعني ربطًا مركزيًا واحدًا يخدم الفروع كلها بدل تكامل مستقل لكل فرع.",
     "إذا سألك العميل «كيف نتكامل؟» فأعطِ المراحل الفعلية بوضوح — مراجعة الرحلة الحالية في الـHIS، ثم الربط والاختبار على بيئة الاختبار، ثم التفعيل على الإنتاج — لا جملة عامة مثل «نربط النظام».",
     "لا تكرّر ما تعرفه في كل رسالة. إذا ذكر العميل عدد الفروع أو بيئة الـHIS مرة واحدة فهي معلومة محفوظة: ابنِ عليها ولا تُعِد سردها.",
     "لا تعرض موعدًا أو مكالمة قبل أن تعطي قيمة تستحقها. ولا تسأل العميل أن يصمّم نموذجك التجاري (اشتراك سنوي أم رسوم تنفيذ) — هذا قرارنا لا قراره.",
@@ -500,7 +509,7 @@ export function systemPrompt(contact: Contact): string {
     // ---------------------------------------------------------------- 22. المعرفة التشغيلية
     "# ٢٢) المعرفة التشغيلية",
     "## الخدمات",
-    productBlock(),
+    productBlock(lockedProduct),
     "## مسارات بديلة",
     ...PIVOTS,
     ...(hubKb.length ? ["## المعرفة الرسمية المعتمدة (لها الأولوية عند أي تعارض)", ...hubKb.map((h) => h.md.slice(0, 6000))] : []),

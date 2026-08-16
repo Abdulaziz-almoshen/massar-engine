@@ -135,3 +135,33 @@ for (const [label, p] of [["known", known], ["cold", cold]]) {
 }
 if (f5) { console.log(`\n${f5} FAILURES (founder review)`); process.exit(1); }
 console.log("founder-review rules: green");
+
+// --- price cannot cross products; scope questions come first -----------------
+// The prompt-level lock stopped the wrong FILE but left every other product's PRICING in context.
+// A model cannot quote a price it was never given, so the knowledge block is narrowed too.
+process.env.ACCOUNTS_JSON = "[]";
+const nvrConvo = {
+  phone: "966500000777", tags: [], statusTimes: {},
+  optedOut: false, human: false, test: true, agentTurns: 0,
+  transcript: [
+    { role: "agent", text: "بخصوص سجل التطعيمات الوطني", ts: 1 },
+    { role: "customer", text: "تفاصيل التكامل", ts: 2 },
+  ],
+};
+const locked = systemPrompt(nvrConvo);
+let f6 = 0;
+const c6 = (n, cond) => { if (!cond) f6++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+c6("locked convo names its product", locked.includes("هذه المحادثة عن «خدمات التطعيمات»"));
+// THE regression: Sick Leave's 18,000 / 95,000 must not be in context at all.
+c6("Sick Leave pricing is absent from a locked NVR prompt", !locked.includes("95,000") && !locked.includes("18,000"));
+c6("Sick Leave features are absent too", !locked.includes("يقلّل زمن إصدار الإجازة"));
+c6("the locked product's own knowledge IS present", locked.includes("خدمات التطعيمات"));
+// NEGATIVE CONTROL — with no lock, the full catalogue must still be available.
+c6("unlocked prompt still carries the full catalogue (control)", cold.includes("95,000") && cold.includes("فحص الموظفين"));
+// Question order.
+for (const [label, p] of [["known", known], ["cold", cold]]) {
+  c6(`${label}: branches asked before the HIS vendor name`, p.includes("اسم نظام الـHIS يأتي لاحقًا"));
+  c6(`${label}: shared environment → central integration is explained`, p.includes("ربطًا مركزيًا واحدًا"));
+}
+if (f6) { console.log(`\n${f6} FAILURES (price scoping / question order)`); process.exit(1); }
+console.log("price scoping + question order: green");
