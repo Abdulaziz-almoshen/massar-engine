@@ -201,17 +201,26 @@ export type InteractionRead = {
  * FAILS CLOSED. An unreadable timestamp returns a window that admits nothing, because the failure
  * we are preventing is crediting history to an event that did not produce it.
  */
+/** WhatsApp's own customer-service window. Using the platform's boundary means the scope can be
+ *  explained to a customer in one sentence, instead of being a number we chose. Klaviyo uses the
+ *  same 24h for SMS, for the same reason. */
+export const CAMPAIGN_WINDOW_MS = 24 * 3600e3;
+
 export function campaignWindow(rawCreatedAt: unknown): { from: number; to: number } {
   const CLOSED = { from: Infinity, to: Infinity };
+  // The window CLOSES. It used to return `to: Infinity`, which meant an older campaign's window
+  // stayed open forever and silently credited every later reply — the same "newest/oldest campaign
+  // steals the reply" defect the founder reported, surviving in the fix meant to end it.
+  const open = (from: number) => ({ from, to: from + CAMPAIGN_WINDOW_MS });
   if (rawCreatedAt === undefined || rawCreatedAt === null || rawCreatedAt === "") return CLOSED;
   const asNum = Number(rawCreatedAt);
-  if (Number.isFinite(asNum) && asNum > 0) return { from: asNum, to: Infinity };
+  if (Number.isFinite(asNum) && asNum > 0) return open(asNum);
   const str = String(rawCreatedAt).trim();
   // Only an ISO-looking string may reach Date.parse. A bare "0" or "-1" parses to the year 2000
   // or earlier, which would open the window on all history through the fallback meant to close it.
   if (!/^\d{4}-\d{2}/.test(str) && !/\d{2}:\d{2}/.test(str)) return CLOSED;
   const parsed = Date.parse(str);
-  return parsed > 0 ? { from: parsed, to: Infinity } : CLOSED;
+  return parsed > 0 ? open(parsed) : CLOSED;
 }
 
 export function interactionRead(c: Contact, isButtonEcho: (t: string) => boolean, win?: { from: number; to: number }): InteractionRead {

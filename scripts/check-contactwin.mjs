@@ -31,7 +31,7 @@ c("numeric epoch parses", ins.campaignWindow(LAUNCH).from, LAUNCH);
 c("ISO parses", ins.campaignWindow(new Date(LAUNCH).toISOString()).from > 0, true);
 // FAIL CLOSED: these must admit NOTHING, never everything.
 for (const bad of [undefined, null, "", "not-a-date", "0", 0, "-1", -1, "  ", "1970-01", "0000-01"])
-  c(`unreadable ${JSON.stringify(bad)} fails closed`, ins.campaignWindow(bad), { from: Infinity, to: Infinity });
+  c(`unreadable ${JSON.stringify(bad)} fails closed`, ins.campaignWindow(bad), { from: null, to: null });
 
 // --- the read itself ---------------------------------------------------------
 const contact = {
@@ -97,3 +97,29 @@ c2("lifetime remains the default", !dash.includes("profileCampaign = cps[0].id")
 
 if (g) { console.log(`\n${g} FAILURES (provenance)`); process.exit(1); }
 console.log("campaign provenance: green");
+
+// --- the window must CLOSE (designer + BA both caught this) ------------------
+// `to: Infinity` meant an older campaign's window stayed open forever and credited every later
+// reply — the founder's own complaint surviving inside the fix meant to end it.
+let h = 0;
+const c3 = (n, cond) => { if (!cond) h++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+const w = ins.campaignWindow(String(LAUNCH));
+c3("the window closes, it is not Infinity", Number.isFinite(w.to));
+c3("it closes at WhatsApp's 24h service window", w.to === LAUNCH + 24 * 3600e3);
+c3("the constant is exported so both screens can agree", ins.CAMPAIGN_WINDOW_MS === 24 * 3600e3);
+
+// A reply 33h after launch belongs to NO campaign window — not to the one that launched first.
+const late = {
+  phone: "2", tags: [], statusTimes: {}, optedOut: false, human: false, test: true, agentTurns: 0,
+  transcript: [{ role: "customer", text: "مهتم", ts: LAUNCH + 33 * HOUR }],
+};
+c3("a reply 33h later is NOT credited to the launch", ins.interactionRead(late, () => false, w).voice === null);
+// …and one inside the window still is. Without this the guard proves nothing.
+const inside = {
+  phone: "3", tags: [], statusTimes: {}, optedOut: false, human: false, test: true, agentTurns: 0,
+  transcript: [{ role: "customer", text: "مهتم بالخدمة", ts: LAUNCH + 2 * HOUR }],
+};
+c3("a reply 2h later IS credited (control)", ins.interactionRead(inside, () => false, w).voice !== null);
+
+if (h) { console.log(`\n${h} FAILURES (window closure)`); process.exit(1); }
+console.log("window closure: green");
