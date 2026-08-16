@@ -117,3 +117,21 @@ for (const [label, p] of [["known", known], ["cold", cold]]) {
 c3("known: told to use account facts in speech", known.includes("لا تسأل عنه ولا تطلب تأكيده"));
 if (f3) { console.log(`\n${f3} FAILURES (single motion)`); process.exit(1); }
 console.log("single-motion guard: green");
+
+// --- founder review 2026-08-16: stop the interview, stop fake actions --------
+let f5 = 0;
+const c5 = (n, cond) => { if (!cond) f5++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+for (const [label, p] of [["known", known], ["cold", cold]]) {
+  c5(`${label}: answer → value → one question, question-stacking banned`,
+    p.includes("أجب ← أضف قيمة ذات صلة") && p.includes("وممنوع نمط: سؤال ← سؤال ← سؤال"));
+  c5(`${label}: a question must earn its place`, p.includes("قبل أن تسأل أي سؤال، تحقق"));
+  c5(`${label}: integration answer must name the real phases`, p.includes("بيئة الاختبار"));
+  c5(`${label}: must not re-recite known facts`, p.includes("لا تكرّر ما تعرفه في كل رسالة"));
+  c5(`${label}: no meeting before value is earned`, p.includes("لا تعرض موعدًا أو مكالمة قبل"));
+  c5(`${label}: customer must not design our commercial model`, p.includes("يصمّم نموذجك التجاري"));
+  c5(`${label}: price qualifier comes AFTER understanding`, p.includes("لا قبل ذلك"));
+  c5(`${label}: fake actions banned`, p.includes("ممنوع ادّعاء أفعال لم تحدث"));
+  c5(`${label}: product lock section present`, p.includes("قفل المنتج"));
+}
+if (f5) { console.log(`\n${f5} FAILURES (founder review)`); process.exit(1); }
+console.log("founder-review rules: green");

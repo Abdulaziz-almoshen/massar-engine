@@ -7,6 +7,7 @@ import type { Contact } from "./tracker.js";
 import { SANDBOX_ACTIVATION_RE, SERVICE_CATALOGUE } from "./insights.js";
 import * as templates from "./templates.js";
 import * as accounts from "./accounts.js";
+import * as productlock from "./productlock.js";
 
 // ---------------------------------------------------------------------------
 // The Arabic AI salesperson — full-capability edition.
@@ -290,6 +291,7 @@ export function systemPrompt(contact: Contact): string {
     : !knowsSize ? "اعرف حجم التشغيل: كم منشأة أو كم إصدارًا شهريًا تقريبًا."
     : "لديك ما يكفي — أوصِ بنموذج التكامل الأنسب واعرض الخطوة التجارية (عرض تعريفي أو جلسة تقنية).";
   const account = accounts.accountBlock(contact.phone);
+  const lockedProduct = productlock.activeProduct(contact);
   return [
     // ---------------------------------------------------------------- 0. الحساب
     // The expansion motion only exists when we actually know the account. When the registry has
@@ -392,6 +394,20 @@ export function systemPrompt(contact: Contact): string {
       : "",
     // Buttons: the model wrote «صباحًا أم بعد الظهر؟» as prose instead of two taps.
     "- قاعدة الأزرار: إذا كانت رسالتك تعرض خيارين أو ثلاثة — أوقاتًا، أو خدمتين، أو نعم/لا — فاستدعِ send_buttons ولا تكتب الخيارات نصًا. الزر يرفع الرد لأنه يلغي الكتابة، وكل عنوان كلمتان أو ثلاث بحد أقصى ٢٠ حرفًا.",
+    // The founder's three rules, 2026-08-16, after reading a real NVR transcript.
+    "# ٧ب) قفل المنتج — إلزامي",
+    lockedProduct
+      ? `هذه المحادثة عن «${lockedProduct}». استخدم معرفة هذا المنتج وحده: خصائصه، تسعيره، ملفه، أمثلته. ممنوع منعًا باتًا أن تستبدل منتجًا آخر لأن سير العمل متشابه، وممنوع إرسال ملف أو سعر لمنتج مختلف. لا يتغيّر هذا القفل إلا إذا غيّر العميل الموضوع صراحة. وإن لم تتوفر معرفة أو ملف لهذا المنتج تحديدًا، قل ذلك بصراحة ولا ترسل بديلًا.`
+      : "لم يتحدد منتج بعد. أول منتج يذكره العميل يصبح موضوع المحادثة، وتلتزم به بعد ذلك.",
+    "# ٧ج) لا تحوّل المحادثة إلى مقابلة",
+    "قبل أن تسأل أي سؤال، تحقق: هل الجواب لازم فعلًا للإجابة على العميل، أو لتحديد ملاءمة المنتج، أو لحساب النطاق والتسعير، أو لتحريك الصفقة؟ إن لم يكن كذلك، لا تسأله.",
+    "التسلسل المطلوب: **أجب ← أضف قيمة ذات صلة ← اسأل سؤالًا واحدًا ضروريًا فقط إذا لزم**. وممنوع نمط: سؤال ← سؤال ← سؤال.",
+    "إذا سألك العميل «كيف نتكامل؟» فأعطِ المراحل الفعلية بوضوح — مراجعة الرحلة الحالية في الـHIS، ثم الربط والاختبار على بيئة الاختبار، ثم التفعيل على الإنتاج — لا جملة عامة مثل «نربط النظام».",
+    "لا تكرّر ما تعرفه في كل رسالة. إذا ذكر العميل عدد الفروع أو بيئة الـHIS مرة واحدة فهي معلومة محفوظة: ابنِ عليها ولا تُعِد سردها.",
+    "لا تعرض موعدًا أو مكالمة قبل أن تعطي قيمة تستحقها. ولا تسأل العميل أن يصمّم نموذجك التجاري (اشتراك سنوي أم رسوم تنفيذ) — هذا قرارنا لا قراره.",
+    "سؤال التأهيل التجاري («إذا اتفقنا على السعر، هل يوقفكم شيء آخر؟») يأتي بعد أن يفهم العميل الحل ويصل النقاش للسعر — لا قبل ذلك.",
+    "# ٧د) ممنوع ادّعاء أفعال لم تحدث",
+    "لا تقل «أشعرت المختص» أو «بدأت التنسيق» أو «الفريق يراجع» أو «حجزت الموعد» أو «أكملنا المراجعة التجارية» إلا إذا نجحت الأداة المقابلة فعلًا في هذه الرسالة نفسها. إن لم توجد أداة، صف ما *يمكن* أن يحدث تاليًا، لا ما حدث.",
     "# ٨) الاكتشاف — بشرط واحد",
     "لا تسأل سؤالًا إلا إذا كان جوابه سيغيّر فعلًا واحدًا من: نطاق الربط · ملاءمة المنتج · السعر · التنفيذ · التفاوض · الخطوة التالية. سؤال لا يغيّر أيًّا منها هو استجواب، ولا يُطرح.",
     "اسأل عن معلومة واحدة مهمة في كل رسالة. وإذا أصبح العميل جاهزًا لخطوة تجارية قبل اكتمال الصورة، انتقل للخطوة ولا تؤخره بأسئلة إضافية.",
@@ -738,7 +754,21 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
     case "send_asset": {
       const key = String(args.asset_id ?? args.product ?? "").trim();
       const cap = String(args.caption ?? "").slice(0, 500);
-      const pa = productAssets.find((x) => x.product === key || x.product.includes(key));
+      // EXACT match first. `includes(key)` alone is how «سجل التطعيمات الوطني» resolved to the
+      // Sick Leave file: any short or odd key the model passed could substring-hit the wrong
+      // product. Substring is kept only as a fallback, and the product lock below is the real wall.
+      const pa = productAssets.find((x) => x.product === key)
+        ?? productAssets.find((x) => productlock.productOf(key) && x.product === productlock.productOf(key))
+        ?? productAssets.find((x) => x.product.includes(key));
+      // PRODUCT LOCK. The founder's review: an NVR conversation received Sick Leave material.
+      // Once the customer has established a product, nothing for a different product goes out.
+      if (pa) {
+        const wrong = productlock.blockedProduct(contact, pa.product);
+        if (wrong) {
+          console.log(JSON.stringify({ at: "agent", msg: "product lock blocked an asset", phone: contact.phone, asked: key, resolved: pa.product, active: wrong }));
+          return `محظور: هذه المحادثة عن «${wrong}» وهذا الملف يخص «${pa.product}». لا ترسل ملف منتج آخر. أجب عن «${wrong}» من المعرفة المعتمدة، وإن لم يتوفر ملف لها فقل ذلك صراحة دون إرسال بديل.`;
+        }
+      }
       // Never send the same asset twice. The founder tapped «الملف التعريفي» after already
       // receiving it and got the identical PDF back with a slightly reworded question — the agent
       // had no idea it had already delivered. The prompt now says so too, but a rule that matters

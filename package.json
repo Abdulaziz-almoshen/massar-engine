@@ -15,10 +15,11 @@
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
     "check:buttons": "npm run build && node scripts/check-buttons.mjs",
-    "check": "npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae",
+    "check": "npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock",
     "check:optout": "npm run build && node scripts/check-optout.mjs",
     "check:campaigns": "npm run build && node scripts/check-campaign-scope.mjs",
-    "check:ae": "npm run build && node scripts/check-ae-prompt.mjs"
+    "check:ae": "npm run build && node scripts/check-ae-prompt.mjs",
+    "check:productlock": "npm run build && node scripts/check-productlock.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",
