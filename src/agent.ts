@@ -299,25 +299,6 @@ export function systemPrompt(contact: Contact): string {
   const agentSaid = since.filter((t) => t.role === "agent").map((t) => t.text).join(" · ");
   const askedType = /(منشأة صحية|مزوّد نظام|مزود نظام|أي وصف يناسبكم|نوع الجهة)/.test(agentSaid);
   const askedSystem = /(نظام HIS|هل تستخدمون|النظام القائم|HIS أو ERP)/i.test(agentSaid);
-  // THE PRICE DIRECTIVE — computed in code, not hoped for from the prompt.
-  //
-  // Across five Codex-judged iterations the price scenario scored 0 every single time, including
-  // the round where the exact sentence («باقة المؤسسات حتى ١٠ فروع سعرها ٩٥,٠٠٠ ريال سنويًا») was
-  // written verbatim into the prompt. Rules and worked examples both failed; the model kept
-  // answering a price question with an offer of paths. So the price stops being an instruction the
-  // model may follow and becomes a fact injected into THIS turn, the same way nextObjective already
-  // works. A number the customer is entitled to is not a judgement call.
-  //
-  // Only fires when the price is REAL — a figure printed in the product table for the locked
-  // product. Everything else keeps the honest "scope determines it" path, so this can never invent.
-  const lockedProductEarly = productlock.activeProduct(contact);
-  const priced = lockedProductEarly ? PRODUCTS.find((p) => p.name === lockedProductEarly) : undefined;
-  const hasRealPrice = !!priced && /[\d٠-٩]/.test(priced.pricing);
-  const priceDirective = wantsCommercial && hasRealPrice
-    ? `- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري و«${priced!.name}» لها سعر معتمد منشور. اذكره حرفيًا في أول سطرين: «${priced!.pricing}». ثم اربطه بما يتغيّر تشغيليًا عندهم. ممنوع «حسب النطاق» وممنوع تأجيله لعرض لاحق وممنوع استبداله بعرض مسارات.`
-    : wantsCommercial
-      ? "- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري ولا يوجد سعر منشور لهذه الخدمة. قل ذلك صراحة، وسمِّ ما يحدد السعر — عدد الفروع، بيئة الـHIS، ومتطلبات التنفيذ — واطلب الناقص منها وحده. ممنوع الاكتفاء بعرض مسارين."
-      : "";
   const nextObjective =
     wantsCommercial
       ? "طلب العميل الجانب التجاري — وهذه إشارة شراء، لا حالة دعم. ممنوع منعًا باتًا أن تنتهي هذه الرسالة عند «تم إشعار المختص» أو ما يشبهها؛ رسالة تُحيل ولا تسأل شيئًا هي نهاية مسدودة. الترتيب الإلزامي: (١) أعطِ السعر إن كان مذكورًا نصًا لنطاقهم، وإن كان نطاقهم خارج المذكور فقل بوضوح إن الرقم النهائي يُبنى على نطاق الربط وعدد الفروع — دون اختراع رقم. (٢) اربطه بما يتغيّر تشغيليًا عندهم. (٣) اختم دائمًا بسؤال التأهيل التجاري: «إذا وصلنا لاتفاق مناسب على السعر، هل فيه أي شيء ثاني ممكن يوقف البدء بالتكامل؟» — هذا السؤال يحوّل طلب السعر إلى التزام مشروط، وهو الهدف."
@@ -330,6 +311,33 @@ export function systemPrompt(contact: Contact): string {
     : !knowsService ? "اعرف أي خدمة تهمهم: سجل التطعيمات، الإجازات المرضية، أو كلاهما. اسأل هذا بأزرار."
     : !knowsSize ? "اعرف حجم التشغيل: كم منشأة أو كم إصدارًا شهريًا تقريبًا."
     : "لديك ما يكفي — أوصِ بنموذج التكامل الأنسب واعرض الخطوة التجارية (عرض تعريفي أو جلسة تقنية).";
+  // THE PRICE DIRECTIVE — computed in code, not hoped for from the prompt.
+  //
+  // Across five Codex-judged iterations the price scenario scored 0 every single time, including
+  // the round where the exact sentence («باقة المؤسسات حتى ١٠ فروع سعرها ٩٥,٠٠٠ ريال سنويًا») was
+  // written verbatim into the prompt. Rules and worked examples both failed; the model kept
+  // answering a price question with an offer of paths. So the price stops being an instruction the
+  // model may follow and becomes a fact injected into THIS turn, the same way nextObjective already
+  // works. A number the customer is entitled to is not a judgement call.
+  //
+  // Only fires when the price is REAL — a figure printed in the product table for the locked
+  // product. Everything else keeps the honest "scope determines it" path, so this can never invent.
+  // Resolved from the transcript directly rather than via productlock, because
+  // scripts/check-buttons.mjs evaluates this slice in isolation where module imports do not exist.
+  // Same rule as productOf: the customer's own words win, newest first.
+  const lockedProductEarly = [...(contact.transcript || [])].reverse()
+    .filter((t) => t.role === "customer")
+    .map((t) => PRODUCTS.find((p) => t.text.includes(p.name))?.name
+      ?? (/\bNVR\b|السجل\s*الوطني|تطعيم/i.test(t.text) ? "خدمات التطعيمات" : undefined))
+    .find(Boolean);
+  const priced = lockedProductEarly ? PRODUCTS.find((p) => p.name === lockedProductEarly) : undefined;
+  // No `!` assertions here: scripts/check-buttons.mjs slices this source and evaluates it as
+  // plain JS, where a TS non-null assertion is a syntax error. Narrow with the guard instead.
+  const priceDirective = wantsCommercial && priced && /[\d٠-٩]/.test(priced.pricing)
+    ? `- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري و«${priced.name}» لها سعر معتمد منشور. اذكره حرفيًا في أول سطرين: «${priced.pricing}». ثم اربطه بما يتغيّر تشغيليًا عندهم. ممنوع «حسب النطاق» وممنوع تأجيله لعرض لاحق وممنوع استبداله بعرض مسارات.`
+    : wantsCommercial
+      ? "- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري ولا يوجد سعر منشور لهذه الخدمة. قل ذلك صراحة، وسمِّ ما يحدد السعر — عدد الفروع، بيئة الـHIS، ومتطلبات التنفيذ — واطلب الناقص منها وحده. ممنوع الاكتفاء بعرض مسارين."
+      : "";
   const account = accounts.accountBlock(contact.phone);
   const lockedProduct = productlock.activeProduct(contact);
   return [
