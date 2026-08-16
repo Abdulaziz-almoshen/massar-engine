@@ -429,6 +429,18 @@ export function systemPrompt(contact: Contact): string {
       ? `- تنبيه: العميل أرسل ${inbound} رسائل ولم تُسجَّل إشارة اهتمام ولا خطوة عملية بعد. لا تطرح سؤال اكتشاف جديدًا — اعرض في هذه الرسالة خطوة من سلّم الالتزام.`
       : "",
     "",
+    // ================================================================
+    // THE JOB, re-framed by the founder: the agent is a SORTER, not a closer. The salesperson wins
+    // the deal; the agent answers the real question and lands the contact in an honest row.
+    // ================================================================
+    "# ٦أ) مهمتك — اقرأها قبل أي شيء",
+    "أنت لا تُغلق الصفقة. المختص يغلقها. مهمتك ثلاث حركات فقط: **أجب ← اطلب موعدًا ← اقبل الرفض**.",
+    "١) أجب عن سؤال العميل الفعلي بمعلومة حقيقية — السعر المعتمد إن وُجد، أو مراحل التنفيذ، أو الأثر التشغيلي. جملة أو جملتان، بلا تأهيل قبلها.",
+    "٢) بعد أن تُجيب، اطلب وقتًا كما يطلبه إنسان: «أقدر أرتب لك مكالمة قصيرة مع المختص — متى يناسبكم؟» واعرض وقتين محددين بأزرار متى أمكن. وفور أن يذكر العميل وقتًا بكلماته — «صباحًا»، «بكرة الصبح»، «الأحد» — استدعِ record_schedule بنص كلامه حرفيًا. هذا هو الناتج الأهم من المحادثة كلها.",
+    "٣) إذا قال إنه غير مهتم: اشكره بجملة واحدة، واسأل سؤال إذن واحدًا فقط — «تسمحون نتواصل معكم لاحقًا إذا كان فيه عرض مناسب؟» — ثم استدعِ mark_not_interested وتوقف. ممنوع عرض بديل، وممنوع سؤال «ليش»، وممنوع رسالة ثانية بعدها.",
+    "لا تسجّل موعدًا اقترحته أنت ولم يؤكده العميل. ولا تسجّل اهتمامًا لم يقله بنفسه. ما لم يقله العميل ليس حقيقة.",
+    "وإذا كان السؤال خارج معرفتك أو يحتاج تفاوضًا، أجب بما تعرفه ثم استدعِ request_human_handoff — الإحالة بعد إجابة، لا بدلًا منها.",
+    "",
     "# ٧) القاعدة الذهبية",
     "استخدم: **أجب ← قيمة ← خطوة تالية**. وليس: سؤال ← سؤال ← سؤال ← سؤال.",
     "ليست كل رسالة من العميل تستوجب سؤالًا في النهاية. أحيانًا أفضل رد بيعي هو إجابة قوية فقط.",
@@ -620,8 +632,19 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "record_schedule",
+      description: "سجّل موعدًا ذكره العميل بنفسه لمكالمة أو اجتماع. استخدمه فور أن يذكر وقتًا («صباحًا»، «بكرة الصبح»، «الأحد الساعة ١١»). لا تستخدمه لوقت اقترحته أنت ولم يؤكده.",
+      parameters: { type: "object", properties: { when_text: { type: "string", description: "كلمات العميل الحرفية التي ذكر فيها الوقت" } }, required: ["when_text"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "mark_not_interested",
-      description: "سجّل عدم الاهتمام النهائي بعد عرض بديلين كحد أقصى.",
+      // The two-alternatives precondition is GONE. The code required the agent to push a pair of
+      // substitutes before it
+      // could accept a refusal — forcing exactly what the founder said never to force.
+      description: "سجّل أن العميل لا يرغب في التواصل، فور أن يقولها. لا تعرض بديلًا قبلها ولا تسأل عن السبب.",
       parameters: {
         type: "object",
         properties: { reason: { type: "string", enum: ["price", "no_need", "competitor", "timing", "other"] } },
@@ -703,13 +726,21 @@ export async function composeOpener(product: string, audience: string, angle: st
 const LEAD_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const lastLeadAlert = new Map<string, number>();   // in-memory: worst case one duplicate after a restart
 
-async function notifyLead(contact: Contact, kind: "hot" | "handoff", product: string, detail: string): Promise<void> {
+async function notifyLead(contact: Contact, kind: "hot" | "handoff" | "scheduled", product: string, detail: string): Promise<void> {
   if (!cfg.notifyNumber || contact.phone === cfg.notifyNumber) return;
-  const prev = lastLeadAlert.get(contact.phone) ?? 0;
-  if (Date.now() - prev < LEAD_ALERT_COOLDOWN_MS) return;
-  lastLeadAlert.set(contact.phone, Date.now());
+  // PER KIND, not per phone. One shared 6h cooldown meant a hot tag at 10:00 silently swallowed
+  // the handoff alert at 10:12 — and under the sorter frame that alert IS the product: if it does
+  // not fire, nobody calls the customer who said yes. A handoff and a schedule are distinct events
+  // about the same person and each deserves its own notification.
+  const key = `${contact.phone}:${kind}`;
+  const prev = lastLeadAlert.get(key) ?? 0;
+  // A booked time is never suppressed. It is the outcome the founder asked for, it happens once,
+  // and a duplicate alert costs a glance while a missed one costs the meeting.
+  if (kind !== "scheduled" && Date.now() - prev < LEAD_ALERT_COOLDOWN_MS) return;
+  lastLeadAlert.set(key, Date.now());
   const lastCustomerLine = [...contact.transcript].reverse().find((t) => t.role === "customer")?.text ?? "";
-  const title = kind === "hot" ? "فرصة مؤهلة تتطلب المتابعة" : "طلب التواصل مع مختص المبيعات";
+  const title = kind === "scheduled" ? "موعد محدد — يحتاج اتصالًا"
+    : kind === "hot" ? "فرصة مؤهلة تتطلب المتابعة" : "طلب التواصل مع مختص المبيعات";
   const card = [
     title,
     `العميل: ${contact.waName || "غير معروف"} — ‎+${contact.phone}`,
@@ -723,7 +754,7 @@ async function notifyLead(contact: Contact, kind: "hot" | "handoff", product: st
     db.insertEvent(contact.phone, "lead_alert", `${kind}:${product}`, Date.now());
     console.log(JSON.stringify({ at: "agent", msg: "lead alert sent", phone: contact.phone, kind, product }));
   } catch (e) {
-    lastLeadAlert.delete(contact.phone);   // failed send shouldn't consume the cooldown
+    lastLeadAlert.delete(key);   // failed send shouldn't consume the cooldown
     console.error(JSON.stringify({ at: "agent", msg: "lead alert failed", err: String(e).slice(0, 150) }));
   }
 }
@@ -844,9 +875,40 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
     case "offer_alternative":
       tracker.recordSystem(contact.phone, `cross-sell offered: ${args.product}`);
       return "سُجّل البديل. قدّمه بقيمة تشغيلية تختلف عن الخدمة السابقة.";
-    case "mark_not_interested":
-      tracker.setOutcome(contact.phone, "not_interested", String(args.reason ?? "other"));
-      return "سُجّل عدم الاهتمام. اختم بعبارة مهنية تتيح التنسيق مستقبلًا.";
+    case "record_schedule": {
+      // THE MISSING OUTCOME. Two of the four real conversations already contained a customer-stated
+      // time («صباح», «صباحًا») and the system recorded neither, because nothing could.
+      //
+      // The customer's WORDS are stored verbatim and are the fact. `scheduledAt` is only what we
+      // read them as, kept advisory: it is never shown as if the customer said it and never used
+      // to send anything. A parsed datetime is a guess, and guesses about a buyer's calendar are
+      // exactly the invented state this project keeps catching.
+      const said = String(args.when_text ?? "").trim().slice(0, 200);
+      if (!said) return "لم تذكر وقتًا. لا تسجّل موعدًا لم يقله العميل.";
+      const c2 = tracker.findContact(contact.phone);
+      const inTranscript = (c2?.transcript || []).some((x) => x.role === "customer" && x.text.includes(said.slice(0, 12)));
+      if (!inTranscript) {
+        // Refuses a time the AGENT proposed and the customer never confirmed.
+        return `لم يقل العميل «${said}» بنفسه. لا تسجّل موعدًا من اقتراحك — اسأله متى يناسبه واستخدم كلماته.`;
+      }
+      tracker.setSchedule(contact.phone, said);
+      // The salesperson must learn about a booked time immediately — this alert is the product.
+      void notifyLead(contact, "scheduled", (contact.tags || [])[0]?.product ?? "غير محدد", said);
+      return "سُجّل الموعد بكلمات العميل. أكّد له الموعد في سطر واحد واذكر أن المختص سيتواصل، ولا تسأل سؤالًا آخر.";
+    }
+    case "mark_not_interested": {
+      // STOPPED, not "not_interested". The founder's rule: «we're not contacting anymore» — one
+      // clean state, visible on the portal, and the agent stops. No split between marketing-stop
+      // and opt-out: a person who says don't contact me has said don't contact me.
+      //
+      // The reason is the CUSTOMER'S OWN WORDS when they gave them, never a model-chosen enum.
+      // «ضغط زر: لا» was written into a real ledger as a reason nobody said (round-26), and a
+      // classification is an opinion that outlives the conversation. Store the sentence.
+      const volunteered = [...(contact.transcript || [])].reverse()
+        .find((t) => t.role === "customer")?.text?.slice(0, 300);
+      tracker.setOutcome(contact.phone, "stopped", volunteered || "");
+      return "سُجّل أنه لا يرغب في التواصل، وتوقف الإرسال. اشكره بجملة واحدة واختم — ممنوع عرض بديل، وممنوع سؤال عن السبب.";
+    }
     case "request_human_handoff": {
       const why = String(args.reason ?? "");
       tracker.setOutcome(contact.phone, "handoff", why);
@@ -854,9 +916,20 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       void notifyLead(contact, "handoff", hotTag?.product ?? "غير محدد", why);
       return "أُشعر مختص المبيعات. أبلغ ممثل المنشأة بأن الفريق سيتواصل معه لاستكمال المتطلبات.";
     }
-    case "close_conversation":
-      tracker.setOutcome(contact.phone, (args.outcome === "later" ? "later" : args.outcome === "interested" ? "interested" : "closed"));
-      return "اختم برسالة موجزة تترك باب التنسيق مفتوحًا.";
+    case "close_conversation": {
+      // A recorded "no" used to be SILENTLY COERCED to "closed" here — the ternary had no branch
+      // for not_interested — so the founder's «who is not interested» column was already lossy
+      // before any of the sorter work. Every outcome the model may close with is now honoured.
+      const asked = String(args.outcome ?? "");
+      const outcome = asked === "later" ? "later"
+        : asked === "interested" ? "interested"
+        : asked === "not_interested" ? "stopped"
+        : "closed";
+      tracker.setOutcome(contact.phone, outcome, outcome === "stopped" ? String(args.reason ?? "") : undefined);
+      return outcome === "stopped"
+        ? "سُجّل أنه لا يرغب في التواصل. اشكره بجملة واحدة وتوقف — لا عرض جديد ولا سؤال."
+        : "اختم برسالة موجزة تترك باب التنسيق مفتوحًا.";
+    }
     default:
       return "الأداة المطلوبة غير معروفة.";
   }

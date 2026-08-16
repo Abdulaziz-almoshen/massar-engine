@@ -21,8 +21,19 @@ export type Contact = {
   lastError?: string;
   transcript: Turn[];
   tags: Tag[];
-  outcome?: "interested" | "not_interested" | "later" | "handoff" | "opted_out" | "closed";
+  outcome?: "interested" | "not_interested" | "later" | "handoff" | "opted_out" | "closed" | "scheduled" | "stopped";
   outcomeReason?: string;
+  /** The customer's OWN words naming a time — «صباحًا», «بكرة الصبح», «الأحد الساعة ١١».
+   *  Stored verbatim and never normalised: two of the four real conversations already contained a
+   *  stated time that nothing recorded, because there was nowhere to put it. A parsed datetime is
+   *  a guess; the sentence is a fact, and a human confirms the guess. */
+  scheduledSaid?: string;
+  /** What we READ that phrase as, epoch ms, Asia/Riyadh. Advisory only — never shown as if the
+   *  customer said it, and never used to send anything. */
+  scheduledAt?: number;
+  /** Which customer turn produced the outcome. Without it an outcome is an assertion with no
+   *  source, which is the invented-state failure this project keeps catching. */
+  outcomeEvidence?: string;
   optedOut: boolean;
   human: boolean;        // true → human took over, agent stays silent
   test: boolean;         // sandbox/demo traffic — excluded from real campaign views
@@ -140,6 +151,42 @@ export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: 
   logEvent(`outcome:${outcome}`, phone, reason ?? "");
 }
 
+/**
+ * Record a time the CUSTOMER stated, in their own words.
+ *
+ * `said` is the fact and is stored verbatim. `scheduledAt` is only what we read it as — advisory,
+ * for sorting a morning list, never displayed as the customer's words and never used to send.
+ * An unreadable phrase leaves scheduledAt undefined rather than guessing a datetime: a wrong
+ * meeting time is worse than an unparsed one, because a human will act on it.
+ */
+export function setSchedule(phone: string, said: string) {
+  const c = getContact(phone);
+  c.scheduledSaid = said;
+  c.scheduledAt = readTime(said);
+  c.outcome = "scheduled";
+  c.outcomeEvidence = said;
+  persist(c);
+  bump("outcome:scheduled");
+  logEvent("outcome:scheduled", phone, said);
+}
+
+/** Best-effort reading of an Arabic time phrase → epoch ms, Asia/Riyadh. Returns undefined when
+ *  it cannot be read with confidence. Deliberately small: it covers the phrases that actually
+ *  appear in this ledger and refuses everything else rather than inventing a slot. */
+function readTime(said: string, now = Date.now()): number | undefined {
+  const s = said.trim();
+  const RIYADH_OFFSET = 3 * 3600e3;
+  const dayMs = 24 * 3600e3;
+  const morning = /صباح/.test(s);
+  const evening = /مساء|بعد\s*الظهر|العصر/.test(s);
+  if (!morning && !evening) return undefined;      // no part-of-day → do not guess a date
+  const tomorrow = /بكرة|بكره|غدًا|غدا/.test(s);
+  const base = new Date(now + RIYADH_OFFSET + (tomorrow ? dayMs : 0));
+  base.setUTCHours(morning ? 9 : 15, 0, 0, 0);
+  const at = base.getTime() - RIYADH_OFFSET;
+  return at > now ? at : at + dayMs;               // never schedule into the past
+}
+
 export function setHuman(phone: string, human: boolean) {
   const c = getContact(phone);
   c.human = human;
@@ -189,6 +236,9 @@ export async function hydrate(): Promise<number> {
       tags: [],
       outcome: (r.outcome as Contact["outcome"]) ?? undefined,
       outcomeReason: r.outcome_reason ?? undefined,
+      scheduledSaid: r.scheduled_said ?? undefined,
+      scheduledAt: r.scheduled_at != null ? Number(r.scheduled_at) : undefined,
+      outcomeEvidence: r.outcome_evidence ?? undefined,
       optedOut: Boolean(r.opted_out),
       human: Boolean(r.human),
       test: Boolean(r.test) || testNumbers.has(r.phone),

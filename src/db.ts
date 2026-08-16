@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS entities (
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
+-- The founder's primary outcome had nowhere to live: two of four real conversations already
+-- contained a customer-stated time («صباح», «صباحًا») and the system recorded neither.
+-- scheduled_said holds the customer's VERBATIM words; scheduled_at is only what we read them as.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS scheduled_said TEXT;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS scheduled_at BIGINT;
+-- Which customer turn justifies the outcome. An outcome with no quotable source is an assertion.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS outcome_evidence TEXT;
 CREATE TABLE IF NOT EXISTS contact_insights (
   phone       TEXT PRIMARY KEY,
   data        JSONB NOT NULL,
@@ -136,10 +143,11 @@ export function upsertContact(c: {
   phone: string; waName?: string; firstSeenAt: number; lastEventAt: number;
   statusTimes: Record<string, number>; outcome?: string; outcomeReason?: string;
   optedOut: boolean; human: boolean; test?: boolean; agentTurns: number; lastError?: string;
+  scheduledSaid?: string; scheduledAt?: number; outcomeEvidence?: string;
 }): void {
   fire(
-    `INSERT INTO contacts (phone, wa_name, first_seen_at, last_event_at, status_times, outcome, outcome_reason, opted_out, human, test, agent_turns, last_error)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+    `INSERT INTO contacts (phone, wa_name, first_seen_at, last_event_at, status_times, outcome, outcome_reason, opted_out, human, test, agent_turns, last_error, scheduled_said, scheduled_at, outcome_evidence)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
      ON CONFLICT (phone) DO UPDATE SET
        wa_name = COALESCE(EXCLUDED.wa_name, contacts.wa_name),
        last_event_at = EXCLUDED.last_event_at,
@@ -150,9 +158,15 @@ export function upsertContact(c: {
        human = EXCLUDED.human,
        test = EXCLUDED.test,
        agent_turns = EXCLUDED.agent_turns,
-       last_error = EXCLUDED.last_error`,
+       last_error = EXCLUDED.last_error,
+       -- COALESCE, not overwrite: a stated time and its evidence are facts the customer produced
+       -- once. A later turn that carries neither must not erase them.
+       scheduled_said = COALESCE(EXCLUDED.scheduled_said, contacts.scheduled_said),
+       scheduled_at = COALESCE(EXCLUDED.scheduled_at, contacts.scheduled_at),
+       outcome_evidence = COALESCE(EXCLUDED.outcome_evidence, contacts.outcome_evidence)`,
     [c.phone, c.waName ?? null, c.firstSeenAt, c.lastEventAt, JSON.stringify(c.statusTimes),
-     c.outcome ?? null, c.outcomeReason ?? null, c.optedOut, c.human, Boolean(c.test), c.agentTurns, c.lastError ?? null],
+     c.outcome ?? null, c.outcomeReason ?? null, c.optedOut, c.human, Boolean(c.test), c.agentTurns, c.lastError ?? null,
+     c.scheduledSaid ?? null, c.scheduledAt ?? null, c.outcomeEvidence ?? null],
   );
 }
 
@@ -195,6 +209,7 @@ export type HydratedContact = {
   phone: string; wa_name: string | null; first_seen_at: string; last_event_at: string;
   status_times: Record<string, number>; outcome: string | null; outcome_reason: string | null;
   opted_out: boolean; human: boolean; test?: boolean; agent_turns: number; last_error: string | null;
+  scheduled_said?: string | null; scheduled_at?: string | number | null; outcome_evidence?: string | null;
 };
 
 /** Load everything needed to rebuild the in-memory tracker at boot. */
