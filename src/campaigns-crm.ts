@@ -487,7 +487,6 @@ function vKmonDetailCrm(id, d) {
 /* The existing contactRowsHtml owns the row's visual language and its status/interest logic. We keep
    it as the single source and only prepend the selection cell, rather than forking that markup. */
 function crmTargetRows(shown, cwin) {
-  var inner = contactRowsHtml(shown, cwin);
   var out = '<div>';
   shown.forEach(function (r) {
     var on = !!crmSelD[r.phone];
@@ -565,25 +564,44 @@ window.crmTogglePageD = function () {
 };
 /* Reclassify each selected campaign through the SAME endpoint the single-row button uses. Partial
    failure is reported with its count rather than swallowed. NO SEND PATH EXISTS HERE. */
+var crmBulkBusy = false;
 window.crmBulkClass = async function (test) {
+  /* Re-entrancy guard: the bar stays on screen while the requests run, and a second click would
+     otherwise fire an overlapping batch against the same ids. */
+  if (crmBulkBusy) return;
   var ids = crmSelIds().map(Number);
   var targets = ids.filter(function (id) {
     var c = campaigns.find(function (x) { return Number(x.id) === id; });
     return c && campIsTest(c) !== Boolean(test);
   });
   if (!targets.length) return;
-  var ok = 0, fail = 0;
-  for (var i = 0; i < targets.length; i++) {
-    try {
-      var r = await fetch("/admin/campaign/test", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-admin-token": TOKEN },
-        body: JSON.stringify({ id: targets[i], test: Boolean(test) })
-      });
-      if (r.ok) { ok++; var cp = campaigns.find(function (x) { return Number(x.id) === targets[i]; }); if (cp) cp.test = Boolean(test); }
-      else fail++;
-    } catch (e) { fail++; }
+  crmBulkBusy = true;
+  var ok = 0, fail = 0, next = 0;
+  /* Bounded concurrency rather than one-at-a-time: 400 selected campaigns was 400 sequential
+     round-trips with the operator staring at a frozen bar. Bounded rather than unbounded so a
+     large selection cannot open 400 sockets at once against our own admin endpoint. */
+  var LANES = 4;
+  async function lane() {
+    while (next < targets.length) {
+      var id = targets[next++];
+      try {
+        var r = await fetch("/admin/campaign/test", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-admin-token": TOKEN },
+          body: JSON.stringify({ id: id, test: Boolean(test) })
+        });
+        if (r.ok) {
+          ok++;
+          var cp = campaigns.find(function (x) { return Number(x.id) === id; });
+          if (cp) cp.test = Boolean(test);   /* only on a confirmed write */
+        } else fail++;
+      } catch (e) { fail++; }
+    }
   }
+  var lanes = [];
+  for (var i = 0; i < Math.min(LANES, targets.length); i++) lanes.push(lane());
+  await Promise.all(lanes);
+  crmBulkBusy = false;
   crmSel = {};
   render(false);
   alertBar(fail ? "غُيّر تصنيف " + fmtN(ok) + " وتعذّر " + fmtN(fail) + " — أعد المحاولة"
