@@ -5,6 +5,14 @@
 //   معرفة الخدمة   — readiness view over the agent's real seed KB (editing = next phase)
 //   شركاء المبيعات + non-marketing screens — the prototype's empty-state pattern.
 // Single-file RTL SPA (hash router), 5s refresh from /admin/state (token → localStorage).
+//
+// The campaigns module's Frappe-CRM view layer (control bar, selection + bulk actions, group/kanban,
+// the 3-tab record) lives in ./campaigns-crm.js and is interpolated below at two anchor points. It is
+// a separate file because ADR-0001 forbids range edits in this one; it is INTERPOLATED rather than
+// imported because the client script is a template literal, and landing it inside this same <script>
+// scope is what lets it reuse campStats/campWin/atOrAfter/seenOf/repliedIn — one definition each.
+
+import { CAMPAIGNS_CRM_CSS, CAMPAIGNS_CRM_JS } from "./campaigns-crm.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -219,6 +227,7 @@ export const DASHBOARD_HTML = `<!doctype html>
                border-top: 1px solid #F2F4F7; padding-top: 14px; }
   }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+${CAMPAIGNS_CRM_CSS}
 </style>
 </head>
 <body>
@@ -616,8 +625,11 @@ function vKmon(d) {
     const isTest = campIsTest(c);
     const stChip = isTest
       ? '<span class="chip c-warn"><span style="width:6px;height:6px;border-radius:999px;background:#B54708;"></span>تجريبية</span>'
-      : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>مكتملة</span>'
-        : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>جارية</span>');
+      // The old "completed" label claimed a lifecycle the campaigns table has no field for — a
+      // reply is not a completed campaign. Both this fallback chip and the kanban column now read
+      // the same three states, emitted by campPerfState() in campaigns-crm so they cannot drift.
+      : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>فيها ردود</span>'
+        : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>بلا ردود بعد</span>');
     h += '<div class="trow km" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
       '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
@@ -686,8 +698,10 @@ function vKmonDetail(id, d) {
   const st = campStats(camp);
   const cwin = campWin(camp);   // every number on this screen is scoped to THIS campaign
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
-  const base = Math.max(1, st.targeted);
-  const pct = (v) => Math.round(v / base * 100);
+  // A rate with no denominator is unknown, not zero: Math.max(1, targeted) used to print a
+  // confident ٠٪ on a campaign that never had an audience. null renders «—».
+  const pct = (v) => st.targeted ? Math.round(v / st.targeted * 100) : null;
+  const pctTxt = (v) => { const r = pct(v); return r === null ? "—" : fmtN(r) + "٪"; };
   const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
   const yieldPer100 = st.targeted ? Math.round(st.interested / st.targeted * 100) : 0;
   let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#475467;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
@@ -708,8 +722,8 @@ function vKmonDetail(id, d) {
   ];
   h += '<div class="statgrid">' + cards.map((c, i) =>
     '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + fmtN(c[1]) + "</div>" +
-    '<div class="p">' + (i === 0 ? "&nbsp;" : fmtN(pct(c[1])) + "٪ من جهات الاستهداف") + "</div>" +
-    '<div class="mb"><i style="width:' + (i === 0 ? 100 : pct(c[1])) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
+    '<div class="p">' + (i === 0 ? "&nbsp;" : (pct(c[1]) === null ? "لا جهات استهداف" : pctTxt(c[1]) + " من جهات الاستهداف")) + "</div>" +
+    '<div class="mb"><i style="width:' + (i === 0 ? 100 : (pct(c[1]) || 0)) + "%;background:" + c[2] + ';"></i></div></div>').join("") + "</div>";
   // Deterministic next-move engine: what this campaign says to do next, computed from its own cohort.
   const seenSilent = rows.filter((r) => r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin));
   const notDelivered = rows.filter((r) => r.contact && atOrAfter((r.contact.statusTimes || {}).failed, cwin) && !atOrAfter((r.contact.statusTimes || {}).delivered, cwin));
@@ -2201,7 +2215,11 @@ function render(fetchNew) {
     if (!TOKEN) return gate();
     if (!cache) return; // first fetch pending
     const campId = cur === "kmon" ? (location.hash || "").split("/")[1] || "" : "";
-    b.innerHTML = cur === "kmon" ? (campId ? vKmonDetail(campId, cache) : vKmon(cache)) : vHome(cache);
+    // campaigns-crm owns the campaigns screens. It is called behind a guard on purpose: this file's
+    // client script is inside a template literal that no static tool here can parse, so a fault in
+    // the new views would blank the demo screen with tsc and node --check both green (ADR-0001).
+    // On any throw we fall back to the original views, which stay live for exactly that reason.
+    b.innerHTML = cur === "kmon" ? crmCampaignsHtml(campId) : vHome(cache);
   } else if (cur === "customer") {
     if (!TOKEN) return gate();
     const ph = (location.hash || "").split("/")[1] || "";
@@ -2316,6 +2334,10 @@ window.addEventListener("hashchange", () => {
   }
   else render(false);
 });
+${CAMPAIGNS_CRM_JS}
+/* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
+   var declarations, so placing this block after the bootstrap would let the first paint read an
+   undefined selection map. */
 if (!location.hash) location.hash = "kmon";
 refresh();
 tplLoad();
