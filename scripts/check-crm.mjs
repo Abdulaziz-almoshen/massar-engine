@@ -67,16 +67,32 @@ assert("crmRate returns null on a zero denominator", /function crmRate\([^)]*\)\
 // ---- 6. NO SEND. The hard one. ----
 // Every fetch in the campaigns-crm block must go to /admin/campaign/test. Any other endpoint, and
 // above all any Gupshup/message path, fails the build.
-// Bounded by explicit start/end markers. An unbounded match ran to end-of-script and swallowed the
-// bootstrap's /admin/state poll — a gate that measures the wrong region is worse than no gate.
-const crmBlock = (js.match(/\/\* =+ campaigns-crm \(client\) =+ \*\/[\s\S]*?\/\* =+ end campaigns-crm \(client\) =+ \*\//) || [""])[0];
-assert("campaigns-crm block is delimited", crmBlock.length > 0);
+// The region is the MODULE ITSELF, not a comment-delimited slice of the emitted string. A review
+// mutation-tested the previous version and got two passes it should have failed: a rogue fetch
+// placed one line BELOW the end marker (exactly where the next handler naturally lands), and a
+// sendBeacon INSIDE the block. Importing the source removes the boundary entirely, and asserting
+// the emitted script still contains it verbatim proves the interpolation landed whole.
+const { CAMPAIGNS_CRM_JS } = await import("../dist/campaigns-crm.js");
+const crmBlock = CAMPAIGNS_CRM_JS;
+assert("campaigns-crm module is non-empty", crmBlock.length > 0);
+assert("the emitted script contains the module verbatim", js.includes(CAMPAIGNS_CRM_JS),
+  "interpolation altered or truncated the module");
 const fetches = [...crmBlock.matchAll(/fetch\(\s*("[^"]*"|'[^']*')/g)].map((x) => x[1].replace(/['"]/g, ""));
 assert("campaigns-crm calls only the reclassify endpoint",
   fetches.every((u) => u === "/admin/campaign/test"),
   "found: " + JSON.stringify(fetches));
+// A non-literal fetch argument defeats the allow-list above (fetch("/gup"+"shup/send")), so any
+// dynamic fetch is refused outright rather than inspected.
+const dynamicFetch = [...crmBlock.matchAll(/fetch\(\s*(?!["'])/g)].length;
+assert("campaigns-crm has no dynamically-constructed fetch URL", dynamicFetch === 0,
+  dynamicFetch + " non-literal fetch call(s)");
+// fetch is not the only way to reach the network. Each of these would have carried a payload out
+// while the allow-list above stayed green.
+const EXFIL = /sendBeacon|XMLHttpRequest|EventSource|WebSocket|\bimport\s*\(|navigator\.send|<form|formAction/i;
+assert("campaigns-crm uses no network primitive other than fetch", !EXFIL.test(crmBlock),
+  "matched: " + (crmBlock.match(EXFIL) || [""])[0]);
 assert("campaigns-crm contains no outbound message path",
-  !/gupshup|\/send|sendMessage|outbound/i.test(crmBlock));
+  !/gupshup|\/send|sendMessage|outbound|campaign\/launch/i.test(crmBlock));
 
 // ---- report, including what this gate does NOT cover ----
 console.log("[check:crm] " + passes.length + " passed, " + fails.length + " failed");

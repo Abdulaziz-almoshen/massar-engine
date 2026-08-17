@@ -1,24 +1,24 @@
 // campaigns-crm.ts — the Frappe-CRM view layer for Massar's campaigns module.
 //
-// WHY THIS FILE EXISTS. `dashboard.ts` is ONE template literal (lines 9-2329) with the whole client
+// WHY THIS FILE EXISTS. dashboard.ts is ONE template literal (lines 9-2329) with the whole client
 // script inside it, and ADR-0001 forbids range edits there. So the port lives here as two exported
 // strings that dashboard.ts interpolates at two anchor points. Everything below is CLIENT JS: it is
 // appended into the same <script> scope as the original views, which is deliberate — it lets these
-// views call `campStats`, `campWin`, `atOrAfter`, `seenOf`, `repliedIn`, `interestedOf`, `esc`,
-// `fmtN`, `fmtD`, `ic` and `contactRowsHtml` directly instead of reimplementing them. Product
+// views call campStats, campWin, atOrAfter, seenOf, repliedIn, interestedOf, esc,
+// fmtN, fmtD, ic and contactRowsHtml directly instead of reimplementing them. Product
 // discovery named that reimplementation as the exact path by which round-22's invented numbers
 // would come back, so there is ONE definition of every statistic and this file owns none of them.
 //
 // WHAT IS PORTED (patterns only — user-model Rule 3: adopt the pattern, never the palette):
-//   Frappe `ViewControls`   -> one merged control bar with a قائمة|تجميع|كانبان toggle
-//   Frappe `ListBulkActions`-> row selection + a floating bulk bar (the highest-value gap)
-//   Frappe `Deal.vue` tabs  -> a 3-tab campaign record
+//   Frappe ViewControls   -> one merged control bar with a قائمة|تجميع|كانبان toggle
+//   Frappe ListBulkActions-> row selection + a floating bulk bar (the highest-value gap)
+//   Frappe Deal.vue tabs  -> a 3-tab campaign record
 // WHAT IS NOT: the right-hand field rail (field census: 1 unrendered substantive field vs a >=5
 // threshold), the Create modal, assignment/owner/@mentions, Tasks/Notes/Email tabs, and the
-// `WhatsAppBox` composer — a send affordance under the standing NO-SEND rule.
+// WhatsAppBox composer — a send affordance under the standing NO-SEND rule.
 //
 // NO HANDLER IN THIS FILE SENDS A WHATSAPP MESSAGE. The only network call is the pre-existing
-// POST /admin/campaign/test (reclassify), reached through the pre-existing `setCampClass`.
+// POST /admin/campaign/test (reclassify), reached through the pre-existing setCampClass.
 
 export const CAMPAIGNS_CRM_CSS = `
   /* ===== campaigns-crm: control bar ===== */
@@ -41,11 +41,13 @@ export const CAMPAIGNS_CRM_CSS = `
   .krow .selcell { opacity:0; transition:opacity .12s ease; }
   .krow:hover .selcell, .krow:focus-within .selcell, .krow.sel .selcell { opacity:1; }
   @media (pointer:coarse) { .krow .selcell { opacity:1; } }
-  .krow.sel { background:#F4F6FA; box-shadow: inset 3px 0 0 #1F7A73; }
+  /* border-inline-start, not an inset box-shadow: a +3px x-offset is PHYSICAL, so in RTL it
+     painted the accent on the end (left) edge while every other rule here is logical. */
+  .krow.sel { background:#F4F6FA; border-inline-start: 3px solid #1F7A73; }
 
   /* ===== bulk bar ===== */
   .bulkbar { position:fixed; inset-block-end:18px; inset-inline:0; display:flex; justify-content:center;
-    z-index:60; pointer-events:none; padding:0 12px; }
+    z-index:120; pointer-events:none; padding:0 12px; }  /* above alertBar (z-index:99), which occluded this for its full lifetime on the select-page path */
   .bulkbar > div { pointer-events:auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap;
     background:#101828; color:#fff; border-radius:999px; padding:9px 14px; max-width:92vw;
     box-shadow:0 12px 32px rgba(16,24,40,.28); }
@@ -117,8 +119,50 @@ function campPerfState(c, st) {
    point: base=Math.max(1,targeted) used to print a confident ٠٪ for a campaign with no audience. */
 function crmRate(a, b) { return b ? Math.round(a / b * 100) : null; }
 function crmPct(a, b) { var r = crmRate(a, b); return r === null ? "—" : fmtN(r) + "٪"; }
-function crmSelIds() { return Object.keys(crmSel).filter(function (k) { return crmSel[k]; }); }
-function crmSelPhones() { return Object.keys(crmSelD).filter(function (k) { return crmSelD[k]; }); }
+/* SELECTION IS INTERSECTED WITH WHAT IS ON SCREEN, STRUCTURALLY.
+   Clearing on every state change is necessary but not sufficient — it relies on remembering to call
+   it from each of the four handlers, and a missed one stages the WRONG cohort into the launch
+   wizard under a label naming the campaign you are looking at. So the accessors themselves refuse
+   to return anything the operator cannot currently see: a hidden selection is unactionable by
+   construction, not by discipline. Both layers are kept; this one is the guarantee. */
+function crmVisibleIds() {
+  /* Deliberately the whole filter match, NOT the LIST_CAP slice: «تحديد المطابقين» selects beyond
+     what is rendered, and that is legitimate because the operator asked for it explicitly and the
+     count says so. What must never be actionable is a selection the CURRENT FILTER excludes. */
+  var ids = {};
+  crmFiltered().forEach(function (x) { ids[x.c.id] = true; });
+  return ids;
+}
+function crmSelIds() {
+  var vis = crmVisibleIds();
+  return Object.keys(crmSel).filter(function (k) { return crmSel[k] && vis[k]; });
+}
+function crmSelPhones() {
+  /* crmLastShown is the cohort the targets tab last rendered, for the campaign currently open. */
+  var vis = {};
+  crmLastShown.forEach(function (p) { vis[p] = true; });
+  return Object.keys(crmSelD).filter(function (k) { return crmSelD[k] && vis[k]; });
+}
+/* The campaign verdict must not describe an event that did not occur. A campaign with no audience
+   was never sent, so «أُرسلت، وبانتظار الرد الأول» is an invented state — the same class as the
+   fabricated ٠٪ removed from the rates beside it. */
+function crmVerdict(st) {
+  if (!st.targeted) return "لا جهات استهداف لهذه الحملة — لم يُرسل شيء.";
+  if (st.replied) {
+    return "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" +
+      (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + ".";
+  }
+  if (st.sent || st.delivered) return "أُرسلت، وبانتظار الرد الأول.";
+  return "لم يُسجَّل إرسال لهذه الحملة بعد.";
+}
+
+/* Drop the selection and say so. Silence here is how «٢ محدَّدة» survives onto a screen showing
+   two different campaigns' rows. */
+function crmDropSel(which) {
+  var n = which === "targets" ? Object.keys(crmSelD).length : Object.keys(crmSel).length;
+  if (which === "targets") crmSelD = {}; else crmSel = {};
+  if (n && typeof alertBar === "function") alertBar("أُلغي تحديد " + fmtN(n) + " عند تغيير العرض", false);
+}
 
 function crmMonth(ts) {
   return new Date(Number(ts)).toLocaleDateString("ar-SA", { month: "long", year: "numeric" });
@@ -221,7 +265,7 @@ function crmListView(withStAll) {
   var h = '<div class="tblwrap rise"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">' +
     '<div style="display:grid;grid-template-columns:' + CRM_GRID + ';gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()"></div>' +
-    '<div>الحملة</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+    '<div>الحملة' + (nOver > 0 ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#1F7A73;font-weight:700;cursor:pointer;font-size:10.5px;">تحديد المطابقين (' + fmtN(withStAll.length) + ')</span>' : "") + '</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
   withSt.forEach(function (x) { h += crmRow(x.c, x.st); });
   if (!withSt.length) h += crmEmptyList();
   h += '</div></div>';
@@ -248,7 +292,14 @@ function crmGroups(withStAll) {
      empty rather than hiding it, so «تجريبية: ٠» is visible instead of silently missing. */
   if (crmActiveKey() === "class") ["فعلية", "تجريبية"].forEach(function (k) { if (!by[k]) { by[k] = []; order.push(k); } });
   if (crmActiveKey() === "perf") ["تجريبية", "فيها ردود", "بلا ردود بعد"].forEach(function (k) { if (!by[k]) { by[k] = []; order.push(k); } });
-  if (crmActiveKey() === "month") order.sort(function (a, b) { return 0; });
+  /* Months must run newest-first regardless of the row sort, or «أغسطس» lands after «يوليو»
+     whenever the list is sorted by replies. Keyed on each group's newest launch. */
+  if (crmActiveKey() === "month") {
+    order.sort(function (a, b) {
+      var newest = function (k) { return Math.max.apply(null, by[k].map(function (x) { return Number(x.c.created_at); })); };
+      return newest(b) - newest(a);
+    });
+  }
   return { def: def, order: order, by: by };
 }
 
@@ -294,7 +345,7 @@ function crmKanbanView(withStAll) {
     var rows = g.by[k].slice(0, LIST_CAP);
     rows.forEach(function (x) {
       var st = x.st, c = x.c;
-      h += '<div class="kcard"' + (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')"' : "") +
+      h += '<div class="kcard"' + (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") +
         ' onclick="location.hash=&quot;kmon/' + c.id + '&quot;">' +
         '<div class="nm">' + esc(c.name) + '</div>' +
         '<div class="mt">' + fmtD(c.created_at) + (c.product ? " · " + esc(c.product) : "") + '</div>' +
@@ -387,7 +438,7 @@ function vKmonDetailCrm(id, d) {
   h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
     '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
     '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
-    (st.replied ? "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" + (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + '</div></div>' +
+    crmVerdict(st) + '</div></div>' +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
     [["نسبة المشاهدة", crmRate(st.seen, st.targeted)], ["نسبة الردود", crmRate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
       .map(function (x) {
@@ -526,7 +577,16 @@ function crmCampaignsHtml(campId) {
     /* Say it out loud rather than silently serving the old screen: a fallback nobody knows about is
        how a regression lives for a week. */
     try { console.error("campaigns-crm fell back:", e); } catch (e2) {}
-    return campId ? vKmonDetail(campId, cache) : vKmon(cache);
+    try {
+      return campId ? vKmonDetail(campId, cache) : vKmon(cache);
+    } catch (e3) {
+      /* Last resort. If the ORIGINAL view is what broke, calling it from the catch propagates out
+         of render() and b.innerHTML is never assigned — a blank screen, which is the exact failure
+         ADR-0001 was written after. Say something rather than nothing. */
+      try { console.error("campaigns-crm fallback also failed:", e3); } catch (e4) {}
+      return '<div class="empty" style="padding:60px 20px;"><div class="t">تعذّر عرض الحملات</div>' +
+        '<div class="s">أعد تحميل الصفحة. إن تكرر الأمر، فالمشكلة في هذا الإصدار وليست في بياناتك.</div></div>';
+    }
   }
 }
 
@@ -549,6 +609,14 @@ window.crmToggle = function (id) { if (crmSel[id]) delete crmSel[id]; else crmSe
 window.crmToggleD = function (ph) { if (crmSelD[ph]) delete crmSelD[ph]; else crmSelD[ph] = true; render(false); };
 window.crmClear = function () { crmSel = {}; render(false); };
 window.crmClearD = function () { crmSelD = {}; render(false); };
+/* FR-6. Distinct from select-page: this reaches the matches LIST_CAP hides. Named and counted so
+   the operator knows the difference between "the 60 I can see" and "the 137 that match". */
+window.crmSelectAllMatching = function () {
+  var all = crmFiltered();
+  all.forEach(function (x) { crmSel[x.c.id] = true; });
+  render(false);
+  alertBar("حُدِّدت " + fmtN(all.length) + " حملة مطابقة، بما فيها غير المعروضة", false);
+};
 window.crmTogglePage = function () {
   var shown = crmFiltered().slice(0, LIST_CAP);
   var allOn = shown.length > 0 && shown.every(function (x) { return crmSel[x.c.id]; });
@@ -576,7 +644,7 @@ window.crmBulkClass = async function (test) {
   });
   if (!targets.length) return;
   crmBulkBusy = true;
-  var ok = 0, fail = 0, next = 0;
+  var ok = 0, fail = 0, next = 0, failed = [];
   /* Bounded concurrency rather than one-at-a-time: 400 selected campaigns was 400 sequential
      round-trips with the operator staring at a frozen bar. Bounded rather than unbounded so a
      large selection cannot open 400 sockets at once against our own admin endpoint. */
@@ -594,15 +662,18 @@ window.crmBulkClass = async function (test) {
           ok++;
           var cp = campaigns.find(function (x) { return Number(x.id) === id; });
           if (cp) cp.test = Boolean(test);   /* only on a confirmed write */
-        } else fail++;
-      } catch (e) { fail++; }
+        } else { fail++; failed.push(id); }
+      } catch (e) { fail++; failed.push(id); }
     }
   }
   var lanes = [];
   for (var i = 0; i < Math.min(LANES, targets.length); i++) lanes.push(lane());
   await Promise.all(lanes);
   crmBulkBusy = false;
+  /* Keep the failures selected. «تعذّر ٣ — أعد المحاولة» with an empty selection is an instruction
+     the operator cannot follow: they would have to work out which three. */
   crmSel = {};
+  failed.forEach(function (id) { crmSel[id] = true; });
   render(false);
   alertBar(fail ? "غُيّر تصنيف " + fmtN(ok) + " وتعذّر " + fmtN(fail) + " — أعد المحاولة"
                 : "غُيّر تصنيف " + fmtN(ok) + " حملة", !!fail);
@@ -650,7 +721,24 @@ window.crmRetargetSel = function () {
   crmSelD = {};
   startRetarget();
 };
+/* ---- wrap the pre-existing state changers so a selection cannot outlive its rows ----
+   These four are the handlers that change WHICH rows are on screen. They live in dashboard.ts and
+   are deliberately not edited there: wrapping keeps the seam to two anchored interpolations, and
+   keeps the rule in one place instead of four. */
+var _origSetCampTab = window.setCampTab;
+window.setCampTab = function (t) { crmDropSel("list"); if (_origSetCampTab) _origSetCampTab(t); };
+var _origCampSearchFn = window.campSearchFn;
+window.campSearchFn = function (el) { crmDropSel("list"); if (_origCampSearchFn) _origCampSearchFn(el); };
+var _origRSearch = window.rSearch;
+window.rSearch = function (el) { crmDropSel("targets"); if (_origRSearch) _origRSearch(el); };
+var _origSetCampSort = window.setCampSort;
+window.setCampSort = function (el) { crmDropSel("list"); if (_origSetCampSort) _origSetCampSort(el); };
+/* Moving between campaigns must not carry a cohort with it — the wizard would be handed campaign
+   A's phone numbers under campaign B's name. */
+window.addEventListener("hashchange", function () { crmSelD = {}; crmSel = {}; });
+
 window.crmDragStart = function (e, id) { crmDragId = id; try { e.dataTransfer.effectAllowed = "move"; } catch (err) {} };
+window.crmDragEnd = function () { crmDragId = null; };
 window.crmDragOver = function (e, el) { e.preventDefault(); if (el) el.classList.add("over"); };
 window.crmDragLeave = function (el) { if (el) el.classList.remove("over"); };
 window.crmDrop = function (e, col, el) {

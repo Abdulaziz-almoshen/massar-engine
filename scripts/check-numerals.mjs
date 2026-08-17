@@ -13,18 +13,20 @@
 import { readFileSync } from "node:fs";
 
 // Server-side Arabic reaches the UI verbatim, so segments.ts is subject to the same rule.
-const FILES = ["src/dashboard.ts", "src/segments.ts"];
+const FILES = ["src/dashboard.ts", "src/segments.ts", "src/campaigns-crm.ts"];
 const FILE = FILES[0];
 const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 
 // GUARD, added after the FOURTH occurrence: src/dashboard.ts is ONE template literal, so a backtick
 // anywhere except the two delimiters terminates it early and ships a broken or blank page. tsc
 // catches it only when the truncation happens to be invalid TypeScript — twice it did not.
-{
-  const dash = readFileSync("src/dashboard.ts", "utf8");
-  const n = (dash.match(/`/g) || []).length;
-  if (n !== 2) {
-    console.error("check-numerals: src/dashboard.ts has " + n + " backticks; exactly 2 are allowed");
+// campaigns-crm.ts carries the SAME hazard for the same reason — its two exported template literals
+// are the client CSS and JS — so it is guarded here too rather than left to be discovered later.
+for (const [file, allowed] of [["src/dashboard.ts", 2], ["src/campaigns-crm.ts", 4]]) {
+  const text = readFileSync(file, "utf8");
+  const n = (text.match(/`/g) || []).length;
+  if (n !== allowed) {
+    console.error("check-numerals: " + file + " has " + n + " backticks; exactly " + allowed + " are allowed");
     console.error("  (the template-literal delimiters). One in a comment or string closes it early.");
     process.exit(1);
   }
