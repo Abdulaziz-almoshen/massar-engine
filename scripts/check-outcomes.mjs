@@ -111,3 +111,27 @@ c2("…and an empty group says so rather than hiding", dash2.includes("لا أح
 c2("…and unsorted contacts are counted, not ignored", dash2.includes("لم تُفرز بعد"));
 if (g) { console.log(`\n${g} FAILURES (scrub / morning list)`); process.exit(1); }
 console.log("scrub + morning list: green");
+
+// --- CRM status region on the client record ---------------------------------
+// CPO: «the UI inside client page has no indicators of the client stage and level of interest».
+// The real defect the Designer found: vCustomer never read the tags array at all — the customers
+// TABLE rendered the tool-written tags while the RECORD showed only the AI's inference, so the row
+// carried more truth than the record it opened.
+let h2 = 0;
+const c3 = (n, cond) => { if (!cond) h2++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
+const dash3 = readFileSync(join(root, "src/dashboard.ts"), "utf8");
+const rec = dash3.slice(dash3.indexOf("CRM STATUS REGION"), dash3.indexOf("CRM STATUS REGION") + 5200);
+c3("the record reads the real interest tags", rec.includes("(c.tags || []).forEach"));
+c3("…one chip per product, never averaged", rec.includes("latest.set(tg.product, tg)"));
+c3("…sorted hot before warm before cold", rec.includes("{ hot: 0, warm: 1, cold: 2 }"));
+c3("stage is shown with its position in the pipeline", rec.includes("من \" + fmtN(6)"));
+c3("an UNJUSTIFIED stage renders visibly weaker", rec.includes('justified ? "c-teal" : "c-grey"'));
+c3("…and says the quote is missing rather than hiding it", rec.includes("بلا اقتباس يسندها بعد"));
+c3("…offering a refresh instead of a dead end", rec.includes("refreshInsights()"));
+c3("the AI reading is used only when no tag exists", rec.includes("لا وسم اهتمام مؤكد بعد"));
+c3("…and is labelled as a reading", rec.includes('class="rd"'));
+c3("outcome leads the region", rec.indexOf('row("الفرز"') < rec.indexOf('row("درجة الاهتمام"'));
+c3("…interest before stage", rec.indexOf('row("درجة الاهتمام"') < rec.indexOf('row("مرحلة البيع"'));
+c3("the decorative monogram is gone", !dash3.includes('width:52px;height:52px'));
+if (h2) { console.log(`\n${h2} FAILURES (status region)`); process.exit(1); }
+console.log("CRM status region: green");

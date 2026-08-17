@@ -1953,7 +1953,7 @@ function vCustomer(ph) {
   let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
-    '<div style="width:52px;height:52px;flex:none;border-radius:14px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;">' + esc(nm.trim().charAt(0)) + "</div>" +
+    // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
     '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
@@ -2017,9 +2017,14 @@ function vCustomer(ph) {
   // both the agent and the portal buttons, so read it from there instead of parsing prose.
   const OUT_TO_BTN = { scheduled: "meeting_booked", interested: "quote_sent", later: "postponed", stopped: "not_a_fit" };
   const activeBtn = OUT_TO_BTN[c.outcome] || "";
-  // THE FRZ STRIP — the first thing a sales manager needs: is this person sorted, and if a time was
-  // agreed, WHAT DID THEY SAY. The customer's verbatim words lead; our parse is secondary and
-  // labelled as ours, because it is a reading and they may have meant something else.
+  // CRM STATUS REGION — outcome, then interest, then stage. Ranked deliberately: outcome is a
+  // fact that decides whether he acts at all; interest names WHICH product and how hot, which
+  // decides what he says; stage is an inference over the same transcript and changes neither.
+  // Facts outrank readings.
+  //
+  // The bug this fixes: vCustomer never read the tags array at all. The customers TABLE he clicks FROM
+  // renders the real tool-written tags via interestChips(), while the RECORD showed only the AI's
+  // product_interest inference — the row carried more truth than the record it opened.
   h += (function () {
     const OUT = {
       scheduled: ["موعد محدد", "#027A48", "#ECFDF3"],
@@ -2032,25 +2037,62 @@ function vCustomer(ph) {
       closed: ["مغلق", "#667085", "#F2F4F7"],
     };
     const o = OUT[c.outcome] || null;
-    const label = o ? o[0] : "لم يُفرز بعد";
-    const ink = o ? o[1] : "#667085";
-    const bg = o ? o[2] : "#F9FAFB";
-    let body = "";
+    const ink = o ? o[1] : "#667085", bg = o ? o[2] : "#F9FAFB";
+    const row = (label, body) =>
+      '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:9px;">' +
+      '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#667085;min-width:92px;">' + label + "</span>" +
+      '<span style="flex:1;min-width:180px;">' + body + "</span></div>";
+
+    // 1 — OUTCOME
+    let outBody = '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + (o ? o[0] : "لم يُفرز بعد") + "</span>";
     if (c.outcome === "scheduled" && c.scheduledSaid) {
-      body = '<div style="font-size:18px;font-weight:700;color:#101828;margin-top:4px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
-        '<div style="font-size:11.5px;color:#667085;margin-top:3px;">' +
-        (c.scheduledAt
-          ? "قراءتنا: " + esc(fmtT(c.scheduledAt)) + " · لم تُؤكَّد بعد"
-          : "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل.") + "</div>";
+      outBody += '<div style="font-size:13px;font-weight:700;color:#101828;margin-top:3px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
+        '<div style="font-size:11.5px;color:#667085;">' + (c.scheduledAt ? "قراءتنا: " + esc(fmtT(c.scheduledAt)) + " · لم تُؤكَّد بعد" : "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل.") + "</div>";
     } else if (c.outcomeEvidence) {
-      body = '<div style="font-size:13px;color:#475467;margin-top:4px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 140)) + "»</div>";
-    } else if (!o) {
-      body = '<div style="font-size:12px;color:#98A2B3;margin-top:3px;">لم تُسجَّل نتيجة بعد لهذه المحادثة.</div>';
+      outBody += '<div style="font-size:12.5px;color:#475467;margin-top:3px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 130)) + "»</div>";
     }
+
+    // 2 — INTEREST, one chip PER PRODUCT. Never averaged: two hot products are two deals, not a
+    // hotter one. Falls back to the AI reading only when no tag exists, and says so.
+    const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
+    const latest = new Map();
+    (c.tags || []).forEach((tg) => latest.set(tg.product, tg));
+    const order = { hot: 0, warm: 1, cold: 2 };
+    const tagList = [...latest.values()].sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3) || (b.ts || 0) - (a.ts || 0));
+    let interestBody;
+    if (tagList.length) {
+      interestBody = tagList.map((tg) => {
+        const m = lv[tg.level] || lv.warm;
+        return '<span class="chip ' + m[0] + '">' + esc(tg.product) + " · " + m[1] + "</span>";
+      }).join(" ");
+    } else if (ins.intent && ins.intent !== "none") {
+      const rd = ins.intent === "high" ? ["c-ok", "نية مرتفعة"] : ins.intent === "medium" ? ["c-warn", "اهتمام مبدئي"] : ["c-grey", "فاتر"];
+      interestBody = '<span class="chip c-read ' + rd[0] + '"><span class="rd">قراءة</span>' + rd[1] + "</span>" +
+        '<div style="font-size:11.5px;color:#98A2B3;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
+    } else {
+      interestBody = '<span style="color:#98A2B3;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
+    }
+
+    // 3 — STAGE, one chip. An unjustified reading renders visibly WEAKER than a justified one:
+    // stage_reason is empty on live data because the scrub removed a claim the customer never made.
+    const STAGES = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"];
+    let stageBody;
+    if (ins.stage) {
+      const idx = STAGES.indexOf(ins.stage);
+      const justified = Boolean(ins.stage_reason);
+      stageBody = '<span class="chip ' + (justified ? "c-teal" : "c-grey") + '">' + esc(ins.stage) +
+        (idx >= 0 ? " · " + fmtN(idx + 1) + " من " + fmtN(6) : "") + "</span>" +
+        (justified
+          ? '<div style="font-size:12.5px;color:#475467;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
+          : '<div style="font-size:11.5px;color:#98A2B3;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
+            '<a href="javascript:void(0)" onclick="refreshInsights()" style="color:#2E7D77;font-weight:700;">حدّث القراءة</a></div>');
+    } else {
+      stageBody = '<span style="color:#98A2B3;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
+    }
+
     return '<div style="background:' + bg + ';border:1px solid #EAECF0;border-inline-start:3px solid ' + ink +
       ';border-radius:12px;padding:13px 16px;margin:2px 0 14px;">' +
-      '<div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:' + ink + ';">' + label + "</div>" +
-      body + "</div>";
+      row("الفرز", outBody) + row("درجة الاهتمام", interestBody) + row("مرحلة البيع", stageBody) + "</div>";
   })();
   h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
