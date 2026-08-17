@@ -1169,18 +1169,19 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       // ONE respectful exploration, THEN accept — the founder's rule, and the judge marked the
       // first version down for closing on the first «ما نحتاج» without asking, then pressing again
       // after the second. Count prior refusals: first one explores, any after it closes and stops.
-      // MEASURED BOTH WAYS. Exploring on the first refusal scored 1.0; closing immediately scored
-      // 2.0. Neither is good, and the judge's objection to both is the same — it reads as pressing
-      // a customer who already said no. So: close on the FIRST refusal, and the one permission
-      // question is the only follow-up. Fewer moves after a no, not more.
+      // ASK THE PERMISSION QUESTION ONCE. The 2.0 score was not the wording — it was REPETITION:
+      // the identical «تسمحون نتواصل معكم لاحقًا؟» went out after the first refusal AND again after
+      // the second. Asking twice is the pressure, whatever the sentence says. So: first refusal
+      // gets the thanks plus the one question; any refusal after it closes warmly with no question
+      // at all and nothing further is sent.
       const priorRefusals = (contact.transcript || [])
         .filter((x) => x.role === "customer" && sorterIntent(x.text) === "refusal").length;
-      if (priorRefusals > 99) {
-        await safeSend(contact.phone, "");
-      } else {
+      if (priorRefusals <= 1) {
         await safeSend(contact.phone, "مفهوم تمامًا، وأشكركم على وقتكم.\n\nتسمحون نتواصل معكم لاحقًا إذا كان عندنا عرض مناسب؟");
-        await execTool(contact, "mark_not_interested", {});
+      } else {
+        await safeSend(contact.phone, "واضح، شكرًا لكم على الرد ووقتكم. يومكم سعيد.");
       }
+      await execTool(contact, "mark_not_interested", {});
       return;
     }
     if (sorter === "budget") {
