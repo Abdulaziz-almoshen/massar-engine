@@ -151,15 +151,42 @@ SELECTION_LEAKS = [
         return bad === null ? '' : 'the bulk bar is covered at ' + bad;
      }"""),
     # CPO round-30 musts, each recreated.
-    ("m1-unsent-vocabulary", "#kmon/1", """() => {
-        campaigns = window.__qaFixture('zerotargets'); render(false);
-        var t = document.body.innerText;
-        if (t.indexOf('بلا ردود بعد') !== -1)
-          return 'a never-sent campaign is still chipped «بلا ردود بعد»';
-        if (t.indexOf('٠٪') !== -1)
-          return 'a never-sent campaign still shows a ٠٪ delivery rate';
-        return (t.indexOf('بلا جمهور') !== -1 || t.indexOf('لم تُرسل') !== -1) ? ''
-          : 'no never-sent vocabulary on the record';
+    # innerText holds only the RENDERED tab, so a one-tab version of this assertion was green while
+    # being false on الأداء at the same commit. Iterate all three tabs or the test cannot see two
+    # thirds of the record it claims to check.
+    # TWO states, not one. «no audience» (targeted=0) and «audience but nothing sent» are different,
+    # and M6 lived in the SECOND — a zerotargets-only fixture left crmRate returning null anyway, so
+    # the first version of this test stayed green through a mutation that reverted M6.
+    # The assertion is also per-card, not a blanket «no ٠٪ on the page»: أُرسلت and وصلت describe the
+    # send itself, so an honest ٠٪ there is correct and must not be flagged. Only the three
+    # recipient-behaviour cards are undefined until something is sent.
+    ("m1-unsent-vocabulary", "#kmon/1", """async () => {
+        var bad = [];
+        var RECIPIENT = ['شوهدت', 'ردّوا', 'جهات مهتمة'];
+        for (var f = 0; f < 2; f++) {
+          campaigns = window.__qaFixture(f === 0 ? 'zerotargets' : 'default');
+          var label = f === 0 ? 'no-audience' : 'never-sent';
+          render(false);
+          var tabs = ['targets', 'perf', 'next'];
+          for (var i = 0; i < tabs.length; i++) {
+            crmSetDetailTab(tabs[i]);
+            await new Promise(r => setTimeout(r, 120));
+            if (document.body.innerText.indexOf('بلا ردود بعد') !== -1)
+              bad.push(label + '/' + tabs[i] + ': chipped «بلا ردود بعد»');
+            [].slice.call(document.querySelectorAll('.statc')).forEach(function (card) {
+              var l = (card.querySelector('.l') || {}).textContent || '';
+              var pct = (card.querySelector('.p') || {}).textContent || '';
+              if (RECIPIENT.indexOf(l.trim()) !== -1 && pct.indexOf('٪') !== -1)
+                bad.push(label + '/' + tabs[i] + ': «' + l.trim() + '» shows «' + pct.trim() + '» on a campaign that was never sent');
+            });
+          }
+          crmSetDetailTab('targets');
+          await new Promise(r => setTimeout(r, 120));
+          var t0 = document.body.innerText;
+          if (t0.indexOf('بلا جمهور') === -1 && t0.indexOf('لم تُرسل') === -1)
+            bad.push(label + ': no never-sent vocabulary on the record');
+        }
+        return bad.length ? bad.slice(0, 4).join('; ') : '';
      }"""),
     ("m2-group-headers", "#kmon", """() => {
         campaigns = window.__qaFixture('default'); render(false);

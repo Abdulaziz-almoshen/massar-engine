@@ -373,7 +373,7 @@ function crmKanbanView(withStAll) {
   var h = '<div class="kboard ms-scroll rise">';
   g.order.forEach(function (k) {
     h += '<div class="kcol" data-col="' + esc(k) + '"' +
-      (canDrag ? ' ondragover="crmDragOver(event,this)" ondragleave="crmDragLeave(this)" ondrop="crmDrop(event,&quot;' + esc(k) + '&quot;,this)"' : "") + '>' +
+      (canDrag ? ' ondragover="crmDragOver(event,this)" ondragleave="crmDragLeave(this)" ondrop="crmDrop(event,&quot;' + (k === "تجريبية" ? "test" : "real") + '&quot;,this)"' : "") + '>' +
       '<div class="kcolh"><div><div class="lb">' + esc(k) + '</div><div class="why">' + g.def[3] + '</div></div>' +
       '<span style="flex:1"></span><span class="cntpill">' + fmtN(g.by[k].length) + '</span></div>';
     var rows = g.by[k].slice(0, LIST_CAP);
@@ -505,12 +505,21 @@ function vKmonDetailCrm(id, d) {
   }).join("") + '</div>';
 
   if (crmDetailTab === "perf") {
-    var cards = [["جهات الاستهداف", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
-      ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["جهات مهتمة", st.interested, "#1f8a52"]];
+    /* THE ASYMMETRY IS DELIBERATE. أُرسلت and وصلت describe the SEND itself, so «٠٪ من جهات
+       الاستهداف» on them is an honest statement about a send that did not happen. شوهدت / ردّوا /
+       جهات مهتمة describe what the RECIPIENTS did, and those are undefined until something was
+       sent — a ٠٪ there asserts that a delivered message went unseen. Flag per card (c[3]). */
+    var cards = [["جهات الاستهداف", st.targeted, "#2F5F94", false], ["أُرسلت", st.sent, "#2F5F94", false],
+      ["وصلت", st.delivered, "#3FB6B0", false], ["شوهدت", st.seen, "#3FB6B0", true],
+      ["ردّوا", st.replied, "#2E8F89", true], ["جهات مهتمة", st.interested, "#1f8a52", true]];
     h += '<div class="statgrid">' + cards.map(function (c, i) {
-      var r = crmRate(c[1], st.targeted);
+      var r = c[3] ? crmDeliveryRate(c[1], st) : crmRate(c[1], st.targeted);
+      var caption = i === 0 ? "&nbsp;"
+        : r !== null ? fmtN(r) + "٪ من جهات الاستهداف"
+        : !st.targeted ? "لا جهات استهداف"
+        : "لم تُرسل بعد";
       return '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + fmtN(c[1]) + '</div>' +
-        '<div class="p">' + (i === 0 ? "&nbsp;" : (r === null ? "لا جهات استهداف" : fmtN(r) + "٪ من جهات الاستهداف")) + '</div>' +
+        '<div class="p">' + caption + '</div>' +
         '<div class="mb"><i style="width:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%;background:' + c[2] + ';"></i></div></div>';
     }).join("") + '</div>' +
     '<div style="font-size:11.5px;color:#98A2B3;margin-top:10px;">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</div>';
@@ -775,11 +784,15 @@ window.crmDragStart = function (e, id) { crmDragId = id; try { e.dataTransfer.ef
 window.crmDragEnd = function () { crmDragId = null; };
 window.crmDragOver = function (e, el) { e.preventDefault(); if (el) el.classList.add("over"); };
 window.crmDragLeave = function (el) { if (el) el.classList.remove("over"); };
-window.crmDrop = function (e, col, el) {
+window.crmDrop = function (e, token, el) {
   e.preventDefault();
   if (el) el.classList.remove("over");
   if (crmDragId === null) return;
-  var want = col === "تجريبية";
+  /* A stable token, never the rendered label: «تجريبية» is also a column on the حالة الأداء board,
+     so keying the write on the visible string would write the wrong flag the moment another board
+     is made draggable. Anything that is not the test token is refused rather than assumed. */
+  if (token !== "test" && token !== "real") return;
+  var want = token === "test";
   var c = campaigns.find(function (x) { return Number(x.id) === Number(crmDragId); });
   crmDragId = null;
   if (!c || campIsTest(c) === want) return;
