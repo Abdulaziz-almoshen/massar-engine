@@ -17,6 +17,14 @@
 // threshold), the Create modal, assignment/owner/@mentions, Tasks/Notes/Email tabs, and the
 // WhatsAppBox composer — a send affordance under the standing NO-SEND rule.
 //
+// DESCOPED, and named here because an omission nobody wrote down is indistinguishable from a bug:
+//   FR-2 filter CONDITION BUILDER (add/remove AND-ed conditions over name/product/class/date/
+//        counters). Shipped instead: search + the three class quick-filters + sort. Re-trigger:
+//        the first time a real question needs two conditions at once.
+//   FR-5 COLUMN PICKER (choose/reorder from the closed set of real fields). Shipped instead: one
+//        fixed column set. Re-trigger: a second operator, or a column someone wants gone.
+// Both are Frappe ViewControls affordances over six fields; neither was worth its surface yet.
+//
 // NO HANDLER IN THIS FILE SENDS A WHATSAPP MESSAGE. The only network call is the pre-existing
 // POST /admin/campaign/test (reclassify), reached through the pre-existing setCampClass.
 
@@ -110,14 +118,23 @@ var crmDragId = null;
 /* ONE function emits the campaign's state — the row chip and the board column both read it, so they
    can never disagree. Retires the old "completed" chip: a reply is not a completed campaign, and there is no
    lifecycle field on the campaigns table to back such a claim (user-model Rule 2). */
+function crmWasSent(st) { return !!(st.sent || st.delivered); }
 function campPerfState(c, st) {
   if (campIsTest(c)) return { key: "test", label: "تجريبية", cls: "c-warn", dot: "#B54708" };
+  /* «بلا ردود بعد» on a campaign that was never sent is the same invented state the hero used to
+     carry. The distinction crmVerdict() learned has to reach the chip, the board column, the group
+     header and the record header — a vocabulary that exists on one screen is a contradiction. */
+  if (!st.targeted) return { key: "noaudience", label: "بلا جمهور", cls: "c-grey", dot: "#98A2B3" };
+  if (!crmWasSent(st)) return { key: "unsent", label: "لم تُرسل بعد", cls: "c-grey", dot: "#98A2B3" };
   if (st.replied > 0) return { key: "replied", label: "فيها ردود", cls: "c-ok", dot: "#027A48" };
   return { key: "silent", label: "بلا ردود بعد", cls: "c-blue", dot: "#2F5F94" };
 }
 /* A rate with no denominator is not zero, it is unknown. Returning null (rendered «—») is the whole
    point: base=Math.max(1,targeted) used to print a confident ٠٪ for a campaign with no audience. */
 function crmRate(a, b) { return b ? Math.round(a / b * 100) : null; }
+/* Delivery rates for a campaign that was never sent are undefined, not zero. */
+function crmDeliveryRate(a, st) { return crmWasSent(st) ? crmRate(a, st.targeted) : null; }
+function crmPctD(a, st) { var r = crmDeliveryRate(a, st); return r === null ? "—" : fmtN(r) + "٪"; }
 function crmPct(a, b) { var r = crmRate(a, b); return r === null ? "—" : fmtN(r) + "٪"; }
 /* SELECTION IS INTERSECTED WITH WHAT IS ON SCREEN, STRUCTURALLY.
    Clearing on every state change is necessary but not sufficient — it relies on remembering to call
@@ -248,8 +265,8 @@ function crmRow(c, st) {
     '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + '</div>' +
     '<div><span class="chip ' + ps.cls + '"><span style="width:6px;height:6px;border-radius:999px;background:' + ps.dot + ';"></span>' + ps.label + '</span></div>' +
     '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + '</div>' +
-    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPct(st.seen, st.targeted) + '</div>' +
-    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPct(st.replied, st.targeted) + '</div>' +
+    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPctD(st.seen, st) + '</div>' +
+    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPctD(st.replied, st) + '</div>' +
     '<div style="display:flex;align-items:center;gap:9px;">' +
       (prog === null
         ? '<span style="font-size:11.5px;color:#98A2B3;">لا جهات استهداف</span>'
@@ -258,14 +275,23 @@ function crmRow(c, st) {
     '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + '</button></div></div>';
 }
 
+/* The column header is shared with crmGroupView. It shipped only in the list view, so تجميع
+   rendered four unlabelled numeric columns — three of which look identical. */
+function crmHeaderRow(withSelectAll, allOn, nOver, nTotal) {
+  return '<div style="display:grid;grid-template-columns:' + CRM_GRID + ';gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
+    (withSelectAll
+      ? '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()"></div>'
+      : '<div class="selcell"></div>') +
+    '<div>الحملة' + (withSelectAll && nOver > 0 ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#1F7A73;font-weight:700;cursor:pointer;font-size:10.5px;">تحديد المطابقين (' + fmtN(nTotal) + ')</span>' : "") + '</div>' +
+    '<div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+}
+
 function crmListView(withStAll) {
   var withSt = withStAll.slice(0, LIST_CAP);
   var nOver = withStAll.length - withSt.length;
   var allOn = withSt.length > 0 && withSt.every(function (x) { return crmSel[x.c.id]; });
   var h = '<div class="tblwrap rise"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">' +
-    '<div style="display:grid;grid-template-columns:' + CRM_GRID + ';gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
-    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()"></div>' +
-    '<div>الحملة' + (nOver > 0 ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#1F7A73;font-weight:700;cursor:pointer;font-size:10.5px;">تحديد المطابقين (' + fmtN(withStAll.length) + ')</span>' : "") + '</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+    crmHeaderRow(true, allOn, nOver, withStAll.length);
   withSt.forEach(function (x) { h += crmRow(x.c, x.st); });
   if (!withSt.length) h += crmEmptyList();
   h += '</div></div>';
@@ -290,8 +316,15 @@ function crmGroups(withStAll) {
   });
   /* A group that exists in the vocabulary but holds nothing is a FACT, not an absence: render it
      empty rather than hiding it, so «تجريبية: ٠» is visible instead of silently missing. */
-  if (crmActiveKey() === "class") ["فعلية", "تجريبية"].forEach(function (k) { if (!by[k]) { by[k] = []; order.push(k); } });
-  if (crmActiveKey() === "perf") ["تجريبية", "فيها ردود", "بلا ردود بعد"].forEach(function (k) { if (!by[k]) { by[k] = []; order.push(k); } });
+  /* Only seed an empty group the CURRENT filter could actually contain. Seeding «تجريبية ٠» while
+     the فعلية pill reads «تجريبية (١)» puts two different counts of the same thing on one screen. */
+  if (crmActiveKey() === "class") {
+    ["فعلية", "تجريبية"].forEach(function (k) {
+      var excluded = (campTab === "real" && k === "تجريبية") || (campTab === "test" && k === "فعلية");
+      if (!by[k] && !excluded) { by[k] = []; order.push(k); }
+    });
+  }
+  if (crmActiveKey() === "perf") ["تجريبية", "بلا جمهور", "لم تُرسل بعد", "فيها ردود", "بلا ردود بعد"].forEach(function (k) { if (!by[k]) { by[k] = []; order.push(k); } });
   /* Months must run newest-first regardless of the row sort, or «أغسطس» lands after «يوليو»
      whenever the list is sorted by replies. Keyed on each group's newest launch. */
   if (crmActiveKey() === "month") {
@@ -320,7 +353,8 @@ function crmGroupView(withStAll) {
       '<span style="font-size:13px;font-weight:700;color:#101828;">' + esc(k) + '</span>' +
       '<span class="cntpill">' + fmtN(g.by[k].length) + '</span>' +
       '<span style="flex:1"></span><span style="font-size:10.5px;color:#98A2B3;">' + g.def[3] + '</span></div>' +
-      '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">';
+      '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">' +
+      crmHeaderRow(false);
     rows.forEach(function (x) { h += crmRow(x.c, x.st); });
     if (!rows.length) h += '<div style="padding:26px;text-align:center;color:#98A2B3;font-size:12px;">لا حملات في هذه المجموعة</div>';
     h += '</div></div>';
@@ -349,7 +383,7 @@ function crmKanbanView(withStAll) {
         ' onclick="location.hash=&quot;kmon/' + c.id + '&quot;">' +
         '<div class="nm">' + esc(c.name) + '</div>' +
         '<div class="mt">' + fmtD(c.created_at) + (c.product ? " · " + esc(c.product) : "") + '</div>' +
-        '<div class="fig"><span>الجمهور <b>' + fmtN(st.targeted) + '</b></span><span>مشاهدة <b>' + crmPct(st.seen, st.targeted) + '</b></span><span>ردود <b>' + crmPct(st.replied, st.targeted) + '</b></span></div>' +
+        '<div class="fig"><span>الجمهور <b>' + fmtN(st.targeted) + '</b></span><span>مشاهدة <b>' + crmPctD(st.seen, st) + '</b></span><span>ردود <b>' + crmPctD(st.replied, st) + '</b></span></div>' +
         '</div>';
     });
     if (!rows.length) h += '<div class="kdrop">' + (canDrag ? "اسحب حملة هنا لتغيير تصنيفها" : "لا حملات") + '</div>';
@@ -434,13 +468,13 @@ function vKmonDetailCrm(id, d) {
     '<div class="acts"><span class="chip ' + ps.cls + '">' + ps.label + '</span></div></div>';
 
   /* حكم الحملة — the verdict hero stays page-level so it is never hidden behind a tab. */
-  var yieldPer100 = crmRate(st.interested, st.targeted);
+  var yieldPer100 = crmDeliveryRate(st.interested, st);
   h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
     '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
     '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
     crmVerdict(st) + '</div></div>' +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
-    [["نسبة المشاهدة", crmRate(st.seen, st.targeted)], ["نسبة الردود", crmRate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
+    [["نسبة المشاهدة", crmDeliveryRate(st.seen, st)], ["نسبة الردود", crmDeliveryRate(st.replied, st)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
       .map(function (x) {
         return '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' +
           (x[1] === null ? "—" : fmtN(x[1]) + '<span style="font-size:14px;color:#9FC0E4;">٪</span>') +

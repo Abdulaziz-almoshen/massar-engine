@@ -150,6 +150,33 @@ SELECTION_LEAKS = [
         crmClear();
         return bad === null ? '' : 'the bulk bar is covered at ' + bad;
      }"""),
+    # CPO round-30 musts, each recreated.
+    ("m1-unsent-vocabulary", "#kmon/1", """() => {
+        campaigns = window.__qaFixture('zerotargets'); render(false);
+        var t = document.body.innerText;
+        if (t.indexOf('بلا ردود بعد') !== -1)
+          return 'a never-sent campaign is still chipped «بلا ردود بعد»';
+        if (t.indexOf('٠٪') !== -1)
+          return 'a never-sent campaign still shows a ٠٪ delivery rate';
+        return (t.indexOf('بلا جمهور') !== -1 || t.indexOf('لم تُرسل') !== -1) ? ''
+          : 'no never-sent vocabulary on the record';
+     }"""),
+    ("m2-group-headers", "#kmon", """() => {
+        campaigns = window.__qaFixture('default'); render(false);
+        crmSetView('group');
+        var t = document.body.innerText;
+        var missing = ['الخدمة','الحالة','الجمهور','مشاهدة','ردود','التقدّم'].filter(function(h){ return t.indexOf(h) === -1; });
+        crmSetView('list');
+        return missing.length === 0 ? '' : 'تجميع view has no column headers: ' + missing.join(', ');
+     }"""),
+    ("m3-board-matches-pill", "#kmon", """() => {
+        campaigns = window.__qaFixture('default'); render(false);
+        setCampTab('real'); crmSetView('kanban');
+        var cols = [].slice.call(document.querySelectorAll('.kcol .lb')).map(function(e){ return e.textContent.trim(); });
+        crmSetView('list'); setCampTab('all');
+        return cols.indexOf('تجريبية') === -1 ? ''
+          : 'class board renders a تجريبية column while the فعلية filter excludes it';
+     }"""),
     ("leak-navigate", "#kmon/1", """() => {
         campaigns = window.__qaFixture('default'); render(false);
         crmToggleD('96650000000010'); crmToggleD('96650000000011');
