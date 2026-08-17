@@ -98,6 +98,52 @@ export const CAMPAIGNS_CRM_CSS = `
   .ctabs button { font-family:inherit; font-size:13px; font-weight:700; color:#667085; background:none;
     border:none; border-bottom:2px solid transparent; padding:0 0 11px; cursor:pointer; white-space:nowrap; }
   .ctabs button.on { color:#1F7A73; border-bottom-color:#1F7A73; }
+
+  /* ===== S1: the row grid lives in CSS, not in an inline style attribute =====
+     It was an inline style on every row and header, which no media query can override — the phone
+     layout was unreachable without !important until this moved here. .c-fig uses display:contents
+     on the wide layout so its three children act as grid items, and becomes a flex line on the
+     phone: ONE dom for both, never a parallel mobile row. */
+  .crmgrid { min-width: 940px; }
+  .crow { display:grid; grid-template-columns: 40px 2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;
+    gap:12px; align-items:center; }
+  .crow .c-fig, .crow .c-meta { display: contents; }
+  .fig { display:flex; gap:12px; font-size:11px; color:#475467; }
+  .crow .c-num { text-align:center; font-size:13px; font-weight:700; color:#101828; font-variant-numeric:tabular-nums; }
+  /* display lives in CSS, never inline: an inline display:flex beats a media query and
+     kept التقدّم rendering as a squeezed 40px stub on the phone row. */
+  .crow .c-prog { display:flex; align-items:center; gap:9px; }
+  .cedge { display:none; }
+
+  @media (max-width: 599px) {
+    /* The nine-column grid cannot answer "which campaign, did it work" on a phone — at 375 every
+       figure sat behind a sideways drag. Three stacked lines, same DOM, same cells. */
+    .crmgrid { min-width: 0; }
+    .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:6px; column-gap:10px;
+      align-items:start; position:relative; padding-block-end:16px !important; }
+    .crow .selcell { grid-row: 1 / 4; grid-column: 1; align-self:center; }
+    .crow .c-name  { grid-row: 1; grid-column: 2; }
+    .crow .c-act   { grid-row: 1; grid-column: 3; }
+    /* product + chip are ONE line: the chip is flex:none and the product ellipsizes first, so a
+       long state label can never squeeze the campaign name the way it did when both sat in the
+       auto-sized third column. */
+    .crow .c-meta  { display:flex; align-items:center; gap:8px; min-width:0;
+      grid-row: 2; grid-column: 2 / 4; }
+    .crow .c-meta .c-prod  { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .crow .c-meta .c-state { flex:none; }
+    .crow .c-fig   { display:flex; grid-row: 3; grid-column: 2 / 4; flex-wrap:wrap; }
+    .crow .c-num   { text-align:start; }
+    /* التقدّم is the one column that cannot survive as text here: it becomes a hairline meter on
+       the row's block-end edge, so stacked rows read as a scannable column of bars. */
+    .crow .c-prog  { display:none; }
+    .crow .cedge   { display:block; position:absolute; inset-inline:0; inset-block-end:0; height:3px;
+      background:#EAECF0; }
+    .crow .cedge > i { display:block; height:100%; background:#1F7A73; }
+    .thead-wide { display:none; }
+    .thead-narrow { display:flex !important; }
+  }
+  .thead-narrow { display:none; align-items:center; gap:10px; padding:12px 16px; background:#F9FAFB;
+    border-block-end:1px solid #EAECF0; font-size:11.5px; font-weight:700; color:#667085; }
 `;
 
 export const CAMPAIGNS_CRM_JS = `
@@ -233,7 +279,16 @@ function crmControlBar(nShown, nTotal) {
           (crmView === "kanban" ? "لوحة: " : "تجميع حسب: ") + k[1] + '</option>';
       }).join("") + '</select>';
   }
-  h += '<span class="cntpill">' + fmtN(nTotal) + " حملة</span></div>";
+  h += '<span class="cntpill">' + fmtN(nTotal) + " حملة</span>";
+  /* Said ONCE, beside the selector that chose it, instead of repeated on every group header and
+     again under the board. */
+  if (crmView !== "list") {
+    var kd = crmKeyDef(crmActiveKey());
+    h += '<div style="flex-basis:100%;font-size:10.5px;color:#98A2B3;padding-top:2px;">' +
+      esc(kd[1]) + " — " + esc(kd[3]) +
+      (crmView === "kanban" && crmActiveKey() !== "class" ? " · هذه اللوحة للعرض فقط." : "") + '</div>';
+  }
+  h += "</div>";
   return h;
 }
 
@@ -250,47 +305,71 @@ function crmFiltered() {
   else withSt.sort(function (a, b) { return Number(b.c.created_at) - Number(a.c.created_at); });
   return withSt;
 }
-var CRM_GRID = "40px 2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px";
 
 function crmRow(c, st) {
   var isTest = campIsTest(c);
   var ps = campPerfState(c, st);
   var prog = crmRate(st.delivered, st.targeted);
   var on = !!crmSel[c.id];
-  return '<div class="trow krow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;kmon/' + c.id + '&quot;" style="display:grid;grid-template-columns:' + CRM_GRID + ';gap:12px;padding:16px 22px;align-items:center;">' +
+  /* N1: one icon with STATE, not two directional glyphs. The two actions are opposite ends of a
+     single boolean, and it reuses the row's own status-dot colours so the dot above teaches the
+     mapping. The directional title/aria-label stay — they are the a11y floor for an icon button. */
+  var actTitle = isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية";
+  /* The km class is not decoration: dashboard.ts:229 applies a legacy 4-column mobile grid to
+     .trow:not(.km) below 900px, with nth-child(4) and (5) hidden. That selector is (0,2,0) and
+     beat .crow, which is why the phone row rendered four tracks with the figures line missing.
+     The original vKmon row carries km for exactly this reason. */
+  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;kmon/' + c.id + '&quot;" style="padding:16px 22px;">' +
     '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(c.name) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggle(' + c.id + ')"></div>' +
-    '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ';box-shadow:0 0 0 3px ' + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
+    '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ';box-shadow:0 0 0 3px ' + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
     '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
     '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + '</div></div></div>' +
-    '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + '</div>' +
-    '<div><span class="chip ' + ps.cls + '"><span style="width:6px;height:6px;border-radius:999px;background:' + ps.dot + ';"></span>' + ps.label + '</span></div>' +
-    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + '</div>' +
-    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPctD(st.seen, st) + '</div>' +
-    '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + crmPctD(st.replied, st) + '</div>' +
-    '<div style="display:flex;align-items:center;gap:9px;">' +
+    '<div class="c-meta">' +
+    '<div class="c-prod" style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' + esc(c.product || "—") + '</div>' +
+    '<div class="c-state"><span class="chip ' + ps.cls + '" style="white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;background:' + ps.dot + ';"></span>' + ps.label + '</span></div></div>' +
+    '<div class="c-fig fig">' +
+      '<div class="c-num"><span class="lbl-ph">الجمهور </span>' + fmtN(st.targeted) + '</div>' +
+      '<div class="c-num"><span class="lbl-ph">مشاهدة </span>' + crmPctD(st.seen, st) + '</div>' +
+      '<div class="c-num"><span class="lbl-ph">ردود </span>' + crmPctD(st.replied, st) + '</div>' +
+    '</div>' +
+    '<div class="c-prog">' +
       (prog === null
         ? '<span style="font-size:11.5px;color:#98A2B3;">لا جهات استهداف</span>'
         : '<div class="prog" style="flex:1;height:6px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#667085;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + '٪</span>') +
     '</div>' +
-    '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + '</button></div></div>';
+    '<div class="c-act" style="text-align:center;"><button class="kebab" title="' + actTitle + '" aria-label="' + actTitle + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + ic("target", 17, isTest ? "#D0D5DD" : "#1F7A73") + '</button></div>' +
+    /* prog === null renders NO bar rather than an empty one: the «بلا جمهور» chip already says why. */
+    (prog === null ? "" : '<div class="cedge" role="img" aria-label="التقدّم ' + fmtN(prog) + '٪"><i style="width:' + prog + '%;"></i></div>') +
+  '</div>';
 }
 
-/* The column header is shared with crmGroupView. It shipped only in the list view, so تجميع
-   rendered four unlabelled numeric columns — three of which look identical. */
 function crmHeaderRow(withSelectAll, allOn, nOver, nTotal) {
-  return '<div style="display:grid;grid-template-columns:' + CRM_GRID + ';gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
-    (withSelectAll
-      ? '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()"></div>'
-      : '<div class="selcell"></div>') +
-    '<div>الحملة' + (withSelectAll && nOver > 0 ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#1F7A73;font-weight:700;cursor:pointer;font-size:10.5px;">تحديد المطابقين (' + fmtN(nTotal) + ')</span>' : "") + '</div>' +
-    '<div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
+  var selAll = withSelectAll && nOver > 0
+    ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#1F7A73;font-weight:700;cursor:pointer;font-size:10.5px;">تحديد المطابقين (' + fmtN(nTotal) + ')</span>'
+    : "";
+  var box = withSelectAll
+    ? '<input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()">'
+    : "";
+  /* Below 600 the nine-column header cannot render and must not be faked — the stacked row labels
+     its own figures. It collapses to one strip carrying only the selection controls. */
+  return '<div class="crow thead-wide" style="padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
+      '<div class="selcell" style="opacity:1;">' + box + '</div>' +
+      '<div>الحملة' + selAll + '</div><div class="c-meta"><div>الخدمة</div><div>الحالة</div></div>' +
+      '<div class="c-fig fig" style="font-weight:700;color:#667085;">' +
+        '<div class="c-num" style="color:#667085;font-size:11.5px;">الجمهور</div>' +
+        '<div class="c-num" style="color:#667085;font-size:11.5px;">مشاهدة</div>' +
+        '<div class="c-num" style="color:#667085;font-size:11.5px;">ردود</div>' +
+      '</div>' +
+      '<div>التقدّم</div><div></div></div>' +
+    '<div class="thead-narrow">' + (withSelectAll ? '<span class="selcell" style="opacity:1;">' + box + '</span><span>تحديد المعروض</span>' : "") +
+      '<span style="flex:1"></span>' + selAll + '</div>';
 }
 
 function crmListView(withStAll) {
   var withSt = withStAll.slice(0, LIST_CAP);
   var nOver = withStAll.length - withSt.length;
   var allOn = withSt.length > 0 && withSt.every(function (x) { return crmSel[x.c.id]; });
-  var h = '<div class="tblwrap rise"><div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">' +
+  var h = '<div class="tblwrap rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
     crmHeaderRow(true, allOn, nOver, withStAll.length);
   withSt.forEach(function (x) { h += crmRow(x.c, x.st); });
   if (!withSt.length) h += crmEmptyList();
@@ -352,8 +431,8 @@ function crmGroupView(withStAll) {
       '<div style="display:flex;align-items:center;gap:9px;padding:13px 18px;border-bottom:1px solid #EAECF0;background:#F9FAFB;">' +
       '<span style="font-size:13px;font-weight:700;color:#101828;">' + esc(k) + '</span>' +
       '<span class="cntpill">' + fmtN(g.by[k].length) + '</span>' +
-      '<span style="flex:1"></span><span style="font-size:10.5px;color:#98A2B3;">' + g.def[3] + '</span></div>' +
-      '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:940px;">' +
+      '</div>' +
+      '<div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
       crmHeaderRow(false);
     rows.forEach(function (x) { h += crmRow(x.c, x.st); });
     if (!rows.length) h += '<div style="padding:26px;text-align:center;color:#98A2B3;font-size:12px;">لا حملات في هذه المجموعة</div>';
@@ -374,7 +453,7 @@ function crmKanbanView(withStAll) {
   g.order.forEach(function (k) {
     h += '<div class="kcol" data-col="' + esc(k) + '"' +
       (canDrag ? ' ondragover="crmDragOver(event,this)" ondragleave="crmDragLeave(this)" ondrop="crmDrop(event,&quot;' + (k === "تجريبية" ? "test" : "real") + '&quot;,this)"' : "") + '>' +
-      '<div class="kcolh"><div><div class="lb">' + esc(k) + '</div><div class="why">' + g.def[3] + '</div></div>' +
+      '<div class="kcolh"><div><div class="lb">' + esc(k) + '</div></div>' +
       '<span style="flex:1"></span><span class="cntpill">' + fmtN(g.by[k].length) + '</span></div>';
     var rows = g.by[k].slice(0, LIST_CAP);
     rows.forEach(function (x) {
@@ -391,7 +470,6 @@ function crmKanbanView(withStAll) {
     h += '</div>';
   });
   h += '</div>';
-  if (!canDrag) h += '<div style="font-size:11px;color:#98A2B3;margin-top:8px;">هذه اللوحة للعرض فقط — ' + g.def[3] + '.</div>';
   return h;
 }
 
@@ -430,9 +508,13 @@ function vKmonCrm(d) {
 /* ============================= the record screen ============================= */
 function crmSpecStrip(camp, st) {
   var msg = camp.message ? String(camp.message) : "";
+  /* The link is emitted hidden and unhidden only if the clamped bubble ACTUALLY overflows.
+     msg.length > 90 was a proxy and it was wrong in the visible direction: measured at 1440, a
+     155-char message fits on one line (scrollHeight 44 == clientHeight 44) and still offered
+     «عرض النص كاملًا» — a control that expands nothing. */
   var body = msg
-    ? '<div class="bub2' + (crmMsgOpen ? "" : " clamp") + '">' + esc(msg) + '</div>' +
-      (msg.length > 90 ? '<div style="margin-top:7px;"><span class="lnk" onclick="crmToggleMsg()" style="color:#1F7A73;font-weight:700;font-size:11.5px;cursor:pointer;">' + (crmMsgOpen ? "طيّ النص" : "عرض النص كاملًا") + '</span></div>' : "")
+    ? '<div class="bub2' + (crmMsgOpen ? "" : " clamp") + '" id="crmmsg">' + esc(msg) + '</div>' +
+      '<div id="crmmsgmore" style="margin-top:7px;' + (crmMsgOpen ? "" : "display:none;") + '"><span class="lnk" onclick="crmToggleMsg()" style="color:#1F7A73;font-weight:700;font-size:11.5px;cursor:pointer;">' + (crmMsgOpen ? "طيّ النص" : "عرض النص كاملًا") + '</span></div>'
     : '<div style="font-size:12px;color:#98A2B3;padding:8px 2px;">لم يُحفظ نص هذه الحملة.</div>';
   return '<div class="spec rise">' +
     '<div class="wa">' + body + '</div>' +
@@ -481,8 +563,6 @@ function vKmonDetailCrm(id, d) {
           '</div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + '</div></div>';
       }).join("") + '</div></div>';
 
-  h += crmSpecStrip(camp, st);
-
   /* ---- the move cards, computed once: the count rides on the tab label ---- */
   var seenSilent = rows.filter(function (r) { return r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin); });
   var notDelivered = rows.filter(function (r) { return r.contact && atOrAfter((r.contact.statusTimes || {}).failed, cwin) && !atOrAfter((r.contact.statusTimes || {}).delivered, cwin); });
@@ -496,6 +576,26 @@ function vKmonDetailCrm(id, d) {
   if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB", "silent"]);
   if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2", "failed"]);
   if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB", ""]);
+
+  /* S4 — the single highest-value move, surfaced under the verdict so the operator sees the next
+     action without opening a tab. moves is already ordered hot -> seen-silent -> not-delivered ->
+     top-cause, which is a value order; this shows moves[0] and invents no score. The fourth kind
+     has no filter action, so the strip degrades to the tab link. ZERO moves renders NOTHING — a
+     strip announcing an absence is chrome, and the count-less tab plus «لا توصية الآن» carries it. */
+  if (moves.length) {
+    var m0 = moves[0];
+    h += '<div class="rise" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:' + m0[3] + ';border:1px solid #EAECF0;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
+      ic("spark", 17, m0[2]) +
+      '<span style="font-size:13px;font-weight:700;color:' + m0[2] + ';">' + esc(m0[0]) + '</span>' +
+      '<span style="flex:1;min-width:12px;"></span>' +
+      (m0[4] ? '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;color:#2E7D77;background:#fff;border:1px solid #3FB6B0;font-weight:700;" onclick="crmGoFilter(&quot;' + m0[4] + '&quot;)">افتح هذه الفئة</button>' : "") +
+      '<span class="lnk" onclick="crmSetDetailTab(&quot;next&quot;)" style="color:#475467;font-weight:700;font-size:11.5px;cursor:pointer;">كل الخطوات (' + fmtN(moves.length) + ')</span>' +
+      '</div>';
+  }
+
+  h += crmSpecStrip(camp, st);
+  setTimeout(crmMeasureMsg, 0);
+
 
   /* A «(٠)» beside «الخطوة التالية» reads as a broken counter rather than as "nothing to do"; the
      panel itself says so in words. Show the count only when there is one. */
@@ -591,6 +691,19 @@ function crmTargetRows(shown, cwin) {
   out += '</div>';
   return out;
 }
+
+/* Measured after layout, again once the webfont swaps (the swap is the real reason a length proxy
+   was reached for), and on a debounced resize. Never measures the unclamped node. */
+function crmMeasureMsg() {
+  var el = document.getElementById("crmmsg"), more = document.getElementById("crmmsgmore");
+  if (!el || !more) return;
+  if (crmMsgOpen) { more.style.display = ""; return; }
+  more.style.display = (el.scrollHeight > el.clientHeight + 1) ? "" : "none";
+}
+window.addEventListener("resize", function () {
+  clearTimeout(window.__crmrz); window.__crmrz = setTimeout(crmMeasureMsg, 150);
+});
+try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(crmMeasureMsg); } catch (e) {}
 
 /* ============================== the guarded entry ==============================
    dashboard.ts's render() calls ONLY this. Two jobs:

@@ -204,6 +204,48 @@ SELECTION_LEAKS = [
         return cols.indexOf('تجريبية') === -1 ? ''
           : 'class board renders a تجريبية column while the فعلية filter excludes it';
      }"""),
+    ("s4-move-strip", "#kmon/1", """async () => {
+        var c = window.__qaFixture('default');
+        var t0 = Date.now() - 3600000;
+        campaigns = [c[0]];
+        cache = cache || {};
+        cache.contacts = c[0].targets.map(function(t, i){
+          return { phone: t.phone, waName: 'جهة ' + (i+1),
+                   statusTimes: { sent: t0, delivered: t0, read: t0 },
+                   transcript: [{role:'agent', ts:t0, text:'x'}], tags: [], test:false };
+        });
+        render(false);
+        await new Promise(r => setTimeout(r, 250));
+        var withMoves = [].slice.call(document.querySelectorAll('.rise')).filter(function(e){
+          return e.textContent.indexOf('كل الخطوات') !== -1; })[0];
+        if (!withMoves) return 'a record WITH moves shows no top-move strip';
+        var spec = document.querySelector('.spec');
+        if (spec && !(withMoves.compareDocumentPosition(spec) & 4))
+          return 'the move strip is not above the launch strip';
+        cache.contacts = [];
+        campaigns = window.__qaFixture('zerotargets'); render(false);
+        await new Promise(r => setTimeout(r, 250));
+        var none = [].slice.call(document.querySelectorAll('.rise')).filter(function(e){
+          return e.textContent.indexOf('كل الخطوات') !== -1; })[0];
+        return none ? 'a record with ZERO moves still renders a strip (chrome announcing an absence)' : '';
+     }"""),
+    # BOTH views. The caption was repeated on the group header AND on every kanban column header
+    # AND under the board; a group-only assertion cannot see a regression in the kanban path.
+    ("n1-caption-said-once", "#kmon", """async () => {
+        campaigns = window.__qaFixture('default'); render(false);
+        var bad = [];
+        for (var i = 0; i < 2; i++) {
+          var view = i === 0 ? 'group' : 'kanban';
+          crmSetView(view);
+          if (view === 'kanban') crmSetGroup('product');   // the board that carries a caption
+          await new Promise(r => setTimeout(r, 220));
+          var t = document.body.innerText;
+          var n = (t.match(/تُحدَّد عند الإطلاق ولا تتغيّر/g) || []).length;
+          if (n !== 1) bad.push(view + ': caption appears ' + n + ' times, must be exactly once');
+        }
+        crmSetView('list');
+        return bad.join('; ');
+     }"""),
     ("leak-navigate", "#kmon/1", """() => {
         campaigns = window.__qaFixture('default'); render(false);
         crmToggleD('96650000000010'); crmToggleD('96650000000011');
@@ -213,6 +255,63 @@ SELECTION_LEAKS = [
           'cohort from campaign 1 survived onto campaign 3: ' + JSON.stringify(leaked);
      }"""),
 ]
+
+
+# F1 polish regressions. PHONE ones must run at 375 — at 1440 the breakpoint is inactive and every
+# one of them would pass vacuously.
+NARROW_CHECKS = [
+    ("s1-phone-row", "#kmon", """() => {
+        campaigns = window.__qaFixture('default'); render(false);
+        var row = document.querySelector('.krow.crow');
+        if (!row) return 'no campaign row';
+        var cols = getComputedStyle(row).gridTemplateColumns.split(' ').length;
+        if (cols !== 3) return 'phone row has ' + cols + ' columns, expected 3 (the legacy .trow:not(.km) rule is winning again)';
+        var fig = row.querySelector('.c-fig');
+        if (!fig || getComputedStyle(fig).display === 'none') return 'the figures line is hidden on the phone row';
+        var txt = fig.innerText;
+        var missing = ['الجمهور','مشاهدة','ردود'].filter(function(l){ return txt.indexOf(l) === -1; });
+        if (missing.length) return 'phone row is missing figures: ' + missing.join(', ');
+        if (getComputedStyle(row.querySelector('.c-prog')).display !== 'none') return 'the wide التقدّم cell is still rendered on the phone';
+        if (!row.querySelector('.cedge')) return 'no edge meter on the phone row';
+        var wrap = document.querySelector('.crmgrid');
+        if (parseInt(getComputedStyle(wrap).minWidth, 10) > 0) return 'the 940px min-width is still forcing a sideways scroller';
+        return '';
+     }"""),
+    # BOTH directions, or the test is vacuous: a long message at 375 overflows, so "always show"
+    # and "show on overflow" agree there and a mutation that reverts to the length proxy passes.
+    # The short message is the only case that separates them.
+    ("s3-link-on-overflow", "#kmon/1", """async () => {
+        var LONG = 'السلام عليكم، نوفّر خدمة الإجازات المرضية الإلكترونية للمنشآت الصحية بتكامل كامل مع منصة صحة ومع أنظمة الموارد البشرية. هل ترغبون بمعرفة التفاصيل والأسعار؟';
+        var bad = [];
+        var cases = [['short', 'نص قصير.'], ['long', LONG]];
+        for (var i = 0; i < cases.length; i++) {
+          var c = window.__qaFixture('default');
+          c[0].message = cases[i][1];
+          campaigns = c; crmMsgOpen = false; render(false);
+          await new Promise(r => setTimeout(r, 350));
+          var el = document.getElementById('crmmsg'), more = document.getElementById('crmmsgmore');
+          if (!el || !more) { bad.push(cases[i][0] + ': launch strip did not render'); continue; }
+          var overflows = el.scrollHeight > el.clientHeight + 1;
+          var shown = getComputedStyle(more).display !== 'none';
+          if (overflows !== shown)
+            bad.push(cases[i][0] + ': link shown=' + shown + ' but the bubble overflow=' + overflows);
+        }
+        return bad.join('; ');
+     }"""),
+]
+
+
+def run_narrow(page, base, tok) -> list:
+    out = []
+    for case_id, route, js in NARROW_CHECKS:
+        page.goto(f"{base}/dashboard?token={tok}{route}", wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)
+        page.evaluate(FIXTURE)
+        why = page.evaluate(js)
+        out.append({"case": case_id, "kind": "regression", "viewport": "375x812",
+                    "verdict": "PASS" if why == "" else "FAIL",
+                    "detail": why or "phone layout holds"})
+    return out
 
 
 def run_selection_leaks(page, base, tok) -> list:
@@ -320,6 +419,11 @@ def main() -> int:
                                   reduced_motion="reduce")
         page = ctx.new_page()
         leaks = run_selection_leaks(page, BASE, tok)
+        ctx375 = browser.new_context(viewport={"width": 375, "height": 812}, locale="ar-SA",
+                                     reduced_motion="reduce")
+        pg375 = ctx375.new_page()
+        leaks += run_narrow(pg375, BASE, tok)
+        ctx375.close()
         for rec in leaks:
             results.append(rec)
             if rec["verdict"] != "PASS":
