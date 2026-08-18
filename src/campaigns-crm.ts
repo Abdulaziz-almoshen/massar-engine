@@ -473,7 +473,9 @@ function crmHeaderRow(withSelectAll, allOn, nOver, nTotal) {
 }
 
 function crmListView(withStAll) {
-  var withSt = withStAll.slice(0, LIST_CAP);
+  /* Paged, not truncated. At 200 launches the old slice made campaign 61 unreachable however the
+     reader searched, under a line that said searching would reach it. */
+  var withSt = pageSlice("kmon", withStAll);
   var nOver = withStAll.length - withSt.length;
   var allOn = withSt.length > 0 && withSt.every(function (x) { return crmSel[x.c.id]; });
   var h = '<div class="tblwrap crmflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
@@ -481,8 +483,8 @@ function crmListView(withStAll) {
   withSt.forEach(function (x) { h += crmRow(x.c, x.st); });
   if (!withSt.length) h += crmEmptyList();
   h += '</div></div>';
-  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span>' +
-    (nOver ? '<span style="color:#B54708;font-weight:700;">تُعرض أحدث ' + fmtN(LIST_CAP) + " حملة من " + fmtN(withStAll.length) + ". ضيّق بالبحث لرؤية الباقي.</span>" : "") + '</div></div>';
+  h += '<div class="tfoot">' + pageBar("kmon", withStAll.length, "حملة") +
+    '<span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span></div></div>';
   return h;
 }
 
@@ -626,7 +628,7 @@ function vKmonCrm(d) {
   if (!campaigns.length) {
     return h + '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#1F7A73;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
   }
-  h += crmControlBar(Math.min(withStAll.length, LIST_CAP), withStAll.length);
+  h += crmControlBar(Math.min(withStAll.length, PAGE_SIZE), withStAll.length);
   if (crmView === "kanban") h += crmKanbanView(withStAll);
   else if (crmView === "group") h += crmGroupView(withStAll);
   else h += crmListView(withStAll);

@@ -131,7 +131,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      five alert levels; none of these is an alert, so the colour is the group's dot, once. */
   /* معرفة الخدمة rows. SIX cells, six tracks — the arity is stated in both directions here so a
      later column cannot be added on one side only. */
-  .kbrow { display: grid; grid-template-columns: minmax(0,1.8fr) 1fr minmax(0,1.4fr) .55fr .7fr auto;
+  .kbrow { display: grid; grid-template-columns: minmax(0,1.8fr) 1fr minmax(0,1.4fr) .55fr .7fr 52px;
     align-items: center; gap: 14px; padding: 12px 20px 12px 12px; border-top: 1px solid #EDEDED;
     text-decoration: none; transition: background .14s ease; }
   .kbrow:first-of-type { border-top: 0; }
@@ -148,7 +148,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     .kbrow { grid-template-columns: minmax(0,1fr) auto; row-gap: 5px; }
     .kbrow .st, .kbrow .fig { grid-column: 1 / 3; }
   }
-  .oprow { display: grid; grid-template-columns: 28px minmax(0,1.5fr) 1.05fr minmax(0,2fr) auto;
+  .oprow { display: grid; grid-template-columns: 28px minmax(0,1.5fr) 1.05fr minmax(0,2fr) 52px;
     align-items: center; gap: 12px; padding: 11px 20px 11px 12px; border-top: 1px solid #EDEDED;
     cursor: pointer; transition: background .14s ease; }
   .oprow:first-of-type { border-top: 0; }
@@ -208,7 +208,19 @@ export const DASHBOARD_HTML = `<!doctype html>
   .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
   .sparse b { color: #171717; font-weight: 700; }
   .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
-  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 11.5px; color: #7C7C7C; }
+  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 12px; color: #7C7C7C; }
+  /* Pagination. Every list in this product used to stop at LIST_CAP and tell the reader to narrow
+     the search — which at 3,000 rows means rows 61 and beyond are simply unreachable, whatever you
+     type. Truncation is not pagination. */
+  .pgnav { display: flex; align-items: center; gap: 6px; }
+  .pgnav button, .pgsize { font-family: inherit; font-size: 12px; color: #525252; background: #fff;
+    border: 1px solid #E2E2E2; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
+    transition: background .14s ease, border-color .14s ease; }
+  .pgnav button:hover:not(:disabled), .pgsize:hover { background: #F3F3F3; border-color: #C7C7C7; }
+  .pgnav button:disabled { color: #C7C7C7; cursor: default; background: #F8F8F8; }
+  .pgnav .at { font-variant-numeric: tabular-nums; color: #383838; padding: 0 4px; white-space: nowrap; }
+  .pgrange { font-variant-numeric: tabular-nums; color: #525252; }
+  .pgrange b { color: #171717; font-weight: 500; }
   .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EDEDED; background: #fff; color: #525252; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .pgbtn.on { background: #171717; color: #fff; border-color: #171717; }
   .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #999999; font-size: 17px; cursor: pointer; line-height: 1; }
@@ -458,7 +470,66 @@ let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = fa
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
 let manualOpen = false; let manualStat = "";
-const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
+// Elapsed time in the unit a person would say it in. Below two days an hour count is what the
+// operator acts on («٩ ساعات بلا متابعة»); above it, hours stop being information.
+function fmtAgo(ms) {
+  if (!ms || ms < 0) return "";
+  const h = Math.round(ms / 3600e3);
+  if (h < 1) return "أقل من ساعة";
+  if (h < 48) return fmtN(h) + (h === 1 ? " ساعة" : h === 2 ? " ساعتين" : h <= 10 ? " ساعات" : " ساعة");
+  const d = Math.round(h / 24);
+  if (d < 60) return fmtN(d) + (d === 2 ? " يومين" : d <= 10 ? " أيام" : " يومًا");
+  const mo = Math.round(d / 30);
+  return fmtN(mo) + (mo === 2 ? " شهرين" : mo <= 10 ? " أشهر" : " شهرًا");
+}
+const LIST_CAP = 60;   // per-GROUP preview cap on grouped/kanban surfaces only; flat lists paginate
+// ---------------------------------------------------------------------------
+// PAGINATION — one implementation, every flat list.
+//
+// Until now every list sliced to LIST_CAP and printed «ضيّق بالبحث لرؤية الباقي». Simulated at the
+// real target — 200 campaigns, 3,000 targets, 1,700 conversations — that sentence is false: row 61
+// is unreachable no matter what you type, because search narrows the same list the same slice then
+// truncates again. Ten sites did this.
+//
+// PAGE is keyed per list so paging the campaigns list does not move the customers list, and
+// pageOf() CLAMPS instead of writing: a filter that shrinks 34 pages to 1 must not strand the
+// reader on an empty page 34, and a render must not mutate the state its own repaint signature is
+// computed from.
+let PAGE = {};
+let PAGE_SIZE = 50;
+const PAGE_SIZES = [25, 50, 100, 200];
+function pageOf(key, total) {
+  const size = PAGE_SIZE;
+  const pages = Math.max(1, Math.ceil(total / size));
+  const p = Math.min(Math.max(1, PAGE[key] || 1), pages);
+  return { p, pages, size, total, from: total ? (p - 1) * size + 1 : 0, to: Math.min(total, p * size) };
+}
+function pageSlice(key, rows) {
+  const m = pageOf(key, rows.length);
+  return rows.slice((m.p - 1) * m.size, m.p * m.size);
+}
+// The range and the total are ALWAYS stated, even on one page — «٦١–١٢٠ من ١٬٧٠٠» is the sentence
+// that tells the reader the list continues, and its absence is what made truncation look complete.
+function pageBar(key, total, unit) {
+  const m = pageOf(key, total);
+  let h = '<span class="pgrange">' + (total
+    ? "<b>" + fmtN(m.from) + "–" + fmtN(m.to) + "</b> من " + fmtN(total) + " " + unit
+    : "لا " + unit) + "</span>";
+  if (total > PAGE_SIZES[0]) {
+    h += '<span class="pgnav">' +
+      '<select class="pgsize" onchange="pageSetSize(this.value)" aria-label="عدد الصفوف في الصفحة">' +
+      PAGE_SIZES.map((n) => '<option value="' + n + '"' + (n === m.size ? " selected" : "") + ">" + fmtN(n) + " لكل صفحة</option>").join("") + "</select>";
+    if (m.pages > 1) {
+      h += '<button onclick="pageGo(&quot;' + key + '&quot;,' + (m.p - 1) + ')"' + (m.p <= 1 ? " disabled" : "") + ">السابق →</button>" +
+        '<span class="at">' + fmtN(m.p) + " / " + fmtN(m.pages) + "</span>" +
+        '<button onclick="pageGo(&quot;' + key + '&quot;,' + (m.p + 1) + ')"' + (m.p >= m.pages ? " disabled" : "") + ">← التالي</button>";
+    }
+    h += "</span>";
+  }
+  return h;
+}
+window.pageGo = (key, p) => { PAGE[key] = p; render(false); const b = document.getElementById("body"); if (b) b.scrollIntoView({ block: "start" }); };
+window.pageSetSize = (n) => { PAGE_SIZE = Number(n); PAGE = {}; render(false); };
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
 // Opens on «فعلية»: rehearsals and duplicate launches are one click away under «تجريبية»,
@@ -1406,13 +1477,13 @@ function vAimkt() {
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EDEDED;border-radius:10px;padding:9px 13px;background:#F8F8F8;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
       (selN ? '<button class="btn" style="font-size:12px;color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
-    const shown = m.slice(0, LIST_CAP);
-    if (m.length > LIST_CAP) {
-      h += '<div style="display:flex;align-items:center;gap:12px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:12px;padding:12px 16px;margin-bottom:10px;">' +
-        '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + fmtN(m.length) + '</span>' +
-        '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + fmtN(LIST_CAP) + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
+    const shown = pageSlice("aud", m);
+    if (m.length > PAGE_SIZE) {
+      h += '<div style="display:flex;align-items:center;gap:12px;background:#F8F8F8;border:1px solid #EDEDED;border-radius:10px;padding:12px 16px;margin-bottom:10px;">' +
+        '<span style="font-size:18px;font-weight:600;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(m.length) + "</span>" +
+        '<span style="font-size:12.5px;color:#525252;line-height:1.8;">جهة مطابقة للشرائح الحالية. «تحديد المطابقين» يختارهم <b style="font-weight:500;color:#171717;">جميعًا</b> — والقائمة أدناه تُستعرض صفحةً صفحة إن أردت مراجعتهم.</span></div>';
     }
-    h += '<div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
+    h += '<div style="border:1px solid #EDEDED;border-radius:12px 12px 0 0;overflow:hidden;max-height:420px;overflow-y:auto;" class="ms-scroll">' +
       shown.map((e) => {
         const on = entSel.has(e.id);
         return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F3F3F3;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
@@ -1421,8 +1492,8 @@ function vAimkt() {
           attrChips(e, 3) +
           '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7C7C7C;font-size:12px;background:#fafbfc;">+ ' + fmtN(m.length - LIST_CAP) + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
-      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>" +
+      (m.length ? '<div class="tfoot" style="border:1px solid #EDEDED;border-top:0;border-radius:0 0 12px 12px;">' + pageBar("aud", m.length, "جهة") + "</div>" : "");
   }
   h += "</div>";
 
@@ -1869,7 +1940,8 @@ function vMorningList() {
       h += '<div style="padding:16px 20px;font-size:12.5px;color:#999999;">لا أحد في هذه المجموعة بعد.</div></div>';
       continue;
     }
-    h += rows.map((c) => {
+    const shown = pageSlice("op_" + key, rows);
+    h += shown.map((c) => {
       const nm = c.waName || "غير معروف";
       // M3 — this function's own comment above quotes the founder's three questions, and this was
       // the one surface that never learned his answer to the third: it read c.scheduledAt alone, so
@@ -1899,7 +1971,9 @@ function vMorningList() {
         '<span class="ph">+' + esc(c.phone) + "</span>" +
         '<span class="wh">' + when + "</span>" +
         '<span class="go">افتح ←</span></div>';
-    }).join("") + "</div>";
+    }).join("") +
+      (rows.length > PAGE_SIZES[0] ? '<div class="tfoot">' + pageBar("op_" + key, rows.length, "جهة") + "</div>" : "") +
+      "</div>";
   }
   if (unsorted.length) {
     h += '<div style="font-size:12.5px;color:#999999;padding:4px 2px 8px;">' +
@@ -2069,25 +2143,25 @@ function vActionQueue(cs, notifyNumber, nTest) {
   const fresh = live.filter((c) => (interestedOf(c, 0) || c.outcome === "handoff") &&
     now - (c.lastEventAt || 0) <= DAY && !hotIdle.includes(c))
     .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  const seenNoReply = [];
+  const seenNoReply = new Set();
   // Windowed per campaign: this pairs a contact WITH a campaign, so it is a campaign claim and
   // reading lifetime state here would queue a retarget for someone who already replied to that very
   // send — or, worse, who replied to a different campaign entirely.
   campaigns.forEach((cp) => { const w = campWin(cp); cp.targets.forEach((t) => {
     const c = contactByPhone(t.phone);
-    if (c && atOrAfter((c.statusTimes || {}).read, w) && !repliedIn(c, w) && !c.optedOut) seenNoReply.push({ c, cp });
+    if (c && atOrAfter((c.statusTimes || {}).read, w) && !repliedIn(c, w) && !c.optedOut) seenNoReply.add(c.phone);
   }); });
   const stalled = live.filter((c) => (insCache[c.phone] || {}).deal_state === "stalled");
 
-  const hrs = (c) => fmtN(Math.round((now - (c.lastEventAt || 0)) / 3600e3));
+  const hrs = (c) => fmtAgo(now - (c.lastEventAt || 0));
   const tagOf = (c) => (c.tags || []).find((t) => t.level === "hot") || (c.tags || [])[0];
   const items = [];
-  hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#B42318", why: "مؤهلة وبلا متابعة منذ " + hrs(c) + " ساعة",
+  hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#B42318", why: "مؤهلة وبلا متابعة منذ " + hrs(c),
     act: (insCache[c.phone] || {}).next_action || "تواصل مباشرة لاستكمال الاهتمام", href: "customer/" + c.phone }));
   fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#027A48", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
     act: (insCache[c.phone] || {}).next_action || "تابع بينما الاهتمام حيّ", href: "customer/" + c.phone }));
-  if (seenNoReply.length) items.push({ c: null, icon: "eye", dot: "#B54708", name: "شاهدوا الرسالة دون ردّ",
-    why: fmtN(seenNoReply.length) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
+  if (seenNoReply.size) items.push({ c: null, icon: "eye", dot: "#B54708", name: "شاهدوا الرسالة دون ردّ",
+    why: fmtN(seenNoReply.size) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
   stalled.slice(0, 2).forEach((c) => { const ins = insCache[c.phone] || {};
     items.push({ c, dot: "#2F5F94", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
       act: ins.fix_suggestion || "تابع بمعلومة جديدة", href: "customer/" + c.phone }); });
@@ -2098,6 +2172,9 @@ function vActionQueue(cs, notifyNumber, nTest) {
     '<div style="font-size:11.5px;color:#999999;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
     '<span style="display:inline-flex;gap:6px;align-items:center;">' +
     (items.length ? '<span class="cntpill">' + fmtN(items.length) + " إجراء</span>" : "") + testToggleChip(nTest) + "</span></div>";
+  // What the queue is a TOP-OF, stated. Four idle + four fresh + two stalled is a shortlist; the
+  // page must not let a shortlist read as a total.
+  const pool = hotIdle.length + fresh.length + stalled.length + (seenNoReply.size ? 1 : 0);
   if (!items.length) {
     h += '<div style="padding:26px 2px 30px;font-size:12.5px;color:#7C7C7C;line-height:1.9;border-top:1px solid #EDEDED;">' +
       "لا شيء يستحق التدخل الآن. حين يرصد المساعد فرصة مؤهلة أو محادثة تتوقف، يظهر السطر هنا فورًا — ويصلك تنبيه واتساب.</div>";
@@ -2118,6 +2195,11 @@ function vActionQueue(cs, notifyNumber, nTest) {
         '<span class="aqa">' + esc(clip(it.act, 150)) + "</span>" +
         '<span class="aqgo">افتح ←</span></div>';
     }).join("");
+  }
+  if (pool > items.length) {
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid #EDEDED;font-size:12.5px;color:#7C7C7C;">' +
+      '<span>أهمّ ' + fmtN(items.length) + " من " + fmtN(pool) + " تستحق المتابعة.</span>" +
+      '<a href="#opps" style="color:#1F7A73;font-weight:500;text-decoration:none;">لوحة الفرز الكاملة ←</a></div>';
   }
   if (notifyNumber) {
     h += '<div style="display:flex;align-items:center;gap:8px;padding:11px 2px;border-top:1px solid #EDEDED;font-size:11.5px;color:#7C7C7C;">' +
@@ -2906,6 +2988,7 @@ function dataSignature() {
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
     JSON.stringify(entFilters), JSON.stringify(tgtFilters), [...entSel].join(","),
+    JSON.stringify(PAGE), PAGE_SIZE,
   ].join("~");
 }
 function render(fetchNew) {

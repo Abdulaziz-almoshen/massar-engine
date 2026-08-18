@@ -153,7 +153,7 @@ function vTargetsCrm() {
       tgtImportBox();
   }
   var rows = tgtMatches();
-  var shown = rows.slice(0, LIST_CAP);
+  var shown = pageSlice("tgt", rows);
   h += tgtFacetBar();
   h += '<div id="entfstat">' + entImportSummary + "</div>";
   h += tgtImportBox();
@@ -162,9 +162,8 @@ function vTargetsCrm() {
   if (!shown.length) {
     h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;">لا جهة تطابق هذا الفرز.</div>';
   }
-  h += '</div></div><div class="tfoot"><span>' + ic("users", 14) + " " + fmtN(rows.length) + " من " + fmtN(entities.length) + " جهة</span>" +
-    (rows.length > shown.length ? '<span style="color:#B54708;font-weight:500;">تُعرض ' + fmtN(shown.length) + " فقط — استخدم البحث أو الفرز.</span>" : "") +
-    "</div></div>";
+  h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
+    '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
   return h;
 }
 

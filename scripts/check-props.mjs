@@ -341,6 +341,9 @@ const saveSrc = cut("window.propSave = async () => {", "\n// أكّد — one ta
 const confirmSrc = cut("window.propConfirm = async (btn) => {", "\n// Clearing the date must be possible");
 const apptSrc = cut("function appt(c) {", "// --- end appointment");
 const morningSrc = cut("function vMorningList() {", "\nwindow.entDel = async (id) => {");
+// The board paginates per group now, so the SHIPPED pagination primitive is lifted with it rather
+// than stubbed — a stub here would prove the board against slicing that is not the slicing users get.
+const pageSrc = cut("let PAGE = {};", "\nwindow.pageGo =");
 // THE ONE READER, executed. appt() and fmtDay() are what M3 reconciles the appointment to, so the
 // three surfaces below are rendered against the REAL functions, not against a stub of them.
 const A = apptSrc ? new Function("return (" + "function () { " + apptSrc + " return { appt: appt, fmtDay: fmtDay }; }" + ")")()() : null;
@@ -785,6 +788,7 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   const morning = (rows) => new Function("ctx", `
     const { esc, fmtN, fmtT, fmtDay, appt } = ctx;
     const cache = { contacts: ctx.rows }, showTest = true;
+    ${pageSrc}
     ${morningSrc}
     return vMorningList();
   `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows });

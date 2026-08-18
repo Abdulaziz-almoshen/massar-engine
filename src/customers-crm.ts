@@ -182,8 +182,7 @@ function cusControlBar(nTotal) {
 
 /* --------------------------------- views --------------------------------- */
 function cusListView(rows) {
-  var shown = rows.slice(0, LIST_CAP);
-  var over = rows.length - shown.length;
+  var shown = pageSlice("cus", rows);
   var allOn = shown.length > 0 && shown.every(function (c) { return cusSel[c.phone]; });
   var h = '<div class="tblwrap crmflat cusflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + cusHeader(allOn);
   shown.forEach(function (c) { h += cusRow(c); });
@@ -192,8 +191,8 @@ function cusListView(rows) {
       (cusQ.trim() ? 'لا جهة تطابق «' + esc(cusQ.trim()) + '».' : 'لا جهات في هذا التبويب.') + '</div>';
   }
   h += '</div></div>';
-  h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الحالة تُقرأ من سجل المحادثة وحالات التسليم. لا تقديرات.</span>' +
-    (over > 0 ? '<span style="color:#B54708;font-weight:500;">تُعرض ' + fmtN(shown.length) + " من " + fmtN(rows.length) + ". ضيّق بالبحث لرؤية الباقي.</span>" : "") + '</div></div>';
+  h += '<div class="tfoot">' + pageBar("cus", rows.length, "جهة") +
+    '<span>' + ic("clock", 14) + ' الحالة تُقرأ من سجل المحادثة وحالات التسليم. لا تقديرات.</span></div></div>';
   return h;
 }
 
@@ -214,7 +213,7 @@ function cusGroupView(rows) {
   }
   var h = "";
   order.forEach(function (k) {
-    var g = by[k].slice(0, LIST_CAP);
+    var g = by[k].slice(0, LIST_CAP);   /* per-group preview; the flat list paginates */
     h += '<div class="tblwrap crmflat cusflat rise" style="margin-bottom:14px;">' +
       '<div style="display:flex;align-items:center;gap:9px;padding:8px 20px 8px 12px;border-bottom:1px solid #EDEDED;background:#F8F8F8;">' +
       '<span style="font-size:13px;font-weight:500;color:#171717;">' + esc(k) + '</span>' +
@@ -271,7 +270,7 @@ window.cusSearch = function (el) { cusQ = el.value; cusDropSel(); clearTimeout(w
 window.cusToggle = function (ph) { if (cusSel[ph]) delete cusSel[ph]; else cusSel[ph] = true; render(false); };
 window.cusClear = function () { cusSel = {}; render(false); };
 window.cusTogglePage = function () {
-  var shown = cusContacts().slice(0, LIST_CAP);
+  var shown = pageSlice("cus", cusContacts());
   var allOn = shown.length > 0 && shown.every(function (c) { return cusSel[c.phone]; });
   shown.forEach(function (c) { if (allOn) delete cusSel[c.phone]; else cusSel[c.phone] = true; });
   render(false);

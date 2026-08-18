@@ -139,16 +139,15 @@ function vActivityCrm() {
       '<div class="t">لا أحداث بعد</div><div class="s">يظهر هنا كل إرسال وتسليم وردّ فور حدوثه.</div></div>';
   }
   var h = actControlBar(rows.length);
-  var shown = rows.slice(0, LIST_CAP);
+  var shown = pageSlice("act", rows);
   h += '<div class="tblwrap crmflat actflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + actHeader();
   shown.forEach(function (e) { h += actRow(e); });
   if (!shown.length) {
     h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;">' +
       (actQ.trim() ? 'لا حدث يطابق «' + esc(actQ.trim()) + '».' : 'لا أحداث في هذه الفترة.') + '</div>';
   }
-  h += '</div></div><div class="tfoot"><span>' + ic("clock", 14) + ' كل سطر حدث مسجَّل — رسالة أو حالة تسليم. لا تقديرات.</span>' +
-    (rows.length > shown.length ? '<span style="color:#B54708;font-weight:500;">تُعرض ' + fmtN(shown.length) + " من " + fmtN(rows.length) + '.</span>' : "") +
-    '</div></div>';
+  h += '</div></div><div class="tfoot">' + pageBar("act", rows.length, "حدث") +
+    '<span>' + ic("clock", 14) + ' كل سطر حدث مسجَّل — رسالة أو حالة تسليم. لا تقديرات.</span></div></div>';
   return h;
 }
 
