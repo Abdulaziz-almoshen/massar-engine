@@ -16,6 +16,7 @@ import { CAMPAIGNS_CRM_CSS, CAMPAIGNS_CRM_JS } from "./campaigns-crm.js";
 import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
+import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -323,6 +324,7 @@ ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
+${TASKS_CRM_CSS}
 </style>
 </head>
 <body>
@@ -412,7 +414,7 @@ let campMsg = "في أغلب المنشآت الصحية، إصدار {product} 
 
 const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
-  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", g: "g-ci" }, { id: "opps", l: "فرص البيع", g: "g-tr" }, { id: "pipeline", l: "لوحة المتابعة", g: "g-ba" },
+  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", g: "g-ci" }, { id: "opps", l: "فرص البيع", g: "g-tr" }, { id: "pipeline", l: "لوحة المتابعة", g: "g-ba" }, { id: "tasks", l: "المهام", g: "g-tb" }, { id: "notes", l: "الملاحظات", g: "g-ri" },
   { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", g: "g-di" }, { id: "kmon", l: "متابعة الحملات", g: "g-ba" }, { id: "kb", l: "معرفة الخدمة", g: "g-ri" }, { id: "partners", l: "شركاء المبيعات", g: "g-ci" },
   { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", g: "g-di" }, { id: "targets", l: "جهات الاستهداف", g: "g-ri" }, { id: "reports", l: "التقارير", g: "g-tb" },
   { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", g: "g-tree" },
@@ -425,7 +427,8 @@ const TITLES = {
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
-  pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"], products: ["المنتجات", "ضمن المرحلة القادمة"],
+  pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
+  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
@@ -2825,7 +2828,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline" || cur === "tasks" || cur === "notes") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -2835,6 +2838,8 @@ function render(fetchNew) {
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? (vMorningList() + vCustomers())
       : cur === "pipeline" ? vActivityCrm()
+      : cur === "tasks" ? vTasksCrm()
+      : cur === "notes" ? vNotesCrm()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -3168,6 +3173,7 @@ ${CAMPAIGNS_CRM_JS}
 ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
+${TASKS_CRM_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */

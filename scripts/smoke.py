@@ -26,6 +26,8 @@ ROUTES = [
     ("#customers", "العملاء"),
     ("#targets", "جهات الاستهداف"),
     ("#pipeline", "لوحة المتابعة"),
+    ("#tasks", "المهام"),
+    ("#notes", "الملاحظات"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#kb", "خدمات المساعد"),
     # The most-edited surface, and the one the blank-page class would hit hardest.
