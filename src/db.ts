@@ -1,4 +1,5 @@
 import pg from "pg";
+import * as facts from "./facts.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -93,6 +94,10 @@ CREATE TABLE IF NOT EXISTS entities (
   created_at BIGINT NOT NULL
 );
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
+-- Account facts with provenance (cycle account-graph). Distinct from attrs on purpose: attrs is
+-- whatever columns the spreadsheet happened to carry, facts are the TYPED, sourced things the
+-- agent is allowed to state back to a customer. See src/facts.ts for the contract.
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS facts JSONB NOT NULL DEFAULT '{}';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 -- The founder's primary outcome had nowhere to live: two of four real conversations already
 -- contained a customer-stated time («صباح», «صباحًا») and the system recorded neither.
@@ -101,6 +106,52 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS scheduled_said TEXT;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS scheduled_at BIGINT;
 -- Which customer turn justifies the outcome. An outcome with no quotable source is an assertion.
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS outcome_evidence TEXT;
+-- ---------------------------------------------------------------------------
+-- Tasks and notes (cycle massar-entities). Ported from Frappe's CRM Task and FCRM Note, which
+-- carry (title, priority, status, start_date, due_date, description, assigned_to) and
+-- (title, content) respectively, both linked by (reference_doctype, reference_docname).
+--
+-- Massar's linkable things are a CONTACT (phone) and a CAMPAIGN (id), so the polymorphic link is
+-- stored as ref_kind + ref_id rather than Frappe's doctype pair, and ref_kind is CHECK-constrained
+-- to the two that exist. A third kind must add a constraint, not a convention.
+--
+-- assigned_to is deliberately a free TEXT name and NOT a users FK: Massar has one operator and one
+-- admin token, so a users table would be a join to a single row. Recording WHO in text keeps the
+-- field honest today and does not pretend a permission model exists.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tasks (
+  id          BIGSERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  description TEXT,
+  status      TEXT NOT NULL DEFAULT 'todo'
+              CHECK (status IN ('backlog','todo','in_progress','done','canceled')),
+  priority    TEXT NOT NULL DEFAULT 'medium'
+              CHECK (priority IN ('low','medium','high')),
+  start_at    BIGINT,
+  due_at      BIGINT,
+  assigned_to TEXT,
+  ref_kind    TEXT CHECK (ref_kind IN ('contact','campaign')),
+  ref_id      TEXT,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL,
+  done_at     BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_ref ON tasks(ref_kind, ref_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_at);
+
+CREATE TABLE IF NOT EXISTS notes (
+  id         BIGSERIAL PRIMARY KEY,
+  title      TEXT,
+  content    TEXT NOT NULL,
+  ref_kind   TEXT CHECK (ref_kind IN ('contact','campaign')),
+  ref_id     TEXT,
+  author     TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_ref ON notes(ref_kind, ref_id);
+
 CREATE TABLE IF NOT EXISTS contact_insights (
   phone       TEXT PRIMARY KEY,
   data        JSONB NOT NULL,
@@ -330,14 +381,17 @@ export async function counts(): Promise<{ contacts: number; messages: number; ev
 export type EntityRow = {
   id: number; name: string; phone: string; size: string | null; city: string | null;
   attrs: Record<string, string>;
+  /** Raw JSONB. Callers pass it through `facts.readFacts` — this layer stores, it does not judge. */
+  facts: Record<string, unknown>;
 };
 
 export async function listEntities(): Promise<EntityRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, phone, size, city, attrs FROM entities ORDER BY name`);
+  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts FROM entities ORDER BY name`);
   // Legacy size/city columns fold into attrs so the UI reads one uniform attribute map.
   return r.rows.map((x) => ({
     ...x, id: Number(x.id),
+    facts: x.facts ?? {},
     attrs: {
       ...(x.size ? { "الحجم": x.size } : {}),
       ...(x.city ? { "المدينة": x.city } : {}),
@@ -352,15 +406,24 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
   let added = 0, updated = 0, skipped = 0;
   for (const r of rows) {
     try {
+      // The sheet is fact producer #1 (src/facts.ts). Mapped columns become TYPED facts with
+      // `source:'human', by:'import'` in the same upsert, so an import can never land a fact the
+      // agent then re-asks for. `||` merges at key level: a re-import updates the columns it
+      // carries and leaves every other fact — including the agent's readings — standing.
+      const imported = facts.factsFromAttrs(
+        { ...(r.attrs ?? {}), ...(r.size ? { "الحجم": r.size } : {}), ...(r.city ? { "المدينة": r.city } : {}) },
+        Date.now());
       const res = await pool.query(
-        `INSERT INTO entities (name, phone, size, city, attrs, created_at) VALUES ($1,$2,$3,$4,$5,$6)
+        `INSERT INTO entities (name, phone, size, city, attrs, facts, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (phone) DO UPDATE SET
            name = EXCLUDED.name,
            size = COALESCE(EXCLUDED.size, entities.size),
            city = COALESCE(EXCLUDED.city, entities.city),
-           attrs = entities.attrs || EXCLUDED.attrs
+           attrs = entities.attrs || EXCLUDED.attrs,
+           facts = entities.facts || EXCLUDED.facts
          RETURNING (xmax = 0) AS inserted`,
-        [r.name, r.phone, r.size ?? null, r.city ?? null, JSON.stringify(r.attrs ?? {}), Date.now()]);
+        [r.name, r.phone, r.size ?? null, r.city ?? null, JSON.stringify(r.attrs ?? {}),
+         JSON.stringify(imported), Date.now()]);
       res.rows[0]?.inserted ? added++ : updated++;
     } catch { skipped++; }
   }
@@ -370,6 +433,48 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
 export async function deleteEntity(id: number): Promise<void> {
   if (!pool || !connected) return;
   await pool.query(`DELETE FROM entities WHERE id = $1`, [id]);
+}
+
+/** One entity by phone. The agent's account snapshot is built from `listEntities`; this is the
+ *  read-modify-write path for a single fact and must see the CURRENT row, not the snapshot. */
+export async function getEntityFacts(phone: string): Promise<Record<string, unknown> | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT facts FROM entities WHERE phone = $1`, [phone]);
+  return r.rows.length ? (r.rows[0].facts ?? {}) : null;
+}
+
+/** Name + facts for one entity. Used by the fact write path so a single write does not have to
+ *  scan the whole table to refresh one row of the snapshot. */
+export async function getEntity(phone: string): Promise<{ name: string; facts: Record<string, unknown> } | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT name, facts FROM entities WHERE phone = $1`, [phone]);
+  return r.rows.length ? { name: String(r.rows[0].name ?? ""), facts: r.rows[0].facts ?? {} } : null;
+}
+
+/** Persist the whole fact set for one entity. Returns false when the row does not exist — a fact
+ *  never manufactures an entity from a typo (the `unknown_phone` precedent in tracker.ts). */
+export async function saveEntityFacts(phone: string, value: Record<string, unknown>): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const r = await pool.query(`UPDATE entities SET facts = $2 WHERE phone = $1`, [phone, JSON.stringify(value)]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+/**
+ * Make sure an entity row exists for a phone we are ALREADY in a WhatsApp conversation with.
+ *
+ * This is not the typo case the guard above protects against: a live thread is proof the number
+ * is real. Without this an inbound stranger's facts would have nowhere to land and the loop would
+ * only ever close for imported targets. Never overwrites an existing row.
+ */
+export async function ensureEntity(phone: string, name: string): Promise<boolean> {
+  if (!pool || !connected) return false;
+  try {
+    await pool.query(
+      `INSERT INTO entities (name, phone, attrs, facts, created_at) VALUES ($1,$2,'{}','{}',$3)
+       ON CONFLICT (phone) DO NOTHING`,
+      [name || phone, phone, Date.now()]);
+    return true;
+  } catch { return false; }
 }
 
 // ------------------------------ contact insights (فهم المساعد cache) ------------------------------
@@ -441,6 +546,139 @@ export async function listCampaigns(): Promise<{
     test: Boolean(c.test),
     targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
   }));
+}
+
+// ------------------------------ tasks & notes ------------------------------
+
+export type TaskRow = {
+  id: number; title: string; description: string | null;
+  status: "backlog" | "todo" | "in_progress" | "done" | "canceled";
+  priority: "low" | "medium" | "high";
+  start_at: number | null; due_at: number | null; assigned_to: string | null;
+  ref_kind: "contact" | "campaign" | null; ref_id: string | null;
+  created_at: number; updated_at: number; done_at: number | null;
+};
+export type NoteRow = {
+  id: number; title: string | null; content: string;
+  ref_kind: "contact" | "campaign" | null; ref_id: string | null;
+  author: string | null; created_at: number; updated_at: number;
+};
+
+const TASK_STATUS = ["backlog", "todo", "in_progress", "done", "canceled"] as const;
+const TASK_PRIORITY = ["low", "medium", "high"] as const;
+const REF_KIND = ["contact", "campaign"] as const;
+
+/** Rejects anything the CHECK constraints would reject, before the query runs, so a bad value
+ *  surfaces as a 400 naming the field rather than a 500 from Postgres. */
+export function validateTask(t: Record<string, unknown>): string | null {
+  if (typeof t.title !== "string" || !t.title.trim()) return "title";
+  if (t.status != null && !TASK_STATUS.includes(String(t.status) as typeof TASK_STATUS[number])) return "status";
+  if (t.priority != null && !TASK_PRIORITY.includes(String(t.priority) as typeof TASK_PRIORITY[number])) return "priority";
+  if (t.ref_kind != null && !REF_KIND.includes(String(t.ref_kind) as typeof REF_KIND[number])) return "ref_kind";
+  if (t.ref_kind != null && !String(t.ref_id || "").trim()) return "ref_id";
+  return null;
+}
+
+export async function listTasks(ref?: { kind: string; id: string }): Promise<TaskRow[]> {
+  if (!pool || !connected) return [];
+  const q = ref
+    ? await pool.query(`SELECT * FROM tasks WHERE ref_kind = $1 AND ref_id = $2 ORDER BY
+        CASE status WHEN 'done' THEN 1 WHEN 'canceled' THEN 1 ELSE 0 END, due_at NULLS LAST, id DESC`, [ref.kind, ref.id])
+    : await pool.query(`SELECT * FROM tasks ORDER BY
+        CASE status WHEN 'done' THEN 1 WHEN 'canceled' THEN 1 ELSE 0 END, due_at NULLS LAST, id DESC`);
+  return q.rows.map(rowToTask);
+}
+function rowToTask(r: Record<string, unknown>): TaskRow {
+  return {
+    id: Number(r.id), title: String(r.title), description: (r.description as string) ?? null,
+    status: r.status as TaskRow["status"], priority: r.priority as TaskRow["priority"],
+    start_at: r.start_at == null ? null : Number(r.start_at),
+    due_at: r.due_at == null ? null : Number(r.due_at),
+    assigned_to: (r.assigned_to as string) ?? null,
+    ref_kind: (r.ref_kind as TaskRow["ref_kind"]) ?? null,
+    ref_id: (r.ref_id as string) ?? null,
+    created_at: Number(r.created_at), updated_at: Number(r.updated_at),
+    done_at: r.done_at == null ? null : Number(r.done_at),
+  };
+}
+
+export async function createTask(t: Partial<TaskRow>): Promise<TaskRow | null> {
+  if (!pool || !connected) return null;
+  const now = Date.now();
+  const q = await pool.query(
+    `INSERT INTO tasks (title, description, status, priority, start_at, due_at, assigned_to,
+       ref_kind, ref_id, created_at, updated_at)
+     VALUES ($1,$2,COALESCE($3,'todo'),COALESCE($4,'medium'),$5,$6,$7,$8,$9,$10,$10) RETURNING *`,
+    [t.title, t.description ?? null, t.status ?? null, t.priority ?? null, t.start_at ?? null,
+     t.due_at ?? null, t.assigned_to ?? null, t.ref_kind ?? null, t.ref_id ?? null, now]);
+  return rowToTask(q.rows[0]);
+}
+
+/** done_at is stamped only on the transition INTO done, and cleared on the way out, so a reopened
+ *  task does not keep claiming it was completed at a time it was not. */
+export async function updateTask(id: number, patch: Partial<TaskRow>): Promise<TaskRow | null> {
+  if (!pool || !connected) return null;
+  const sets: string[] = [], vals: unknown[] = []; let i = 1;
+  for (const k of ["title", "description", "status", "priority", "start_at", "due_at", "assigned_to", "ref_kind", "ref_id"] as const) {
+    if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
+  }
+  if (!sets.length) return null;
+  sets.push(`updated_at = $${i++}`); vals.push(Date.now());
+  if (patch.status !== undefined) {
+    sets.push(`done_at = CASE WHEN $${i} = 'done' THEN COALESCE(done_at, $${i + 1}) ELSE NULL END`);
+    vals.push(patch.status, Date.now()); i += 2;
+  }
+  vals.push(id);
+  const q = await pool.query(`UPDATE tasks SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+  return q.rows[0] ? rowToTask(q.rows[0]) : null;
+}
+
+export async function deleteTask(id: number): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const q = await pool.query(`DELETE FROM tasks WHERE id = $1`, [id]);
+  return (q.rowCount ?? 0) > 0;
+}
+
+export async function listNotes(ref?: { kind: string; id: string }): Promise<NoteRow[]> {
+  if (!pool || !connected) return [];
+  const q = ref
+    ? await pool.query(`SELECT * FROM notes WHERE ref_kind = $1 AND ref_id = $2 ORDER BY id DESC`, [ref.kind, ref.id])
+    : await pool.query(`SELECT * FROM notes ORDER BY id DESC`);
+  return q.rows.map(rowToNote);
+}
+function rowToNote(r: Record<string, unknown>): NoteRow {
+  return {
+    id: Number(r.id), title: (r.title as string) ?? null, content: String(r.content),
+    ref_kind: (r.ref_kind as NoteRow["ref_kind"]) ?? null, ref_id: (r.ref_id as string) ?? null,
+    author: (r.author as string) ?? null,
+    created_at: Number(r.created_at), updated_at: Number(r.updated_at),
+  };
+}
+export async function createNote(n: Partial<NoteRow>): Promise<NoteRow | null> {
+  if (!pool || !connected) return null;
+  const now = Date.now();
+  const q = await pool.query(
+    `INSERT INTO notes (title, content, ref_kind, ref_id, author, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$6) RETURNING *`,
+    [n.title ?? null, n.content, n.ref_kind ?? null, n.ref_id ?? null, n.author ?? null, now]);
+  return rowToNote(q.rows[0]);
+}
+export async function updateNote(id: number, patch: Partial<NoteRow>): Promise<NoteRow | null> {
+  if (!pool || !connected) return null;
+  const sets: string[] = [], vals: unknown[] = []; let i = 1;
+  for (const k of ["title", "content", "ref_kind", "ref_id"] as const) {
+    if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
+  }
+  if (!sets.length) return null;
+  sets.push(`updated_at = $${i++}`); vals.push(Date.now());
+  vals.push(id);
+  const q = await pool.query(`UPDATE notes SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+  return q.rows[0] ? rowToNote(q.rows[0]) : null;
+}
+export async function deleteNote(id: number): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const q = await pool.query(`DELETE FROM notes WHERE id = $1`, [id]);
+  return (q.rowCount ?? 0) > 0;
 }
 
 // ------------------------------ product intro assets (sent by the agent) ------------------------------

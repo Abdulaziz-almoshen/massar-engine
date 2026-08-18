@@ -9,6 +9,7 @@ import { enqueue } from "./queue.js";
 import * as kb from "./kb.js";
 import * as audience from "./audience.js";
 import * as insights from "./insights.js";
+import * as accounts from "./accounts.js";
 import * as segments from "./segments.js";
 import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
@@ -80,6 +81,10 @@ app.get("/health", async () => ({
   sourceNumber: gupshup.sourceNumber() || "(unset — auto-learns from v3 webhooks)",
   outbound: gupshup.outboundReady(),
   db: { enabled: db.enabled(), connected: db.isConnected(), counts: await db.counts() },
+  // The account graph, reported honestly: `known` counts entities in the snapshot, `withFacts`
+  // counts the ones that actually carry a fact the agent can state. Before this cycle the second
+  // number was zero for every conversation and nothing said so.
+  accounts: { known: accounts.count(), withFacts: accounts.withFacts(), refreshedAt: accounts.lastRefreshAt() },
   config: configReport(),
 }));
 
@@ -130,6 +135,7 @@ app.post("/admin/entities", async (req, reply) => {
     rows.push({ name, phone, size: parts[2] || undefined, city: parts[3] || undefined });
   }
   const res = await db.addEntities(rows);
+  await accounts.refresh();
   return { ...res, invalid: bad.length, invalidLines: bad.slice(0, 5) };
 });
 
@@ -143,6 +149,9 @@ app.post("/admin/entities/import", async (req, reply) => {
   try {
     const parsed = audience.parseAudienceFile(buf, file.filename || "audience.xlsx");
     const res = await db.addEntities(parsed.rows);
+    // Imported columns became typed facts inside the upsert; the agent must see them on the very
+    // next inbound message, not after the next restart.
+    await accounts.refresh();
     log({ at: "audience", msg: "import done", filename: file.filename, ...res, skipped_rows: parsed.skipped.length });
     return {
       ...res,
@@ -549,6 +558,37 @@ app.post("/admin/contact/props", async (req, reply) => {
   return { ok: true, persisted: true, props: written };
 });
 
+// ------------------------------ the account graph (entity facts) ------------------------------
+// The HUMAN write path onto an entity's typed facts — the operator half of what `record_fact`
+// does from a conversation. Same door (`accounts.writeFact`), same precedence rule, opposite
+// failure mode: a fact that did not reach the row must NEVER render as saved, so an unpersisted
+// write is a 503 here and a swallowed log in agent.ts.
+//
+// Like the props route it reads nothing from the model and sends nothing.
+app.post("/admin/entity/facts", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const body = (req.body ?? {}) as { phone?: string; by?: string; facts?: Record<string, string> };
+  const phone = String(body.phone ?? "").replace(/\D/g, "");
+  if (!phone || !body.facts || typeof body.facts !== "object") {
+    return reply.code(400).send({ error: "body: { phone, facts: { <key>: value } }" });
+  }
+  const entries = Object.entries(body.facts);
+  if (!entries.length) return reply.code(400).send({ error: "facts: at least one key" });
+  const by = String(body.by ?? "").trim().slice(0, 60) || "الفريق";
+  const written: Record<string, boolean> = {};
+  for (const [key, raw] of entries) {
+    const r = await accounts.writeFact(phone, key, String(raw ?? ""), "human", by);
+    if (r.reason === "not_persisted") {
+      // No entity row for this phone, or the ledger is unreachable. Both mean the same thing to an
+      // operator — nothing was saved — and both must keep the editor open.
+      return reply.code(503).send({ ok: false, persisted: false, error: "not_persisted", key });
+    }
+    if (!r.applied) return reply.code(400).send({ ok: false, error: r.reason, key });
+    written[key] = true;
+  }
+  return { ok: true, persisted: true, facts: written };
+});
+
 // Behavioural segmentation — evaluate a segment against the live ledger and return what would
 // be sent, what is suppressed, and what is too new. Read-only: it never sends and never writes.
 app.post("/admin/segments/preview", async (req, reply) => {
@@ -648,6 +688,84 @@ app.get("/admin/segments/presets", async (req, reply) => {
 
 // Sandbox separation for a whole launch: a rehearsal sent to real numbers is still a rehearsal,
 // and «campaign is test only if every target is a test contact» could not express that.
+// ------------------------------ tasks & notes ------------------------------
+// Ported from Frappe's CRM Task / FCRM Note. Every route is admin-token gated like the rest of
+// /admin, and NONE of them touch Gupshup: a task or a note is an internal record, never a message.
+
+app.get("/admin/tasks", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const q = req.query as Record<string, string | undefined>;
+  const ref = q.kind && q.id ? { kind: q.kind, id: q.id } : undefined;
+  return { tasks: await db.listTasks(ref) };
+});
+
+app.post("/admin/tasks", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const bad = db.validateTask(body);
+  if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
+  const row = await db.createTask(body as never);
+  if (!row) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });
+  return { ok: true, task: row };
+});
+
+app.patch("/admin/tasks/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  // a PATCH carries a subset, so only the fields present are validated
+  if (body.title !== undefined || body.status !== undefined || body.priority !== undefined || body.ref_kind !== undefined) {
+    const merged = { title: body.title ?? "x", ...body };
+    const bad = db.validateTask(merged);
+    if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
+  }
+  const row = await db.updateTask(id, body as never);
+  if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
+  return { ok: true, task: row };
+});
+
+app.delete("/admin/tasks/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  return { ok: await db.deleteTask(id) };
+});
+
+app.get("/admin/notes", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const q = req.query as Record<string, string | undefined>;
+  const ref = q.kind && q.id ? { kind: q.kind, id: q.id } : undefined;
+  return { notes: await db.listNotes(ref) };
+});
+
+app.post("/admin/notes", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if (typeof body.content !== "string" || !body.content.trim()) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "content" });
+  }
+  const row = await db.createNote(body as never);
+  if (!row) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });
+  return { ok: true, note: row };
+});
+
+app.patch("/admin/notes/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const row = await db.updateNote(id, (req.body ?? {}) as never);
+  if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
+  return { ok: true, note: row };
+});
+
+app.delete("/admin/notes/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  return { ok: await db.deleteNote(id) };
+});
+
 app.post("/admin/campaign/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { id, test } = (req.body ?? {}) as { id?: number; test?: boolean };
@@ -741,6 +859,9 @@ const main = async () => {
   await db.init();                            // memory-only if DATABASE_URL unset/down
   if (db.isConnected()) await tracker.hydrate();
   if (db.isConnected()) await agent.refreshKb();
+  // The agent's account facts. Loaded once at boot into a synchronous snapshot, then kept current
+  // by every import and every fact write — systemPrompt is sync and must not wait on a query.
+  if (db.isConnected()) await accounts.refresh();
   agent.initModel().catch(() => { /* retried lazily on first turn */ });
   await app.listen({ port: cfg.port, host: "0.0.0.0" });
   log({ at: "boot", msg: `listening on :${cfg.port}` });
