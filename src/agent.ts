@@ -339,6 +339,13 @@ export function systemPrompt(contact: Contact): string {
       ? "- إلزامي في هذه الرسالة: العميل سأل عن الجانب التجاري ولا يوجد سعر منشور لهذه الخدمة. قل ذلك صراحة، وسمِّ ما يحدد السعر — عدد الفروع، بيئة الـHIS، ومتطلبات التنفيذ — واطلب الناقص منها وحده. ممنوع الاكتفاء بعرض مسارين."
       : "";
   const account = accounts.accountBlock(contact.phone);
+  // What we still do not know, named and ranked. Without it the agent cannot tell «unknown» from
+  // «not worth asking» and re-runs the whole §٨ ladder on every conversation — the founder's
+  // complaint of 2026-08-18 («it asks clients»). See accounts.gapBlock.
+  const gaps = accounts.gapBlock(contact.phone);
+  // The usage-led motion ASSERTS the customer's own operation back to them. Holding a row is not
+  // a licence to do that; measured usage is. A prospect we merely have a name for stays cold.
+  const expansion = accounts.isExpansion(contact.phone);
   const lockedProduct = productlock.activeProduct(contact);
   return [
     // ---------------------------------------------------------------- 0. الحساب
@@ -346,7 +353,7 @@ export function systemPrompt(contact: Contact): string {
     // no record this block is empty and §١ب switches the agent back to the cold-inbound path —
     // an agent that TALKS like an account manager without the facts is the bot he complained about.
     account,
-    account ? "" : "",
+    gaps,
     // ---------------------------------------------------------------- 0ب. حقائق الفريق
     // BR-7d. What an operator TYPED outranks anything the model can read off a transcript, so it
     // is injected as context rather than left for the agent to re-derive and re-ask. Placed with
@@ -365,7 +372,7 @@ export function systemPrompt(contact: Contact): string {
     "لست دعمًا فنيًا. لست روبوت تأهيل. لست موزّع طلبات. مهمتك أن تساعد العميل على فهم القيمة، وتحديد الملاءمة، وإزالة الاعتراضات، والتقدّم نحو الشراء.",
     "",
     "# ٢) الحركة البيعية",
-    account
+    expansion
       ? "هذه الجهة تستخدم خدمتنا فعلًا، وغالبًا يدويًا عبر المنصة. الاستخدام المرتفع فرصة توسّع، وليس مشكلة."
       : "أغلب عملائنا يستخدمون خدمة أو أكثر يدويًا عبر المنصة. الاستخدام المرتفع فرصة توسّع، وليس مشكلة.",
     "الوضع الحالي: الممارس يخرج من الـHIS ← يفتح منصتنا ← يدخل المعلومات أو يكرّرها ← ينهي المعاملة ← يعود للـHIS.",
@@ -470,6 +477,7 @@ export function systemPrompt(contact: Contact): string {
     "سيئ: «كم فرع؟ ما اسم الـHIS؟ هل النظام مركزي؟ من المسؤول التقني؟ متى تبغون تبدأون؟» — جيد: «هل الفروع السبعة كلها تعمل على نفس بيئة الـHIS؟» ثم استخدم الجواب.",
     "أولوية الاكتشاف للتكامل، إن لم تكن معروفة: ١ أي خدمة؟ ٢ كم فرعًا في النطاق؟ ٣ هل على نفس بيئة الـHIS؟ ٤ هل الربط مركزي؟ ٥ هل يوجد متطلب تقني غير معتاد؟ ٦ ما الذي يمنعهم من المضي؟",
     "لا تسألها كلها تلقائيًا. توقّف عن الاكتشاف حين يصبح لديك ما يكفي لتقديم الصفقة.",
+    "وقبل أي سؤال، ارجع إلى القسمين (٠) و(٠ب): ما ورد في حقائق الحساب معروف ولا يُسأل عنه بأي صياغة، وقائمة الناقص هي وحدها ما يجوز السؤال عنه. وكل جواب يعطيك إياه العميل يُسجَّل فورًا بـrecord_fact بكلماته — سؤال بلا تسجيل يعني أننا سنسأله مرة أخرى.",
     "",
     "# ٩) أجب عن السؤال المباشر أولًا",
     "«كيف نتكامل؟» لا يُقابَل بـ«هل الربط عبر HIS أم مزوّد النظام؟». أجب أولًا: الربط يخلي العملية تتم من داخل الـHIS عندكم؛ النظام يرسل البيانات المطلوبة للخدمة ويستقبل نتيجة العملية عبر التكامل، بحيث لا يحتاج الممارس إعادة الإدخال في منصة ثانية. وعادة نبدأ بمراجعة رحلة العمل الحالية، ثم اختبار الربط على البيئة التجريبية، وبعد نجاح الاختبارات يتم التفعيل.",
@@ -478,7 +486,7 @@ export function systemPrompt(contact: Contact): string {
     "# ١٠) بِع النتيجة قبل الخاصية",
     "«وش ميزة الباقة؟» لا يُبدأ بواجهات برمجية أو لوحات أو حدود فروع. ابدأ بما يتغيّر في تشغيلهم: الخدمة تتحول من عملية يدوية متكررة إلى جزء من رحلة العمل داخل الـHIS؛ بدل أن ينتقل الممارس بين النظام والمنصة يكمل الإجراء من نفس النظام، ويكبر الأثر كلما زادت العمليات والفروع. ثم اذكر مكوّنات الباقة إن كانت مفيدة.",
     "",
-    account
+    expansion
       ? "# ١١) التواصل مع الاستخدام المرتفع\nالاستخدام المرتفع فرصة لا مشكلة. لا تقل «لاحظنا أن عندكم مشكلة». قل: «لاحظنا أن استخدامكم لهذه الخدمة مرتفع، ومع هذا الحجم فيه فرصة نخلي العملية أسهل على الفريق.» ثم اربط الإشارة بالحل: «بدل تنفيذ المعاملات يدويًا من المنصة، نقدر نربط الخدمة مباشرة مع الـHIS بحيث تتم العملية من النظام المستخدم يوميًا.» ثم دعوة سهلة: «إذا مناسب، أوضح لك كيف يكون الربط.»"
       : "",
     "# ١٢) حين يقول العميل «تفاصيل»",
@@ -543,6 +551,7 @@ export function systemPrompt(contact: Contact): string {
     productAssets.length
       ? `send_asset: ملفات متاحة: ${productAssets.map((a) => a.product).join("، ")}. أرسل الملف الخاص بالمنتج النشط فقط، مرة واحدة لكل ملف، مع تعليق قصير.`
       : "send_asset: لا تتوفر ملفات تعريفية حاليًا. لا تَعِد بإرسال ملف.",
+    "record_fact: فور أن يذكر العميل نوع نظامه أو اسمه أو عدد فروعه أو بنية الربط أو عائقه — بكلماته حرفيًا في said.",
     "tag_interest: عند أول إشارة شراء حقيقية. offer_alternative: قبل اقتراح خدمة بديلة. request_human_handoff: للحالات في §١٥ فقط — لا للهروب من سؤال تستطيع الإجابة عنه.",
     "mark_not_interested: بعد رفض واضح متكرر، وسجّل السبب بصياغة العميل. close_conversation: فقط عند انتهاء المحادثة فعليًا أو طلب العميل الإنهاء.",
     "لا تعرض أبدًا إيقاف الرسائل أو الانسحاب من تلقاء نفسك — إيقاف التواصل يبدأ من العميل وحده.",
@@ -640,6 +649,32 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       name: "record_schedule",
       description: "سجّل موعدًا ذكره العميل بنفسه لمكالمة أو اجتماع. استخدمه فور أن يذكر وقتًا («صباحًا»، «بكرة الصبح»، «الأحد الساعة ١١»). لا تستخدمه لوقت اقترحته أنت ولم يؤكده.",
       parameters: { type: "object", properties: { when_text: { type: "string", description: "كلمات العميل الحرفية التي ذكر فيها الوقت" } }, required: ["when_text"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "record_fact",
+      // The founder, 2026-08-18: «does the agent know the potential client needs HIS or ERP?
+      // because it asks clients.» This is the write half of the answer — every scope answer the
+      // customer gives becomes a durable, sourced fact on the entity, so the NEXT conversation
+      // (and the next campaign) starts from it instead of re-asking.
+      description: "سجّل معلومة عن الجهة ذكرها العميل بنفسه — نوع النظام (HIS/ERP)، اسم النظام، عدد الفروع، بنية الربط، حالة التكامل، أو العائق. استخدمه فور أن يذكرها، ولا تستخدمه لمعلومة استنتجتها أو افترضتها.",
+      parameters: {
+        type: "object",
+        properties: {
+          key: {
+            type: "string",
+            enum: ["systemKind", "hisName", "erpName", "branches", "hisArchitecture", "integrationStatus",
+                   "currentProducts", "transactionVolume", "usageLevel", "manualUsage", "customerType",
+                   "technicalNotes", "blocker"],
+            description: "الحقل المطلوب تسجيله",
+          },
+          value: { type: "string", description: "القيمة موجزة — مثل «HIS» أو «سبعة فروع» أو «مركزي»" },
+          said: { type: "string", description: "كلمات العميل الحرفية التي ذكر فيها هذه المعلومة" },
+        },
+        required: ["key", "value", "said"],
+      },
     },
   },
   {
@@ -942,6 +977,30 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       // The salesperson must learn about a booked time immediately — this alert is the product.
       void notifyLead(contact, "scheduled", (contact.tags || [])[0]?.product ?? "غير محدد", said);
       return "سُجّل الموعد بكلمات العميل. أكّد له الموعد في سطر واحد واذكر أن المختص سيتواصل، ولا تسأل سؤالًا آخر.";
+    }
+    case "record_fact": {
+      // THE EVIDENCE RULE, same as record_schedule and for the same reason: a fact with no
+      // quotable source is an assertion about the customer's own operation — and unlike a wrong
+      // sentence, a wrong FACT persists into every future campaign. So the customer's words must
+      // actually appear in the customer's turns before anything is stored.
+      const key = String(args.key ?? "").trim();
+      const value = String(args.value ?? "").trim();
+      const said = String(args.said ?? "").trim().slice(0, 200);
+      if (!value || !said) return "لم تذكر المعلومة أو مصدرها. لا تسجّل معلومة لم يقلها العميل.";
+      const c3 = tracker.findContact(contact.phone);
+      const quoted = (c3?.transcript || []).some((x) => x.role === "customer" && x.text.includes(said.slice(0, 12)));
+      if (!quoted) {
+        return `لم يقل العميل «${said}» بنفسه. لا تسجّل استنتاجًا كأنه حقيقة — إن أردت المعلومة فاسأل عنها سؤالًا صريحًا.`;
+      }
+      const r = await accounts.writeFact(contact.phone, key, value, "agent", "agent:record_fact",
+        { said, entityName: contact.waName || "" });
+      if (r.reason === "human_value_wins") {
+        return "هذه المعلومة مسجّلة بخط الفريق ولا تُعدَّل من هنا. لا تُعِد المحاولة، واستخدم القيمة المذكورة في ملف الحساب.";
+      }
+      if (r.reason === "not_agent_writable") return "هذا الحقل لا يُسجَّل من المحادثة. تابع دون تسجيله.";
+      if (r.reason === "unknown_fact") return "اسم حقل غير معروف. اختر حقلًا من القائمة المعتمدة فقط.";
+      if (!r.applied) return "تعذّر حفظ المعلومة الآن. تابع المحادثة واستخدمها في كلامك دون أن تعِد بتسجيلها.";
+      return "سُجّلت المعلومة في ملف الحساب. لا تسأل عنها مرة أخرى، واستخدمها في بناء التوصية.";
     }
     case "mark_not_interested": {
       // STOPPED, not "not_interested". The founder's rule: «we're not contacting anymore» — one

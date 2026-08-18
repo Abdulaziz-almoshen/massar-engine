@@ -106,12 +106,28 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* ===== components (reference-grade) ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .kpi .ico { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #E9F7F6; color: #1F7A73; }
-  .kpi .k { font-size: 12.5px; color: #7C7C7C; font-weight: 600; }
-  .kpi .v { font-size: 30px; font-weight: 700; color: #171717; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
-  .kpi .dl { font-size: 11.5px; font-weight: 700; }
-  .kpi .v small { font-size: 12px; font-weight: 500; color: #999999; }
+  /* A number card carries a label and a number. The 40px pastel disc that used to sit here held a
+     droplet for «مهتمة» and a checkmark for «وصلت» — decoration standing in for meaning, and the
+     loudest colour on the page. Frappe's number cards have no icon; neither do these now. */
+  .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 10px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px; }
+  .kpi .k { font-size: 12px; color: #7C7C7C; font-weight: 450; }
+  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
+  .kpi .dl { font-size: 11.5px; font-weight: 450; color: #7C7C7C; }
+  .kpi .v small { font-size: 12px; font-weight: 450; color: #999999; }
+  /* ما يستحق المتابعة الآن. Flush rows on a hairline, not four pastel cards — four tinted fills
+     read as four alarms and the eye cannot rank four alarms. Urgency is the dot. */
+  .aq { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid #EDEDED; cursor: pointer; transition: background .14s ease; }
+  .aq:hover { background: #F8F8F8; }
+  .aqd { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+  .aqav { width: 32px; height: 32px; flex: none; border-radius: 8px; background: #F3F3F3; color: #525252; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px; }
+  .aqic { background: #F8F8F8; }
+  .aqt { flex: 1 1 44%; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .aqn { font-size: 13.5px; font-weight: 500; color: #171717; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .aqw { font-size: 12px; color: #7C7C7C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aqa { flex: 1 1 34%; min-width: 0; font-size: 12.5px; color: #525252; line-height: 1.6; }
+  .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  .aq:hover .aqgo, .aq:focus-within .aqgo { opacity: 1; }
+  @media (max-width: 860px) { .aqa { display: none; } }
   .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
     margin-bottom:16px; }
   .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: .1px; }
@@ -246,8 +262,7 @@ export const DASHBOARD_HTML = `<!doctype html>
        re-ran this 420ms slide-up each time and the table visibly jumped while typing. */
     .rise { animation: rise .28s cubic-bezier(.22,.9,.32,1) both; }
     .norise .rise { animation: none; }
-    .card, .kpi, .statc, .step { transition: transform .18s ease, box-shadow .18s ease; }
-    .kpi:hover, .statc:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,24,40,.08); }
+    .card, .statc, .step { transition: border-color .16s ease; }
     .trow { transition: background .15s ease; }
     .bar i, .fun .fill, .statc .mb i, .prog i { transition: width .7s cubic-bezier(.22,.9,.32,1); }
     .livechip .d { animation: pulse 2s ease-in-out infinite; }
@@ -951,43 +966,31 @@ function vHome(d) {
   const interestedList = cs.filter((c) => interestedOf(c, 0) || c.outcome === "handoff");
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
-  const hotOf = (c) => (c.tags || []).find((t) => t.level === "hot");
-  const kpi = (icon, label, value, tint, delta) =>
-    '<div class="kpi rise"><div class="ico" style="background:' + tint[0] + ';color:' + tint[1] + ';">' + ic(icon, 20) + "</div>" +
-    '<div><div class="v">' + (typeof value === "number" ? fmtN(value) : value) + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
-    (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#7C7C7C") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
+  // Label first, then the figure: you read what it is before you read how much. The old order put a
+  // bare «٦» above «الحملات الفعلية», which forces a second pass to find out what six means.
+  const kpi = (label, value, note) =>
+    '<div class="kpi rise"><div class="k">' + label + "</div>" +
+    '<div class="v">' + (typeof value === "number" ? fmtN(value) : value) + "</div>" +
+    (note ? '<div class="dl">' + note + "</div>" : "") + "</div>";
   let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
-    kpi("send", "الحملات الفعلية", fmtN(realCampaigns.length) + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#999999;font-weight:600;">+' + fmtN(campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
+    // The «+٣٢ تجريبية» used to be inlined into the figure, so the value line read «٦ +٣٢ تجريبية»
+    // — two numbers of different kinds in one glance. It is a note under the figure now.
+    kpi("الحملات الفعلية", realCampaigns.length,
+      campaigns.length > realCampaigns.length ? "و" + fmtN(campaigns.length - realCampaigns.length) + " تجريبية" : "") +
     // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
     // reached (4), while this counts the whole imported book (15). One label, two numbers, one
     // screen is exactly the contradiction the funnel fix just removed.
-    kpi("users", "جهات في قوائمك", fmtN(entities.length), ["#EFF4FB", "#2F5F94"]) +
-    kpi("check", "وصلت الرسائل إلى الجهات", delivered, ["#E9F7F6", "#1F7A73"]) +
-    kpi("reply", "ردّوا", replied, ["#E9F7F6", "#1F7A73"]) +
-    kpi("flame", "جهات مهتمة ومؤهلة", interestedList.length, ["#FEF3F2", "#B42318"]) + "</div>";
-  h += vActionQueue(cs);
+    kpi("جهات في قوائمك", entities.length) +
+    kpi("وصلت الرسائل", delivered) +
+    kpi("ردّوا", replied) +
+    kpi("مهتمة ومؤهلة", interestedList.length) + "</div>";
+  h += vActionQueue(cs, d.notifyNumber, nTest);
   h += vHomeCharts(cs);
   h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أفضل الفرص الآن</h3><span style="display:inline-flex;gap:6px;align-items:center;"><span class="chip ' + (interestedList.length ? "c-ok" : "c-grey") + '">' + fmtN(interestedList.length) + "</span>" + testToggleChip(nTest) + "</span></div>" +
-    (interestedList.length
-      ? '<div style="margin-top:10px;">' + interestedList.slice(0, 6).map((c) => {
-          const tg = hotOf(c) || (c.tags || [])[0];
-          const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
-          const ci = insCache[c.phone];
-          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;cursor:pointer;">' +
-            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#171717;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(c.waName || "غير معروف") + " " +
-            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip">تجريبي</span>' : "") + "</div>" +
-            (ci && ci.next_action ? '<div style="font-size:11px;color:#2E7D77;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">← ' + esc(ci.next_action) + '</div>'
-              : (last ? '<div style="font-size:11px;color:#7C7C7C;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
-            '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
-        }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#999999;margin-top:12px;line-height:1.9;">حين يرصد المساعد فرصة مؤهلة سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
-    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F3F3F3;font-size:11px;color:#7C7C7C;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#171717;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
@@ -1889,18 +1892,26 @@ function vCustomers() {
 window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
 
 function ratesStrip(agg) {
-  const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
-  const cards = [
-    ["نسبة الوصول", pct(agg.delivered, agg.sent || agg.targeted), "#3FB6B0"],
-    ["نسبة المشاهدة", pct(agg.seen, agg.delivered), "#2E8F89"],
-    ["نسبة الردود", pct(agg.replied, agg.delivered), "#2F5F94"],
-    ["نسبة الاهتمام", pct(agg.interested, agg.replied), "#1f8a52"],
+  // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
+  // stops «٠٪ من جهات الاستهداف» appearing under a hero that honestly reads «—».
+  const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
+  const rows = [
+    ["نسبة الوصول", pct(agg.delivered, agg.sent || agg.targeted), "من التي أُرسلت"],
+    ["نسبة المشاهدة", pct(agg.seen, agg.delivered), "من التي وصلت"],
+    ["نسبة الردود", pct(agg.replied, agg.delivered), "من التي وصلت"],
+    ["نسبة الاهتمام", pct(agg.interested, agg.replied), "ممن ردّوا"],
   ];
-  return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;">' +
-    cards.map((c) => '<div class="card rise" style="margin:0;padding:16px 18px;">' +
-      '<div style="font-size:11.5px;color:#7C7C7C;font-weight:600;">' + c[0] + "</div>" +
-      '<div style="font-size:26px;font-weight:700;color:#171717;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + fmtN(c[1]) + '<span style="font-size:14px;color:#999999;">٪</span></div>' +
-      '<div style="height:5px;background:#F3F3F3;border-radius:999px;overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:' + Math.min(100, c[1]) + "%;background:" + c[2] + ';border-radius:999px;"></i></div></div>').join("") + "</div>";
+  return '<div class="card rise" style="margin-bottom:18px;padding-bottom:2px;">' +
+    '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:4px;">' +
+    '<h3 style="margin:0;">معدلات الأداء</h3>' +
+    '<span style="font-size:10.5px;color:#999999;">كل نسبة ومقامها معها</span></div>' +
+    rows.map((r) => '<div style="display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid #EDEDED;">' +
+      '<span style="flex:0 0 108px;font-size:12.5px;color:#383838;">' + r[0] + "</span>" +
+      '<span style="flex:1;min-width:80px;height:6px;background:#F3F3F3;border-radius:999px;overflow:hidden;">' +
+        (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#1F7A73;border-radius:999px;"></i>') + "</span>" +
+      '<span style="flex:0 0 92px;text-align:start;font-size:12px;color:#999999;">' + r[2] + "</span>" +
+      '<span style="flex:0 0 56px;text-align:end;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#C7C7C7" : "#171717") +
+        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#999999;font-weight:450;">٪</span>') + "</span></div>").join("") + "</div>";
 }
 function stageBars(rows) {
   const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
@@ -1914,38 +1925,6 @@ function stageBars(rows) {
       (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + fmtN(drop) + "٪</span>" : "") + "</span></div>" +
       '<div style="height:10px;background:#F3F3F3;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
   }).join("") + "</div>";
-}
-function funnelSvgUnused(rows) {
-  const mx = Math.max(1, ...rows.map((r) => r[1]));
-  const W = 300, segH = 40, gap = 5, H = rows.length * (segH + gap);
-  let shapes = "";
-  rows.forEach((r, i) => {
-    const wTop = Math.max(0.16, (i === 0 ? rows[0][1] : rows[i - 1][1]) / mx) * (W - 20);
-    const wBot = Math.max(0.16, r[1] / mx) * (W - 20);
-    const y = i * (segH + gap);
-    const x1t = (W - wTop) / 2, x2t = (W + wTop) / 2, x1b = (W - wBot) / 2, x2b = (W + wBot) / 2;
-    shapes += '<polygon points="' + x1t + ',' + y + ' ' + x2t + ',' + y + ' ' + x2b + ',' + (y + segH) + ' ' + x1b + ',' + (y + segH) + '" fill="' + r[2] + '" opacity="0.92"/>' +
-      '<text x="' + (W / 2) + '" y="' + (y + segH / 2 + 4) + '" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">' + fmtN(r[1]) + "</text>";
-  });
-  return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
-    '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار تحويل الحملات">' + shapes + "</svg></div>" +
-    '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
-    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#383838;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
-}
-function colChart(rows, color) {
-  const mx = Math.max(1, ...rows.map((r) => r[1]));
-  return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
-    rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
-      '<div style="font-size:11px;font-weight:700;color:#171717;">' + fmtN(r[1]) + "</div>" +
-      '<div style="width:100%;max-width:44px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:4px 4px 2px 2px;"></div>' +
-      '<div style="font-size:10px;color:#7C7C7C;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
-}
-function treemapTiles(rows) {
-  const total = Math.max(1, rows.reduce((a, r) => a + r[1], 0));
-  const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#171717"], ["#AFC6DE", "#171717"], ["#D6E2F1", "#171717"], ["#EFF4FB", "#171717"], ["#F8F8F8", "#171717"]];
-  return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
-    rows.map((r, i) => { const tn = tones[i % tones.length]; return '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:78px;border-radius:12px;background:' + tn[0] + ';color:' + tn[1] + ';padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">' +
-      '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) + "</div></div>"; }).join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#999999;">' + sub + "</span></div>" + inner + "</div>";
@@ -2006,7 +1985,7 @@ function vHomeCharts(cs) {
     replied: reached.filter((c) => (c.statusTimes || {}).replied).length,
     interested: reached.filter((c) => interestedOf(c, 0)).length,
   };
-  const funnel = [["جهات الاستهداف", agg.targeted, "#2F5F94"], ["أُرسلت", agg.sent, "#2F5F94"], ["وصلت", agg.delivered, "#3FB6B0"], ["شوهدت", agg.seen, "#3FB6B0"], ["ردّوا", agg.replied, "#2E8F89"], ["جهات مهتمة", agg.interested, "#1f8a52"]];
+  const funnel = [["جهات الاستهداف", agg.targeted], ["أُرسلت", agg.sent], ["وصلت", agg.delivered], ["شوهدت", agg.seen], ["ردّوا", agg.replied], ["جهات مهتمة", agg.interested]].map((r) => [r[0], r[1], "#1F7A73"]);
   const byProd = new Map();
   cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
   const prodRows = [...byProd.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
@@ -2025,24 +2004,47 @@ function vHomeCharts(cs) {
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
   h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
-  h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
-    ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#999999;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#999999;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
-    : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
-  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  // Four distributions, one idiom. They answer the same shape of question — «how does the book
+  // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
+  // does not exist. Teal is the accent; the ramp behind it is neutral.
+  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? hbarRows(cityRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+  h += chartCard("حسب الحجم", "من أعمدة ملفك", sizeRows.length ? hbarRows(sizeRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود الحجم.</div>');
+  h += chartCard("حسب القطاع", "من أعمدة ملفك", secRows.length ? hbarRows(secRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود القطاع.</div>');
   h += "</div>";
   return h;
 }
 const DEAL_META = { won: ["صفقة مكتسبة", "#027A48", "#ECFDF3"], lost: ["غير مكتسبة", "#B42318", "#FEF3F2"], stalled: ["متوقفة", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
-function vActionQueue(cs) {
+// ---------------------------------------------------------------------------
+// «ما يستحق المتابعة الآن» — the ONE morning list in the product.
+//
+// It used to be three lists. This card, «أفضل الفرص الآن» 900px below it on the same page, and
+// «قائمة الصباح» on #targets all ranked the same four people from the same signals in three
+// different visual languages. A list you meet three times is a list nobody trusts, because the
+// three never quite agree. There is one now, and the other two surfaces link to it.
+//
+// FOUR reasons a row can appear, in descending urgency. Each states its own reason in words —
+// no row appears without one, and no reason is inferred:
+//   1. مؤهلة وصامتة  — tagged hot / high intent, then nothing for over a day.
+//   2. فرصة جديدة    — tagged interested (or asked for a person) within the last day.
+//   3. شاهدوا دون ردّ — a campaign-windowed claim: read the message, never replied to THAT send.
+//   4. صفقة متوقفة   — the assistant judged the conversation stalled, and says why.
+//
+// The tinted row fills are gone. Four rows in four pastels read as four alerts; the eye cannot
+// rank four alerts. Urgency is one 8px dot now, and the rows are white with a hairline between —
+// the same list idiom as every other table in the product.
+function vActionQueue(cs, notifyNumber, nTest) {
   const now = Date.now();
-  const hotIdle = cs.filter((c) => {
-    const ins = insCache[c.phone] || {};
-    const hot = (c.tags || []).some((t) => t.level === "hot") || ins.intent === "high";
-    return hot && (now - (c.lastEventAt || 0)) > 24 * 3600e3 && !c.optedOut;
-  }).sort((a, b) => (a.lastEventAt || 0) - (b.lastEventAt || 0));
+  const DAY = 24 * 3600e3;
+  const isHot = (c) => (c.tags || []).some((t) => t.level === "hot") || (insCache[c.phone] || {}).intent === "high";
+  const live = cs.filter((c) => !c.optedOut);
+  const hotIdle = live.filter((c) => isHot(c) && now - (c.lastEventAt || 0) > DAY)
+    .sort((a, b) => (a.lastEventAt || 0) - (b.lastEventAt || 0));
+  // Fresh opportunities were only ever visible in the card this one absorbed. Dropping them would
+  // have meant a contact the assistant qualified an hour ago appearing NOWHERE until it went cold.
+  const fresh = live.filter((c) => (interestedOf(c, 0) || c.outcome === "handoff") &&
+    now - (c.lastEventAt || 0) <= DAY && !hotIdle.includes(c))
+    .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
   const seenNoReply = [];
   // Windowed per campaign: this pairs a contact WITH a campaign, so it is a campaign claim and
   // reading lifetime state here would queue a retarget for someone who already replied to that very
@@ -2051,32 +2053,54 @@ function vActionQueue(cs) {
     const c = contactByPhone(t.phone);
     if (c && atOrAfter((c.statusTimes || {}).read, w) && !repliedIn(c, w) && !c.optedOut) seenNoReply.push({ c, cp });
   }); });
-  const stalled = cs.filter((c) => (insCache[c.phone] || {}).deal_state === "stalled");
+  const stalled = live.filter((c) => (insCache[c.phone] || {}).deal_state === "stalled");
+
+  const hrs = (c) => fmtN(Math.round((now - (c.lastEventAt || 0)) / 3600e3));
+  const tagOf = (c) => (c.tags || []).find((t) => t.level === "hot") || (c.tags || [])[0];
   const items = [];
-  hotIdle.slice(0, 3).forEach((c) => {
-    const ins = insCache[c.phone] || {};
-    items.push(["call", "تواصل الآن مع الفرصة المؤهلة", (c.waName || c.phone) + " · " + fmtN(Math.round((now - (c.lastEventAt || 0)) / 3600e3)) + " ساعة بلا متابعة",
-      ins.next_action || "تواصل مباشرة لاستكمال الاهتمام", "customer/" + c.phone, "#B42318", "#FEF3F2"]);
-  });
-  if (seenNoReply.length) {
-    items.push(["retarget", "فرصة لإعادة التواصل", fmtN(seenNoReply.length) + " جهة شاهدت الرسالة دون ردّ",
-      "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", "kmon", "#B54708", "#FFFAEB"]);
+  hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#B42318", why: "مؤهلة وبلا متابعة منذ " + hrs(c) + " ساعة",
+    act: (insCache[c.phone] || {}).next_action || "تواصل مباشرة لاستكمال الاهتمام", href: "customer/" + c.phone }));
+  fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#027A48", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
+    act: (insCache[c.phone] || {}).next_action || "تابع بينما الاهتمام حيّ", href: "customer/" + c.phone }));
+  if (seenNoReply.length) items.push({ c: null, icon: "eye", dot: "#B54708", name: "شاهدوا الرسالة دون ردّ",
+    why: fmtN(seenNoReply.length) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
+  stalled.slice(0, 2).forEach((c) => { const ins = insCache[c.phone] || {};
+    items.push({ c, dot: "#2F5F94", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
+      act: ins.fix_suggestion || "تابع بمعلومة جديدة", href: "customer/" + c.phone }); });
+
+  let h = '<div class="card rise" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;">' +
+    '<div><h3 style="margin:0;">ما يستحق المتابعة الآن</h3>' +
+    '<div style="font-size:11.5px;color:#999999;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
+    '<span style="display:inline-flex;gap:6px;align-items:center;">' +
+    (items.length ? '<span class="cntpill">' + fmtN(items.length) + " إجراء</span>" : "") + testToggleChip(nTest) + "</span></div>";
+  if (!items.length) {
+    h += '<div style="padding:26px 2px 30px;font-size:12.5px;color:#7C7C7C;line-height:1.9;border-top:1px solid #EDEDED;">' +
+      "لا شيء يستحق التدخل الآن. حين يرصد المساعد فرصة مؤهلة أو محادثة تتوقف، يظهر السطر هنا فورًا — ويصلك تنبيه واتساب.</div>";
+  } else {
+    h += items.map(function (it) {
+      const c = it.c;
+      const nm = c ? (c.waName || c.phone) : it.name;
+      const tg = c ? tagOf(c) : null;
+      return '<div class="aq" onclick="location.hash=&quot;' + it.href + '&quot;">' +
+        '<span class="aqd" style="background:' + it.dot + ';"></span>' +
+        (c ? '<span class="aqav">' + esc((c.waName || "؟").trim().charAt(0)) + "</span>"
+           : '<span class="aqav aqic">' + ic(it.icon, 16, "#7C7C7C") + "</span>") +
+        '<span class="aqt"><span class="aqn">' + esc(nm) +
+          (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '">' + esc(clip(tg.product, 26)) +
+            (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : "") +
+          (c && c.test ? '<span class="chip">تجريبي</span>' : "") + "</span>" +
+        '<span class="aqw">' + esc(it.why) + "</span></span>" +
+        '<span class="aqa">' + esc(clip(it.act, 64)) + "</span>" +
+        '<span class="aqgo">افتح ←</span></div>';
+    }).join("");
   }
-  stalled.slice(0, 2).forEach((c) => {
-    const ins = insCache[c.phone] || {};
-    items.push(["revive", "صفقة متوقفة", (c.waName || c.phone) + (ins.loss_cause ? " · " + ins.loss_cause : ""),
-      ins.fix_suggestion || "تابع بمعلومة جديدة", "customer/" + c.phone, "#2F5F94", "#EFF4FB"]);
-  });
-  if (!items.length) return "";
-  return '<div class="card rise" style="margin-bottom:18px;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
-    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق المتابعة الآن</h3>" +
-    '<span class="cntpill">' + fmtN(items.length) + " إجراء</span></div>" +
-    '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">' +
-    items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EDEDED;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
-      '<span style="width:8px;height:8px;border-radius:999px;background:' + it[5] + ';flex:none;"></span>' +
-      '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#171717;">' + it[1] + ' <span style="font-weight:600;color:#7C7C7C;">— ' + esc(it[2]) + "</span></div>" +
-      '<div style="font-size:11.5px;color:#525252;margin-top:4px;line-height:1.7;">' + esc(it[3]) + "</div></div>" +
-      '<span style="font-size:12px;font-weight:700;color:' + it[5] + ';flex:none;">افتح التفاصيل ←</span></div>').join("") + "</div></div>";
+  if (notifyNumber) {
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:11px 2px;border-top:1px solid #EDEDED;font-size:11.5px;color:#7C7C7C;">' +
+      ic("send", 14, "#999999") + '<span>تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج</span>' +
+      '<b style="color:#525252;font-weight:500;direction:ltr;">+' + esc(notifyNumber) + "</b></div>";
+  }
+  return h + "</div>";
 }
 function vWinLoss() {
   if (!winloss) return "";
@@ -2092,20 +2116,30 @@ function vWinLoss() {
     h += '<div style="font-size:12.5px;color:#7C7C7C;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
     return h;
   }
+  const nWin = (winloss.win_drivers || []).length, nLoss = (winloss.loss_causes || []).length;
+  const cnt = (k) => (k > 1 ? '<span class="chip">×' + fmtN(k) + "</span>" : "");
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
-  h += '<div><div style="font-size:11.5px;font-weight:700;color:#027A48;margin-bottom:9px;">✓ ما يكسب لنا الصفقات</div>' +
-    ((winloss.win_drivers || []).length
-      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F3F3F3;"><span style="flex:1;font-size:12.5px;color:#171717;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + fmtN(w.count) + "</span></div>").join("")
-      : '<div style="font-size:12px;color:#999999;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
-  h += '<div><div style="font-size:11.5px;font-weight:700;color:#B42318;margin-bottom:9px;">✕ ما يخسّرنا الصفقات</div>' +
-    ((winloss.loss_causes || []).length
-      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F3F3F3;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#171717;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + fmtN(c.count) + "</span></div>" +
-        (c.example ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("")
-      : '<div style="font-size:12px;color:#999999;">لا خسائر محكومة بعد — وهذا خبر جيد.</div>') + "</div>";
+  if (nWin) {
+    h += '<div><div style="font-size:11.5px;font-weight:500;color:#027A48;margin-bottom:9px;">ما يكسب لنا الصفقات</div>' +
+      winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid #EDEDED;"><span style="flex:1;font-size:12.5px;color:#171717;line-height:1.8;">' + esc(w.driver) + "</span>" + cnt(w.count) + "</div>").join("") + "</div>";
+  }
+  if (nLoss) {
+    h += '<div><div style="font-size:11.5px;font-weight:500;color:#B42318;margin-bottom:9px;">ما يخسّرنا الصفقات</div>' +
+      winloss.loss_causes.map((c) => '<div style="padding:9px 0;border-top:1px solid #EDEDED;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:500;color:#171717;">' + esc(c.cause) + "</span>" + (c.products || []).map((pd) => '<span class="chip">' + esc(clip(pd, 22)) + "</span>").join("") + cnt(c.count) + "</div>" +
+        (c.example ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("") + "</div>";
+  }
   h += "</div>";
+  if (!nWin || !nLoss) {
+    h += '<div style="font-size:12px;color:#999999;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #EDEDED;" : "10px;") + '">' +
+      (!nWin && !nLoss ? "لا محرّكات محكومة بعد على أي من الجانبين."
+        : !nLoss ? "لا خسائر محكومة بعد — وهذا خبر جيد." : "لا مكاسب محكومة بعد.") + "</div>";
+  }
   if ((winloss.by_product || []).length) {
-    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F3F3F3;">' +
-      winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue" title="' + esc(pr.product) + '">' + esc(clip(pr.product, 24)) + ": " + fmtN(pr.won) + " مكتسبة · " + fmtN(pr.lost) + " غير مكتسبة</span>").join("") + "</div>";
+    h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDEDED;">' +
+      winloss.by_product.slice(0, 4).map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
+        '<span style="flex:1;min-width:0;color:#383838;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
+        '<span style="color:#027A48;">' + fmtN(pr.won) + ' مكتسبة</span><span style="color:#C7C7C7;">·</span>'  +
+        '<span style="color:#B42318;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
   }
   h += "</div>";
   return h;

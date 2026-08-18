@@ -37,7 +37,6 @@ export const cfg = {
   // [{"phone":"9665...","customerName":"…","branches":10,"hisName":"…",
   //   "transactionVolume":"≈1,400 إجازة شهريًا","currentProducts":["الإجازات المرضية"]}]
   // Absent facts stay absent — the agent asks rather than guessing. See src/accounts.ts.
-  accountsJson: process.env.ACCOUNTS_JSON || "[]",
 };
 
 export function configReport() {
