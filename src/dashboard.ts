@@ -638,7 +638,18 @@ function funnelData(d) {
   ];
 }
 
-function contactByPhone(phone) { return ((cache && cache.contacts) || []).find((c) => c.phone === phone); }
+// INDEXED, not scanned. This is the hottest function in the client: the campaigns list calls
+// campStats() for every campaign on every paint, and campStats calls this once per target. At the
+// simulated target — 200 launches averaging 87 targets over 1,700 contacts — a linear .find() is
+// ~26 million string comparisons per repaint, measured at 110-123ms EVERY paint, which is a visible
+// stutter on every keystroke in the campaigns search box and grows linearly with the book.
+// Rebuilt when the identity of the contacts array changes, so it can never serve a stale row.
+let _cbpSrc = null, _cbpMap = null;
+function contactByPhone(phone) {
+  const list = (cache && cache.contacts) || [];
+  if (_cbpSrc !== list) { _cbpSrc = list; _cbpMap = new Map(); list.forEach((c) => _cbpMap.set(c.phone, c)); }
+  return _cbpMap.get(phone);
+}
 // EVERY campaign number is windowed to that campaign's launch. Without this a campaign inherits the
 // contact's whole history: two contacts who had replied hours earlier made a campaign sent minutes
 // ago report «ردّوا ٢ · شوهدت ٢ · مهتم» before the customers had even opened it. statusTimes holds

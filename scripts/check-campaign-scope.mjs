@@ -17,7 +17,7 @@ import vm from "node:vm";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { DASHBOARD_HTML } = await import(join(root, "dist/dashboard.js"));
 const script = [...DASHBOARD_HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1])[0];
-const from = script.indexOf("function contactByPhone");
+const from = script.indexOf("let _cbpSrc = null, _cbpMap = null;");
 const to = script.indexOf("function clip(s, n)");
 if (from < 0 || to < 0) {
   console.error("FAIL [slice] campStats anchors moved in src/dashboard.ts — this gate is inert");
