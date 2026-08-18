@@ -340,7 +340,7 @@ const outSrc = cut("window.setOutcome = async (btn) => {", "\nwindow.refreshInsi
 const saveSrc = cut("window.propSave = async () => {", "\n// أكّد — one tap");
 const confirmSrc = cut("window.propConfirm = async (btn) => {", "\n// Clearing the date must be possible");
 const apptSrc = cut("function appt(c) {", "// --- end appointment");
-const morningSrc = cut("function vMorningList() {", "\nwindow.entDel = async (id) => {");
+const morningSrc = cut("function vMorningList() {", "\nwindow.oppSetTab =");
 // The board paginates per group now, so the SHIPPED pagination primitive is lifted with it rather
 // than stubbed — a stub here would prove the board against slicing that is not the slicing users get.
 const pageSrc = cut("let PAGE = {};", "\nwindow.pageGo =");
@@ -785,13 +785,16 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   // M10 — قائمة الصباح LEARNS THE OPERATOR'S DAY. (CPO round-33 M3a.) The screen whose own source
   // comment quotes the founder's three questions read c.scheduledAt alone, so the answer he typed
   // to the third question never reached the list he works from in the morning.
-  const morning = (rows) => new Function("ctx", `
+  // The board shows ONE group at a time now, so the harness drives the tab exactly as a click
+  // would. Rendering all five at once here would prove a board no operator sees.
+  const morning = (rows, tab) => new Function("ctx", `
     const { esc, fmtN, fmtT, fmtDay, appt } = ctx;
     const cache = { contacts: ctx.rows }, showTest = true;
+    let oppTab = ctx.tab;
     ${pageSrc}
     ${morningSrc}
     return vMorningList();
-  `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows });
+  `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows, tab: tab || "scheduled" });
   const mHuman = morning([{ phone: P, waName: "مجمع النور", outcome: "scheduled", scheduledSaid: "الأحد الصباح",
     scheduledAt: DUE, props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }]);
   check("M10 a day the operator confirmed reaches قائمة الصباح", [mHuman.includes(DAYTXT), mHuman.includes("مؤكَّد")], [true, true]);
@@ -801,8 +804,8 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     scheduledAt: DUE, props: { nextStep: { value: "زيارة", source: "agent", by: "agent:x", ts: 1, due: DUE } } }]);
   check("M10 an unconfirmed reading is still labelled as ours (control)",
     [mAgent.includes("قراءتنا"), mAgent.includes("لم تُؤكَّد بعد"), mAgent.includes(DAYTXT)], [true, true, false]);
-  const mInterested = morning([{ phone: P, waName: "مجمع النور", outcome: "interested", scheduledAt: DUE,
-    props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }]);
+  const mInterested = morning([{ phone: P, waName: "مجمع النور", outcome: "later", scheduledAt: DUE,
+    props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }], "later");
   check("M10 …and a confirmed day answers «متى؟» outside موعد محدد too",
     [mInterested.includes("موعد مؤكَّد"), mInterested.includes(DAYTXT)], [true, true]);
 }

@@ -26,7 +26,7 @@ ROUTES = [
     ("#customers", "العملاء"),
     ("#targets", "جهات الاستهداف"),
     # فرص البيع stopped being a «ضمن المرحلة القادمة» placeholder this cycle; it is the outcome board.
-    ("#opps", "موعد محدد"),
+    ("#opps", "جهة في السجل"),
     ("#pipeline", "لوحة المتابعة"),
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),
