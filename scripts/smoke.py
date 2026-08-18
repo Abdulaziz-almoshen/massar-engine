@@ -21,7 +21,10 @@ BASE = "https://massar-engine.fly.dev"
 ROUTES = [
     ("#home", "مركز القيادة"),
     ("#kmon", "الحملات"),
-    ("#customers", "جهات الاستهداف"),
+    # #customers became the العملاء LIST this cycle; the importer moved to #targets, which
+    # is why both routes are asserted now — the old landmark would still pass on the wrong screen.
+    ("#customers", "العملاء"),
+    ("#targets", "جهات الاستهداف"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#kb", "خدمات المساعد"),
     # The most-edited surface, and the one the blank-page class would hit hardest.

@@ -13,6 +13,7 @@
 // scope is what lets it reuse campStats/campWin/atOrAfter/seenOf/repliedIn — one definition each.
 
 import { CAMPAIGNS_CRM_CSS, CAMPAIGNS_CRM_JS } from "./campaigns-crm.js";
+import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -294,6 +295,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 ${CAMPAIGNS_CRM_CSS}
+${CUSTOMERS_CRM_CSS}
 </style>
 </head>
 <body>
@@ -394,10 +396,10 @@ const TITLES = {
   aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
   kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
-  customers: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"],
+  customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
   pipeline: ["لوحة متابعة الفرص", "ضمن المرحلة القادمة"], products: ["المنتجات", "ضمن المرحلة القادمة"],
-  targets: ["جهات الاستهداف", "ضمن المرحلة القادمة"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
@@ -2300,6 +2302,73 @@ function propRow(o) {
   return '<div class="frow' + (reading ? " rdrow" : "") + (propFlash === o.key ? " fsaved" : "") + '">' +
     pmSpan(mark, "") + '<div class="fbody">' + body + "</div>" + pen + "</div>";
 }
+// ملف الحساب — the ACCOUNT graph (cycle account-graph, 2026-08-18).
+//
+// The founder: «does the agent know the potential client needs HIS or ERP? because it asks
+// clients.» It did not, because nothing populated the account registry. Now imports, operators and
+// the customer's own answers all write typed facts onto the entity — and this panel is the half
+// that makes them visible: a fact the agent states to a customer that no human can see is the same
+// defect as a value the system writes but cannot read back.
+//
+// Read-only in this increment, on purpose: the write door exists (POST /admin/entity/facts) and is
+// exercised by the agent, but the inline editor is a separate slice. The panel says so rather than
+// showing a pencil that does nothing.
+var ACC_LABELS = {
+  systemKind: "نوع النظام المستخدم", hisName: "نظام الـHIS", erpName: "نظام الـERP",
+  branches: "عدد الفروع", hisArchitecture: "بنية النظام", integrationStatus: "حالة التكامل",
+  currentProducts: "الخدمات المستخدمة حاليًا", transactionVolume: "حجم العمليات المقاس",
+  usageLevel: "مستوى الاستخدام", manualUsage: "ما زال يدويًا", customerType: "نوع الجهة",
+  technicalNotes: "ملاحظات تقنية", blocker: "ما الذي يمنع المضي", customerName: "اسم الجهة",
+  pricing: "التسعير المعتمد لهذا الحساب", approvedDiscountRange: "هامش الخصم المعتمد",
+  contractStatus: "حالة العقد",
+};
+// The discovery ladder, in ask-order — mirrored from facts.ts GAP_ORDER and asserted equal by
+// scripts/check-facts.mjs, so the rows an operator sees are the questions the agent may still ask.
+var ACC_LADDER = ["systemKind", "hisName", "branches", "hisArchitecture", "integrationStatus", "blocker"];
+var ACC_EXTRA = ["erpName", "customerType", "currentProducts", "transactionVolume", "usageLevel",
+  "manualUsage", "pricing", "contractStatus", "technicalNotes"];
+function accSig(f) {
+  var when = f.ts ? " · " + fmtD(f.ts) : "";
+  if (f.source !== "human") return "من كلام العميل" + when + (f.said ? " · «" + esc(String(f.said).slice(0, 60)) + "»" : "");
+  if (f.by === "import") return "من ملف الاستيراد" + when;
+  return "سجّلها " + esc(f.by || "اللوحة") + when;
+}
+function vAccountPanel(d) {
+  var e = d.entity || null;
+  var f = (e && e.facts) || {};
+  var known = ACC_LADDER.filter(function (k) { return f[k] && f[k].value; }).length;
+  var rows = ACC_LADDER.concat(ACC_EXTRA.filter(function (k) { return f[k] && f[k].value; }));
+  var h = '<div class="card" style="margin:14px 0 0;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+    '<h3 style="margin:0;">ملف الحساب</h3>' +
+    (known === ACC_LADDER.length
+      ? '<span class="chip c-teal">نطاق التكامل مكتمل</span>'
+      : '<span class="chip c-warn">يعرف ' + fmtN(known) + " من " + fmtN(ACC_LADDER.length) + " من نطاق التكامل</span>") +
+    "</div>" +
+    '<div style="font-size:11.5px;color:#7C7C7C;margin:6px 0 4px;line-height:1.8;">' +
+    "ما يظهر هنا يعرفه المساعد ولا يسأل عنه. وما هو ناقص هو وحده ما يجوز أن يسأل عنه." + "</div>";
+  if (!e) {
+    return h + '<div class="fval-m">لا سجل جهة لهذا الرقم بعد، فلا يستطيع المساعد حفظ ما يقوله العميل عن نظامه. ' +
+      '<a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
+  }
+  h += '<div class="plgnd"><span class="i">' + pmSpan("h", "margin:0") + "بخط الفريق</span>" +
+    '<span class="i">' + pmSpan("i", "margin:0") + "مستورد</span>" +
+    '<span class="i">' + pmSpan("a", "margin:0") + "من كلام العميل</span>" +
+    '<span class="i">' + pmSpan("m", "margin:0") + "ناقص</span></div>";
+  rows.forEach(function (k) {
+    var v = f[k];
+    var mark = !v ? "m" : v.source !== "human" ? "a" : v.by === "import" ? "i" : "h";
+    var body = '<div class="flab">' + ACC_LABELS[k] + "</div>";
+    if (!v) body += '<div class="fval-m">لم يُعرف بعد — المساعد مصرّح له بالسؤال عنه.</div>';
+    else body += '<div class="fval' + (v.source === "human" ? "" : " fval-a") + '">' + esc(v.value) + "</div>" +
+      '<div class="sig">' + accSig(v) + "</div>" +
+      (v.contested
+        ? '<div class="quote" style="color:#B54708;">قراءة مختلفة من المساعد: «' + esc(v.contested.value) + "»</div>"
+        : "");
+    h += '<div class="frow">' + pmSpan(mark, "") + '<div class="fbody">' + body + "</div></div>";
+  });
+  return h + "</div>";
+}
 function vFactsPanel(d) {
   const c = d.contact || {};
   const ins = d.insights || {};
@@ -2604,7 +2673,7 @@ function vCustomer(ph) {
   // §1 region map. DOM order is panel THEN main, so the 372px track lands on the RIGHT — the
   // start side in RTL — and collapses at 900 with ملف العميل above فهم المساعد, deliberately:
   // what the team recorded outranks what the model inferred.
-  h += '<div class="crec">' + factsPanel + '<div class="crecmain">';
+  h += '<div class="crec">' + factsPanel + vAccountPanel(d) + '<div class="crecmain">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +
     // The intent badge is DELETED here: interest already renders in the status strip and, with
@@ -2722,10 +2791,16 @@ function render(fetchNew) {
     if (!TOKEN) return gate();
     const ph = (location.hash || "").split("/")[1] || "";
     b.innerHTML = vCustomer(ph);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
-    b.innerHTML = cur === "aimkt" ? vAimkt() : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb()) : (vMorningList() + vCustomers());
+    // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
+    // was already «جهات الاستهداف». Until this split the sidebar said العملاء and the screen showed
+    // the importer, and there was no list to click a customer FROM.
+    b.innerHTML = cur === "aimkt" ? vAimkt()
+      : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
+      : cur === "targets" ? (vMorningList() + vCustomers())
+      : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
@@ -3055,6 +3130,7 @@ window.addEventListener("hashchange", () => {
   else render(false);
 });
 ${CAMPAIGNS_CRM_JS}
+${CUSTOMERS_CRM_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */
