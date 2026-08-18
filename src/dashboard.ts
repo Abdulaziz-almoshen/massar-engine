@@ -2563,13 +2563,30 @@ function vCustomer(ph) {
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
     // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
-    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#171717;">' + esc(nm) + (c.test ? ' <span class="chip">تجريبي</span>' : "") + "</div>" +
+    /* STATUS BELONGS IN THE HEADER, beside the name — Frappe puts a status control there because it
+       is the first thing anyone needs to know about a lead. Ours was buried in a band further down,
+       which the conversation slide-over then covered entirely. */
+    '<div style="flex:1;min-width:0;">' +
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+    '<div style="font-size:18px;font-weight:600;color:#171717;">' + esc(nm) + "</div>" +
+    (function () {
+      const OM = { interested:["مهتم","#027A48"], scheduled:["موعد محدَّد","#1F7A73"],
+        handoff:["تحويل لمندوب","#2F5F94"], later:["لاحقًا","#B54708"],
+        not_interested:["غير مهتم","#7C7C7C"], closed:["مغلق","#7C7C7C"],
+        stopped:["أوقف الرسائل","#B42318"], opted_out:["ألغى الاشتراك","#B42318"] };
+      const o = c.optedOut ? OM.opted_out : (OM[c.outcome || ""] || ["جديد", "#C7C7C7"]);
+      return '<span class="chip" style="font-size:12.5px;padding:4px 10px;">' +
+        '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + o[1] + ';"></span>' +
+        o[0] + "</span>";
+    })() +
+    (c.test ? ' <span class="chip">تجريبي</span>' : "") +
+    (c.human ? ' <span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
     // «واتساب ✓» deleted: every contact on this screen arrived by WhatsApp, so the chip carries no
     // information. Designer's call.
-    (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
-    '<div style="font-size:11.5px;color:#999999;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
+    "</div>" +
+    '<div style="font-size:12px;color:#7C7C7C;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
     // «أول ظهور» deleted — it never changed a decision. Last activity stays: it tells you whether
     // this person is warm right now.
     '<div style="font-size:11px;color:#999999;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
@@ -2724,7 +2741,8 @@ function vCustomer(ph) {
      against «فتح المحادثة» with the label wedged between them. */
   h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #EDEDED;border-radius:10px;padding:10px 14px;">' +
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
-    '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
+    /* «فتح المحادثة» is GONE: المحادثة is a tab on this record now, so the slide-over duplicated it
+       and covered the status region while doing so. One action, one place. */
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button></div>' +
     '<span style="flex:1;min-width:8px;"></span>' +
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
