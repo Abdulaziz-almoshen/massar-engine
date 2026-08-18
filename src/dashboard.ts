@@ -135,12 +135,13 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hspark { margin-top: auto; padding-top: 14px; }
   .hero .haxis { display: flex; justify-content: space-between; font-size: 11px; color: #C7C7C7; margin-top: 4px; }
   .hero .hside { border-inline-start: 1px solid #EDEDED; background: #FCFCFC; display: flex; flex-direction: column; }
-  .hero .hs { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-    padding: 13px 20px; border-top: 1px solid #EDEDED; }
+  .hero .hs { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 20px; border-top: 1px solid #EDEDED; }
   .hero .hs:first-child { border-top: 0; }
-  .hero .hs .k { font-size: 12.5px; color: #7C7C7C; min-width: 0; }
+  .hero .hs .k { font-size: 12.5px; color: #7C7C7C; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hero .hs .k em { font-style: normal; font-size: 11.5px; color: #999999; }
   .hero .hs .v { font-size: 19px; font-weight: 600; color: #171717; font-variant-numeric: tabular-nums; }
-  .hero .hs .v em { font-style: normal; font-size: 12px; font-weight: 450; color: #999999; margin-inline-start: 5px; }
+
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
     .hero .hside { border-inline-start: 0; border-top: 1px solid #EDEDED; }
@@ -151,6 +152,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      show — the narrowing — as nothing at all; when the stages are genuinely equal this draws a
      column, which is the honest picture of a campaign that lost nobody. */
   .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
+  @media (max-width: 900px) { .chgrid { grid-template-columns: 1fr !important; } }
   .fnl .lg { display: flex; flex-direction: column; gap: 6px; }
   .fnl .lgr { display: flex; align-items: baseline; gap: 8px; height: 44px; }
   .fnl .lgr .nm { font-size: 12.5px; color: #383838; white-space: nowrap; }
@@ -166,6 +168,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .aqt { flex: 0 0 min(42%, 360px); min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .aqn { font-size: 13.5px; font-weight: 500; color: #171717; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .aqw { font-size: 12px; color: #7C7C7C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .noact .aqa { display: none; }
+  .noact .aqt { flex: 1 1 auto; }
   .aqa { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: #525252; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
   /* لوحة الفرز rows: the same flush-row grid as every other table here. Five tinted fills read as
@@ -1177,11 +1181,12 @@ function vHome(d) {
     '<span class="hd' + (newQual ? "" : " flat") + '">' +
       (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
     '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
-    '<div class="hspark">' + sparkArea(series, 320, 62) +
-    '<div class="haxis"><span>قبل ١٤ يومًا</span><span>مؤهلون جدد يوميًا</span><span>اليوم</span></div></div></div>' +
+    '<div class="hspark"><div style="font-size:11.5px;color:#999999;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
+    sparkArea(series, 320, 62) +
+    '<div class="haxis"><span>قبل ١٤ يومًا</span><span>اليوم</span></div></div></div>' +
     '<div class="hside">' + heroSide.map((r) =>
-      '<div class="hs"><span class="k">' + r[0] + '</span><span class="v">' + r[1] +
-      (r[2] ? "<em>" + r[2] + "</em>" : "") + "</span></div>").join("") + "</div></div>";
+      '<div class="hs"><span class="k">' + r[0] + (r[2] ? "<em>" + r[2] + "</em>" : "") + "</span>" +
+      '<span class="v">' + r[1] + "</span></div>").join("") + "</div></div>";
   h += vActionQueue(cs, d.notifyNumber, nTest);
   h += vHomeCharts(cs);
   h += vWinLoss();
@@ -2113,13 +2118,17 @@ function qualSeries(cs, days) {
   });
   return out;
 }
+// TIME RUNS RIGHT TO LEFT, like the language. Drawn left-to-right, the newest point landed on the
+// right while the axis label «اليوم» sat on the left — the curve and its own axis disagreeing about
+// which end was today. x is mirrored rather than the array reversed, so the data stays in
+// chronological order for anything else that reads it.
 function sparkArea(vals, w, hgt) {
   const mx = Math.max(1, ...vals);
   const n = vals.length;
-  const x = (i) => (n === 1 ? w : (i / (n - 1)) * w);
+  const x = (i) => (n === 1 ? 0 : w - (i / (n - 1)) * w);
   const y = (v) => hgt - (v / mx) * (hgt - 6) - 2;
   const line = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
-  const area = line + " L" + w + "," + hgt + " L0," + hgt + " Z";
+  const area = line + " L0," + hgt + " L" + w + "," + hgt + " Z";
   const last = vals[n - 1];
   return '<svg dir="ltr" viewBox="0 0 ' + w + " " + hgt + '" preserveAspectRatio="none" ' +
     'style="width:100%;height:' + hgt + 'px;display:block;overflow:visible;" role="img" aria-label="جهات مؤهلة جديدة يوميًا">' +
@@ -2169,7 +2178,7 @@ function ratesStrip(agg) {
     ["نسبة الردود", pct(agg.replied, agg.delivered), "من التي وصلت"],
     ["نسبة الاهتمام", pct(agg.interested, agg.replied), "ممن ردّوا"],
   ];
-  return '<div class="card rise" style="margin-bottom:18px;padding-bottom:2px;">' +
+  return '<div class="card rise" style="margin:0;padding-bottom:2px;">' +
     '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:4px;">' +
     '<h3 style="margin:0;">معدلات الأداء</h3>' +
     '<span style="font-size:10.5px;color:#999999;">كل نسبة ومقامها معها</span></div>' +
@@ -2207,10 +2216,10 @@ function dailyActivitySvg(cs) {
   }));
   const mx = Math.max(1, ...days.map((d) => d.inN + d.outN));
   const W = 320, H = 96, n = days.length;
-  const x = (i) => (i / (n - 1)) * W;
+  const x = (i) => W - (i / (n - 1)) * W;   /* mirrored: oldest at the start edge, today at the end */
   const y = (v) => H - (v / mx) * (H - 8) - 2;
   const path = (get) => days.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(get(d)).toFixed(1)).join(" ");
-  const areaOf = (p) => p + " L" + W + "," + H + " L0," + H + " Z";
+  const areaOf = (p) => p + " L0," + H + " L" + W + "," + H + " Z";
   const total = days.reduce((a, d) => a + d.inN + d.outN, 0);
   if (!total) return '<div style="font-size:12px;color:#999999;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
   const stack = path((d) => d.inN + d.outN), inner = path((d) => d.inN);
@@ -2273,9 +2282,14 @@ function vHomeCharts(cs) {
   const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
-  h += ratesStrip(agg);
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
+  // ROW A — conversion. The funnel and the rates answer the same question at two resolutions, so
+  // they belong side by side; splitting them left the rates as a full-width strip of thin bars.
+  h += '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr);gap:16px;align-items:start;margin-bottom:16px;" class="chgrid">';
   h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += ratesStrip(agg);
+  h += "</div>";
+  // ROW B — what is moving, and in which service.
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
@@ -2343,7 +2357,8 @@ function vActionQueue(cs, notifyNumber, nTest) {
     items.push({ c, dot: "#2F5F94", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
       act: ins.fix_suggestion || "", href: "customer/" + c.phone }); });
 
-  let h = '<div class="card rise" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
+  const anyAct = items.some((i) => i.act);
+  let h = '<div class="card rise' + (anyAct ? "" : " noact") + '" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;">' +
     '<div><h3 style="margin:0;">ما يستحق المتابعة الآن</h3>' +
     '<div style="font-size:11.5px;color:#999999;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +

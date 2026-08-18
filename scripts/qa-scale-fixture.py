@@ -36,8 +36,11 @@ for i in range(1000):
                  ["نعم أرسلوا التفاصيل","كم السعر؟","نحتاج تكامل مع نظامنا","لاحقًا من فضلك","غير مهتم شكرًا","ما هي مدة التفعيل؟"])},
              {"role":"agent","ts":t0+3700000,"text":"سعدنا باهتمامكم — نرتب مكالمة قصيرة لمناقشة الربط."}]
     st = {"sent": t0, "delivered": t0+60000, "read": t0+900000, "replied": t0+3600000}
-    tags = [{"product": prod, "level": random.choice(["hot","warm","cold"])}]
-    if random.random() < .3: tags.append({"product": random.choice(PRODUCTS), "level": random.choice(["warm","cold"])})
+    # tags carry ts in the real ledger (interestedOf windows on it) — the fixture must too, or the
+    # dashboard's fourteen-day qualification series reads flat against data that is not flat.
+    tags = [{"product": prod, "level": random.choice(["hot","warm","cold"]), "ts": t0 + 3600000}]
+    if random.random() < .3:
+        tags.append({"product": random.choice(PRODUCTS), "level": random.choice(["warm","cold"]), "ts": t0 + 7200000})
     contacts.append({"phone": e["phone"], "waName": e["name"], "transcript": turns, "statusTimes": st,
         "tags": tags, "outcome": oc, "optedOut": oc == "stopped" and random.random() < .5,
         "lastEventAt": t0 + 3700000, "test": False, "human": random.random() < .04,
