@@ -23,13 +23,14 @@ export const DASHBOARD_HTML = `<!doctype html>
 <title>مسار — نظام إدارة المبيعات</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;450;500;600;700&family=Cairo:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
-  /* IBM Plex Sans Arabic ships a Text 450 weight — the analogue of Frappe's regular 420, which
-     Cairo has no equivalent for. Cairo survives in the sidebar wordmark only (DESIGN.md §4). */
-  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
+  /* Cairo is the platform font (founder's call). It is a VARIABLE face on Google Fonts
+     (wght 200..1000), so it holds 450 — the weight the Frappe translation is built on — natively;
+     the earlier swap to IBM Plex existed only because static Cairo jumps 400→500. */
+  body { font-family: 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
   .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
@@ -48,7 +49,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .switcher .logo { width:28px; height:28px; flex:none; border-radius:6px;
     background:linear-gradient(135deg,#3FB6B0,#1F7A73); display:flex; align-items:center;
     justify-content:center; font-weight:700; font-size:15px; color:#fff; }
-  .switcher .t1 { font-family:'Cairo','IBM Plex Sans Arabic',sans-serif; font-size:13px;
+  .switcher .t1 { font-size:13px;
     font-weight:700; color:#171717; line-height:1.3; }
   .switcher .t2 { font-size:11px; font-weight:450; color:#7C7C7C; margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
