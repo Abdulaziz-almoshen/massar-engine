@@ -25,7 +25,14 @@ ROUTES = [
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#kb", "خدمات المساعد"),
     # The most-edited surface, and the one the blank-page class would hit hardest.
-    ("#customer/966500000850", "مسار البيع مع هذا العميل"),
+    # The landmark below is the enrichment panel's sub-line, «ما تكتبه هنا لا يستطيع المساعد
+    # تغييره». Repointed in the crm-record cycle from vSalesPath's heading «مسار البيع مع هذا
+    # العميل», which the same cycle deleted — an assertion on deleted copy turns smoke red for the
+    # wrong reason. The panel's own heading «ملف العميل» was rejected as the replacement because
+    # that exact phrase also appears in this view's loading and error states («جارٍ تجميع ملف
+    # العميل…», «تعذّر فتح ملف العميل»), so it would go GREEN on a page that never loaded — which
+    # is the one thing this script exists to catch. The sub-line renders only from vFactsPanel.
+    ("#customer/966500000850", "ما تكتبه هنا لا يستطيع المساعد تغييره"),
 ]
 MIN_CHARS = 400
 

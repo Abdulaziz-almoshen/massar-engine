@@ -347,6 +347,11 @@ export function systemPrompt(contact: Contact): string {
     // an agent that TALKS like an account manager without the facts is the bot he complained about.
     account,
     account ? "" : "",
+    // ---------------------------------------------------------------- 0ب. حقائق الفريق
+    // BR-7d. What an operator TYPED outranks anything the model can read off a transcript, so it
+    // is injected as context rather than left for the agent to re-derive and re-ask. Placed with
+    // the account block because it is the same kind of fact: known, not inferred.
+    tracker.humanFactsBlock(contact),
     // ---------------------------------------------------------------- 1. الهدف
     // ================================================================
     // The founder's AE spec, 2026-08-16. This section IS the spec — sections ١-٢١ were replaced
@@ -726,6 +731,26 @@ export async function composeOpener(product: string, audience: string, angle: st
 const LEAD_ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const lastLeadAlert = new Map<string, number>();   // in-memory: worst case one duplicate after a restart
 
+/**
+ * Every property this file writes goes through here, and here goes through `tracker.writeProp` —
+ * the single door (BR-7a). This function contains NO source check of its own on purpose: if the
+ * rule lived in the caller, the next tool would be written without it.
+ *
+ * THE AGENT HALF OF THE ASYMMETRY (plan D2). A refusal or an unpersisted reading is logged and
+ * swallowed. A refused inference is normal operation, not an incident (BR-7c), and a live Arabic
+ * conversation must never stall on the ledger. The HUMAN half is the opposite and returns 503 —
+ * see `POST /admin/contact/props` in index.ts, which carries the mirror of this comment.
+ * The reason is returned so the tool result can tell the model to stop retrying.
+ */
+async function propRead(phone: string, key: tracker.PropKey, value: string, tool: string,
+  opts?: { due?: number }): Promise<tracker.PropReject | undefined> {
+  const r = await tracker.writeProp(phone, key, value, "agent", `agent:${tool}`, opts);
+  if (!r.applied) {
+    console.log(JSON.stringify({ at: "agent", msg: "prop reading not applied", phone, key, tool, reason: r.reason ?? null }));
+  }
+  return r.reason;
+}
+
 async function notifyLead(contact: Contact, kind: "hot" | "handoff" | "scheduled", product: string, detail: string): Promise<void> {
   if (!cfg.notifyNumber || contact.phone === cfg.notifyNumber) return;
   // PER KIND, not per phone. One shared 6h cooldown meant a hot tag at 10:00 silently swallowed
@@ -867,9 +892,27 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       const tagProduct = String(args.product ?? PRODUCTS[0].name);
       const lvlRaw = String(args.level ?? "warm").toLowerCase();
       const tagLevel = (["hot", "warm", "cold"].includes(lvlRaw) ? lvlRaw : "warm") as "hot" | "warm" | "cold";
-      tracker.addTag(contact.phone, tagProduct, tagLevel);
+      // FR-3 as a READING, in ONE write. `tracker.addTag` is a thin wrapper over the only door
+      // (`tracker.writeProp`), so the tag set and its provenance commit together and this call
+      // performs no source check of its own: if an operator has already typed the interest, BR-1
+      // refuses BOTH and the panel keeps showing حقيقة. The second write that used to follow this
+      // line — a propRead re-sending the same set — is gone with the divergence it created.
+      const tagged = await tracker.addTag(contact.phone, tagProduct, tagLevel, "agent:tag_interest");
       tracker.setOutcome(contact.phone, "interested");
+      // The alert is about the CONVERSATION, not the ledger. A refused or unpersisted write does
+      // not make a hot lead less hot, and if it does not fire nobody calls the customer who said
+      // yes — so this stays exactly where it was, ahead of every early return below.
       if (tagLevel === "hot") void notifyLead(contact, "hot", tagProduct, "مستوى الاهتمام: مرتفع");
+      // BR-7c: the tool result carries the reason, so the model stops retrying a refusal.
+      if (tagged.reason === "human_value_wins") {
+        return "الاهتمام مسجّل بخط الفريق ولا يُعدَّل من هنا. لا تُعِد المحاولة، واقترح تنسيق عرض تعريفي.";
+      }
+      // The AGENT half of NFR-3 — the opposite of the human half in index.ts, on purpose: a typed
+      // fact that missed the ledger must stop the operator, a missed reading must not stop a live
+      // conversation. Logged by writeProp, surfaced here, and never claimed as saved.
+      if (!tagged.applied) {
+        return "تعذّر تسجيل الاهتمام الآن. تابع المحادثة واقترح تنسيق عرض تعريفي.";
+      }
       return "سُجّل الاهتمام. اقترح الآن تنسيق عرض تعريفي.";
     }
     case "offer_alternative":
@@ -892,6 +935,10 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
         return `لم يقل العميل «${said}» بنفسه. لا تسجّل موعدًا من اقتراحك — اسأله متى يناسبه واستخدم كلماته.`;
       }
       tracker.setSchedule(contact.phone, said);
+      // FR-4 as a READING: the customer's VERBATIM words are the value; `due` is only what we read
+      // them as. If the operator has already typed the next step, BR-1 keeps theirs.
+      await propRead(contact.phone, "nextStep", said, "record_schedule",
+        { due: tracker.findContact(contact.phone)?.scheduledAt });
       // The salesperson must learn about a booked time immediately — this alert is the product.
       void notifyLead(contact, "scheduled", (contact.tags || [])[0]?.product ?? "غير محدد", said);
       return "سُجّل الموعد بكلمات العميل. أكّد له الموعد في سطر واحد واذكر أن المختص سيتواصل، ولا تسأل سؤالًا آخر.";
@@ -907,6 +954,11 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       const volunteered = [...(contact.transcript || [])].reverse()
         .find((t) => t.role === "customer")?.text?.slice(0, 300);
       tracker.setOutcome(contact.phone, "stopped", volunteered || "");
+      // FR-6 as a READING. The enum is «other» because we do not KNOW the reason — we have their
+      // sentence, and the sentence is the free text. Choosing «price» or «no_need» from a refusal
+      // that named neither is the classification-as-opinion defect this tool already fixed once.
+      await propRead(contact.phone, "disqualifyReason",
+        `other: ${volunteered || "لا يرغب في التواصل"}`.slice(0, 200), "mark_not_interested");
       return "سُجّل أنه لا يرغب في التواصل، وتوقف الإرسال. اشكره بجملة واحدة واختم — ممنوع عرض بديل، وممنوع سؤال عن السبب.";
     }
     case "request_human_handoff": {
@@ -926,6 +978,12 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
         : asked === "not_interested" ? "stopped"
         : "closed";
       tracker.setOutcome(contact.phone, outcome, outcome === "stopped" ? String(args.reason ?? "") : undefined);
+      // Only a «stopped» close is a disqualification. Closing as later/interested/closed writes no
+      // property — an open conversation with no next contact scheduled is not a rejection.
+      if (outcome === "stopped") {
+        await propRead(contact.phone, "disqualifyReason",
+          `other: ${String(args.reason ?? "أنهى المحادثة دون رغبة في المتابعة")}`.slice(0, 200), "close_conversation");
+      }
       return outcome === "stopped"
         ? "سُجّل أنه لا يرغب في التواصل. اشكره بجملة واحدة وتوقف — لا عرض جديد ولا سؤال."
         : "اختم برسالة موجزة تترك باب التنسيق مفتوحًا.";
@@ -1046,6 +1104,10 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   // tolerates up to 40 trailing characters, so when it ran first «proxy stop messaging me» and
   // «بروكسي أوقفوا الرسائل» were swallowed as plumbing: the person asking us to stop was never
   // marked opted out and got an opener back. CLAUDE.md §8 forbids weakening this path.
+  // NOT A PROPERTY WRITER, deliberately (BR-3). Opt-out is the customer's RIGHT, not our judgement
+  // that they are unqualified. Stamping سبب الاستبعاد here would file «asked us to stop» next to
+  // «too expensive» in the same field, and the disqualification report would then count people who
+  // never rejected the product. Do not add writeProp to this branch.
   if (isOptOut(text)) {
     tracker.setOutcome(contact.phone, "opted_out");
     await safeSend(contact.phone, "تم إيقاف الرسائل. شكرًا لوقتكم، ونعتذر عن الإزعاج.");
@@ -1077,6 +1139,12 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       // button tap, so «ضغط زر» is now a fact rather than an assumption — it used to be written for
       // typed text too, fabricating a button press in the audit trail.
       tracker.setOutcome(contact.phone, firm ? "not_interested" : "later", `ضغط زر: ${text.trim()}`);
+      // Only the FIRM decline is a disqualification. «ليس الآن» sets `later`, which is a timing
+      // answer, not a reason to exclude — writing سبب الاستبعاد for it would put a rejection on the
+      // record that nobody made. FR-6's enum is «no_need»: they tapped a button that says so.
+      if (firm) {
+        await propRead(contact.phone, "disqualifyReason", `no_need: ضغط زر «${text.trim()}»`, "decline_tap");
+      }
     }
   }
 
@@ -1247,6 +1315,10 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   const convTurns = (contact.transcript || [])
     .filter((t) => t.role === "customer" && t.ts >= lastCampaignAt).length;
   if (convTurns >= MAX_AGENT_TURNS) {
+    // NOT A PROPERTY WRITER, deliberately. Hitting the automation's turn cap is a fact about US,
+    // not about the buyer: a handoff means a human continues, which is the opposite of exclusion.
+    // Writing سبب الاستبعاد here would disqualify our most engaged conversations. Do not add
+    // writeProp to this branch.
     if (contact.outcome !== "handoff") {
       tracker.setOutcome(contact.phone, "handoff", "turn cap reached — human continues");
       void notifyLead(contact, "handoff", (contact.tags || [])[0]?.product ?? "غير محدد", "بلغت المحادثة الآلية حدها الأقصى");

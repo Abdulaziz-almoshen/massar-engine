@@ -226,6 +226,49 @@ export const DASHBOARD_HTML = `<!doctype html>
     .convled { width: 100% !important; border-inline-start: 0 !important; padding-inline-start: 0 !important;
                border-top: 1px solid #F2F4F7; padding-top: 14px; }
   }
+  /* ===== ملف العميل — the enrichable client record (cycle crm-record; DESIGN.md) =====
+     The provenance mark is an 8px SHAPE in a fixed start-side column: shape carries the meaning,
+     colour only reinforces it, and the mark never renders without its word. */
+  .crec { display: grid; grid-template-columns: 372px minmax(0, 1fr); gap: 18px; align-items: start; }
+  .crecmain { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; align-items: start; }
+  .pm { width: 8px; height: 8px; flex: none; margin-top: 7px; }
+  .pm-h { background: #1F7A73; border-radius: 2px; }
+  .pm-a { border: 1.5px dashed #B54708; border-radius: 999px; background: transparent; }
+  .pm-i { background: #2F5F94; border-radius: 2px; opacity: .55; }
+  .pm-m { border: 1px dashed #D0D5DD; border-radius: 2px; background: transparent; }
+  .frow { display: flex; gap: 11px; padding: 13px 0; border-bottom: 1px solid #F2F4F7; position: relative; }
+  .frow:last-child { border-bottom: none; }
+  /* the only tinted rows in the panel, and lighter than any chip: a reading never outranks a fact */
+  .frow.rdrow { background: #FFFDF7; margin: 0 -8px; padding: 13px 8px; border-radius: 10px; }
+  .fbody { flex: 1; min-width: 0; }
+  .flab { font-size: 10.5px; font-weight: 700; color: #667085; letter-spacing: .02em; }
+  .fval { font-size: 13.5px; font-weight: 700; color: #101828; line-height: 1.75; margin-top: 3px; }
+  .fval-a { font-size: 13px; font-weight: 600; color: #475467; }
+  .fval-m { font-size: 12.5px; font-weight: 500; color: #98A2B3; margin-top: 3px; }
+  .sig { font-size: 10.5px; color: #98A2B3; margin-top: 4px; font-weight: 600; }
+  .quote { font-size: 11.5px; color: #667085; margin-top: 4px; line-height: 1.8; }
+  .ferr { font-size: 11.5px; color: #B42318; font-weight: 700; margin-top: 6px; line-height: 1.7; }
+  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #98A2B3; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
+  .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
+  .pen[disabled] { cursor: not-allowed; color: #D0D5DD; }
+  @media (hover: none) { .pen { opacity: 1; } }
+  .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
+  .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
+  .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
+  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #98A2B3; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F2F4F7; }
+  .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
+  .crec :focus-visible { outline: 2px solid #2E7D77; outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .fsaved { animation: fsaved .14s ease-out; }
+    @keyframes fsaved { from { background: #ECFDF3; } to { background: transparent; } }
+  }
+  /* one column below 900: ملف العميل comes BEFORE فهم المساعد on purpose — properties beat the
+     AI card, and the 372px track would otherwise become an orphaned strip. */
+  @media (max-width: 900px) { .crec { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) {
+    .pen { opacity: 1; width: 40px; height: 40px; top: 6px; }
+    .cbar .mini { flex: 1 1 44%; min-height: 40px; }
+  }
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 ${CAMPAIGNS_CRM_CSS}
 </style>
@@ -291,6 +334,9 @@ let showTestDecided = false;
 let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
 let profileCampaign = "";     // campaign id the read is scoped to ("" = lifetime)
+// ملف العميل — the ONE field open in the editor, never a whole-form mode: { key, val, err, sel }.
+let propEdit = null;
+let propFlash = "";           // key whose row just saved, for the 140ms confirmation tint
 let insCache = {};            // phone → cached فهم المساعد (list rows read this, no LLM)
 let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
@@ -1920,27 +1966,15 @@ function vWinLoss() {
   h += "</div>";
   return h;
 }
-const SALES_PATH = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"];
-function vSalesPath(ins) {
-  const cur = Math.max(0, SALES_PATH.indexOf(ins.stage || "تعارف"));
-  return '<div class="card rise" style="padding:22px 24px;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:18px;">' +
-    '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("target", 18, "#1F7A73") + "مسار البيع مع هذا العميل</h3>" +
-    '<span class="chip c-teal">' + (ins.learning ? "المرحلة قيد التعلّم" : "المرحلة " + fmtN(cur + 1) + " من " + fmtN(SALES_PATH.length)) + "</span></div>" +
-    '<div id="pathScroll" style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;" class="ms-scroll">' +
-    SALES_PATH.map((st, i) => {
-      const done = i < cur, now = i === cur;
-      const col = done ? "#1F7A73" : now ? "#101828" : "#D0D5DD";
-      return '<div style="flex:1;min-width:110px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;">' +
-        (i > 0 ? '<span style="position:absolute;top:13px;inset-inline-end:50%;width:100%;height:2px;background:' + (done || now ? "#1F7A73" : "#EAECF0") + ';"></span>' : "") +
-        '<span style="position:relative;z-index:1;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;' +
-        (done ? "background:#1F7A73;color:#fff;" : now ? "background:#101828;color:#fff;box-shadow:0 0 0 4px rgba(16,24,40,.08);" : "background:#fff;color:#98A2B3;border:2px solid #EAECF0;") + '">' + (done ? "✓" : fmtN(i + 1)) + "</span>" +
-        '<div' + (now ? ' id="pathNow"' : "") + ' style="font-size:11.5px;font-weight:' + (now ? "700" : "600") + ';color:' + col + ';margin-top:8px;line-height:1.5;">' + st + "</div></div>";
-    }).join("") + "</div>" +
-    (ins.stage_reason ? '<div style="font-size:12px;color:#475467;margin-top:16px;padding-top:14px;border-top:1px solid #F2F4F7;line-height:1.9;"><b style="color:#101828;">لماذا هذه المرحلة:</b> ' + esc(ins.stage_reason) + "</div>" : "") +
-    "</div>";
-}
-const INTENT_META = { high: ["نية مرتفعة", "#1f8a52"], medium: ["نية متوسطة", "#b5810f"], low: ["نية منخفضة", "#667085"], none: ["لا إشارة بعد", "#98A2B3"] };
+// vSalesPath + SALES_PATH are DELETED, not merely uncalled (design-plan.md section 5). Leaving the
+// renderer defined kept 30 lines that paint five stages nobody reached and a ✓ nobody verified one
+// call site away from returning, and check-outcomes.mjs can now ban the identifier outright instead
+// of banning one exact spelling of one call. ADR-0001 forbids RANGE edits here; this was a single
+// anchored replacement of the whole function text, with a definition-count audit either side.
+// INTENT_META is deleted with its last reader (the «const im» line in vCustomer): the intent badge and the
+// tone badge that read it are both gone from the record, and a table nothing reads is an invented
+// vocabulary waiting to be re-rendered. Interest now has exactly one home per provenance —
+// solid chips in ملف العميل (fact) and the status strip's «قراءة» chip (reading).
 function toneBadge(label, color) {
   return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #EAECF0;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#344054;">' +
     '<span style="width:8px;height:8px;border-radius:999px;background:' + color + ';"></span>' + esc(label) + "</span>";
@@ -1948,6 +1982,294 @@ function toneBadge(label, color) {
 function tlDot(kind) {
   return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#98A2B3", sys: "#D0D5DD" }[kind] || "#D0D5DD";
 }
+// ---------------------------------------------------------------------------
+// ملف العميل — the enrichable client record (cycle crm-record; design plan §3/§4).
+// Six typed properties mirroring tracker.ts PROP_KEYS, each carrying WHO said it and WHEN.
+// Three states per field: حقيقة (source human) · قراءة (source agent) · ناقص (key absent).
+// The mark is a SHAPE first and a colour second, and it NEVER renders without its word — so a
+// single field lifted out of this panel still says «سجّلها …» or «قراءة المساعد».
+// These are siblings of vCustomer, not edits inside it: ADR-0001 forbids range edits in this file
+// and vCustomer is 216 lines, so the panel is spliced in with one anchored concat instead.
+// ---------------------------------------------------------------------------
+const OPERATOR = "عبدالعزيز";
+// NFR-1 bounds, mirrored from tracker.ts MAX_LEN so the over-limit message can state the real
+// number instead of a plausible one. A wrong cap in a message IS an invented number.
+const PROP_MAX = { decisionMaker: 120, orgProfile: 120, productInterest: 800, nextStep: 120, note: 2000, disqualifyReason: 200 };
+// FR-6's closed vocabulary PAIRED with its Arabic label in ONE table. The value this panel WRITES
+// («price: …») is the value it must READ BACK; a label that lives only on the write side is the
+// defect class this repo keeps re-learning (emitted values must be readable).
+const DQ_REASONS = [["price", "السعر"], ["no_need", "لا حاجة لدى العميل"], ["wrong_contact", "جهة اتصال خاطئة"],
+  ["competitor", "لدى منافس"], ["no_response", "لا رد"], ["other", "سبب آخر"]];
+const LV_META = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
+// The five fields «ناقص N» counts. سبب الاستبعاد is SHOWN but never counted: an un-excluded
+// customer is the normal case, and counting it would make every healthy record read as a gap.
+const GAP_KEYS = ["decisionMaker", "orgProfile", "productInterest", "nextStep", "note"];
+
+function pmSpan(kind, style) {
+  return '<span class="pm pm-' + kind + '"' + (style ? ' style="' + style + '"' : "") + "></span>";
+}
+// ONE reading of a field's state, used by BOTH the «ناقص N» chip and the row it describes — so the
+// header can never claim two gaps while three rows render the missing mark.
+function propState(d, key) {
+  const c = d.contact || {};
+  const p = (c.props || {})[key];
+  if (p && p.value) return { state: p.source === "human" ? (p.by === "import" ? "imported" : "fact") : "reading", prop: p };
+  if (key === "orgProfile" && d.entity) return { state: "imported", prop: null };
+  if (key === "productInterest" && (c.tags || []).length) return { state: "reading", prop: null };
+  if (key === "nextStep" && c.scheduledSaid) return { state: "reading", prop: null };
+  return { state: "missing", prop: null };
+}
+function propGapCount(d) {
+  let n = 0;
+  GAP_KEYS.forEach((k) => { if (propState(d, k).state === "missing") n++; });
+  return n;
+}
+// The signature is the mark's word. «أكّدها» and «سجّلها» are different facts about the same
+// value: prior holding the SAME value is what a confirmation is, and the operator can see it.
+function propSig(p) {
+  const when = p.ts ? " · " + fmtD(p.ts) : "";
+  if (p.source !== "human") return "قراءة المساعد" + when;
+  if (p.by === "import") return "من ملف الاستيراد" + when + " · يمكنك تصحيحه";
+  const confirmed = p.prior && p.prior.value === p.value;
+  return (confirmed ? "أكّدها " : "سجّلها ") + esc(p.by || "اللوحة") + when;
+}
+// ONE vocabulary, read in BOTH the shapes we emit. tracker.formatInterest writes the wire form
+// «منتج:hot · منتج:warm»; propDraft() below hands the operator the same set as Arabic he can read,
+// «منتج: نية مرتفعة، منتج: مهتم». This reads either back to the same pairs.
+// It parsed only the wire form once — so a correction typed by a human returned [], the row fell
+// back to the AGENT's tags, and rendered them SOLID under «سجّلها عبدالعزيز»: the machine's guess
+// signed by a person who never wrote it. The round-trip is asserted in scripts/check-props.mjs.
+// A label that lives only on the write side is the defect class this repo keeps re-learning.
+const LV_BY_LABEL = {};
+Object.keys(LV_META).forEach((k) => { LV_BY_LABEL[LV_META[k][1]] = k; });
+function interestLevel(s) {
+  const t = String(s || "").trim();
+  return LV_META[t] ? t : (LV_BY_LABEL[t] || "");
+}
+// «،» separates pairs in the display form, « · » in the wire form: normalised to one, so a set
+// typed in Arabic and a set written by the tool split identically. ONE splitter, because the count
+// of what the operator typed and the count of what we understood must be taken the same way —
+// otherwise the «was anything dropped?» question below answers about a different string.
+function interestSegs(v) {
+  return String(v || "").split("،").join(" · ").split(" · ").map((x) => x.trim()).filter((x) => x);
+}
+function interestPairs(v) {
+  const out = [];
+  interestSegs(v).forEach((t) => {
+    const i = t.lastIndexOf(":");
+    if (i <= 0) return;
+    const lvl = interestLevel(t.slice(i + 1));
+    const product = t.slice(0, i).trim();
+    if (lvl && product) out.push({ product: product, level: lvl });
+  });
+  return out;
+}
+// The segments interestPairs could NOT read. A set that parses PARTLY is the dangerous case: it
+// stored the half we understood, dropped the rest, and printed «حُفظ في ملف العميل» over the loss.
+// propPost() refuses that save and names these segments back to the operator.
+function interestUnread(v) {
+  return interestSegs(v).filter((t) => {
+    const i = t.lastIndexOf(":");
+    if (i <= 0) return true;
+    return !(interestLevel(t.slice(i + 1)) && t.slice(0, i).trim());
+  });
+}
+// The canonical STORED shape, mirroring tracker.formatInterest, so حقيقة and قراءة stay comparable
+// strings rather than two formats that always "differ".
+function interestWire(pairs) {
+  return pairs.map((t) => t.product + ":" + t.level).join(" · ");
+}
+function dqRead(v) {
+  const s = String(v || "");
+  const i = s.indexOf(":");
+  const key = (i < 0 ? s : s.slice(0, i)).trim();
+  const rest = i < 0 ? "" : s.slice(i + 1).trim();
+  const hit = DQ_REASONS.filter((r) => r[0] === key)[0];
+  return hit ? hit[1] + (rest ? " · " + rest : "") : s;
+}
+// What «صحّح» puts in the box: the reading as a HUMAN would write it, so a correction costs one
+// keystroke and never asks the operator to retype a machine string like «أشعة الأسنان:hot».
+// SYMMETRY IS THE CONTRACT: interestPairs(propDraft(p)) === interestPairs(p.value). The old draft
+// joined product and level with « · » — the wire form's PAIR separator — so nothing the operator
+// edited could be read back. Change one side of this pair only with the other in the same edit.
+function propDraft(key, p) {
+  if (!p) return "";
+  if (key === "productInterest") {
+    const pairs = interestPairs(p.value);
+    if (pairs.length) return pairs.map((t) => t.product + ": " + LV_META[t.level][1]).join("، ");
+  }
+  if (key === "disqualifyReason") {
+    const i = String(p.value || "").indexOf(":");
+    return i < 0 ? "" : String(p.value).slice(i + 1).trim();
+  }
+  return String(p.value || "");
+}
+function propEditorHtml(key, val, err) {
+  const cap = PROP_MAX[key] || 120;
+  let h = "";
+  if (key === "disqualifyReason") {
+    const cur = String((((profileData || {}).contact || {}).props || {})[key] ? ((profileData.contact.props)[key]).value : "");
+    const at = cur.indexOf(":");
+    const sel = (at < 0 ? cur : cur.slice(0, at)).trim();
+    // WHAT THIS FIELD ACTUALLY DOES, said where it is written. «استبعاد» reads like suppression,
+    // but nothing about outcome gates sending: outbound.checkOutbound and segments.evaluate
+    // suppress on optedOut alone. Promising a stop we do not perform is the same defect class as
+    // an invented number.
+    h += '<div class="quote" style="margin-top:6px;">حكمنا نحن على الحساب. لا يوقف إرسال الرسائل — الإيقاف حق العميل وحده حين يكتب «إيقاف».</div>';
+    // A <select> with no neutral option is PRE-ANSWERED: the browser shows the first entry, so
+    // opening this editor and pressing حفظ filed «السعر» — a rejection the customer never stated,
+    // signed by the operator. The first option carries an empty value, is selected whenever
+    // nothing is stored, and propSave() refuses it. Nothing is filed that a human did not pick.
+    // With a value stored the same empty option is the way OUT of it, so the erase path
+    // decideProp has always had is finally reachable from the panel.
+    h += '<select id="propsel" class="inp" style="margin-top:6px;padding:9px 12px;width:100%;">' +
+      '<option value=""' + (sel ? "" : " selected") + ">" + (sel ? "— أزل الاستبعاد —" : "اختر السبب…") + "</option>" +
+      DQ_REASONS.map((r) => '<option value="' + r[0] + '"' + (r[0] === sel ? " selected" : "") + ">" + r[1] + "</option>").join("") + "</select>";
+  }
+  h += key === "note"
+    ? '<textarea id="propinp" class="inp" rows="3" maxlength="' + cap + '" style="margin-top:6px;width:100%;" onkeydown="propKey(event)" placeholder="ما لا يظهر في المحادثة: من قابلته، ما وعدت به، ما يمنع الشراء.">' + esc(val) + "</textarea>"
+    : '<input id="propinp" class="inp" maxlength="' + cap + '" style="margin-top:6px;width:100%;" value="' + esc(val) + '" onkeydown="propKey(event)">';
+  h += '<div class="cbar"><button class="btn btn-teal mini" onclick="propSave()">حفظ</button>' +
+    '<button class="btn btn-ghost mini" onclick="propCancel()">إلغاء</button></div>';
+  // The save that did not reach the ledger keeps the editor OPEN with the typed text in it. A
+  // closed editor plus a toast is how a fact silently becomes «ناقص» again.
+  if (err) h += '<div class="ferr">' + esc(err) + "</div>";
+  return h;
+}
+function propRow(o) {
+  const st = o.state;
+  const mark = st === "fact" ? "h" : st === "imported" ? "i" : st === "reading" ? "a" : "m";
+  const open = propEdit && propEdit.key === o.key;
+  const reading = st === "reading" && !open;
+  let body = '<div class="flab">' + o.label +
+    (o.suffix ? ' <span style="color:#98A2B3;font-weight:600;">' + o.suffix + "</span>" : "") + "</div>";
+  if (open) {
+    body += propEditorHtml(o.key, propEdit.val, propEdit.err);
+  } else if (st === "missing") {
+    body += '<div class="fval-m">' + o.miss + "</div>" +
+      (!o.writable ? "" : o.addHref
+        ? '<a class="add" href="' + o.addHref + '">' + o.add + "</a>"
+        : '<button class="add" data-k="' + o.key + '" onclick="propOpen(this)">' + o.add + "</button>");
+  } else {
+    body += o.html + (o.support || "") + (o.sig ? '<div class="sig">' + o.sig + "</div>" : "");
+    // «أكّد» is one tap and no dialog; «صحّح» opens the same editor prefilled and selected.
+    if (reading && o.writable) {
+      body += '<div class="cbar"><button class="btn btn-teal mini" data-k="' + o.key + '" onclick="propConfirm(this)">أكّد</button>' +
+        '<button class="btn btn-ghost mini" data-k="' + o.key + '" data-sel="1" onclick="propOpen(this)">صحّح</button></div>';
+    }
+    // A refused agent reading is a PASSIVE line, never a competing value: the fact keeps the row.
+    if (o.contested) {
+      body += '<div class="quote" style="color:#B54708;">قراءة مختلفة من المساعد: «' + esc(o.contested.value) + "»</div>" +
+        (o.writable ? '<div class="cbar"><button class="btn btn-ghost mini" data-k="' + o.key + '" data-use="c" onclick="propConfirm(this)">اعتمدها</button>' +
+          '<button class="btn btn-ghost mini" data-k="' + o.key + '" onclick="propConfirm(this)">تجاهل</button></div>' : "");
+    }
+  }
+  const pen = open ? ""
+    : '<button class="pen" data-k="' + o.key + '" onclick="propOpen(this)" aria-label="تعديل ' + o.label + '"' +
+      (o.writable ? "" : ' disabled title="التعديل معطّل: قاعدة البيانات غير متصلة."') + ">&#9998;</button>";
+  return '<div class="frow' + (reading ? " rdrow" : "") + (propFlash === o.key ? " fsaved" : "") + '">' +
+    pmSpan(mark, "") + '<div class="fbody">' + body + "</div>" + pen + "</div>";
+}
+function vFactsPanel(d) {
+  const c = d.contact || {};
+  const ins = d.insights || {};
+  // NFR-3 made visible: with no reachable ledger a save CANNOT persist, so the pencils are disabled
+  // with the reason stated rather than offering a green save that will 503.
+  const w = d.propsWritable !== false;
+  const gaps = propGapCount(d);
+  const S = (k) => propState(d, k);
+  let h = '<div class="card" style="margin:0;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+    '<h3 style="margin:0;">ملف العميل</h3>' +
+    (gaps ? '<span class="chip c-warn">ناقص ' + fmtN(gaps) + "</span>" : '<span class="chip c-teal">لا نواقص</span>') + "</div>" +
+    '<div style="font-size:11.5px;color:#667085;margin:6px 0 4px;line-height:1.8;">ما تكتبه هنا لا يستطيع المساعد تغييره.</div>' +
+    '<div class="plgnd"><span class="i">' + pmSpan("h", "margin:0") + "بخط الفريق</span>" +
+    '<span class="i">' + pmSpan("a", "margin:0") + "قراءة المساعد</span>" +
+    '<span class="i">' + pmSpan("i", "margin:0") + "مستورد</span>" +
+    '<span class="i">' + pmSpan("m", "margin:0") + "ناقص</span></div>" +
+    (w ? "" : '<div class="ferr">التعديل معطّل: قاعدة البيانات غير متصلة.</div>');
+
+  // 1 · صاحب القرار — human-only this increment (plan OQ-1): the agent may not infer a person.
+  const s1 = S("decisionMaker"), p1 = s1.prop;
+  h += propRow({ key: "decisionMaker", label: "صاحب القرار", state: s1.state, writable: w,
+    html: '<div class="fval' + (s1.state === "fact" ? "" : " fval-a") + '">' + esc(p1 ? p1.value : "") + "</div>",
+    sig: p1 ? propSig(p1) : "", contested: p1 && p1.contested ? p1.contested : null,
+    miss: "لم يُسجَّل صاحب القرار بعد.", add: "أضِف الاسم والصفة" });
+
+  // 2 · المنشأة — imported, and a human overwrite outranks the import file.
+  const s2 = S("orgProfile"), p2 = s2.prop, ent = d.entity;
+  const entTxt = ent ? [ent.name].concat(Object.keys(ent.attrs || {}).map((k) => ent.attrs[k])).filter((x) => x).join(" · ") : "";
+  h += propRow({ key: "orgProfile", label: "المنشأة", state: s2.state, writable: w,
+    html: '<div class="fval' + (s2.state === "fact" ? "" : " fval-a") + '">' + esc(p2 ? p2.value : entTxt) + "</div>",
+    sig: p2 ? propSig(p2) : (ent ? "من ملف الاستيراد · يمكنك تصحيحه" : ""),
+    contested: p2 && p2.contested ? p2.contested : null,
+    miss: "غير مستورد في القوائم.", add: "→ استورد القائمة", addHref: "#customers" });
+
+  // 3 · الاهتمام — one chip PER PRODUCT, never averaged: two hot products are two deals.
+  const s3 = S("productInterest"), p3 = s3.prop;
+  const pairs = p3 ? interestPairs(p3.value) : [];
+  // When the property exists it IS this field. Falling back to c.tags BEHIND a stored value is how
+  // the agent's tags ended up rendered under a human signature; the tags follow the typed set now
+  // (propPost), so there is nothing left to fall back to.
+  const tagList = p3 ? pairs : (c.tags || []).map((t) => ({ product: t.product, level: t.level }));
+  // A human fact never lends its styling to chips it did not produce: solid requires BOTH that a
+  // human wrote this field AND that these chips were parsed out of what he wrote.
+  const solid = s3.state === "fact" && pairs.length > 0;
+  let i3 = "";
+  if (tagList.length) {
+    i3 = '<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;">' + tagList.map((t) => {
+      const m = LV_META[t.level] || LV_META.warm;
+      return '<span class="chip ' + (solid ? "" : "c-read ") + m[0] + '">' +
+        (solid ? "" : '<span class="rd">قراءة</span>') + esc(t.product) + " · " + m[1] + "</span>";
+    }).join(" ") + "</div>";
+  } else if (p3) {
+    // Free text the parser cannot read is still a human fact — it just is not a chip set, so it
+    // reads from the state, not from solid.
+    i3 = '<div class="fval' + (s3.state === "fact" ? "" : " fval-a") + '">' + esc(p3.value) + "</div>";
+  }
+  const sig3 = (ins.signals || [])[0];
+  h += propRow({ key: "productInterest", label: "الاهتمام", state: s3.state, writable: w,
+    html: i3, sig: p3 ? propSig(p3) : (tagList.length ? "قراءة المساعد" : ""),
+    support: s3.state === "reading" ? (sig3 ? '<div class="quote">من قوله: «' + esc(sig3) + "»</div>"
+      : '<div class="quote">بلا اقتباس يسندها بعد.</div>') : "",
+    contested: p3 && p3.contested ? p3.contested : null,
+    miss: "لم يُسجَّل اهتمام بعد.", add: "سجّل الاهتمام" });
+
+  // 4 · الخطوة التالية — TWO marks on purpose: the customer's sentence is a fact, our parse of it
+  // is not. That distinction is the whole reason this panel exists.
+  const s4 = S("nextStep"), p4 = s4.prop;
+  const due = (p4 && p4.due) || c.scheduledAt;
+  const said = c.scheduledSaid
+    ? '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:5px;">' + pmSpan("h", "margin-top:5px") +
+      '<div class="quote" style="margin:0;">قال العميل: «' + esc(c.scheduledSaid) + "»</div></div>" : "";
+  const parsed = s4.state === "reading"
+    ? '<div class="quote" style="color:#B54708;">' + (due ? "قراءتنا: " + fmtD(due) + " " + fmtT(due) + " · لم تُؤكَّد بعد"
+      : "قراءتنا لم تُؤكَّد بعد.") + "</div>" : "";
+  h += propRow({ key: "nextStep", label: "الخطوة التالية", state: s4.state, writable: w,
+    html: '<div class="fval' + (s4.state === "fact" ? "" : " fval-a") + '">' + esc(p4 ? p4.value : (c.scheduledSaid || "")) + "</div>",
+    support: said + parsed, sig: p4 ? propSig(p4) : "",
+    contested: p4 && p4.contested ? p4.contested : null,
+    miss: "لا خطوة تالية محددة.", add: "حدّد الخطوة" });
+
+  // 5 · ملاحظة — human-only by contract (FR-5); it never reaches the agent's context at all.
+  const s5 = S("note"), p5 = s5.prop;
+  h += propRow({ key: "note", label: "ملاحظة", suffix: "· بخط الفريق فقط", state: s5.state, writable: w,
+    html: '<div class="fval" style="font-weight:600;">' + esc(p5 ? p5.value : "") + "</div>",
+    sig: p5 ? propSig(p5) : "", contested: null,
+    miss: "لا ملاحظات. اكتب ما لا يظهر في المحادثة.", add: "أضِف ملاحظة" });
+
+  // 6 · سبب الاستبعاد — shown, never counted as a gap.
+  const s6 = S("disqualifyReason"), p6 = s6.prop;
+  h += propRow({ key: "disqualifyReason", label: "سبب الاستبعاد", state: s6.state, writable: w,
+    html: '<div class="fval' + (s6.state === "fact" ? "" : " fval-a") + '">' + esc(p6 ? dqRead(p6.value) : "") + "</div>",
+    sig: p6 ? propSig(p6) : "", contested: p6 && p6.contested ? p6.contested : null,
+    // «استبعد هذا العميل…» promised a stop. This records a judgement and moves the outcome; it
+    // sends nothing and it stops nothing (outbound.ts §36, segments.ts §163 suppress on optedOut).
+    miss: "لم يُسجَّل سبب استبعاد.", add: "سجّل سبب الاستبعاد…" });
+
+  return h + "</div>";
+}
+
 function vCustomer(ph) {
   if (!profileData || profilePhone !== ph) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">جارٍ تجميع ملف العميل…</div><div class="s">السجل، قراءة المساعد، وقراءة الحوار.</div></div>';
@@ -1960,10 +2282,11 @@ function vCustomer(ph) {
   if (profileData.missing) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
   }
-  const d = profileData; const c = d.contact; const ins = d.insights || {}; const ctx = d.context || { score: 0, parts: [] };
+  // «d.context» is NOT read here any more (design plan §5): contextScore is a 0-100 invented
+  // score over fields we happen to hold, and it read FULL on a contact whose only sentence was
+  // «ماني مهتم». ملف العميل replaces it with a count of named gaps that an operator can close.
+  const d = profileData; const c = d.contact; const ins = d.insights || {};
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
-  const im = INTENT_META[ins.intent] || INTENT_META.none;
-  const missing = (ctx.parts || []).filter((p) => !p.got).slice(0, 2);
   let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
@@ -2029,6 +2352,12 @@ function vCustomer(ph) {
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
   // had never rendered once. The outcome now lives on the contact in one vocabulary, written by
   // both the agent and the portal buttons, so read it from there instead of parsing prose.
+  // BUILT HERE, ABOVE the status-region marker comment below, and spliced into the record grid
+  // further down. This comment must NOT repeat that marker string: check-outcomes.mjs locates the
+  // region with indexOf, so a second copy of it here would move the window start and push the
+  // twelve strings it pins past the 5200-char slice. Nothing may be inserted between that marker
+  // and the end of the region either, for the same reason (plan R6). Measured, not assumed.
+  const factsPanel = vFactsPanel(d);
   const OUT_TO_BTN = { scheduled: "meeting_booked", interested: "quote_sent", later: "postponed", stopped: "not_a_fit" };
   const activeBtn = OUT_TO_BTN[c.outcome] || "";
   // CRM STATUS REGION — outcome, then interest, then stage. Ranked deliberately: outcome is a
@@ -2089,13 +2418,13 @@ function vCustomer(ph) {
 
     // 3 — STAGE, one chip. An unjustified reading renders visibly WEAKER than a justified one:
     // stage_reason is empty on live data because the scrub removed a claim the customer never made.
-    const STAGES = ["تعارف", "تشخيص الاحتياج", "عرض الحل", "معالجة الاعتراض", "تنسيق العرض التعريفي", "الإغلاق"];
+    // The STAGES list and its index are GONE with the ordinal: naming a position implies a rail,
+    // and a rail paints stages nobody reached. The stage is a reading, shown once, unranked.
     let stageBody;
     if (ins.stage) {
-      const idx = STAGES.indexOf(ins.stage);
       const justified = Boolean(ins.stage_reason);
       stageBody = '<span class="chip ' + (justified ? "c-teal" : "c-grey") + '">' + esc(ins.stage) +
-        (idx >= 0 ? " · " + fmtN(idx + 1) + " من " + fmtN(6) : "") + "</span>" +
+        "</span>" +
         (justified
           ? '<div style="font-size:12.5px;color:#475467;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
           : '<div style="font-size:11.5px;color:#98A2B3;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
@@ -2115,11 +2444,20 @@ function vCustomer(ph) {
     '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
       .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;border-radius:999px;' + (o[0] === "meeting_booked" ? "color:#fff;background:" + o[2] + ";border:1px solid " + o[2] + ";font-weight:700;" : "color:" + o[2] + ";background:#fff;border:1px solid #EAECF0;") + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "55;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
-  if (!ins.learning) h += vSalesPath(ins);
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px;align-items:start;">';
+  // The 6-node sales-path rail is DELETED from the record (design-plan.md section 5): it paints
+  // five stages nobody reached and a check mark nobody verified. The stage now appears exactly
+  // once, as a reading, inside the status region. The renderer itself is gone too, so no future
+  // edit can re-call it; scripts/check-outcomes.mjs bans the identifier.
+  // §1 region map. DOM order is panel THEN main, so the 372px track lands on the RIGHT — the
+  // start side in RTL — and collapses at 900 with ملف العميل above فهم المساعد, deliberately:
+  // what the team recorded outranks what the model inferred.
+  h += '<div class="crec">' + factsPanel + '<div class="crecmain">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +
-    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;color:#1F4470;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3>" + toneBadge(im[0], im[1]) + "</div>";
+    // The intent badge is DELETED here: interest already renders in the status strip and, with
+    // provenance, in ملف العميل. The hollow .pm-a mark replaces it and says what this card is.
+    '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#1F4470;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3></div>" +
+    '<div style="font-size:11px;color:#667085;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
   if (ins.learning) {
     h += '<div style="font-size:13px;color:#475467;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
       ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>" : "") +
@@ -2128,23 +2466,25 @@ function vCustomer(ph) {
     h += '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
       '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
       '<div style="font-size:14px;font-weight:700;color:#101828;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
-    const dmx = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
-    const mcards = [["نية الشراء", im[0], im[1]], ["حكم الصفقة", dmx[0], dmx[1]], ["القناة المفضّلة", "واتساب", "#1F7A73"], ["وقت التواصل", (ins.best_time || "—").slice(0, 30), "#2F5F94"]];
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">' +
-      mcards.map((m) => '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:13px 14px;">' +
-        '<div style="font-size:10.5px;color:#667085;font-weight:600;">' + m[0] + "</div>" +
-        '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';margin-top:6px;line-height:1.6;">' + esc(m[1]) + "</div></div>").join("") + "</div>";
-    if ((ins.product_interest || []).length) h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">' + ins.product_interest.map((p) => toneBadge(p.product + (p.level === "high" ? " · مرتفع" : p.level === "medium" ? " · متوسط" : " · منخفض"), p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>";
+    // DELETED (design plan §5): the 2×2 mcards grid and the product_interest badge row.
+    // «القناة المفضّلة: واتساب» is a constant on a WhatsApp-only platform, and «نية الشراء»,
+    // «حكم الصفقة» and the interest badges each rendered a THIRD and FOURTH time on this one
+    // page — the status strip and ملف العميل already carry them, and carry them with a source.
     if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#344054;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
     if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
     const dm = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
     h += '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
       '<span class="chip" style="background:' + dm[2] + ';color:' + dm[1] + ';font-size:12px;padding:6px 14px;">حكم الصفقة: ' + dm[0] + "</span>" +
       (ins.loss_cause ? '<span class="chip c-bad">السبب: ' + esc(ins.loss_cause) + "</span>" : "") + "</div>" +
-      (ins.evidence ? '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
+      // Only when it differs from c.outcomeEvidence: the same sentence printed twice on one
+      // screen reads as two independent pieces of evidence for the same claim.
+      (ins.evidence && String(ins.evidence).trim() !== String(c.outcomeEvidence || "").trim()
+        ? '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
       (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
     h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
-      '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">الخطوة التالية</div>' +
+      // Renamed: two blocks called الخطوة التالية with different provenance — one a stored fact
+      // in ملف العميل, one a model suggestion — is the exact confusion this cycle exists to kill.
+      '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">اقتراح المساعد للخطوة التالية</div>' +
       '<div style="font-size:13px;font-weight:700;color:#101828;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
       (ins.why ? '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
       (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">وقت التواصل: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
@@ -2161,7 +2501,7 @@ function vCustomer(ph) {
       '<div style="flex:1;min-width:0;"><div style="font-size:10.5px;font-weight:700;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
       '<div style="font-size:12.5px;color:#101828;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
       : '<div style="padding:20px;text-align:center;color:#98A2B3;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
-  h += "</div>";
+  h += "</div></div>";
   return h;
 }
 
@@ -2231,14 +2571,8 @@ function render(fetchNew) {
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
-  // The current stage must be what you see first, even when the path overflows.
-  // Deferred a frame: at innerHTML-assignment time the strip has no layout yet.
-  requestAnimationFrame(() => {
-    const pnow = document.getElementById("pathNow"), pscroll = document.getElementById("pathScroll");
-    if (!pnow || !pscroll || pscroll.scrollWidth <= pscroll.clientWidth) return;
-    // Let the engine do the RTL maths — hand-computed scrollLeft was wrong in every direction.
-    pnow.scrollIntoView({ inline: "center", block: "nearest" });
-  });
+  // The #pathNow / #pathScroll scroll-into-view went with the stage rail that produced those two
+  // ids. Nothing renders them any more, so it ran on every paint and could never fire.
   if (afId) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
@@ -2303,12 +2637,161 @@ async function refresh(force) {
   render(true);
   renderConvo();
 }
+// ---------------------------------------------------------------------------
+// ملف العميل — the write path. PER FIELD, never a whole-form edit mode: pencil → input →
+// حفظ/إلغاء, Enter saves, Esc cancels. Every call goes to /admin/contact/props, which is the only
+// human door onto the six properties and reaches no sender (BR-4). Nothing here can send WhatsApp.
+// The operator name rides the JSON BODY as «by» — Arabic cannot travel in an HTTP header.
+// ---------------------------------------------------------------------------
+async function propPost(key, value, keepOpen) {
+  const ph = profilePhone;
+  if (!ph) return false;
+  const body = { phone: ph, props: {}, by: OPERATOR };
+  let val = value;
+  // BR-2 + AC-7: the tag set and its provenance commit in ONE transaction, and the set that ships is
+  // the one the OPERATOR just typed — parsed by interestPairs, the same reader that draws the chips.
+  // It used to send the UNCHANGED c.tags, so deleting a tag the agent fabricated — the primary
+  // reason FR-3 is editable at all — was a guaranteed no-op. An emptied field sends [] and clears
+  // them, which is the delete.
+  if (key === "productInterest") {
+    const pairs = interestPairs(val);
+    // A PARTIAL parse is data loss reported as success: «منتج أ: مهتم، منتج ب: مهتم جدا» stored one
+    // pair, dropped the other, and printed «حُفظ في ملف العميل» over the loss. Refused, and the
+    // refusal NAMES the segments that were not understood. A set that parses to nothing at all is a
+    // different thing — a human sentence about the account — and is still stored verbatim.
+    const unread = interestUnread(val);
+    if (pairs.length && unread.length) {
+      const perr = "لم يُفهم: «" + unread.join("» و«") + "». اكتب كل منتج هكذا: «اسم المنتج: نية مرتفعة».";
+      if (keepOpen && propEdit) { propEdit.err = perr; render(false); } else alertBar(perr, true);
+      return false;
+    }
+    // The same product typed twice made two chips and two interest_tags rows. tracker.addTag drops
+    // the older entry for a product it re-tags; the human path does the same now, last wins.
+    const uniq = [];
+    pairs.forEach((t) => {
+      const at = uniq.map((u) => u.product).indexOf(t.product);
+      if (at < 0) uniq.push(t); else uniq[at] = t;
+    });
+    pairs.length = 0;
+    uniq.forEach((t) => pairs.push(t));
+    body.tags = pairs.map((t) => ({ product: t.product, level: t.level }));
+    // Stored in the canonical wire shape so a human set and a machine set are comparable strings.
+    // Text the parser cannot read is stored verbatim and renders as a sentence; the tag set it does
+    // not name is cleared rather than left on screen contradicting it.
+    if (pairs.length) val = interestWire(pairs);
+  }
+  body.props[key] = val;
+  try {
+    const r = await fetch("/admin/contact/props", { method: "POST",
+      headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify(body) });
+    if (r.ok) {
+      propEdit = null; propFlash = key;
+      await refresh();
+      // refresh() ends in render(true), which SKIPS a repaint when the data signature is unchanged
+      // — and a property write moves no field that signature reads. Forced, or the value the
+      // operator just typed would not appear until the next hash change.
+      render(false);
+      setTimeout(() => { propFlash = ""; }, 600);
+      alertBar("حُفظ في ملف العميل", false);
+      return true;
+    }
+    let j = null;
+    try { j = await r.json(); } catch (e) {}
+    const code = j ? (j.error || j.reason || "") : "";
+    let err = "لم يُحفظ. أعد المحاولة.";
+    if (code === "too_long") err = "النص أطول من المسموح (" + fmtN(PROP_MAX[key] || 120) + " حرفًا).";
+    else if (r.status === 503) err = "لم يُحفظ: قاعدة البيانات غير متصلة. أعد المحاولة.";
+    else if (code === "unknown_reason") err = "اختر سببًا من القائمة.";
+    else if (code === "unknown_phone") err = "لم يُحفظ: لا سجل لهذا الرقم.";
+    if (keepOpen && propEdit) { propEdit.err = err; render(false); } else alertBar(err, true);
+    return false;
+  } catch (e) {
+    if (keepOpen && propEdit) { propEdit.err = "لم يُحفظ. أعد المحاولة."; render(false); } else alertBar("تعذّر الاتصال بالخادم", true);
+    return false;
+  }
+}
+window.propOpen = (btn) => {
+  const key = btn.dataset.k;
+  const c = (profileData || {}).contact || {};
+  const p = (c.props || {})[key] || null;
+  propEdit = { key: key, val: propDraft(key, p), err: "", sel: btn.dataset.sel === "1" };
+  render(false);
+  const el = document.getElementById("propinp");
+  if (!el) return;
+  el.focus();
+  // «صحّح» selects the reading, so correcting it costs one keystroke rather than a delete-all.
+  if (propEdit.sel && el.select) el.select();
+};
+window.propCancel = () => { propEdit = null; render(false); };
+window.propSave = async () => {
+  if (!propEdit) return;
+  const key = propEdit.key;
+  const el = document.getElementById("propinp");
+  let val = el ? String(el.value) : propEdit.val;
+  // FR-6 is a closed vocabulary: the enum is chosen, never typed, and the free text rides after it
+  // in the same shape the route validates and dqRead() reads back.
+  if (key === "disqualifyReason") {
+    const sel = document.getElementById("propsel");
+    const reason = sel ? String(sel.value).trim() : "";
+    const free = val.trim();
+    const had = String((((profileData || {}).contact || {}).props || {})[key]
+      ? ((profileData.contact.props)[key]).value : "");
+    if (!reason) {
+      // Nothing picked. The default used to be «price», so this save filed a price rejection
+      // nobody stated under the operator's name; it now refuses, with the SAME sentence the route
+      // returns for unknown_reason so the operator reads one message for one situation.
+      if (!had) {
+        propEdit.val = el ? String(el.value) : propEdit.val;
+        propEdit.err = "اختر سببًا من القائمة.";
+        render(false);
+        return;
+      }
+      // «— أزل الاستبعاد —» over a stored reason IS an explicit human choice: erase. Empty from a
+      // human is decideProp's remove path (tracker.ts §137) — unreachable from this panel until
+      // now, because propDraft strips the enum and this line put it straight back.
+      val = "";
+    } else {
+      val = free ? reason + ": " + free : reason;
+    }
+  }
+  propEdit.val = el ? String(el.value) : propEdit.val;
+  await propPost(key, val, true);
+};
+// أكّد — one tap, no dialog. It re-writes the SAME value as a human, which is exactly what a
+// confirmation is: tracker.decideProp stamps «prior» with the reading it confirms, and that stamp
+// is the only thing that makes a confirmation rate computable later.
+// «اعتمدها» writes the contested reading instead; «تجاهل» re-writes the standing fact, which
+// clears the stale «قراءة مختلفة» line without inventing a new value.
+window.propConfirm = async (btn) => {
+  const key = btn.dataset.k;
+  const c = (profileData || {}).contact || {};
+  const p = (c.props || {})[key];
+  if (!p) return;
+  const val = btn.dataset.use === "c" && p.contested ? p.contested.value : p.value;
+  await propPost(key, val, false);
+};
+window.propKey = (e) => {
+  if (e.key === "Escape") { e.preventDefault(); propCancel(); }
+  else if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); propSave(); }
+};
 window.setOutcome = async (btn) => {
   try {
     const r = await fetch("/admin/contact/outcome", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({ phone: btn.dataset.ph, outcome: btn.dataset.out }) });
     if (!r.ok) { alertBar("تعذّر تسجيل النتيجة (" + r.status + ")", true); return; }
-    alertBar("سُجّلت النتيجة، وستُحتسب ضمن قياس أثر الحملات", false);
+    // NFR-3. «غير مناسب» ALSO writes a حقيقة on the record, and that write can fail while the
+    // outcome itself — telemetry-grade, fire-and-forget — succeeds. The route reports it in
+    // the disqualify field; a 200 alone is not evidence the fact reached the ledger, and «سُجّلت النتيجة»
+    // on a fact that never landed is exactly the silent failure this cycle exists to stop.
+    let j = null;
+    try { j = await r.json(); } catch (e) {}
+    const dq = j ? j.disqualify : null;
+    if (dq && dq !== "saved") {
+      alertBar(btn.dataset.out === "clear"
+        ? "أُزيلت النتيجة، لكن سبب الاستبعاد ما زال مسجّلًا"
+        : "سُجّلت النتيجة، لكن سبب الاستبعاد لم يُحفظ", true);
+    } else alertBar("سُجّلت النتيجة، وستُحتسب ضمن قياس أثر الحملات", false);
     await refresh();
   } catch (e) { alertBar("تعذّر الاتصال بالخادم", true); }
 };

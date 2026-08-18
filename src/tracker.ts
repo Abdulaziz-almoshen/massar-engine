@@ -11,6 +11,143 @@ import * as db from "./db.js";
 export type Turn = { role: "customer" | "agent" | "system"; text: string; ts: number };
 export type Tag = { product: string; level: "hot" | "warm" | "cold"; ts: number };
 
+// ---------------------------------------------------------------------------
+// Enrichable client record (cycle crm-record, requirements FR-1…FR-7).
+// Exactly six typed properties, each carrying WHO said it and WHEN. Three states per property:
+// حقيقة (source:'human') · قراءة (source:'agent') · ناقص (key absent). No seventh key.
+// ---------------------------------------------------------------------------
+
+export const PROP_KEYS = [
+  "decisionMaker", "orgProfile", "productInterest", "nextStep", "note", "disqualifyReason",
+] as const;
+export type PropKey = (typeof PROP_KEYS)[number];
+
+/** Arabic labels — part of the contract (requirements §1), not of the view layer. */
+export const PROP_LABELS: Record<PropKey, string> = {
+  decisionMaker: "صاحب القرار",
+  orgProfile: "المنشأة",
+  productInterest: "الاهتمام",
+  nextStep: "الخطوة التالية",
+  note: "ملاحظة",
+  disqualifyReason: "سبب الاستبعاد",
+};
+
+/** FR-6's closed vocabulary. «other» is the escape hatch that will reveal a missing reason. */
+export const DISQUALIFY_REASONS = ["price", "no_need", "wrong_contact", "competitor", "no_response", "other"] as const;
+
+/** Who held a value before, so a confirmation and a correction are distinguishable. */
+export type PropStamp = { value: string; by: string; ts: number };
+
+export type Prop = {
+  value: string;
+  source: "human" | "agent";
+  /** The named writer — an admin, or `agent:<tool>`, or `import`. `source` stays two-valued. */
+  by: string;
+  ts: number;
+  /** FR-4 only: what we READ the stated time as, epoch ms. Advisory, never sent from. */
+  due?: number;
+  /** The value this one replaced. Populated on أكّد (same value) and on صحّح (different value) —
+   *  which is what makes the confirmation-rate metric computable at all. */
+  prior?: PropStamp;
+  /** A refused agent reading that disagrees with the stored human fact. LATEST ONLY, never a
+   *  growing list: it is a passive «قراءة مختلفة» line the operator may accept, not a log. */
+  contested?: PropStamp;
+};
+
+export type PropReject =
+  | "unknown_property" | "not_agent_writable" | "unknown_phone"
+  | "too_long" | "human_value_wins" | "not_persisted"
+  // Not in the plan's list: the plan's condition 6 clears a key only «from a human». An EMPTY
+  // agent write therefore has no defined home, and silently dropping it is this repo's own
+  // recurring defect (emitted-values-must-be-readable). It gets a readable reason instead, and
+  // never clears a value the agent did not have the right to clear.
+  | "empty_value";
+
+/** Which keys an agent may write at all. `note` is human-only (FR-5); `orgProfile` is import-only
+ *  (FR-2); `decisionMaker` is HUMAN-ONLY in this increment (plan OQ-1 — adding a new LLM inference
+ *  in the increment that exists to distrust inferences is the wrong order). An importer wanting
+ *  orgProfile writes it as `source:'human', by:'import'` until FR-2 gets its own path. */
+const AGENT_WRITABLE: ReadonlySet<PropKey> = new Set<PropKey>(["productInterest", "nextStep", "disqualifyReason"]);
+
+/** NFR-1 bounds. productInterest is an enum-SET, not short text: the tags route admits 8 products of
+ *  up to 80 chars each, so a 120-char cap would reject a legal correction. */
+const MAX_LEN: Record<PropKey, number> = {
+  decisionMaker: 120, orgProfile: 120, productInterest: 800, nextStep: 120, note: 2000, disqualifyReason: 200,
+};
+const YEAR_MS = 365 * 24 * 3600e3;
+
+export type PropDecision = {
+  applied: boolean;
+  reason?: PropReject;
+  /** What the ledger and memory should hold for this key afterwards. Absent → write nothing. */
+  prop?: Prop;
+  /** Delete the key back to «ناقص». */
+  remove?: boolean;
+};
+
+/**
+ * THE GUARD (BR-7). Pure: it reads no module state and performs no I/O, so every branch below is
+ * falsifiable by `scripts/check-props.mjs` without a database. `writeProp` supplies `known` and
+ * `current` from memory and owns nothing but persistence — there is exactly one place where a
+ * property's provenance is decided.
+ *
+ * The conditions are ordered, and the order is load-bearing: an unknown key must be reported as an
+ * unknown key even for an unknown phone, and a refused agent write must be refused before its
+ * length is judged.
+ */
+export function decideProp(args: {
+  key: string; value: unknown; source: "human" | "agent"; by: string;
+  known: boolean; current?: Prop; due?: number; now?: number;
+}): PropDecision {
+  const { source, by, known, current } = args;
+  const now = args.now ?? Date.now();
+
+  // 1. NFR-2 — an unknown key is never silently dropped.
+  if (!(PROP_KEYS as readonly string[]).includes(args.key)) return { applied: false, reason: "unknown_property" };
+  const key = args.key as PropKey;
+
+  // 2. AC-3 — human-only / import-only keys refuse the agent outright, before anything else.
+  if (source === "agent" && !AGENT_WRITABLE.has(key)) return { applied: false, reason: "not_agent_writable" };
+
+  // 3. A property never manufactures a contact from a typo (the replaceTags precedent).
+  if (!known) return { applied: false, reason: "unknown_phone" };
+
+  const value = String(args.value ?? "").trim();
+
+  // 4. NFR-1 — length and date bounds.
+  if (value.length > MAX_LEN[key]) return { applied: false, reason: "too_long" };
+  if (args.due !== undefined) {
+    const due = Number(args.due);
+    if (!Number.isFinite(due) || due < now - YEAR_MS || due > now + 2 * YEAR_MS) {
+      return { applied: false, reason: "too_long" };
+    }
+  }
+
+  // 5. BR-1, the hard invariant. A human fact is never replaced by a machine reading. The
+  //    disagreement is kept ONCE as `contested`; value/source/by/ts are untouched.
+  if (current && current.source === "human" && source === "agent") {
+    if (current.value === value) return { applied: false, reason: "human_value_wins" };
+    return {
+      applied: false, reason: "human_value_wins",
+      prop: { ...current, contested: { value, by, ts: now } },
+    };
+  }
+
+  // 6. Empty from a human is an explicit erase back to «ناقص» — never a stored empty string.
+  if (!value) {
+    if (source === "human") return { applied: true, remove: true };
+    return { applied: false, reason: "empty_value" };
+  }
+
+  const prop: Prop = { value, source, by, ts: now };
+  if (args.due !== undefined) prop.due = Number(args.due);
+  // `prior` is what a confirmation IS: same value, new source. A correction is the same shape with
+  // a different value, which is why one field serves both and the metric can tell them apart.
+  if (current) prop.prior = { value: current.value, by: current.by, ts: current.ts };
+  // An accepted write settles the disagreement, so a stale «قراءة مختلفة» must not survive it.
+  return { applied: true, prop };
+}
+
 export type Contact = {
   phone: string;
   waName?: string;
@@ -38,7 +175,41 @@ export type Contact = {
   human: boolean;        // true → human took over, agent stays silent
   test: boolean;         // sandbox/demo traffic — excluded from real campaign views
   agentTurns: number;
+  /** The six typed properties (FR-1…FR-6). Deeply `Readonly` on purpose: `c.props.note = …`
+   *  outside this module is a tsc error, so `writeProp` below is the only door. Absent key =
+   *  «ناقص», which is why it is Partial and not a full Record. */
+  props: Readonly<Partial<Record<PropKey, Readonly<Prop>>>>;
 };
+
+/** The module-local key that opens the readonly door — deliberately not exported. */
+type MutableProps = { -readonly [K in PropKey]?: Prop };
+function propsOf(c: Contact): MutableProps { return c.props as MutableProps; }
+
+/** Rebuild props from JSONB, keeping only what the contract admits. A hand-edited or legacy row
+ *  must not put an unknown key or a non-string value into a typed field. */
+function readProps(raw: unknown): Partial<Record<PropKey, Prop>> {
+  const out: MutableProps = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const key of PROP_KEYS) {
+    const r = (raw as Record<string, unknown>)[key];
+    if (!r || typeof r !== "object") continue;
+    const p = r as Partial<Prop>;
+    if (typeof p.value !== "string" || !p.value) continue;
+    if (p.source !== "human" && p.source !== "agent") continue;
+    const prop: Prop = { value: p.value, source: p.source, by: String(p.by ?? ""), ts: Number(p.ts ?? 0) };
+    if (typeof p.due === "number") prop.due = p.due;
+    if (p.prior && typeof p.prior.value === "string") prop.prior = { value: p.prior.value, by: String(p.prior.by ?? ""), ts: Number(p.prior.ts ?? 0) };
+    if (p.contested && typeof p.contested.value === "string") prop.contested = { value: p.contested.value, by: String(p.contested.by ?? ""), ts: Number(p.contested.ts ?? 0) };
+    out[key] = prop;
+  }
+  return out;
+}
+
+/** One rendering of an interest set, shared by the human correction route and the agent's tag tool,
+ *  so حقيقة and قراءة are comparable strings rather than two formats that always "differ". */
+export function formatInterest(tags: readonly { product: string; level: string }[]): string {
+  return tags.map((t) => `${t.product}:${t.level}`).join(" · ");
+}
 
 const contacts = new Map<string, Contact>();
 const counters: Record<string, number> = {};
@@ -63,7 +234,7 @@ export function getContact(phone: string, waName?: string): Contact {
   if (!c) {
     c = {
       phone, firstSeenAt: Date.now(), lastEventAt: Date.now(),
-      statusTimes: {}, transcript: [], tags: [],
+      statusTimes: {}, transcript: [], tags: [], props: {},
       optedOut: false, human: false, test: testNumbers.has(phone), agentTurns: 0,
     };
     contacts.set(phone, c);
@@ -112,30 +283,130 @@ export function recordSystem(phone: string, text: string) {
   logEvent("system", phone, text);
 }
 
-export function addTag(phone: string, product: string, level: Tag["level"]) {
+/**
+ * FR-3 as a READING — and a property write like any other, so it goes through the ONE door.
+ *
+ * It used to push straight into `c.tags` and call `db.insertTag`, which made it a SECOND tag writer
+ * standing outside BR-1: an operator could delete a fabricated tag in ملف العميل and the next
+ * inference put it back into the customers table while the record still read حقيقة. `writeProp`
+ * now owns the decision, the transaction (`upsertProps` rewrites `interest_tags` inside it) and the
+ * memory, so a tag obeys the same refusal ladder as the property it renders as — and the refusal is
+ * a value the caller can read instead of a silent divergence.
+ *
+ * The whole set is sent, with this product replacing any earlier entry for it. An interest whose
+ * level did not change keeps its original `ts`: curation fixes what we recorded, it must not
+ * restate WHEN the customer showed it.
+ */
+export async function addTag(
+  phone: string, product: string, level: Tag["level"], by = "agent:tag_interest",
+): Promise<{ applied: boolean; persisted: boolean; reason?: PropReject; prop?: Prop }> {
   const c = getContact(phone);
-  c.tags.push({ product, level, ts: Date.now() });
-  db.insertTag(phone, product, level, Date.now());
-  persist(c);
-  bump("tag");
-  logEvent("tag", phone, `${product}:${level}`);
+  const kept = (c.tags || []).find((t) => t.product === product);
+  const next: Tag[] = (c.tags || []).filter((t) => t.product !== product)
+    .concat([{ product, level, ts: kept && kept.level === level ? kept.ts : Date.now() }]);
+  const r = await writeProp(phone, "productInterest", formatInterest(next), "agent", by, { tags: next });
+  // The timeline entry belongs to an ACCEPTED tag only. A refused write that still drew a dot on
+  // the record would be the same lie in a smaller font.
+  if (r.applied) {
+    bump("tag");
+    logEvent("tag", phone, `${product}:${level}`);
+  }
+  return r;
 }
 
-/** Curate a contact's interest tags (admin correction path) — memory + ledger together. */
-/** Correct a contact's interest tags. Curation fixes what we recorded — it must not restate
- *  WHEN the customer showed interest, so a tag whose product is unchanged keeps its original
- *  ts. Returns false when the phone is unknown, rather than manufacturing a contact from a typo. */
-export async function replaceTags(phone: string, tags: { product: string; level: Tag["level"]; ts?: number }[]): Promise<boolean> {
-  const c = findContact(phone);
-  if (!c) return false;
+/** Curation fixes what we recorded — it must not restate WHEN the customer showed interest, so a
+ *  tag whose product is unchanged keeps its original ts. */
+function mergeTagTs(c: Contact, tags: readonly { product: string; level: Tag["level"]; ts?: number }[]): Tag[] {
   const prior = new Map((c.tags || []).map((t) => [t.product, t.ts]));
-  const next = tags.map((t) => ({ product: t.product, level: t.level, ts: t.ts ?? prior.get(t.product) ?? Date.now() }));
-  // DB first: if it throws, memory still matches the ledger instead of drifting ahead of it.
-  await db.replaceTags(phone, next);
-  c.tags = next;
-  persist(c);
-  logEvent("tags_curated", phone, tags.map((t) => `${t.product}:${t.level}`).join(" | "));
-  return true;
+  return tags.map((t) => ({ product: t.product, level: t.level, ts: t.ts ?? prior.get(t.product) ?? Date.now() }));
+}
+
+/**
+ * THE ONLY DOOR onto `contacts.props` (BR-7a). Every caller — route, agent tool, importer — goes
+ * through here and performs no source check of its own, so no future tool can bypass BR-1.
+ *
+ * The decision is `decideProp`'s (pure, above); this function owns only lookup, persistence and
+ * memory. DB FIRST, memory second: if the ledger refuses, memory stays as it was, so a re-GET reads
+ * «ناقص» consistently instead of showing a value that does not exist anywhere.
+ *
+ * Never throws. It returns a reason the caller can read and act on — and the two callers act
+ * OPPOSITELY on purpose (plan D2): the admin route turns `not_persisted` into a 503 that keeps the
+ * editor open, while the agent logs it and keeps talking. See both sites for why.
+ */
+export async function writeProp(
+  phone: string,
+  key: PropKey | string,
+  value: unknown,
+  source: "human" | "agent",
+  by: string,
+  opts?: { tags?: readonly { product: string; level: Tag["level"]; ts?: number }[]; due?: number },
+): Promise<{ applied: boolean; persisted: boolean; reason?: PropReject; prop?: Prop }> {
+  const c = findContact(phone);
+  const current = c && (PROP_KEYS as readonly string[]).includes(key) ? c.props[key as PropKey] : undefined;
+  const d = decideProp({ key, value, source, by, known: Boolean(c), current, due: opts?.due });
+
+  // Nothing to store: a refusal that changes no state (an unknown key, a refused agent write, an
+  // identical re-inference). Readable, never a silent no-op.
+  if (!c || (!d.prop && !d.remove)) return { applied: false, persisted: false, reason: d.reason };
+
+  const k = key as PropKey;
+  const nextTags = d.applied && opts?.tags ? mergeTagTs(c, opts.tags) : undefined;
+  try {
+    const found = await db.upsertProps(
+      phone,
+      d.prop ? { [k]: d.prop } : {},
+      d.remove ? [k] : [],
+      nextTags,
+    );
+    // The ledger disagrees with memory about this phone existing; believe the ledger.
+    if (!found) return { applied: false, persisted: false, reason: "unknown_phone" };
+  } catch (e) {
+    const reason = e instanceof db.NotPersisted ? String(e.message) : String(e).slice(0, 200);
+    console.error(JSON.stringify({ at: "tracker", msg: "prop write not persisted", phone, key: k, source, reason }));
+    return { applied: false, persisted: false, reason: "not_persisted" };
+  }
+
+  const mp = propsOf(c);
+  if (d.remove) delete mp[k];
+  else if (d.prop) mp[k] = d.prop;
+  if (nextTags) {
+    c.tags = nextTags;
+    persist(c);   // bump last_event_at; `props` is NOT in upsertContact and never will be
+  }
+
+  if (d.applied) {
+    logEvent(`prop:${k}`, phone, d.remove ? `${by} · مسح` : `${by} · ${source} · ${d.prop?.value.slice(0, 80) ?? ""}`);
+  } else if (d.reason === "human_value_wins" && d.prop?.contested) {
+    // BR-7c: a refusal is normal operation, not an incident — logged, never alerted. Only the
+    // DISAGREEING case is logged, so an insights re-run that re-infers the same value does not
+    // churn the timeline on every refresh.
+    logEvent(`prop_rejected:${k}`, phone, `human_value_wins · قراءة مختلفة: ${d.prop.contested.value.slice(0, 80)}`);
+  }
+  return { applied: d.applied, persisted: true, reason: d.reason, prop: d.prop };
+}
+
+/** BR-7d — the human facts, as grounded truth for the agent's context, so it stops re-asking what
+ *  the operator already answered. Only حقيقة: a machine reading fed back to the machine that
+ *  produced it is not evidence, and re-asserting it as fact is how a guess hardens into a record.
+ *  `note` is excluded deliberately — it is the operator's internal commentary about the customer,
+ *  and anything in this block can end up paraphrased into a message. */
+export function humanFactsBlock(c: Pick<Contact, "props">): string {
+  const lines: string[] = [];
+  for (const k of PROP_KEYS) {
+    // `note` is the team's private scratchpad, and `disqualifyReason` is our INTERNAL judgement of
+    // this account — «غير مناسب», «لا حاجة». Neither is a fact about the customer, and the model
+    // paraphrases what it is given: telling a clinic we filed them as unsuitable is the kind of
+    // sentence that ends a relationship. Both stay out of the prompt. (safety-gate advisory,
+    // crm-record cycle.)
+    if (k === "note" || k === "disqualifyReason") continue;
+    const p = c.props?.[k];
+    if (p && p.source === "human") lines.push(`- ${PROP_LABELS[k]}: ${p.value}`);
+  }
+  if (!lines.length) return "";
+  return ["# حقائق مؤكدة من الفريق — لا تسأل عنها ولا تناقضها",
+    ...lines,
+    "هذه أثبتها زميل بشري. اعتمدها كما هي؛ إن ذكر العميل خلافها فانقل كلامه دون تصحيح السجل بنفسك.",
+  ].join("\n");
 }
 
 export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: string) {
@@ -243,6 +514,7 @@ export async function hydrate(): Promise<number> {
       human: Boolean(r.human),
       test: Boolean(r.test) || testNumbers.has(r.phone),
       agentTurns: Number(r.agent_turns),
+      props: readProps(r.props),
     };
     contacts.set(c.phone, c);
   }

@@ -124,7 +124,14 @@ const rec = dash3.slice(dash3.indexOf("CRM STATUS REGION"), dash3.indexOf("CRM S
 c3("the record reads the real interest tags", rec.includes("(c.tags || []).forEach"));
 c3("…one chip per product, never averaged", rec.includes("latest.set(tg.product, tg)"));
 c3("…sorted hot before warm before cold", rec.includes("{ hot: 0, warm: 1, cold: 2 }"));
-c3("stage is shown with its position in the pipeline", rec.includes("من \" + fmtN(6)"));
+// The ordinal «N من ٦» is the banned 6-node rail expressed as text — it names a position on a
+// pipeline the customer never walked. design-plan.md section 5 deletes it, so the gate now
+// asserts its ABSENCE. Flipped deliberately in the crm-record cycle; do not restore.
+c3("the stage carries NO pipeline ordinal", !rec.includes("من \" + fmtN(6)"));
+// Bans the IDENTIFIER, not one spelling of one call: `h += vSalesPath(ins)` passed while
+// `h+=vSalesPath(ins)` or `factsPanel + vSalesPath(x)` would have sailed through. The renderer
+// is deleted outright now, so any reference at all — call or definition — is a restoration.
+c3("…and the 6-node rail exists nowhere in the dashboard", !/vSalesPath\s*\(/.test(dash3));
 c3("an UNJUSTIFIED stage renders visibly weaker", rec.includes('justified ? "c-teal" : "c-grey"'));
 c3("…and says the quote is missing rather than hiding it", rec.includes("بلا اقتباس يسندها بعد"));
 c3("…offering a refresh instead of a dead end", rec.includes("refreshInsights()"));

@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS contacts (
   agent_turns    INT NOT NULL DEFAULT 0,
   last_error     TEXT
 );
+-- Enrichable client record (cycle crm-record). ONE JSONB column holding the six typed properties
+-- with their provenance. It is written ONLY by upsertProps() below and is deliberately absent from
+-- upsertContact's INSERT/ON CONFLICT — scheduled_said needed a COALESCE because it rides the shared
+-- upsert; props avoids that trap entirely by never riding it. A typed fact must not be nullable by
+-- an unrelated delivery receipt.
+-- MUST stay immediately after the CREATE above (§90's warning): the whole schema runs as ONE simple
+-- query, so an ALTER on a table that does not exist yet aborts every statement after it.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS props JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE TABLE IF NOT EXISTS messages (
   id    BIGSERIAL PRIMARY KEY,
   phone TEXT NOT NULL,
@@ -173,18 +181,52 @@ export function upsertContact(c: {
 export function insertMessage(phone: string, role: string, text: string, ts: number): void {
   fire(`INSERT INTO messages (phone, role, text, ts) VALUES ($1,$2,$3,$4)`, [phone, role, text, ts]);
 }
-/** Atomic: a failed INSERT halfway through must not leave the contact with its old tags
- *  deleted and its new ones missing. One client, one transaction, rolled back on any throw. */
-export async function replaceTags(phone: string, tags: { product: string; level: string; ts: number }[]): Promise<void> {
-  if (!pool || !connected) return;
+// NOTE: `replaceTags` was removed with the props write path. Correcting a contact's interest tags
+// without also stamping `props.productInterest` leaves a human correction rendering as a machine
+// reading (BR-2), so the two now commit together inside `upsertProps` above — one door, one
+// transaction. A second tag-only writer would re-open exactly that gap.
+/** Thrown when a property write could not reach Postgres. NOT an ordinary Error: the caller has to
+ *  distinguish "the ledger refused" from "the code broke", because the two get opposite treatment
+ *  (a human write becomes a 503, an agent write is logged and swallowed). */
+export class NotPersisted extends Error {
+  constructor(reason: "no_database_url" | "db_unreachable") { super(reason); this.name = "NotPersisted"; }
+}
+
+/**
+ * Write typed properties (+ optionally the interest tags that belong with them) in ONE transaction.
+ *
+ * Diverges from fire() on purpose (NFR-3): fire() is fire-and-forget, which is right for status
+ * telemetry and wrong for a fact a human typed once. It MUST throw rather than return early the way
+ * replaceTags does — a silent early return is how local dev pretends a save succeeded, and the
+ * field then reads «ناقص» after the next hydrate with nothing having reported a failure.
+ *
+ * Tags ride the same transaction (BR-2): a crash between two separate commits would leave the tags
+ * corrected and the provenance missing, i.e. a human fact rendering as a machine reading.
+ * Returns false when the phone is unknown — never manufactures a contact.
+ */
+export async function upsertProps(
+  phone: string,
+  set: Record<string, unknown>,
+  del: string[],
+  tags?: { product: string; level: string; ts: number }[],
+): Promise<boolean> {
+  if (!pool || !connected) throw new NotPersisted(enabled() ? "db_unreachable" : "no_database_url");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`DELETE FROM interest_tags WHERE phone = $1`, [phone]);
-    for (const t of tags) {
-      await client.query(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, t.product, t.level, t.ts]);
+    const r = await client.query(
+      `UPDATE contacts SET props = (COALESCE(props,'{}'::jsonb) || $2::jsonb) - $3::text[] WHERE phone = $1`,
+      [phone, JSON.stringify(set), del]);
+    if ((r.rowCount ?? 0) === 0) { await client.query("ROLLBACK"); return false; }
+    if (tags) {
+      await client.query(`DELETE FROM interest_tags WHERE phone = $1`, [phone]);
+      for (const t of tags) {
+        await client.query(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`,
+          [phone, t.product, t.level, t.ts]);
+      }
     }
     await client.query("COMMIT");
+    return true;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
@@ -192,15 +234,16 @@ export async function replaceTags(phone: string, tags: { product: string; level:
     client.release();
   }
 }
+
 /** Mark a campaign as a sandbox/rehearsal launch so the real views stop counting it. */
 export async function setCampaignTest(id: number, test: boolean): Promise<boolean> {
   if (!pool || !connected) return false;
   const r = await pool.query(`UPDATE campaigns SET test = $2 WHERE id = $1`, [id, test]);
   return (r.rowCount ?? 0) > 0;
 }
-export function insertTag(phone: string, product: string, level: string, ts: number): void {
-  fire(`INSERT INTO interest_tags (phone, product, level, ts) VALUES ($1,$2,$3,$4)`, [phone, product, level, ts]);
-}
+// insertTag is deleted with its only caller (tracker.addTag). It was a fire-and-forget INSERT into
+// interest_tags outside any transaction — the second write path that let a curated tag set drift
+// from its provenance. `upsertProps` is now the only writer of that table, and it is transactional.
 export function insertEvent(phone: string, kind: string, note: string, ts: number): void {
   fire(`INSERT INTO events (phone, kind, note, ts) VALUES ($1,$2,$3,$4)`, [phone, kind, note, ts]);
 }
@@ -210,6 +253,8 @@ export type HydratedContact = {
   status_times: Record<string, number>; outcome: string | null; outcome_reason: string | null;
   opted_out: boolean; human: boolean; test?: boolean; agent_turns: number; last_error: string | null;
   scheduled_said?: string | null; scheduled_at?: string | number | null; outcome_evidence?: string | null;
+  /** The six typed properties + provenance. `loadAll` is SELECT *, so it comes back for free. */
+  props?: Record<string, unknown> | null;
 };
 
 /** Load everything needed to rebuild the in-memory tracker at boot. */

@@ -79,6 +79,16 @@ app.get("/health", async () => ({
 function adminOk(req: any): boolean {
   return Boolean(cfg.adminToken) && req.headers["x-admin-token"] === cfg.adminToken;
 }
+/** WHO typed a fact. One operator today (assumption A-3), so the token is the authorization and
+ *  this is only a label on the record.
+ *
+ *  Read from the BODY, not a header: HTTP header values are latin-1, so «أبو عزيز» in an
+ *  `x-admin-name` header throws ERR_INVALID_CHAR in the client before the request is even sent —
+ *  measured, not assumed. A percent-encoded header would work and would also be a value the portal
+ *  emits and cannot read back, which is this project's own recurring defect. */
+function adminName(req: any): string {
+  return String((req.body ?? {}).by ?? "").trim().slice(0, 60) || "اللوحة";
+}
 
 app.get("/admin/state", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
@@ -355,6 +365,10 @@ app.get("/admin/customer/:phone", async (req, reply) => {
   const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
   return {
     contact, entity, insights: ins,
+    // NFR-3 made visible: with no DATABASE_URL (or a dropped pool) a property write CANNOT persist,
+    // so the panel renders its editors disabled with the reason stated rather than offering a save
+    // that will 503. A local dev with no database is a visible disabled state, never a green save.
+    propsWritable: db.enabled() && db.isConnected(),
     context: insights.contextScore(contact, entity),
     // What the conversation actually WAS. `contextScore` measures fields we hold and can read full
     // on a contact whose only real sentence was «ماني مهتم لا تتصل علي»; this reads the transcript.
@@ -407,7 +421,21 @@ app.post("/admin/contact/outcome", async (req, reply) => {
   else if (outcome === "clear") tracker.setOutcome(p, undefined, "");
   tracker.recordSystem(p, outcome === "clear" ? "[أُزيلت النتيجة البشرية]" : `[نتيجة بشرية: ${outcome}]`);
   db.insertEvent(p, "human_outcome", String(outcome), Date.now());
-  return { status: "ok", outcome: mapped ?? null };
+  // ONE VOCABULARY, second half: «غير مناسب» IS a disqualification, so it becomes a حقيقة on the
+  // record instead of living only in outcomeReason where the agent could later overwrite it.
+  // «clear» erases it back to «ناقص» — the same button that made the judgement withdraws it.
+  let disqualify: string | null = null;
+  if (outcome === "not_a_fit" || outcome === "clear") {
+    const r = await tracker.writeProp(p, "disqualifyReason",
+      // «other», NOT «no_need». The button says only «غير مناسب» — our judgement of the account.
+      // Filing it as «لا حاجة لدى العميل» would put a sentence in the customer's mouth that they
+      // may never have said, signed by the operator. Same class as the preselected-«السعر» bug.
+      outcome === "clear" ? "" : "other: غير مناسب (قرار بشري من اللوحة)", "human", adminName(req));
+    // Reported, not swallowed: the operator must be able to see that the fact did not reach the
+    // ledger. The outcome itself is telemetry-grade and stays fire-and-forget.
+    disqualify = r.applied ? "saved" : (r.reason ?? "unchanged");
+  }
+  return { status: "ok", outcome: mapped ?? null, disqualify };
 });
 
 // Correct a contact's interest tags (removes fabricated or duplicated entries).
@@ -419,9 +447,91 @@ app.post("/admin/contact/tags", async (req, reply) => {
     product: String(t.product).slice(0, 80),
     level: (["hot", "warm", "cold"].includes(String(t.level)) ? String(t.level) : "warm") as "hot" | "warm" | "cold",
   }));
-  const ok = await tracker.replaceTags(String(phone).replace(/\D/g, ""), clean);
-  if (!ok) return reply.code(404).send({ error: "unknown phone — curation never creates a contact" });
+  // BR-2: the tag set and its provenance commit TOGETHER. Curating tags alone left the panel unable
+  // to tell a human correction from the machine reading it replaced, and a crash between two
+  // separate commits would have made that permanent for that contact.
+  const r = await tracker.writeProp(
+    String(phone).replace(/\D/g, ""), "productInterest", tracker.formatInterest(clean),
+    "human", adminName(req), { tags: clean });
+  if (r.reason === "unknown_phone") return reply.code(404).send({ error: "unknown phone — curation never creates a contact" });
+  if (r.reason === "not_persisted") return reply.code(503).send({ ok: false, persisted: false, reason: "not_persisted" });
+  if (!r.applied) return reply.code(400).send({ ok: false, error: r.reason, key: "productInterest" });
   return { status: "ok", tags: clean.length };
+});
+
+// ------------------------------ the enrichable client record (props) ------------------------------
+// The ONLY human write path onto the six typed properties. It reads nothing from the model and
+// sends nothing: BR-4 makes "no enrichment path may send WhatsApp" a hard invariant, asserted by
+// scripts/check-props.mjs greping this body for `gupshup.` / `agent.`. Keep it that way.
+app.post("/admin/contact/props", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const body = (req.body ?? {}) as {
+    phone?: string;
+    props?: Record<string, string | { value?: string; due?: number }>;
+    tags?: { product: string; level: string }[];
+  };
+  const phone = String(body.phone ?? "").replace(/\D/g, "");
+  if (!phone || !body.props || typeof body.props !== "object") {
+    return reply.code(400).send({ error: "body: { phone, props: { <key>: value | {value, due} } }" });
+  }
+  const entries = Object.entries(body.props);
+  if (!entries.length) return reply.code(400).send({ error: "props: at least one key" });
+
+  // NFR-2: validate EVERY key before writing ANY of them, so a typo in the fourth key cannot leave
+  // the first three written and the caller told the request failed.
+  for (const [key] of entries) {
+    if (!(tracker.PROP_KEYS as readonly string[]).includes(key)) {
+      return reply.code(400).send({ ok: false, error: "unknown_property", key, allowed: tracker.PROP_KEYS });
+    }
+  }
+  // FR-6 is a closed vocabulary; «other» carries the free text. An unrecognised reason is reported,
+  // never coerced to «other» — a coerced value is a fact nobody stated.
+  const reasonOf = (v: string) => v.split(/[:：]/)[0].trim();
+  for (const [key, raw] of entries) {
+    if (key !== "disqualifyReason") continue;
+    const v = String((typeof raw === "object" && raw ? raw.value : raw) ?? "").trim();
+    if (v && !(tracker.DISQUALIFY_REASONS as readonly string[]).includes(reasonOf(v))) {
+      return reply.code(400).send({ ok: false, error: "unknown_reason", key, allowed: tracker.DISQUALIFY_REASONS });
+    }
+  }
+
+  const by = adminName(req);
+  const written: Record<string, unknown> = {};
+  for (const [key, raw] of entries) {
+    const value = typeof raw === "object" && raw ? String(raw.value ?? "") : String(raw ?? "");
+    const due = typeof raw === "object" && raw && raw.due !== undefined ? Number(raw.due) : undefined;
+    // BR-2 again: tags ride the productInterest write and nothing else.
+    const tags = key === "productInterest" && Array.isArray(body.tags)
+      ? body.tags.filter((t) => t && t.product).slice(0, 8).map((t) => ({
+          product: String(t.product).slice(0, 80),
+          level: (["hot", "warm", "cold"].includes(String(t.level)) ? String(t.level) : "warm") as "hot" | "warm" | "cold",
+        }))
+      : undefined;
+    const r = await tracker.writeProp(phone, key, value, "human", by, { due, tags });
+    if (r.reason === "unknown_phone") {
+      return reply.code(404).send({ ok: false, error: "unknown_phone", phone });
+    }
+    // NFR-3 / plan D2, the HUMAN half of the asymmetry: a typed fact that did not reach the ledger
+    // must never render as saved. 503 keeps the editor open with «لم يُحفظ — أعد المحاولة». The
+    // agent half (agent.ts) does the opposite and swallows this — a live conversation must not
+    // stall on the ledger. Both sites carry this comment on purpose.
+    if (r.reason === "not_persisted") {
+      return reply.code(503).send({ ok: false, persisted: false, error: "not_persisted", key });
+    }
+    if (r.reason === "too_long") {
+      return reply.code(400).send({ ok: false, error: "too_long", key });
+    }
+    if (!r.applied) return reply.code(400).send({ ok: false, error: r.reason, key });
+    written[key] = r.prop ?? null;   // null → the key was cleared back to «ناقص»
+
+    // BR-3: a human disqualification is OUR judgement, so it moves the outcome — and it never sets
+    // `opted_out`, which is the customer's right and only theirs to exercise.
+    if (key === "disqualifyReason" && r.prop) {
+      const stated = reasonOf(r.prop.value) === "no_need";
+      tracker.setOutcome(phone, stated ? "stopped" : "not_interested", r.prop.value);
+    }
+  }
+  return { ok: true, persisted: true, props: written };
 });
 
 // Behavioural segmentation — evaluate a segment against the live ledger and return what would
