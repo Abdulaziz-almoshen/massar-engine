@@ -113,6 +113,59 @@ export const CAMPAIGNS_CRM_CSS = `
     border:none; border-bottom:2px solid transparent; padding:0 0 11px; cursor:pointer; white-space:nowrap; }
   .ctabs button.on { color:#1F7A73; border-bottom-color:#1F7A73; }
 
+  /* ===== the interaction layer, extracted from Frappe CRM's own source =====
+     Measured usage there: transition-colors (19) · duration-300 (34) · ease-in (33) ·
+     hover:bg-surface-gray-2/3 (40) · hover:shadow-sm (10) · group-hover:opacity-100 (14) ·
+     focus-visible:ring-2 (11) · animate-pulse/spin. Massar had none of this: every control
+     changed state instantly, nothing revealed on hover, and focus was the browser default.
+     That absence is most of why the UI read as unfinished next to the reference. */
+  .crmbar, .crow, .kcard, .ncard, .rtask, .qpill, .vtog button, .ptab, .btn, .nv, .switcher,
+  .collapse, .rtabs button, .ctabs button, .kebab, .selcell input, .lnk, .chip {
+    /* 140ms, not Frappe's 300: at our row density 300 reads as lag rather than polish. */
+    transition: background-color .14s ease-in, color .14s ease-in, border-color .14s ease-in,
+                box-shadow .14s ease-in, opacity .14s ease-in;
+  }
+  /* rows and cards take a grey wash on hover, the way every Frappe list row does */
+  .crmflat .crow:hover { background:#F8F8F8; }
+  .crmflat .crow.sel:hover { background:#F3F3F3; }
+  .kcard:hover, .ncard:hover { box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .qpill:hover:not(.on), .ptab:hover:not(.on) { background:#F3F3F3; border-color:#E2E2E2; }
+  .vtog button:hover:not(.on) { color:#171717; }
+  .rtabs button:hover:not(.on), .ctabs button:hover:not(.on) { color:#525252; }
+  .kebab:hover { background:#F3F3F3; }
+  .lnk:hover { opacity:.7; }
+  .btn:hover { filter:brightness(.96); }
+
+  /* one focus treatment everywhere, replacing the browser default (focus:outline-none +
+     focus-visible:ring-2 in Frappe). Keyboard users get a ring; mouse users get nothing. */
+  .crmbar :focus, .crow :focus, .btn:focus, .qpill:focus, .ptab:focus { outline:none; }
+  .btn:focus-visible, .qpill:focus-visible, .ptab:focus-visible, .vtog button:focus-visible,
+  .rtabs button:focus-visible, .ctabs button:focus-visible, .nv:focus-visible,
+  .switcher:focus-visible, .collapse:focus-visible, .kebab:focus-visible,
+  .inp:focus-visible, .crmsel:focus-visible, .selcell input:focus-visible {
+    outline:2px solid #C7C7C7; outline-offset:1px; }
+  .inp:focus, .crmsel:focus { border-color:#C7C7C7; }
+
+  /* actions reveal on row hover instead of shouting on every row (group-hover:opacity-100) */
+  .crow .c-act { opacity:0; transition:opacity .14s ease-in; }
+  .crow:hover .c-act, .crow:focus-within .c-act, .crow.sel .c-act { opacity:1; }
+  @media (pointer:coarse) { .crow .c-act { opacity:1; } }
+
+  /* loading is a skeleton, not the word «جارٍ التحميل» (animate-pulse) */
+  @keyframes crmpulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
+  .skel-row { display:grid; grid-template-columns:40px 2fr 1.1fr 1.5fr 1fr; gap:12px;
+    padding:8px 20px 8px 12px; border-top:1px solid #EDEDED; align-items:center; }
+  .skel-row > i { display:block; height:12px; border-radius:4px; background:#EDEDED;
+    animation:crmpulse 1.4s ease-in-out infinite; }
+  .skel-row > i:nth-child(2) { width:70%; } .skel-row > i:nth-child(3) { width:50%; }
+  .skel-row > i:nth-child(4) { width:60%; } .skel-row > i:nth-child(5) { width:40%; }
+  @media (prefers-reduced-motion: reduce) {
+    .skel-row > i { animation:none; }
+    .crmbar, .crow, .kcard, .ncard, .rtask, .qpill, .vtog button, .ptab, .btn, .nv, .switcher,
+    .collapse, .rtabs button, .ctabs button, .kebab, .lnk, .chip { transition:none; }
+  }
+
+
   /* ===== S1: the row grid lives in CSS, not in an inline style attribute =====
      It was an inline style on every row and header, which no media query can override — the phone
      layout was unreachable without !important until this moved here. .c-fig uses display:contents
@@ -366,7 +419,9 @@ function crmRow(c, st) {
      .trow:not(.km) below 900px, with nth-child(4) and (5) hidden. That selector is (0,2,0) and
      beat .crow, which is why the row rendered four tracks with the figures line missing.
      The original vKmon row carries km for exactly this reason. */
-  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;kmon/' + c.id + '&quot;">' +
+  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" role="link" tabindex="0"' +
+    ' onclick="location.hash=&quot;kmon/' + c.id + '&quot;"' +
+    ' onkeydown="if(event.key===&quot;Enter&quot;){location.hash=&quot;kmon/' + c.id + '&quot;}">' +
     '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(c.name) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggle(' + c.id + ')"></div>' +
     '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#E2E2E2" : "#1F7A73") + ';box-shadow:0 0 0 3px ' + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
     '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div></div>' +
@@ -381,7 +436,9 @@ function crmRow(c, st) {
     '</div>' +
     '<div class="c-prog">' +
       (prog === null
-        ? '<span style="font-size:11.5px;color:#999999;">لا جهات استهداف</span>'
+        ? '<span style="font-size:12px;color:#999999;">لا جهات استهداف</span>'
+        : !crmWasSent(st)
+        ? '<span style="font-size:12px;color:#999999;">لم تُرسل بعد</span>'
         : '<div class="prog" style="flex:1;height:6px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#7C7C7C;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + '٪</span>') +
     '</div>' +
     '<div class="c-act" style="text-align:center;"><button class="kebab" title="' + actTitle + '" aria-label="' + actTitle + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + ic("target", 17, isTest ? "#E2E2E2" : "#1F7A73") + '</button></div>' +
@@ -822,6 +879,17 @@ window.addEventListener("resize", function () {
   clearTimeout(window.__crmrz); window.__crmrz = setTimeout(crmMeasureMsg, 150);
 });
 try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(crmMeasureMsg); } catch (e) {}
+
+/* Holds the list's shape while data loads. Frappe uses animate-pulse skeletons for this; a
+   centred «جارٍ التحميل» both shifts the layout when rows arrive and tells the operator nothing
+   about what is coming. */
+function crmSkeleton(n) {
+  var h = '<div class="tblwrap crmflat rise" aria-busy="true" aria-live="polite">';
+  for (var i = 0; i < n; i++) {
+    h += '<div class="skel-row"><i style="width:16px;"></i><i></i><i></i><i></i><i></i></div>';
+  }
+  return h + '</div>';
+}
 
 /* ============================== the guarded entry ==============================
    dashboard.ts's render() calls ONLY this. Two jobs:

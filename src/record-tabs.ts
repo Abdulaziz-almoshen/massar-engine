@@ -194,8 +194,9 @@ function recEntityPanel(kind) {
   wrap.appendChild(add);
 
   var list = document.createElement("div");
-  list.textContent = "جارٍ التحميل…";
-  list.style.cssText = "font-size:13px;color:#7C7C7C;";
+  list.setAttribute("aria-busy", "true");
+  list.innerHTML = '<div class="skel-row"><i style="width:16px;"></i><i></i><i></i><i></i><i></i></div>' +
+                   '<div class="skel-row"><i style="width:16px;"></i><i></i><i></i><i></i><i></i></div>';
   wrap.appendChild(list);
 
   var ph = (location.hash || "").split("/")[1] || "";
@@ -229,6 +230,7 @@ function recLoadEntities(kind, ph, list) {
     .then(function (j) {
       var rows = (kind === "tasks" ? j.tasks : j.notes) || [];
       list.innerHTML = "";
+      list.removeAttribute("aria-busy");
       if (!rows.length) {
         list.textContent = kind === "tasks" ? "لا مهام على هذا العميل." : "لا ملاحظات على هذا العميل.";
         list.style.color = "#7C7C7C";

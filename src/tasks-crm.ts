@@ -96,9 +96,9 @@ function tskRow(t) {
 function vTasksCrm() {
   setTimeout(function () { tskPaintCrumb(); }, 0);
   tskLoad(false);
-  if (tskRows === null) {
-    return '<div class="empty" style="padding:60px 20px;"><div class="t">جارٍ التحميل…</div></div>';
-  }
+  /* A skeleton, not the word «جارٍ التحميل». Frappe holds the list's SHAPE while it loads so the
+     page does not jump when rows arrive; a centred word is a layout shift waiting to happen. */
+  if (tskRows === null) return crmSkeleton(6);
   var all = tskRows;
   var open = all.filter(function (t) { return t.status !== "done" && t.status !== "canceled"; }).length;
   var doneN = all.filter(function (t) { return t.status === "done"; }).length;
@@ -132,7 +132,7 @@ function vTasksCrm() {
 function vNotesCrm() {
   setTimeout(function () { ntePaintCrumb(); }, 0);
   nteLoad(false);
-  if (nteRows === null) return '<div class="empty" style="padding:60px 20px;"><div class="t">جارٍ التحميل…</div></div>';
+  if (nteRows === null) return crmSkeleton(4);
   var q = nteQ.trim();
   var rows = (nteRows || []).filter(function (n) {
     if (!q) return true;

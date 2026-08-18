@@ -100,12 +100,16 @@ function cusRow(c) {
   var msgs = (c.transcript || []).length;
   var on = !!cusSel[c.phone];
   var nm = c.waName || c.phone;
-  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
+  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" role="link" tabindex="0"' +
+    ' onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;"' +
+    ' onkeydown="if(event.key===&quot;Enter&quot;){location.hash=&quot;customer/' + esc(c.phone) + '&quot;}">' +
     '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(nm) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();cusToggle(&quot;' + esc(c.phone) + '&quot;)"></div>' +
     '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;">' +
       '<span role="img" aria-label="' + (c.test ? "جهة تجريبية" : "جهة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (c.test ? "#E2E2E2" : "#1F7A73") + ';"></span>' +
       '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</div></div>' +
-      '<span style="font-size:12px;color:#7C7C7C;flex:none;direction:ltr;">' + esc(c.phone) + '</span></div>' +
+      /* only show the phone as a SECOND line when the name is not already the phone — a nameless
+         contact was rendering the same number twice, at two different weights. */
+      (c.waName ? '<span style="font-size:12px;color:#7C7C7C;flex:none;direction:ltr;">' + esc(c.phone) + '</span>' : "") + '</div>' +
     '<div class="c-meta">' +
       '<div class="c-prod taglvl"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:13px;color:#525252;">' + oc.label + '</span></div>' +
       '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#B54708;">تدخّل بشري</span>' : "") + '</div>' +

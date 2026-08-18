@@ -216,7 +216,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .btn-teal { color: #fff; background: #1F7A73; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
   .btn-dark { color: #fff; background: #171717; }
   .btn-ghost { color: #383838; background: #fff; border: 1px solid #E2E2E2; }
-  .btn:hover { filter: brightness(1.04); }
+  .btn:hover { filter: brightness(.97); }
   .btn-dis { color: #999999; background: #F3F3F3; cursor: not-allowed; }
   .note { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #EDEDED;
     border-inline-start:3px solid #B54708; border-radius:10px; padding:12px 16px; font-size:12px;
@@ -242,7 +242,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   @media (prefers-reduced-motion: no-preference) {
-    .rise { animation: rise .42s cubic-bezier(.22,.9,.32,1) both; }
+    /* Entrance only. render() rewrites #body on every keystroke, so an unconditional .rise
+       re-ran this 420ms slide-up each time and the table visibly jumped while typing. */
+    .rise { animation: rise .28s cubic-bezier(.22,.9,.32,1) both; }
+    .norise .rise { animation: none; }
     .card, .kpi, .statc, .step { transition: transform .18s ease, box-shadow .18s ease; }
     .kpi:hover, .statc:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,24,40,.08); }
     .trow { transition: background .15s ease; }
@@ -413,11 +416,11 @@ let lastDetailCohort = null;  // captured at render time by vKmonDetail (current
 let campMsg = "في أغلب المنشآت الصحية، إصدار {product} يمر بخطوات ورقية متكررة بين النظام الداخلي والجهات الرسمية.\\n\\nما نقدمه في لِين هو ربط مباشر مع نظام HIS لديكم: الإجراء يُنفَّذ من داخل نظامكم بتوثيق رسمي معتمد، فيقل زمن الإصدار بنسبة تصل إلى ٧٠٪ ويختفي الإدخال المزدوج.\\n\\nأرفقنا ملفًا موجزًا يوضح آلية الربط والخطوات.\\n\\nسؤال واحد لنعرف ما يناسبكم: كم فرعًا لديكم تقريبًا؟";
 
 const NAV = [
-  { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", g: "g-sq" },
-  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", g: "g-ci" }, { id: "opps", l: "فرص البيع", g: "g-tr" }, { id: "pipeline", l: "لوحة المتابعة", g: "g-ba" }, { id: "tasks", l: "المهام", g: "g-tb" }, { id: "notes", l: "الملاحظات", g: "g-ri" },
-  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", g: "g-di" }, { id: "kmon", l: "متابعة الحملات", g: "g-ba" }, { id: "kb", l: "معرفة الخدمة", g: "g-ri" }, { id: "partners", l: "شركاء المبيعات", g: "g-ci" },
-  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", g: "g-di" }, { id: "targets", l: "جهات الاستهداف", g: "g-ri" }, { id: "reports", l: "التقارير", g: "g-tb" },
-  { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", g: "g-tree" },
+  { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", i: "home" },
+  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", i: "users" }, { id: "opps", l: "فرص البيع", i: "target" }, { id: "pipeline", l: "لوحة المتابعة", i: "reply" }, { id: "tasks", l: "المهام", i: "check" }, { id: "notes", l: "الملاحظات", i: "doc" },
+  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", i: "send" }, { id: "kmon", l: "متابعة الحملات", i: "eye" }, { id: "kb", l: "معرفة الخدمة", i: "book" }, { id: "partners", l: "شركاء المبيعات", i: "spark" },
+  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "reports", l: "التقارير", i: "chart" },
+  { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
 ];
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
@@ -456,7 +459,7 @@ function nav() {
   document.getElementById("nav").innerHTML = NAV.map((x) => x.grp
     ? '<div class="grp">' + x.grp + "</div>"
     : '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
-      '<span class="gx"><span class="' + x.g + '"></span></span><span class="lbl">' + x.l + '</span><span class="dot"></span></button>'
+      '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#525252" : "#999999") + '</span><span class="lbl">' + x.l + '</span></button>'
   ).join("");
   // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
   // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
@@ -2846,6 +2849,11 @@ function render(fetchNew) {
   }
   // The #pathNow / #pathScroll scroll-into-view went with the stage rail that produced those two
   // ids. Nothing renders them any more, so it ran on every paint and could never fire.
+  // After the first paint of a route the entrance animation is noise: every keystroke re-renders
+  // #body, and replaying a 420ms slide-up on each one is the jump the designer measured.
+  { const cur2 = (location.hash || "").slice(1);
+    if (b.dataset.routePainted === cur2) b.classList.add("norise");
+    else { b.classList.remove("norise"); b.dataset.routePainted = cur2; } }
   if (afId) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
