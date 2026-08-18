@@ -1715,7 +1715,11 @@ function vMorningList() {
   // typed was rendering «موعد مؤكَّد: الثلاثاء ٢٥ أغسطس» UNDER the heading «مهتم بلا موعد» — the
   // header denying the row beneath it, on the one screen whose job is «who do I call today».
   const of = (k) => cs.filter((c) => {
-    const confirmed = Boolean(appt(c).confirmed);
+    // appt() returns NULL when there is no appointment — the common case on this list. The gate
+    // asserted the SOURCE contained appt(c).confirmed and passed; only smoke, which executes the
+    // page, caught the dereference. Assertions on text are not assertions on behaviour.
+    const a = appt(c);
+    const confirmed = Boolean(a && a.confirmed);
     if (k === "scheduled") return c.outcome === "scheduled" || (confirmed && c.outcome !== "stopped" && c.outcome !== "not_interested" && !c.optedOut);
     if (k === "interested") return c.outcome === "interested" && !confirmed;
     if (k === "stopped") return c.outcome === "stopped" || c.outcome === "not_interested" || c.optedOut;

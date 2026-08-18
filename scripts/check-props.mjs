@@ -716,11 +716,29 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
 
   // M15 — the morning list header must not deny the row beneath it. An interested clinic whose day
   // the operator CONFIRMED was rendering «موعد مؤكَّد: …» under the heading «مهتم بلا موعد».
-  const morn = cut("function vMorningList() {", "\nfunction vCustomers()");
-  check("M15 the morning list buckets by the CONFIRMED appointment, not by outcome alone",
-    /appt\(c\)\.confirmed/.test(morn || ""), true);
-  check("M15 …and «مهتم بلا موعد» excludes anyone who has one",
-    /k === "interested"[\s\S]{0,120}!confirmed/.test(morn || ""), true);
+  // EXECUTED, not grepped. The first version of this asserted the source CONTAINED
+  // appt(c).confirmed and passed green while the shipped page threw «Cannot read properties of null»
+  // on #customers, because appt() returns null whenever there is no appointment — the common case.
+  // Smoke caught it in production. A regex over source is not a test of behaviour; run the classifier.
+  // `of` is scoped INSIDE vMorningList, so the classifier itself is lifted — the exact shipped
+  // lines, with cs and appt supplied — rather than the whole view with its dozen dependencies.
+  const ofSrc = cut("  const of = (k) => cs.filter", "\n  const unsorted");
+  const ofFn = (contacts) => new Function("ctx", `
+    const { appt, cs } = ctx;
+    ${ofSrc}
+    return of;
+  `)({ appt: A.appt, cs: contacts });
+  const NO_APPT = { phone: "1", outcome: "interested", props: {}, tags: [] };
+  const HAS_APPT = { phone: "2", outcome: "interested", scheduledAt: 1_787_637_600_000,
+    props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: 1_787_637_600_000 } }, tags: [] };
+  let of2;
+  try { of2 = ofFn([NO_APPT, HAS_APPT]); } catch (e) { of2 = null; }
+  check("M15 the classifier RUNS on a contact with no appointment at all (appt() returns null)",
+    Boolean(of2) && (() => { try { of2("interested"); return true; } catch { return false; } })(), true);
+  check("M15 …an interested contact WITHOUT a day stays in «مهتم بلا موعد»",
+    of2 ? of2("interested").map((c) => c.phone) : null, ["1"]);
+  check("M15 …and one WITH a confirmed day moves to «موعد محدد», so the header cannot deny the row",
+    of2 ? of2("scheduled").map((c) => c.phone) : null, ["2"]);
 
   // M16 — one variable was feeding both the sidebar highlight and the page heading, so every CLIENT
   // RECORD was headed «جهات الاستهداف», the import list's title, and TITLES.customer was unreachable.
