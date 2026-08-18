@@ -41,6 +41,22 @@ export const RECORD_TABS_CSS = `
     font-size:13px; font-weight:600; color:#171717; }
   .rsechd .cv { margin-inline-start:auto; color:#C7C7C7; font-size:12px; transition:transform .12s; }
   .rsec.shut .rsechd .cv { transform:rotate(-90deg); }
+
+  /* tasks + notes */
+  .rtask { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-top:1px solid #EDEDED; }
+  .rtask:first-of-type { border-top:0; }
+  .rtask .cb { width:16px; height:16px; accent-color:#1F7A73; margin-top:2px; flex:none; cursor:pointer; }
+  .rtask .ti { font-size:14px; font-weight:450; color:#171717; }
+  .rtask.done .ti { color:#999999; text-decoration:line-through; }
+  .rtask .mt { font-size:12px; color:#7C7C7C; margin-top:3px; display:flex; gap:10px; flex-wrap:wrap; }
+  .rnote { border:1px solid #EDEDED; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .rnote .nt { font-size:14px; font-weight:500; color:#171717; }
+  .rnote .nc { font-size:13px; color:#525252; line-height:1.8; margin-top:5px; white-space:pre-wrap; }
+  .rnote .nm { font-size:12px; color:#999999; margin-top:6px; }
+  .radd { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .radd input, .radd select { font-family:inherit; font-size:13px; height:32px; border:1px solid #EDEDED;
+    border-radius:6px; padding:0 10px; background:#fff; color:#171717; }
+  .radd input { flex:1; min-width:180px; }
 `;
 
 export const RECORD_TABS_JS = `
@@ -77,6 +93,10 @@ function recApplyTabs() {
      transcript the ledger already holds — no new data, no new endpoint. */
   var conv = recConversationPanel();
   if (conv) panels.unshift(conv);
+  /* Tasks and Notes are real entities now (tasks/notes tables), so these tabs are backed by rows
+     rather than decoration. They always appear — unlike المحادثة, an EMPTY task list is a
+     meaningful state that the operator acts on by adding one. */
+  panels.push(recEntityPanel("tasks"), recEntityPanel("notes"));
   if (!panels.length) return;
 
   var title = function (el) {
@@ -142,6 +162,128 @@ function recConversationPanel() {
   });
   wrap.appendChild(box);
   return wrap;
+}
+
+/* A tasks or notes tab: a heading, an add row, and a list that loads from the API. Rendered
+   immediately with a loading line so the tab never appears blank while the fetch is in flight. */
+function recEntityPanel(kind) {
+  var wrap = document.createElement("div");
+  wrap.className = "card";
+  var h = document.createElement("h3");
+  h.textContent = kind === "tasks" ? "المهام" : "الملاحظات";
+  wrap.appendChild(h);
+
+  var add = document.createElement("div");
+  add.className = "radd";
+  var inp = document.createElement("input");
+  inp.placeholder = kind === "tasks" ? "مهمة جديدة…" : "ملاحظة جديدة…";
+  add.appendChild(inp);
+  var pri = null;
+  if (kind === "tasks") {
+    pri = document.createElement("select");
+    [["", "الأولوية"], ["high", "عالية"], ["medium", "متوسطة"], ["low", "منخفضة"]].forEach(function (o) {
+      var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; pri.appendChild(op);
+    });
+    add.appendChild(pri);
+  }
+  var btn = document.createElement("button");
+  btn.className = "btn";
+  btn.style.cssText = "color:#fff;background:#1F7A73;";
+  btn.textContent = "إضافة";
+  add.appendChild(btn);
+  wrap.appendChild(add);
+
+  var list = document.createElement("div");
+  list.textContent = "جارٍ التحميل…";
+  list.style.cssText = "font-size:13px;color:#7C7C7C;";
+  wrap.appendChild(list);
+
+  var ph = (location.hash || "").split("/")[1] || "";
+  var load = function () { recLoadEntities(kind, ph, list); };
+  btn.onclick = function () {
+    var v = inp.value.trim();
+    if (!v) return;
+    btn.disabled = true;
+    var body = kind === "tasks"
+      ? { title: v, priority: pri && pri.value ? pri.value : null, ref_kind: "contact", ref_id: ph }
+      : { content: v, ref_kind: "contact", ref_id: ph };
+    fetch("/admin/" + kind, { method: "POST",
+      headers: { "content-type": "application/json", "x-admin-token": TOKEN },
+      body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        btn.disabled = false;
+        if (!res.ok) { alertBar("تعذّر الحفظ — " + (res.j && res.j.error ? res.j.error : "أعد المحاولة"), true); return; }
+        inp.value = ""; load();
+      })
+      .catch(function () { btn.disabled = false; alertBar("تعذّر الاتصال بالخادم", true); });
+  };
+  inp.onkeydown = function (e) { if (e.key === "Enter") btn.click(); };
+  setTimeout(load, 0);
+  return wrap;
+}
+
+function recLoadEntities(kind, ph, list) {
+  fetch("/admin/" + kind + "?kind=contact&id=" + encodeURIComponent(ph), { headers: { "x-admin-token": TOKEN } })
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      var rows = (kind === "tasks" ? j.tasks : j.notes) || [];
+      list.innerHTML = "";
+      if (!rows.length) {
+        list.textContent = kind === "tasks" ? "لا مهام على هذا العميل." : "لا ملاحظات على هذا العميل.";
+        list.style.color = "#7C7C7C";
+        return;
+      }
+      list.style.color = "";
+      rows.forEach(function (r) { list.appendChild(kind === "tasks" ? recTaskRow(r, ph, list) : recNoteRow(r)); });
+    })
+    .catch(function () { list.textContent = "تعذّر تحميل السجلات."; });
+}
+
+var REC_PRI = { high: "عالية", medium: "متوسطة", low: "منخفضة" };
+var REC_ST = { backlog: "مؤجلة", todo: "للتنفيذ", in_progress: "قيد التنفيذ", done: "منجزة", canceled: "ملغاة" };
+
+function recTaskRow(t, ph, list) {
+  var d = document.createElement("div");
+  d.className = "rtask" + (t.status === "done" ? " done" : "");
+  var cb = document.createElement("input");
+  cb.type = "checkbox"; cb.className = "cb"; cb.checked = t.status === "done";
+  cb.setAttribute("aria-label", t.title);
+  cb.onchange = function () {
+    cb.disabled = true;
+    fetch("/admin/tasks/" + t.id, { method: "PATCH",
+      headers: { "content-type": "application/json", "x-admin-token": TOKEN },
+      body: JSON.stringify({ status: cb.checked ? "done" : "todo" }) })
+      .then(function () { recLoadEntities("tasks", ph, list); })
+      .catch(function () { cb.disabled = false; alertBar("تعذّر التحديث", true); });
+  };
+  d.appendChild(cb);
+  var body = document.createElement("div");
+  body.style.cssText = "min-width:0;flex:1;";
+  var ti = document.createElement("div");
+  ti.className = "ti"; ti.textContent = t.title;
+  body.appendChild(ti);
+  var mt = document.createElement("div");
+  mt.className = "mt";
+  /* absent priority renders «—», never a defaulted "medium" */
+  mt.appendChild(recChipEl(REC_ST[t.status] || t.status));
+  mt.appendChild(recChipEl(t.priority ? REC_PRI[t.priority] : "—"));
+  if (t.due_at) { try { mt.appendChild(recChipEl("تستحق " + fmtD(t.due_at))); } catch (e) {} }
+  body.appendChild(mt);
+  d.appendChild(body);
+  return d;
+}
+function recChipEl(txt) { var s = document.createElement("span"); s.textContent = txt; return s; }
+
+function recNoteRow(n) {
+  var d = document.createElement("div");
+  d.className = "rnote";
+  if (n.title) { var t = document.createElement("div"); t.className = "nt"; t.textContent = n.title; d.appendChild(t); }
+  var c = document.createElement("div"); c.className = "nc"; c.textContent = n.content; d.appendChild(c);
+  var m = document.createElement("div"); m.className = "nm";
+  try { m.textContent = fmtD(n.created_at); } catch (e) { m.textContent = ""; }
+  d.appendChild(m);
+  return d;
 }
 
 /* Makes each rail card's heading a collapse toggle, the way Frappe's side-panel sections work. */
