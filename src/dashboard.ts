@@ -15,6 +15,7 @@
 import { CAMPAIGNS_CRM_CSS, CAMPAIGNS_CRM_JS } from "./campaigns-crm.js";
 import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
+import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -310,6 +311,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
+${RECORD_TABS_CSS}
 </style>
 </head>
 <body>
@@ -2808,6 +2810,10 @@ function render(fetchNew) {
     if (!TOKEN) return gate();
     const ph = (location.hash || "").split("/")[1] || "";
     b.innerHTML = vCustomer(ph);
+    // Frappe's tabbed record shell, applied to the DOM vCustomer just produced. Post-render rather
+    // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
+    // range edits here.
+    setTimeout(recApplyTabs, 0);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
@@ -3150,6 +3156,7 @@ window.addEventListener("hashchange", () => {
 ${CAMPAIGNS_CRM_JS}
 ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
+${RECORD_TABS_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */
