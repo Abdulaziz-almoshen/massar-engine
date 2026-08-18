@@ -790,11 +790,12 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   const morning = (rows, tab) => new Function("ctx", `
     const { esc, fmtN, fmtT, fmtDay, appt } = ctx;
     const cache = { contacts: ctx.rows }, showTest = true;
-    let oppTab = ctx.tab;
+    const ic = () => "";   // the board's search affordance draws an icon; the assertions are on text
+    let oppTab = ctx.tab, oppQ = ctx.q || "";
     ${pageSrc}
     ${morningSrc}
     return vMorningList();
-  `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows, tab: tab || "scheduled" });
+  `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows, tab: tab || "scheduled", q: "" });
   const mHuman = morning([{ phone: P, waName: "مجمع النور", outcome: "scheduled", scheduledSaid: "الأحد الصباح",
     scheduledAt: DUE, props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }]);
   check("M10 a day the operator confirmed reaches قائمة الصباح", [mHuman.includes(DAYTXT), mHuman.includes("مؤكَّد")], [true, true]);

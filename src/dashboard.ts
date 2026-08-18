@@ -469,7 +469,7 @@ let cache = null; let selProd = 0;
 let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = false; let segWindow = 5;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
-let manualOpen = false; let manualStat = ""; let oppTab = "scheduled";
+let manualOpen = false; let manualStat = ""; let oppTab = "scheduled"; let oppQ = "";
 // Elapsed time in the unit a person would say it in. Below two days an hour count is what the
 // operator acts on («٩ ساعات بلا متابعة»); above it, hours stop being information.
 function fmtAgo(ms) {
@@ -1926,17 +1926,30 @@ function vMorningList() {
   const unsorted = cs.filter((c) => !c.outcome && !c.optedOut);
   const counts = {};
   GROUPS.forEach(([k]) => { counts[k] = of(k).length; });
+  // A group of 162 needs a way in. The tab counts stay whole-group on purpose — narrowing the view
+  // must not change what the strip reports the book contains.
+  const oq = oppQ.trim();
+  const match = (c) => !oq || (c.waName || "").includes(oq) || c.phone.includes(oq);
   const active = GROUPS.some((g) => g[0] === oppTab) ? oppTab : GROUPS[0][0];
   let h = '<div class="crmbar rise">' + GROUPS.map(([k, label, ink]) =>
     '<button class="qpill' + (active === k ? " on" : "") + '" onclick="oppSetTab(&quot;' + k + '&quot;)">' +
     '<span style="display:inline-block;width:7px;height:7px;border-radius:999px;background:' + ink + ';margin-inline-end:7px;"></span>' +
     label + " (" + fmtN(counts[k]) + ")</button>").join("") +
     '<span style="flex:1"></span>' +
+    '<span style="position:relative;display:inline-flex;align-items:center;min-width:190px;max-width:280px;">' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + "</span>" +
+    '<input id="oq" class="inp" value="' + esc(oppQ) + '" oninput="oppSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
+    'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>' +
     '<span style="font-size:12px;color:#7C7C7C;">' + fmtN(cs.length) + " جهة في السجل" +
     (unsorted.length ? " · " + fmtN(unsorted.length) + " لم تُفرز بعد" : "") + "</span></div>";
   for (const [key, label, ink, hint] of GROUPS) {
     if (key !== active) continue;
-    const rows = of(key);
+    // «موعد محدد» is a call list: the soonest appointment is the one you ring first, and ordering it
+    // by the ledger's insertion order made the first row an accident. Every other group leads with
+    // the most recent movement, which is the row most likely to still be warm.
+    const rows = of(key).filter(match).sort(key === "scheduled"
+      ? (a, b) => { const x = appt(a), y = appt(b); return ((x && x.at) || Infinity) - ((y && y.at) || Infinity); }
+      : (a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
     // Group header on the same #F8F8F8 bar as #customers' group view — one grouped-list idiom in
     // the product, not one per screen. The five tinted row fills that used to be here are gone:
     // five pastels down one page read as five alert levels, and none of these is an alert.
@@ -1947,7 +1960,8 @@ function vMorningList() {
       '<span class="cntpill">' + fmtN(rows.length) + "</span>" +
       '<span style="font-size:12px;color:#999999;">' + hint + "</span></div>";
     if (!rows.length) {
-      h += '<div style="padding:16px 20px;font-size:12.5px;color:#999999;">لا أحد في هذه المجموعة بعد.</div></div>';
+      h += '<div style="padding:16px 20px;font-size:12.5px;color:#999999;">' +
+        (oq ? "لا أحد في هذه المجموعة يطابق «" + esc(oq) + "»." : "لا أحد في هذه المجموعة بعد.") + "</div></div>";
       continue;
     }
     const shown = pageSlice("op_" + key, rows);
@@ -1993,6 +2007,7 @@ function vMorningList() {
 }
 
 window.oppSetTab = (k) => { oppTab = k; render(false); };
+window.oppSearch = (el) => { oppQ = el.value; clearTimeout(window.__oq); window.__oq = setTimeout(() => render(false), 250); };
 window.entDel = async (id) => {
   await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
   entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
@@ -2995,7 +3010,7 @@ function dataSignature() {
     campaigns.length, entities.length, kbDocs.length, prodAssets.length,
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
-    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, oppTab, campFilter, rQ, selProd,
+    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, oppTab, oppQ, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
     JSON.stringify(entFilters), JSON.stringify(tgtFilters), [...entSel].join(","),
