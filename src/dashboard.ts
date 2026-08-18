@@ -2183,14 +2183,14 @@ function vActionQueue(cs, notifyNumber, nTest) {
   const tagOf = (c) => (c.tags || []).find((t) => t.level === "hot") || (c.tags || [])[0];
   const items = [];
   hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#B42318", why: "مؤهلة وبلا متابعة منذ " + hrs(c),
-    act: (insCache[c.phone] || {}).next_action || "تواصل مباشرة لاستكمال الاهتمام", href: "customer/" + c.phone }));
+    act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
   fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#027A48", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
-    act: (insCache[c.phone] || {}).next_action || "تابع بينما الاهتمام حيّ", href: "customer/" + c.phone }));
+    act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
   if (seenNoReply.size) items.push({ c: null, icon: "eye", dot: "#B54708", name: "شاهدوا الرسالة دون ردّ",
     why: fmtN(seenNoReply.size) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
   stalled.slice(0, 2).forEach((c) => { const ins = insCache[c.phone] || {};
     items.push({ c, dot: "#2F5F94", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
-      act: ins.fix_suggestion || "تابع بمعلومة جديدة", href: "customer/" + c.phone }); });
+      act: ins.fix_suggestion || "", href: "customer/" + c.phone }); });
 
   let h = '<div class="card rise" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;">' +
@@ -2218,7 +2218,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
             (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : "") +
           (c && c.test ? '<span class="chip">تجريبي</span>' : "") + "</span>" +
         '<span class="aqw">' + esc(it.why) + "</span></span>" +
-        '<span class="aqa">' + esc(clip(it.act, 150)) + "</span>" +
+        '<span class="aqa">' + (it.act ? esc(clip(it.act, 150)) : "") + "</span>" +
         '<span class="aqgo">افتح ←</span></div>';
     }).join("");
   }
