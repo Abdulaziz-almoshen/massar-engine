@@ -86,11 +86,15 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* ===== main ===== */
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-  header { flex: none; height: 76px; background: #fff; border-bottom: 1px solid #EDEDED; display: flex; align-items: center; gap: 18px; padding: 0 32px; }
-  header .tt { flex: 1; min-width: 0; }
+  header.crumb { height:48px; flex:none; display:flex; align-items:center; gap:8px;
+    padding-inline:20px; background:#fff; border-bottom:1px solid #EDEDED; }
+  header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
+  header.crumb .sep { font-size:13px; color:#C7C7C7; }
+  header.crumb .s { font-size:13px; font-weight:450; color:#525252; }
   header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: -.2px; }
   header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
-  .livechip { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; color: #2E7D77; background: #DCF1EF; border-radius: 999px; padding: 7px 14px; }
+  .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#7C7C7C;
+    background:transparent; padding:0; border-radius:0; }
   .livechip .d { width: 7px; height: 7px; border-radius: 999px; background: #3FB6B0; }
   .body { flex: 1; overflow-y: auto; padding: 30px 32px 56px; }
 
@@ -328,9 +332,16 @@ ${CAMPAIGNS_CRM_CSS}
     </button>
   </aside>
   <main>
-    <header>
-      <div class="tt"><div class="t" id="pt">مسار</div><div class="s" id="ps"></div></div>
+    <!-- Frappe's breadcrumb bar: module / current view, and ONE primary action. Replaces the 76px
+         header AND the .ptitle band beneath it. #pt/#ps/#live are kept as ids because nav() writes
+         all three by id every route change — deleting them blanks every screen (ADR-0001). -->
+    <header class="crumb">
+      <span class="t" id="pt">مسار</span>
+      <span class="sep">/</span>
+      <span class="s" id="ps"></span>
+      <span style="flex:1"></span>
       <span class="livechip" id="live" style="display:none"><span class="d"></span> مباشر · <span id="upd">—</span></span>
+      <span id="crumbact"></span>
     </header>
     <div class="body ms-scroll" id="body"></div>
   </main>

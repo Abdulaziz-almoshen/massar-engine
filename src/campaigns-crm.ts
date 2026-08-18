@@ -316,6 +316,7 @@ function crmControlBar(nShown, nTotal) {
           (crmView === "kanban" ? "لوحة: " : "تجميع حسب: ") + k[1] + '</option>';
       }).join("") + '</select>';
   }
+  h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12.5px;" onclick="exportCampaigns()">' + ic("doc", 15) + ' تصدير CSV</button>';
   h += '<span class="cntpill">' + fmtN(nTotal) + " حملة</span>";
   /* Said ONCE, beside the selector that chose it, instead of repeated on every group header and
      again under the board. */
@@ -552,9 +553,10 @@ function crmBulkBar() {
 /* ============================== the list screen ============================== */
 function vKmonCrm(d) {
   var withStAll = crmFiltered();
-  var h = '<div class="ptitle rise"><div><h1>الحملات</h1><p>كل إطلاق، أرقامه الفعلية، ونتيجته. اضغط أي حملة لفتح لوحتها.</p></div>' +
-    '<div class="acts"><button class="btn btn-ghost" onclick="exportCampaigns()">' + ic("doc", 17) + ' تصدير CSV</button>' +
-    '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + ' إنشاء حملة</a></div></div>';
+  /* No .ptitle band: the breadcrumb carries the module name and the ONE primary action, Frappe's
+     shape. Reclaims ~158px of vertical space above the list. تصدير CSV moves to the filter row. */
+  var h = "";
+  setTimeout(crmPaintCrumb, 0);
   if (!campaigns.length) {
     return h + '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#1F7A73;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
   }
@@ -656,6 +658,7 @@ function vKmonDetailCrm(id, d) {
 
   h += crmSpecStrip(camp, st);
   setTimeout(crmMeasureMsg, 0);
+  setTimeout(crmPaintCrumb, 0);
 
 
   /* A «(٠)» beside «الخطوة التالية» reads as a broken counter rather than as "nothing to do"; the
@@ -765,6 +768,24 @@ window.addEventListener("resize", function () {
   clearTimeout(window.__crmrz); window.__crmrz = setTimeout(crmMeasureMsg, 150);
 });
 try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(crmMeasureMsg); } catch (e) {}
+
+/* Writes the breadcrumb's view label and its primary action. Called after render() has replaced
+   #body, because the header lives outside #body and nav() only sets #pt/#ps by route. */
+function crmPaintCrumb() {
+  var ps = document.getElementById("ps");
+  var act = document.getElementById("crumbact");
+  var id = (location.hash || "").split("/")[1];
+  if (ps) {
+    ps.textContent = id ? "حملة" :
+      (crmView === "kanban" ? "كانبان" : crmView === "group" ? "تجميع" : "قائمة");
+  }
+  if (act) {
+    act.innerHTML = '<a href="#aimkt" class="btn" style="text-decoration:none;display:inline-flex;' +
+      'align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:13px;' +
+      'font-weight:500;color:#fff;background:#1F7A73;border:none;">' + ic("send", 15, "#fff") +
+      ' إنشاء حملة</a>';
+  }
+}
 
 /* ============================== the guarded entry ==============================
    dashboard.ts's render() calls ONLY this. Two jobs:
