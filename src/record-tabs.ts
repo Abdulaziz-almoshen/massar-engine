@@ -27,12 +27,15 @@ export const RECORD_TABS_CSS = `
 
   /* conversation tab — the transcript inline, not in a slide-over */
   .rconv { display:flex; flex-direction:column; gap:10px; max-height:560px; overflow-y:auto; padding:2px; }
-  .rconv .b { max-width:76%; padding:9px 12px; border-radius:10px; font-size:13px; line-height:1.85;
+  .rconv .b { max-width:76%; min-width:120px; padding:9px 12px; border-radius:10px; font-size:13px; line-height:1.85;
     white-space:pre-wrap; word-break:break-word; }
-  .rconv .b.ag { align-self:flex-start; background:#F3F3F3; color:#171717; }
-  .rconv .b.cu { align-self:flex-end; background:#DCF8C6; color:#171717; }
+  /* Arabic WhatsApp: OUR outgoing sits at the end (left) in green, THEIR incoming at the start
+     (right) in white. Both were inverted — the customer's words were green on the left and ours
+     grey on the right, which reads as the customer talking to themselves. */
+  .rconv .b.ag { align-self:flex-end;   background:#DCF8C6; color:#171717; border:1px solid #CFEBB4; }
+  .rconv .b.cu { align-self:flex-start; background:#fff;    color:#171717; border:1px solid #EDEDED; }
   .rconv .b.sy { align-self:center; background:#fff; border:1px solid #EDEDED; color:#7C7C7C; font-size:12px; }
-  .rconv .t { font-size:11px; color:#999999; margin-top:4px; }
+  .rconv .t { font-size:11px; color:#999999; margin-top:4px; text-align:end; }
 
   /* Frappe's side panel sections collapse. The rail was 856px beside a 456px main. */
   .rsec > h3, .rsec > div > h3 { cursor:pointer; user-select:none; }

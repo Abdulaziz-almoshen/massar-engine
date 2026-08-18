@@ -284,7 +284,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   .frow { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #F3F3F3; position:relative; }
   .frow:last-child { border-bottom: none; }
   /* the only tinted rows in the panel, and lighter than any chip: a reading never outranks a fact */
-  .frow.rdrow { background: #FFFDF7; margin: 0 -8px; padding: 13px 8px; border-radius: 10px; }
+  /* A reading is marked by its «قراءة» chip and its dashed provenance dot, not by a cream wash.
+     #FFFDF7 was the last tinted surface in the panel and it made the AI's guess the loudest block
+     on the record — the opposite of the intended hierarchy. */
+  .frow.rdrow { background:#fff; margin:0 -8px; padding:8px; border-radius:8px;
+    border-inline-start:2px solid #EDEDED; }
   /* EXACT-1: the field row is two columns, 35/65, with an 80px floor on the label — that split is
      what makes Frappe's panel scan as a form instead of a stack of caption-and-value pairs. */
   .fbody { flex:1; min-width:0; display:grid; grid-template-columns: minmax(80px,35%) minmax(0,65%);
@@ -292,7 +296,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* the label owns column 1; every other child stacks down column 2. Doing this in CSS avoids
      restructuring propRow's markup, which emits value/sig/quote as siblings. */
   .fbody > .flab { grid-column:1; grid-row:1; }
-  .fbody > :not(.flab) { grid-column:2; }
+  .fbody > :not(.flab) { grid-column:2; min-width:0; }
+  /* chips wrap and clip inside their column instead of spilling past the panel edge */
+  .fbody .chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
   .flab { font-size:13px; font-weight:450; color:#7C7C7C; letter-spacing:0; line-height:1.5; }
   .fval { font-size:14px; font-weight:450; color:#171717; line-height:1.5; min-height:28px;
     margin-top:0; }
@@ -585,7 +591,14 @@ function interestChips(c) {
     }).join(" ");
   }
   const ins = insCache[c.phone] || {};
-  const pi = (ins.product_interest || []).filter((x) => x.product);
+  // same dedupe as the tags path above: a repeated reading is one interest, not two.
+  const piMap = new Map();
+  (ins.product_interest || []).filter((x) => x.product).forEach((x) => {
+    const r = { high: 3, medium: 2, low: 1 };
+    const cur = piMap.get(x.product);
+    if (!cur || (r[x.level] || 0) > (r[cur.level] || 0)) piMap.set(x.product, x);
+  });
+  const pi = [...piMap.values()];
   if (pi.length) {
     return pi.slice(0, 2).map((x) => '<span class="chip c-read ' + (x.level === "high" ? "c-ok" : x.level === "medium" ? "c-warn" : "c-grey") + '" title="' + esc(x.product) + " — قراءة المساعد من نص المحادثة، لم تُسجَّل كوسم مؤكد" + '">' +
       '<span class="rd">قراءة</span>' + esc(clip(x.product, 24)) + " · " + (x.level === "high" ? "نية مرتفعة" : x.level === "medium" ? "مهتم" : "فاتر") + "</span>").join(" ");
@@ -2448,7 +2461,17 @@ function vFactsPanel(d) {
   // When the property exists it IS this field. Falling back to c.tags BEHIND a stored value is how
   // the agent's tags ended up rendered under a human signature; the tags follow the typed set now
   // (propPost), so there is nothing left to fall back to.
-  const tagList = p3 ? pairs : (c.tags || []).map((t) => ({ product: t.product, level: t.level }));
+  // Deduped by product, strongest level wins. c.tags holds one row PER READING EVENT, so a product
+  // the agent read twice rendered as two identical chips — visible on a real record.
+  const tagList = p3 ? pairs : (() => {
+    const rank = { hot: 3, warm: 2, cold: 1 };
+    const best = new Map();
+    (c.tags || []).forEach((t) => {
+      const cur = best.get(t.product);
+      if (!cur || (rank[t.level] || 0) > (rank[cur.level] || 0)) best.set(t.product, { product: t.product, level: t.level });
+    });
+    return [...best.values()];
+  })();
   // A human fact never lends its styling to chips it did not produce: solid requires BOTH that a
   // human wrote this field AND that these chips were parsed out of what he wrote.
   const solid = s3.state === "fact" && pairs.length > 0;
