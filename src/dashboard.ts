@@ -35,34 +35,51 @@ export const DASHBOARD_HTML = `<!doctype html>
   .app { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 
   /* ===== sidebar (Massar identity) ===== */
-  aside { width: 264px; flex: none; background: linear-gradient(180deg, #2F5F94 0%, #1F4470 100%); color: #cdd6e6; display: flex; flex-direction: column; border-left: 1px solid #163257; }
-  .brand { padding: 24px 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 12px; }
-  .brand .logo { width: 42px; height: 42px; flex: none; border-radius: 12px; background: linear-gradient(135deg, #3FB6B0, #2E8F89); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 22px; color: #1F4470; }
-  .brand .t1 { font-size: 21px; font-weight: 700; color: #fff; line-height: 1; }
-  .brand .t2 { font-size: 11.5px; color: #8ea3c0; margin-top: 4px; }
-  nav { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 22px; }
-  .grp { font-size: 11px; letter-spacing: .6px; color: #a9c2e0; padding: 15px 12px 8px; margin-top: 7px; font-weight: 700; border-top: 1px solid rgba(255,255,255,0.1); }
-  .grp:first-child { border-top: none; margin-top: 0; }
-  .nv { display: flex; align-items: center; gap: 12px; width: 100%; font-family: inherit; font-size: 13.5px; font-weight: 500; color: #cdd6e6; background: transparent; border: none; border-radius: 10px; padding: 11px 12px; cursor: pointer; text-align: right; margin-bottom: 3px; }
-  .nv:hover { background: rgba(255,255,255,0.06); }
-  .nv.on { font-weight: 700; color: #fff; background: rgba(201,162,39,0.14); }
+  /* V2: the sidebar is light. Navy and gold are retired from the product — with no dark surface
+     they have no legal home. border-inline-end, not border-left: logical properties only. */
+  aside { width: 250px; flex: none; background: #F8F8F8; color: #525252; display: flex;
+    flex-direction: column; border-inline-end: 1px solid #EDEDED; }
+  .switcher { display:flex; align-items:center; gap:10px; width:100%; font-family:inherit;
+    height:52px; padding:10px 12px; background:transparent; border:none;
+    border-bottom:1px solid #EDEDED; cursor:pointer; text-align:start; }
+  .switcher:hover { background:#F3F3F3; }
+  .switcher .chev { color:#C7C7C7; font-size:12px; flex:none; }
+  .switcher .logo { width:28px; height:28px; flex:none; border-radius:6px;
+    background:linear-gradient(135deg,#3FB6B0,#1F7A73); display:flex; align-items:center;
+    justify-content:center; font-weight:700; font-size:15px; color:#fff; }
+  .switcher .t1 { font-family:'Cairo','IBM Plex Sans Arabic',sans-serif; font-size:13px;
+    font-weight:700; color:#171717; line-height:1.3; }
+  .switcher .t2 { font-size:11px; font-weight:450; color:#7C7C7C; margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  nav { flex:1; min-height:0; overflow-y:auto; padding:8px; }
+  .grp { font-size:11px; font-weight:500; color:#999999; padding:6px 10px; margin-block-start:12px; }
+  .grp:first-child { margin-block-start:4px; }
+  .nv { display:flex; align-items:center; gap:10px; width:100%; font-family:inherit; height:32px;
+    font-size:13px; font-weight:450; color:#525252; background:transparent; border:none;
+    border-radius:6px; padding-inline:10px; cursor:pointer; text-align:start; margin-bottom:1px; }
+  .nv:hover { background:#F3F3F3; }
+  .nv.on { font-weight:500; color:#171717; background:#EDEDED; }
   .nv .gx { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; }
   .nv .lbl { flex: 1; }
-  .nv .dot { width: 6px; height: 6px; border-radius: 999px; background: #3FB6B0; flex: none; display: none; }
-  .nv.on .dot { display: block; }
-  .g-sq { width: 13px; height: 13px; border-radius: 3px; background: #7f95b4; }
-  .g-ci { width: 13px; height: 13px; border-radius: 999px; background: #7f95b4; }
-  .g-di { width: 11px; height: 11px; background: #7f95b4; transform: rotate(45deg); border-radius: 2px; }
-  .g-tr { width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-bottom: 12px solid #7f95b4; }
-  .g-ba { width: 13px; height: 13px; border-right: 3px solid #7f95b4; border-left: 3px solid #7f95b4; border-radius: 1px; }
-  .g-ri { width: 13px; height: 13px; border-radius: 999px; border: 3px solid #7f95b4; }
-  .g-tb { width: 13px; height: 13px; border-top: 3px solid #7f95b4; border-bottom: 3px solid #7f95b4; }
-  .g-tree { width: 13px; height: 13px; border: 2px solid #7f95b4; border-radius: 3px; }
-  .nv.on .gx > * { background-color: #3FB6B0; border-color: #3FB6B0; }
-  .nv.on .g-tr { background: none; border-bottom-color: #3FB6B0; }
+  .nv .dot { display:none; }
+  .g-sq { width: 13px; height: 13px; border-radius: 3px; background: #999999; }
+  .g-ci { width: 13px; height: 13px; border-radius: 999px; background: #999999; }
+  .g-di { width: 11px; height: 11px; background: #999999; transform: rotate(45deg); border-radius: 2px; }
+  .g-tr { width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-bottom: 12px solid #999999; }
+  .g-ba { width: 13px; height: 13px; border-right: 3px solid #999999; border-left: 3px solid #999999; border-radius: 1px; }
+  .g-ri { width: 13px; height: 13px; border-radius: 999px; border: 3px solid #999999; }
+  .g-tb { width: 13px; height: 13px; border-top: 3px solid #999999; border-bottom: 3px solid #999999; }
+  .g-tree { width: 13px; height: 13px; border: 2px solid #999999; border-radius: 3px; }
+  .nv.on .gx > * { background-color:#525252; border-color:#525252; }
+  .nv.on .g-tr { background:none; border-bottom-color:#525252; }
   /* flex:none — without it the card is squeezed by the scrolling nav above and the last nav
      item reads as clipped behind it, on every screen. */
-  .userbox { flex: none; padding: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 11px; background: #1F4470; }
+  .collapse { display:flex; align-items:center; gap:10px; font-family:inherit; height:32px;
+    margin:8px; width:calc(100% - 16px); padding-inline:10px; font-size:12px; color:#7C7C7C;
+    background:transparent; border:none; border-radius:6px; cursor:pointer; text-align:start;
+    flex:none; }
+  .collapse:hover { background:#F3F3F3; }
+  .collapse .cicon { color:#999999; font-size:14px; }
   .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #1c3a5e; display: flex; align-items: center; justify-content: center; color: #cdd6e6; font-weight: 700; font-size: 14px; }
   .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
   .userbox .r { font-size: 11px; color: #8ea3c0; }
@@ -295,12 +312,20 @@ ${CAMPAIGNS_CRM_CSS}
 </defs></svg>
 <div class="app">
   <aside>
-    <div class="brand">
+    <!-- Frappe's product switcher: app mark, workspace over operator, one chevron. Replaces the
+         old .brand band AND the bottom .userbox — the operator's name belongs here, not twice. -->
+    <button class="switcher" aria-label="مسار — عبدالعزيز المحسن">
       <div class="logo">م</div>
-      <div><div class="t1">مسار</div><div class="t2">نظام إدارة المبيعات</div></div>
-    </div>
+      <div style="min-width:0;flex:1;text-align:start;">
+        <div class="t1">مسار</div>
+        <div class="t2">عبدالعزيز المحسن</div>
+      </div>
+      <span class="chev">⌄</span>
+    </button>
     <nav class="ms-scroll" id="nav"></nav>
-    <div class="userbox"><div class="av">ع</div><div><div class="n">عبدالعزيز المحسن</div><div class="r">المدير التنفيذي</div></div></div>
+    <button class="collapse" id="navcollapse" aria-label="طيّ القائمة">
+      <span class="cicon">⇤</span><span class="clbl">طيّ القائمة</span>
+    </button>
   </aside>
   <main>
     <header>
