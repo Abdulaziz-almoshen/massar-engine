@@ -73,12 +73,21 @@ export const CAMPAIGNS_CRM_CSS = `
   .kcol.over { border-color:#3FB6B0; background:#F0FAF9; }
   .kcolh { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 4px; }
   .kcolh .lb { font-size:12.5px; font-weight:700; color:#171717; }
-  .kcard { background:#fff; border:1px solid #EDEDED; border-radius:11px; padding:12px; margin-bottom:9px;
-    cursor:pointer; }
+  .kcard { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:12px;
+    margin-bottom:9px; cursor:pointer; display:block; text-decoration:none; }
+  .kcard:hover { border-color:#C7C7C7; }
+  .kcard:focus-visible { outline:2px solid #1F7A73; outline-offset:-2px; }
+  .kcard .ktitle { display:flex; align-items:center; gap:8px; min-width:0; }
+  .kcard .kline { font-size:13px; font-weight:450; color:#525252; margin-top:6px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kcard .kfoot { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px;
+    border-top:1px solid #EDEDED; margin-block-start:10px; padding-block-start:8px; }
+  .kcard .kfoot .kl { font-size:12px; color:#7C7C7C; }
+  .kcard .kfoot .kv { font-size:13px; font-weight:500; color:#171717; font-variant-numeric:tabular-nums; }
+  .kcard .kfoot .ksep { color:#C7C7C7; font-size:12px; }
   .kcard:hover { border-color:#3FB6B0; }
-  .kcard .nm { font-size:13px; font-weight:700; color:#171717; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .kcard .mt { font-size:10.5px; color:#999999; margin-top:3px; }
-  .kcard .fig { display:flex; gap:12px; margin-top:9px; font-size:11px; color:#525252; }
+  .kcard .nm { font-size:14px; font-weight:500; color:#171717; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
   .kdrop { border:1.5px dashed #E2E2E2; border-radius:11px; padding:18px 12px; text-align:center;
     color:#999999; font-size:11.5px; }
 
@@ -489,12 +498,33 @@ function crmKanbanView(withStAll) {
     var rows = g.by[k].slice(0, LIST_CAP);
     rows.forEach(function (x) {
       var st = x.st, c = x.c;
-      h += '<div class="kcard"' + (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") +
-        ' onclick="location.hash=&quot;kmon/' + c.id + '&quot;">' +
-        '<div class="nm">' + esc(c.name) + '</div>' +
-        '<div class="mt">' + fmtD(c.created_at) + (c.product ? " · " + esc(c.product) : "") + '</div>' +
-        '<div class="fig"><span>الجمهور <b>' + fmtN(st.targeted) + '</b></span><span>مشاهدة <b>' + crmPctD(st.seen, st) + '</b></span><span>ردود <b>' + crmPctD(st.replied, st) + '</b></span></div>' +
-        '</div>';
+      var ps = campPerfState(c, st);
+      /* Frappe's card rhythm with Massar's honest zones. Its avatar, assignee, relative time and
+         @/note/task/comment footer are all DROPPED — none of those entities exist here, and four
+         permanently-zero counters is exactly the invented-value failure the founder catches.
+         The footer carries campStats, which is real engagement, as label+figure pairs: مشاهدة and
+         ردود have no honest glyph and a wrong icon is worse than a word. */
+      var foot;
+      if (!st.targeted) {
+        foot = '<span class="kl">بلا جمهور</span>';
+      } else {
+        foot = [["الجمهور", fmtN(st.targeted)], ["شوهدت", crmPctD(st.seen, st)],
+                ["ردّوا", crmPctD(st.replied, st)], ["مهتمة", crmPctD(st.interested, st)]]
+          .map(function (f, i) {
+            return (i ? '<span class="ksep">·</span>' : "") +
+              '<span class="kl">' + f[0] + '</span><span class="kv">' + f[1] + '</span>';
+          }).join("");
+        /* a zero failure is a default state, not a vocabulary slot — it renders nothing */
+        if (st.failed > 0) foot += '<span class="ksep">·</span><span class="kl" style="color:#B42318;">تعذّر ' + fmtN(st.failed) + '</span>';
+      }
+      h += '<a class="kcard" href="#kmon/' + c.id + '" aria-label="' + esc(c.name) + '"' +
+        (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") + '>' +
+        '<div class="ktitle"><span style="width:8px;height:8px;border-radius:999px;flex:none;background:' + ps.dot + ';"></span>' +
+        '<span class="nm">' + esc(c.name) + '</span></div>' +
+        '<div class="kline">' + esc(c.product || "بلا خدمة") + '</div>' +
+        '<div class="kline">' + fmtD(c.created_at) + '</div>' +
+        '<div class="kfoot">' + foot + '</div>' +
+        '</a>';
     });
     if (!rows.length) h += '<div class="kdrop">' + (canDrag ? "اسحب حملة هنا لتغيير تصنيفها" : "لا حملات") + '</div>';
     if (g.by[k].length > rows.length) h += '<div style="font-size:10.5px;color:#B54708;font-weight:700;padding:4px;">تُعرض ' + fmtN(rows.length) + " من " + fmtN(g.by[k].length) + '</div>';

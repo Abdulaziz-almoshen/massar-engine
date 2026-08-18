@@ -671,6 +671,7 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     const { interestPairs, interestUnread, interestWire, interestLatest, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
     let propEdit = null, propFlash = "";
     const profileData = ctx.profileData;
+    ${apptSrc}
     ${postSrc}
     ${confirmSrc.replace("window.propConfirm =", "const propConfirm =")}
     return propConfirm;
@@ -698,6 +699,40 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   await rigTags({ phone: P, props: {}, tags: [] })({ dataset: { k: "productInterest" } });
   check("M13 …and with genuinely nothing to confirm it SAYS so rather than failing mutely, and writes nothing",
     [cAlert, cBody], ["لا توجد قراءة لتأكيدها.", null]);
+
+  // M14 — CPO round-34. «أكّد» on a reading with NO stored prop still narrowed: propCarry can only
+  // carry from a prop, so the appointment moment read out of c.scheduledSaid was dropped and the row
+  // printed «أكّدها عبدالعزيز» directly above «لم تُؤكَّد بعد» about the SAME appointment.
+  const APPT = 1_787_637_600_000;
+  cBody = null; cAlert = null;
+  await rigTags({ phone: P, props: {}, tags: [], scheduledSaid: "الأحد صباحًا", scheduledAt: APPT })({ dataset: { k: "nextStep" } });
+  check("M14 confirming a reading with no stored prop still carries the appointment moment",
+    [cBody && cBody.props ? cBody.props.nextStep.value : null, cBody && cBody.props ? cBody.props.nextStep.due : null],
+    ["الأحد صباحًا", APPT]);
+  cBody = null; cAlert = null;
+  await rigTags({ phone: P, props: {}, tags: [], scheduledSaid: "متى ما تيسّر" })({ dataset: { k: "nextStep" } });
+  check("M14 …and with no readable moment it stays a bare value, inventing none",
+    typeof (cBody && cBody.props ? cBody.props.nextStep : null), "string");
+
+  // M15 — the morning list header must not deny the row beneath it. An interested clinic whose day
+  // the operator CONFIRMED was rendering «موعد مؤكَّد: …» under the heading «مهتم بلا موعد».
+  const morn = cut("function vMorningList() {", "\nfunction vCustomers()");
+  check("M15 the morning list buckets by the CONFIRMED appointment, not by outcome alone",
+    /appt\(c\)\.confirmed/.test(morn || ""), true);
+  check("M15 …and «مهتم بلا موعد» excludes anyone who has one",
+    /k === "interested"[\s\S]{0,120}!confirmed/.test(morn || ""), true);
+
+  // M16 — one variable was feeding both the sidebar highlight and the page heading, so every CLIENT
+  // RECORD was headed «جهات الاستهداف», the import list's title, and TITLES.customer was unreachable.
+  const navSrc = cut("function nav() {", "\n// win scopes the delivery chip");
+  check("M16 the page title reads the RAW route, not the sidebar alias",
+    /TITLES\[raw\]/.test(navSrc || ""), true);
+
+  // M17 — live data carries insights.evidence === "»". A quote with no letters is not a quote.
+  const hw = cut("function hasWords(x) {", "\nfunction appt(c) {");
+  const hasWords = new Function((hw || "") + "\nreturn hasWords;")();
+  check("M17 a wordless quote is refused, so «الدليل: « » »» cannot render",
+    [hasWords("»"), hasWords("« · »"), hasWords(""), hasWords("لأنه قال")], [false, false, false, true]);
 
   // M9 — THE HUMAN'S DAY IS RENDERED, AND ONLY THE DAY. (CPO round-33 M1.)
   // Measured by rendering the shipped vFactsPanel: the row used to print the value and its

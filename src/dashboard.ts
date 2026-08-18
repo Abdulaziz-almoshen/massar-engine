@@ -415,7 +415,11 @@ function nav() {
     : '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
       '<span class="gx"><span class="' + x.g + '"></span></span><span class="lbl">' + x.l + '</span><span class="dot"></span></button>'
   ).join("");
-  const t = TITLES[cur] || TITLES.kmon;
+  // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
+  // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
+  // الاستهداف وأدرها للحملات» — the import list's title — above every CLIENT RECORD, and made
+  // TITLES.customer unreachable. One variable was doing two jobs with opposite answers.
+  const t = TITLES[raw] || TITLES[cur] || TITLES.kmon;
   document.getElementById("pt").textContent = t[0];
   document.getElementById("ps").textContent = t[1];
   document.getElementById("live").style.display = (cur === "kmon" || cur === "home") ? "" : "none";
@@ -554,6 +558,11 @@ function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { da
 // typed. props.nextStep carries the PROVENANCE of that same moment — so «مؤكَّد» is DERIVED, never
 // a second store. Every surface that speaks about the appointment (قائمة الصباح · شريط الفرز ·
 // ملف العميل) reads it here and nowhere else, so a fourth surface cannot invent a fourth opinion.
+// A string that contains no letter or digit is not a quote — it is leftover punctuation from a
+// scrub or a truncation. Surfaces that quote the assistant must refuse it rather than framing it.
+function hasWords(x) {
+  return /[\\p{L}\\p{N}]/u.test(String(x || ""));
+}
 function appt(c) {
   const at = c && c.scheduledAt ? Number(c.scheduledAt) : 0;
   if (!at) return null;
@@ -1702,7 +1711,16 @@ function vMorningList() {
     ["later", "مؤجل", "#7C7C7C", "#F3F3F3", "طلبوا التأجيل"],
     ["stopped", "لا يرغب في التواصل", "#B42318", "#FEF3F2", "توقّف الإرسال إليهم"],
   ];
-  const of = (k) => cs.filter((c) => c.outcome === k || (k === "stopped" && (c.outcome === "not_interested" || c.optedOut)));
+  // A confirmed day decides the bucket, not c.outcome. An interested clinic whose day the operator
+  // typed was rendering «موعد مؤكَّد: الثلاثاء ٢٥ أغسطس» UNDER the heading «مهتم بلا موعد» — the
+  // header denying the row beneath it, on the one screen whose job is «who do I call today».
+  const of = (k) => cs.filter((c) => {
+    const confirmed = Boolean(appt(c).confirmed);
+    if (k === "scheduled") return c.outcome === "scheduled" || (confirmed && c.outcome !== "stopped" && c.outcome !== "not_interested" && !c.optedOut);
+    if (k === "interested") return c.outcome === "interested" && !confirmed;
+    if (k === "stopped") return c.outcome === "stopped" || c.outcome === "not_interested" || c.optedOut;
+    return c.outcome === k;
+  });
   const unsorted = cs.filter((c) => !c.outcome && !c.optedOut);
   let h = '<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
     '<h3 style="margin:0;flex:1;min-width:180px;">قائمة الصباح</h3>' +
@@ -2600,7 +2618,10 @@ function vCustomer(ph) {
       (ins.loss_cause ? '<span class="chip c-bad">السبب: ' + esc(ins.loss_cause) + "</span>" : "") + "</div>" +
       // Only when it differs from c.outcomeEvidence: the same sentence printed twice on one
       // screen reads as two independent pieces of evidence for the same claim.
-      (ins.evidence && String(ins.evidence).trim() !== String(c.outcomeEvidence || "").trim()
+      // …and only when it actually SAYS something. Live data carries evidence === "»" — a single
+      // guillemet — which rendered as «الدليل: « » »: the assistant's proof of its own verdict was
+      // one punctuation mark. A quote with no letters in it is not a quote; hasWords is the floor.
+      (hasWords(ins.evidence) && String(ins.evidence).trim() !== String(c.outcomeEvidence || "").trim()
         ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
       (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
     h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
@@ -2952,7 +2973,16 @@ window.propConfirm = async (btn) => {
     : key === "nextStep" ? String(c.scheduledSaid || "")
     : "";
   if (!shown) { alertBar("لا توجد قراءة لتأكيدها.", true); return; }
-  await propPost(key, shown, false);
+  // propCarry can only carry from a STORED prop. On this branch there is none — the reading came
+  // straight off c.scheduledSaid — so the moment we already read from it has to be carried by hand,
+  // or confirming prints «أكّدها عبدالعزيز» directly above «لم تُؤكَّد بعد» about the same
+  // appointment. Confirming a reading must never narrow it, whichever branch produced it.
+  // Through appt(), never c.scheduledAt directly: the gate holds the appointment to exactly ONE
+  // reader in the shipped bundle, and that rule is what stops a fourth surface re-opening the
+  // two-stores class. A new consumer joins the reader; it does not become one.
+  const ap = !p && key === "nextStep" ? appt(c) : null;
+  const carry = ap && ap.at ? { value: shown, due: ap.at } : shown;
+  await propPost(key, carry, false);
 };
 // Clearing the date must be possible without clearing the step itself: an operator who learns the
 // meeting slipped should be able to drop the date and keep «زيارة الفرع». Blanking the input and
