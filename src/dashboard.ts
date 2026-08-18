@@ -215,7 +215,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   .btn-ghost { color: #383838; background: #fff; border: 1px solid #E2E2E2; }
   .btn:hover { filter: brightness(1.04); }
   .btn-dis { color: #999999; background: #F3F3F3; cursor: not-allowed; }
-  .note { display: flex; align-items: center; gap: 9px; background: #FFFAEB; border: 1px solid #F5E3B7; border-radius: 12px; padding: 12px 16px; font-size: 12px; color: #B54708; font-weight: 600; margin-top: 14px; }
+  .note { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #EDEDED;
+    border-inline-start:3px solid #B54708; border-radius:10px; padding:12px 16px; font-size:12px;
+    color:#525252; font-weight:450; margin-top:14px; }
 
   /* kb */
   .kbrow { display: flex; align-items: center; gap: 14px; padding: 17px 22px; border-bottom: 1px solid #F3F3F3; }
@@ -262,8 +264,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* ===== ملف العميل — the enrichable client record (cycle crm-record; DESIGN.md) =====
      The provenance mark is an 8px SHAPE in a fixed start-side column: shape carries the meaning,
      colour only reinforces it, and the mark never renders without its word. */
-  .crec { display: grid; grid-template-columns: 372px minmax(0, 1fr); gap: 18px; align-items: start; }
-  .crecmain { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; align-items: start; }
+  /* Frappe's record is main + a narrower side rail. 372px was too wide for a rail and too narrow
+     for a column, so the two panels fought for the same space and left a ragged edge. */
+  .crec { display:grid; grid-template-columns: 340px minmax(0,1fr); gap:16px; align-items:start; }
+  .crecmain { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
   .pm { width: 8px; height: 8px; flex: none; margin-top: 7px; }
   .pm-h { background: #1F7A73; border-radius: 2px; }
   .pm-a { border: 1.5px dashed #B54708; border-radius: 999px; background: transparent; }
@@ -2665,17 +2669,20 @@ function vCustomer(ph) {
       stageBody = '<span style="color:#999999;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
     }
 
-    return '<div style="background:' + bg + ';border:1px solid #EDEDED;border-inline-start:3px solid ' + ink +
-      ';border-radius:12px;padding:13px 16px;margin:2px 0 14px;">' +
+    /* neutral surface: the tint was the last coloured band on this record (DESIGN.md §2) */
+    return '<div style="background:#fff;border:1px solid #EDEDED;border-inline-start:3px solid ' + ink +
+      ';border-radius:10px;padding:13px 16px;margin:2px 0 14px;">' +
       row("الفرز", outBody) + row("درجة الاهتمام", interestBody) + row("مرحلة البيع", stageBody) + "</div>";
   })();
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;">' +
+  /* The actions floated loose between sections with no container, which is most of why this page
+     read as unorganised. They belong in one bounded toolbar, as Frappe's record header does. */
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #EDEDED;border-radius:10px;padding:10px 14px;">' +
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
     '<span style="flex:1"></span>' +
     '<span style="font-size:11.5px;color:#7C7C7C;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#7C7C7C"]]
-      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;border-radius:999px;' + (o[0] === "meeting_booked" ? "color:#fff;background:" + o[2] + ";border:1px solid " + o[2] + ";font-weight:700;" : "color:" + o[2] + ";background:#fff;border:1px solid #EDEDED;") + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "55;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
+      .map((o) => '<button class="ptab' + (activeBtn === o[0] ? " on" : "") + '" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)">' + o[1] + "</button>").join("") + "</div>";
   // The 6-node sales-path rail is DELETED from the record (design-plan.md section 5): it paints
   // five stages nobody reached and a check mark nobody verified. The stage now appears exactly
   // once, as a reading, inside the status region. The renderer itself is gone too, so no future
@@ -2685,10 +2692,10 @@ function vCustomer(ph) {
   // what the team recorded outranks what the model inferred.
   h += '<div class="crec">' + factsPanel + vAccountPanel(d) + '<div class="crecmain">';
   // فهم المساعد
-  h += '<div class="card rise" style="margin:0;background:#F2F7FB;border-color:#DCE7F2;">' +
+  h += '<div class="card rise" style="margin:0;">' +
     // The intent badge is DELETED here: interest already renders in the status strip and, with
     // provenance, in ملف العميل. The hollow .pm-a mark replaces it and says what this card is.
-    '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#1F4470;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3></div>" +
+    '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#171717;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3></div>" +
     '<div style="font-size:11px;color:#7C7C7C;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
   if (ins.learning) {
     // S4 — the product_interest badge row is DELETED here too. §5 deleted it from the other branch
