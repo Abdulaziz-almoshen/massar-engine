@@ -614,16 +614,19 @@ function vKmonDetailCrm(id, d) {
 
   /* حكم الحملة — the verdict hero stays page-level so it is never hidden behind a tab. */
   var yieldPer100 = crmDeliveryRate(st.interested, st);
-  h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
-    '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
-    '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
+  /* The navy gradient is retired from the product (DESIGN.md invariant 3, V2). This was the last
+     dark surface, and it is what made the record screen read as a different product from the list
+     one click away. Neutral card, quiet label, the verdict as plain text, figures at 18/600. */
+  h += '<div class="card rise" style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
+    '<div style="flex:1;min-width:240px;"><div style="font-size:12px;color:#7C7C7C;font-weight:450;">حكم الحملة</div>' +
+    '<div style="font-size:15px;font-weight:500;color:#171717;margin-top:6px;line-height:1.6;">' +
     crmVerdict(st) + '</div></div>' +
-    '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
+    '<div style="display:flex;gap:28px;flex-wrap:wrap;">' +
     [["نسبة المشاهدة", crmDeliveryRate(st.seen, st)], ["نسبة الردود", crmDeliveryRate(st.replied, st)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
       .map(function (x) {
-        return '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' +
-          (x[1] === null ? "—" : fmtN(x[1]) + '<span style="font-size:14px;color:#9FC0E4;">٪</span>') +
-          '</div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + '</div></div>';
+        return '<div><div style="font-size:18px;font-weight:600;color:#171717;font-variant-numeric:tabular-nums;">' +
+          (x[1] === null ? "—" : fmtN(x[1]) + '<span style="font-size:12px;color:#7C7C7C;">٪</span>') +
+          '</div><div style="font-size:12px;color:#7C7C7C;margin-top:3px;">' + x[0] + '</div></div>';
       }).join("") + '</div></div>';
 
   /* ---- the move cards, computed once: the count rides on the tab label ---- */
@@ -647,9 +650,9 @@ function vKmonDetailCrm(id, d) {
      strip announcing an absence is chrome, and the count-less tab plus «لا توصية الآن» carries it. */
   if (moves.length) {
     var m0 = moves[0];
-    h += '<div class="rise" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:' + m0[3] + ';border:1px solid #EDEDED;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
-      ic("spark", 17, m0[2]) +
-      '<span style="font-size:13px;font-weight:700;color:' + m0[2] + ';">' + esc(m0[0]) + '</span>' +
+    h += '<div class="rise" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #EDEDED;border-inline-start:3px solid #1F7A73;border-radius:10px;padding:12px 16px;margin-bottom:14px;">' +
+      ic("spark", 16, "#1F7A73") +
+      '<span style="font-size:13px;font-weight:500;color:#171717;">' + esc(m0[0]) + '</span>' +
       '<span style="flex:1;min-width:12px;"></span>' +
       (m0[4] ? '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;color:#2E7D77;background:#fff;border:1px solid #3FB6B0;font-weight:700;" onclick="crmGoFilter(&quot;' + m0[4] + '&quot;)">افتح هذه الفئة</button>' : "") +
       '<span class="lnk" onclick="crmSetDetailTab(&quot;next&quot;)" style="color:#525252;font-weight:700;font-size:11.5px;cursor:pointer;">كل الخطوات (' + fmtN(moves.length) + ')</span>' +
@@ -694,8 +697,8 @@ function vKmonDetailCrm(id, d) {
     if (!moves.length) return h + '<div class="empty" style="padding:44px;"><div class="t">لا توصية الآن</div><div class="s">لم يُسجَّل حدث بعد الإطلاق.</div></div>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">' +
       moves.map(function (m) {
-        return '<div style="background:' + m[3] + ';border:1px solid #EDEDED;border-radius:13px;padding:14px 16px;">' +
-          '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';">' + esc(m[0]) + '</div>' +
+        return '<div style="background:#fff;border:1px solid #EDEDED;border-inline-start:3px solid ' + m[2] + ';border-radius:10px;padding:14px 16px;">' +
+          '<div style="font-size:13px;font-weight:500;color:#171717;">' + esc(m[0]) + '</div>' +
           '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.8;">' + esc(m[1]) + '</div>' +
           (m[4] ? '<div style="margin-top:10px;"><button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;font-weight:700;" onclick="crmGoFilter(&quot;' + m[4] + '&quot;)">افتح هذه الفئة</button></div>' : "") +
           '</div>';
@@ -725,11 +728,9 @@ function vKmonDetailCrm(id, d) {
     '<span style="font-size:13px;font-weight:700;color:#171717;flex:none;">جهات الاستهداف</span>' +
     '<span style="font-size:11px;color:#999999;flex:none;">' + fmtN(shown.length) + ' من ' + fmtN(rows.length) + '</span>' +
     '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ')</button>' : "") +
+    (shown.length ? '<button class="btn" style="font-size:12.5px;border-radius:6px;color:#1F7A73;background:#fff;border:1px solid #1F7A73;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ')</button>' : "") +
     filters.map(function (f) {
-      return '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
-        (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
-        '" onclick="crmSetCampFilter(&quot;' + f[0] + '&quot;)">' + f[1] + ' (' + fmtN(f[2]) + ')</button>';
+      return '<button class="ptab' + (campFilter === f[0] ? " on" : "") + '" onclick="crmSetCampFilter(&quot;' + f[0] + '&quot;)">' + f[1] + ' (' + fmtN(f[2]) + ')</button>';
     }).join("") +
     '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EDEDED;border-radius:999px;padding:7px 13px;background:#F8F8F8;width:130px;">' +
     '</div>';

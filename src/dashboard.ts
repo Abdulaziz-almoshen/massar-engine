@@ -109,18 +109,23 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kpi .v { font-size: 30px; font-weight: 700; color: #171717; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .kpi .dl { font-size: 11.5px; font-weight: 700; }
   .kpi .v small { font-size: 12px; font-weight: 500; color: #999999; }
-  .card { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
+    margin-bottom:16px; }
   .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: .1px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 4px 12px; white-space: nowrap; border: 1px solid transparent; }
-  .c-grey { background: #F3F3F3; color: #525252; border-color: #E4E7EC; } .c-blue { background: #EFF4FB; color: #2F5F94; border-color: #D6E2F1; }
-  .c-teal { background: #E9F7F6; color: #2E7D77; border-color: #C4E8E5; } .c-ok { background: #ECFDF3; color: #027A48; border-color: #C7EED8; }
-  .c-warn { background: #FFFAEB; color: #B54708; border-color: #F5E3B7; } .c-bad { background: #FEF3F2; color: #B42318; border-color: #F7D4D1; }
+  .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:450;
+    border-radius:6px; padding:3px 8px; white-space:nowrap; background:#F8F8F8;
+    border:1px solid #EDEDED; color:#525252; }
+  /* Semantic classes now tint only the TEXT, never the fill. */
+  .c-grey { color:#525252; } .c-blue { color:#2F5F94; }
+  .c-teal { color:#1F7A73; } .c-ok { color:#027A48; }
+  .c-warn { color:#B54708; } .c-bad { color:#B42318; }
   /* An assistant reading is not a confirmed tag. Same hue so the level still reads at a
      glance, but hollow with a dashed edge so it can never be mistaken for a recorded fact. */
   .c-read { background: transparent; border-style: dashed; font-weight: 600; }
   .c-read .rd { font-weight: 700; opacity: .72; font-size: 10px; }
-  .ptab { font-family: inherit; font-size: 13px; font-weight: 700; border: 1px solid #E4E7EC; background: #fff; color: #525252; border-radius: 999px; padding: 10px 20px; cursor: pointer; }
-  .ptab.on { background: #171717; color: #fff; border-color: #171717; }
+  .ptab { font-family:inherit; font-size:12px; font-weight:450; border:1px solid #EDEDED;
+    background:#fff; color:#525252; border-radius:6px; padding:6px 12px; cursor:pointer; }
+  .ptab.on { background:#EDEDED; color:#171717; border-color:#EDEDED; }
   .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
   .inp:focus { border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.15); }
   .fun { margin-bottom: 13px; }
@@ -160,13 +165,13 @@ export const DASHBOARD_HTML = `<!doctype html>
   .trow:hover { background: #F8F8F8; }
   .trow:last-child { border-bottom: none; }
   .cust { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EFF4FB; display: flex; align-items: center; justify-content: center; color: #2F5F94; font-weight: 700; font-size: 15px; }
+  .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #F3F3F3; display: flex; align-items: center; justify-content: center; color: #525252; font-weight: 700; font-size: 15px; }
   .cust .nm { font-size: 13.5px; font-weight: 700; color: #171717; }
   .cust .ph { font-size: 11px; color: #999999; direction: ltr; text-align: right; }
   .lastm { font-size: 12px; color: #7C7C7C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tm { font-size: 11px; color: #999999; font-variant-numeric: tabular-nums; }
   .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 18px; }
-  .statc { background: #fff; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
+  .statc { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:14px 16px; }
   .statc .l { font-size: 11.5px; color: #7C7C7C; margin-bottom: 8px; font-weight: 600; }
   .statc .v { font-size: 24px; font-weight: 700; color: #171717; line-height: 1; font-variant-numeric: tabular-nums; }
   .statc .p { font-size: 10.5px; color: #2E7D77; font-weight: 700; margin-top: 6px; }
@@ -175,7 +180,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.4); z-index: 69; }
   .convo { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(430px, 94vw); background: #fff; z-index: 70; display: flex; flex-direction: column; box-shadow: 12px 0 32px rgba(16,24,40,.18); }
   .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid #EDEDED; }
-  .convo .hd .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EFF4FB; color: #2F5F94; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
+  .convo .hd .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #F3F3F3; color: #525252; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
   .convo .msgs { flex: 1; overflow-y: auto; background: #E5DDD4; padding: 16px; }
   .convo .ft { flex: none; padding: 13px 18px; border-top: 1px solid #EDEDED; }
   @media (prefers-reduced-motion: no-preference) { .convo { animation: slideIn .18s ease; } @keyframes slideIn { from { transform: translateX(-30px); opacity: .6; } to { transform: none; opacity: 1; } } }
@@ -203,7 +208,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .wa-prev { background: #E5DDD4; border-radius: 16px; padding: 18px; max-width: 480px; }
   .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12.5px; color: #171717; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
   .wa-prev .t { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 6px; }
-  .btn { font-family: inherit; font-size: 13.5px; font-weight: 700; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; }
+  .btn { font-family:inherit; font-size:13px; font-weight:500; border:none; border-radius:6px;
+    padding:0 12px; height:32px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .btn-teal { color: #fff; background: #1F7A73; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
   .btn-dark { color: #fff; background: #171717; }
   .btn-ghost { color: #383838; background: #fff; border: 1px solid #E2E2E2; }
@@ -222,7 +228,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E4E7EC; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-  .ptitle h1 { margin: 0; font-size: 30px; font-weight: 700; color: #171717; letter-spacing: -.6px; line-height: 1.2; }
+  .ptitle h1 { margin:0; font-size:18px; font-weight:600; color:#171717; letter-spacing:0;
+    line-height:1.4; }
   .ptitle p { margin: 6px 0 0; font-size: 13.5px; color: #7C7C7C; }
   .ptitle .acts { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
   .sec { font-size: 14px; font-weight: 700; color: #525252; margin: 4px 0 14px; }
@@ -606,7 +613,7 @@ function contactRowsHtml(rows, win) {
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
       '<div class="lastm">' + (ci && ci.next_action ? '<span style="color:#2E7D77;font-weight:600;">← ' + esc(ci.next_action) + "</span>" : esc(last ? last.text : "—")) + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
-      '<div style="text-align:left;font-size:12px;color:#2F5F94;font-weight:700;" onclick="event.stopPropagation();openConvo(\\'' + esc(c.phone) + '\\')">المحادثة ←</div></div>';
+      '<div style="text-align:left;font-size:12px;color:#1F7A73;font-weight:500;" onclick="event.stopPropagation();openConvo(\\'' + esc(c.phone) + '\\')">المحادثة ←</div></div>';
   });
   return h;
 }
@@ -665,7 +672,7 @@ function renderConvo() {
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد" : "إيقاف المساعد") + "</button>" +
     '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:11.5px;' +
-    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;') +
+    (c.test ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
     (c.test ? "تجريبي" : "تصنيف كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
@@ -686,7 +693,7 @@ function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#999999;background:#fff;border:1px dashed #d5dae2;') +
+    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #d5dae2;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -826,13 +833,13 @@ function vKmonDetail(id, d) {
     '<div class="ptitle rise"><div><h1 style="font-size:26px;">' + esc(camp.name) + "</h1>" +
     '<p>' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</p></div>" +
     '<div class="acts">' + (campIsTest(camp) ? '<span class="chip c-warn">حملة تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div></div>";
-  h += '<div class="card rise" style="background:linear-gradient(135deg,#0F2E52,#1F4470);border:none;color:#fff;display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
-    '<div style="flex:1;min-width:240px;"><div style="font-size:11.5px;color:#9FC0E4;font-weight:700;">حكم الحملة</div>' +
+  h += '<div class="card rise" style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
+    '<div style="flex:1;min-width:240px;"><div style="font-size:12px;color:#7C7C7C;font-weight:450;">حكم الحملة</div>' +
     '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
     (st.replied ? "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" + (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
     [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
-      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#9FC0E4;">٪</span></div><div style="font-size:11px;color:#9FC0E4;margin-top:3px;">' + x[0] + "</div></div>").join("") +
+      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#7C7C7C;">٪</span></div><div style="font-size:11px;color:#7C7C7C;margin-top:3px;">' + x[0] + "</div></div>").join("") +
     "</div></div>";
   const cards = [
     ["جهات الاستهداف", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
@@ -886,7 +893,7 @@ function vKmonDetail(id, d) {
     '<span style="font-size:13px;font-weight:700;color:#171717;flex:none;">جهات الاستهداف</span>' +
     '<span style="font-size:11px;color:#999999;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
+    (shown.length ? '<button class="btn" style="font-size:12.5px;border-radius:6px;color:#1F7A73;background:#fff;border:1px solid #1F7A73;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
       (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + fmtN(f[2]) + ")</button>").join("") +
@@ -937,7 +944,7 @@ function vHome(d) {
           return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;cursor:pointer;">' +
             '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#171717;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(c.waName || "غير معروف") + " " +
-            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+            (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip">تجريبي</span>' : "") + "</div>" +
             (ci && ci.next_action ? '<div style="font-size:11px;color:#2E7D77;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">← ' + esc(ci.next_action) + '</div>'
               : (last ? '<div style="font-size:11px;color:#7C7C7C;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
@@ -949,7 +956,7 @@ function vHome(d) {
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
           return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;">' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip">تجريبية</span>' : "") + "</div>" +
             '<div style="font-size:10.5px;color:#999999;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
@@ -1206,8 +1213,8 @@ function vSegBuilder() {
     }
   }
   // The constraint that makes this different from an email tool.
-  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#FBF3DC;border:1px solid #F0DFB4;border-radius:12px;padding:12px 15px;font-size:12px;color:#8a6d10;line-height:1.9;">' +
-    ic("clock", 16, "#8a6d10") +
+  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#F8F8F8;border:1px solid #EDEDED;border-inline-start:3px solid #B54708;border-radius:10px;padding:12px 15px;font-size:12px;color:#525252;line-height:1.9;">' +
+    ic("clock", 16, "#B54708") +
     "<div><b>الإطلاق من هذه الشريحة غير متاح بعد.</b><br>" +
     "الجهة التي لم تردّ منذ أيام تقع خارج نافذة الـ٢٤ ساعة، ولا يصلها إلا قالب معتمد من Meta. " +
     "مسار الإطلاق الحالي يرسل رسائل جلسة، فلو أُتيح الزر هنا لرفضت واتساب الإرسال. " +
@@ -1299,7 +1306,7 @@ function vAimkt() {
     h += vSegBuilder();
   } else
   if (retargetCohort) {
-    h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
+    h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid #EDEDED;border-inline-start:3px solid #B54708;background:#fff;border-radius:10px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
       '<div style="font-size:13.5px;font-weight:700;color:#171717;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
       '<div style="font-size:11.5px;color:#7C7C7C;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
@@ -1392,7 +1399,7 @@ function vAimkt() {
     // it is that this audience needs an approved template the send path does not yet use. Saying
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
-      ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#8a6d10;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
+      ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:500;color:#171717;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
         '<div style="font-size:10.5px;color:#999999;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
       : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#171717;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
@@ -2509,7 +2516,7 @@ function vCustomer(ph) {
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
     // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
-    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#171717;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#171717;">' + esc(nm) + (c.test ? ' <span class="chip">تجريبي</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
     // «واتساب ✓» deleted: every contact on this screen arrived by WhatsApp, so the chip carries no
