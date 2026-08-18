@@ -47,6 +47,28 @@ window.__qaFixture = function (kind) {
 };
 """
 
+# Contact fixture for #customers. Mirrors the campaign fixture's job: the states that matter
+# (opted out, human takeover, no tags, test) do not reliably exist in the ledger at any moment.
+CUS_FIXTURE = """
+window.__qaContacts = function (kind) {
+  var now = Date.now();
+  var mk = function (n, name, test, opted, human, lvl, product, msgs, outcome) {
+    var t = [];
+    for (var i = 0; i < msgs; i++) t.push({ role: i % 2 ? "customer" : "agent", ts: now - (msgs - i) * 60000, text: "س" + i });
+    return { phone: "96650000" + (1000 + n), waName: name, lastEventAt: now - n * 3600000,
+             test: test, optedOut: opted, human: human, agentTurns: msgs,
+             statusTimes: { sent: now - 7200000, delivered: now - 7100000 },
+             transcript: t, tags: lvl ? [{ product: product, level: lvl, ts: now }] : [],
+             outcome: outcome, props: {} };
+  };
+  if (kind === "empty") return [];
+  return [mk(1,"عيادة النور",false,false,false,"hot","الإجازات المرضية",4,"interested"),
+          mk(2,"مجمع الرياض",false,false,true,"warm","التطعيمات",2,"later"),
+          mk(3,"",false,true,false,null,null,0,"opted_out"),
+          mk(4,"بروفة",true,false,false,null,null,0,undefined)];
+};
+"""
+
 # Per-case blank-page floor. MIN_CHARS exists to catch a BLANK render, and an empty state is not a
 # blank render — it is a short one BY DESIGN, and shorter still at 375/768 where the sidebar
 # collapses (measured: 499 chars at 1440, 235 at 375, with the landmark and both actions present in
@@ -76,6 +98,15 @@ CASES = [
     ("detail-next",    "default",      "#kmon/1", 'crmSetDetailTab("next");',                "الخطوة التالية"),
     ("detail-spec",    "default",      "#kmon/1", "",                                        "لا يقبل التعديل بعد الإطلاق"),
     ("detail-zero",    "zerotargets",  "#kmon/1", "",                                        "—"),
+]
+
+# العملاء shipped on smoke and inspection only; these put it in the pixel suite.
+CUS_CASES = [
+    ("cus-list",     "",                                    "العميل"),
+    ("cus-group",    'cusSetView("group");',                "تجميع"),
+    ("cus-selected", 'cusToggle("966500001001");',          "محدَّدة"),
+    ("cus-stopped",  'cusSetTab("stopped");',               "ألغى الاشتراك"),
+    ("cus-empty",    'cache.contacts = []; render(false);', "لا جهات بعد"),
 ]
 
 
@@ -442,6 +473,30 @@ def main() -> int:
                 }
                 results.append(rec)
                 if not (ok_render and ok_landmark and ok_console and ok_overflow):
+                    failures.append(rec)
+            # العملاء at the same three viewports
+            for case_id, setup, landmark in CUS_CASES:
+                del errors[:]
+                page.goto(f"{BASE}/dashboard?token={tok}#customers", wait_until="domcontentloaded")
+                page.wait_for_timeout(3000)
+                page.evaluate(CUS_FIXTURE)
+                page.evaluate("() => { cache = cache || {}; cache.contacts = window.__qaContacts('d'); render(false); }")
+                page.wait_for_timeout(250)
+                if setup:
+                    page.evaluate(setup)
+                    page.wait_for_timeout(250)
+                text = page.inner_text("body")
+                shot = OUT / f"{case_id}@{vp_name}.png"
+                page.screenshot(path=str(shot), full_page=False)
+                overflow = page.evaluate("() => document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth")
+                rec = {"case": case_id, "viewport": vp_name, "route": "#customers", "fixture": "contacts",
+                       "chars": len(text), "blank_floor": 90, "landmark": landmark,
+                       "missing_content": [], "render_ok": len(text) >= 90,
+                       "landmark_ok": landmark in text, "console_errors": errors[:3],
+                       "console_ok": len(errors) == 0, "page_h_overflow_px": overflow,
+                       "overflow_ok": overflow <= 1, "capture": str(shot.relative_to(OUT.parent.parent))}
+                results.append(rec)
+                if not (rec["render_ok"] and rec["landmark_ok"] and rec["console_ok"] and rec["overflow_ok"]):
                     failures.append(rec)
             ctx.close()
 

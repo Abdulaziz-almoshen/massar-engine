@@ -14,6 +14,7 @@
 
 import { CAMPAIGNS_CRM_CSS, CAMPAIGNS_CRM_JS } from "./campaigns-crm.js";
 import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
+import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -297,6 +298,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
+${ACTIVITY_CRM_CSS}
 </style>
 </head>
 <body>
@@ -399,7 +401,7 @@ const TITLES = {
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
-  pipeline: ["لوحة متابعة الفرص", "ضمن المرحلة القادمة"], products: ["المنتجات", "ضمن المرحلة القادمة"],
+  pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
@@ -2792,7 +2794,7 @@ function render(fetchNew) {
     if (!TOKEN) return gate();
     const ph = (location.hash || "").split("/")[1] || "";
     b.innerHTML = vCustomer(ph);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -2801,6 +2803,7 @@ function render(fetchNew) {
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? (vMorningList() + vCustomers())
+      : cur === "pipeline" ? vActivityCrm()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -3132,6 +3135,7 @@ window.addEventListener("hashchange", () => {
 });
 ${CAMPAIGNS_CRM_JS}
 ${CUSTOMERS_CRM_JS}
+${ACTIVITY_CRM_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */

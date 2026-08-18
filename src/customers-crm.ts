@@ -132,7 +132,11 @@ function cusHeader(allOn) {
       '<div class="c-num" style="color:#7C7C7C;font-size:12px;">الرسائل</div>' +
       '<div class="c-num" style="text-align:start;color:#7C7C7C;font-size:12px;">آخر نشاط</div>' +
     '</div>' +
-    '<div></div></div>';
+    '<div></div></div>' +
+    /* Below 940px .thead-wide is hidden, so without this the list had NO header at all on phone and
+       tablet — the campaigns list got a narrow strip and this one did not. Caught by extending the
+       pixel suite to #customers, which is exactly why the debt was worth closing before the next module. */
+    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="cusTogglePage()"></span><span>العميل</span><span style="flex:1"></span><span>الحالة</span></div>';
 }
 
 /* ------------------------------- control bar ------------------------------- */
