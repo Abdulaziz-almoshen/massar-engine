@@ -56,7 +56,7 @@ export type Prop = {
 
 export type PropReject =
   | "unknown_property" | "not_agent_writable" | "unknown_phone"
-  | "too_long" | "human_value_wins" | "not_persisted"
+  | "too_long" | "bad_date" | "human_value_wins" | "not_persisted"
   // Not in the plan's list: the plan's condition 6 clears a key only «from a human». An EMPTY
   // agent write therefore has no defined home, and silently dropping it is this repo's own
   // recurring defect (emitted-values-must-be-readable). It gets a readable reason instead, and
@@ -118,8 +118,11 @@ export function decideProp(args: {
   if (value.length > MAX_LEN[key]) return { applied: false, reason: "too_long" };
   if (args.due !== undefined) {
     const due = Number(args.due);
+    // Its OWN reason. Sharing "too_long" made the panel tell an operator with a short, perfectly
+    // valid phrase and a bad date that «النص أطول من المسموح» — an error about the wrong field, which
+    // is unactionable. One rule, one readable code. (QA-3.)
     if (!Number.isFinite(due) || due < now - YEAR_MS || due > now + 2 * YEAR_MS) {
-      return { applied: false, reason: "too_long" };
+      return { applied: false, reason: "bad_date" };
     }
   }
 

@@ -2701,6 +2701,7 @@ async function propPost(key, value, keepOpen) {
     const code = j ? (j.error || j.reason || "") : "";
     let err = "لم يُحفظ. أعد المحاولة.";
     if (code === "too_long") err = "النص أطول من المسموح (" + fmtN(PROP_MAX[key] || 120) + " حرفًا).";
+    else if (code === "bad_date") err = "التاريخ خارج المدى المقبول. اكتب موعدًا قريبًا أو اترك التاريخ فارغًا.";
     else if (r.status === 503) err = "لم يُحفظ: قاعدة البيانات غير متصلة. أعد المحاولة.";
     else if (code === "unknown_reason") err = "اختر سببًا من القائمة.";
     else if (code === "unknown_phone") err = "لم يُحفظ: لا سجل لهذا الرقم.";

@@ -74,10 +74,10 @@ check("121 chars in a short text is too_long", reason(d({ value: "ا".repeat(121
 check("120 chars in a short text is accepted (control)", reason(d({ value: "ا".repeat(120) })), null);
 check("2001 chars in a note is too_long", reason(d({ key: "note", value: "ا".repeat(2001) })), "too_long");
 check("2000 chars in a note is accepted (control)", reason(d({ key: "note", value: "ا".repeat(2000) })), null);
-check("a due date 3 years out is too_long", reason(d({ due: NOW + 3 * 365 * 24 * 3600e3 })), "too_long");
-check("a due date 2 years back is too_long", reason(d({ due: NOW - 2 * 365 * 24 * 3600e3 })), "too_long");
+check("a due date 3 years out gets its OWN reason, not a length error", reason(d({ due: NOW + 3 * 365 * 24 * 3600e3 })), "bad_date");
+check("a due date 2 years back gets its OWN reason, not a length error", reason(d({ due: NOW - 2 * 365 * 24 * 3600e3 })), "bad_date");
 check("a due date next week is accepted (control)", reason(d({ due: NOW + 7 * 24 * 3600e3 })), null);
-check("an unreadable due date is too_long", reason(d({ due: Number.NaN })), "too_long");
+check("an unreadable due date gets its OWN reason, not a length error", reason(d({ due: Number.NaN })), "bad_date");
 
 // 5 · BR-1, the hard invariant. A human fact is never replaced by a machine reading.
 const HUMAN = { value: "د. سارة — مديرة العمليات", source: "human", by: "اللوحة", ts: NOW - 5000 };
@@ -197,7 +197,15 @@ for (const frag of ["NotPersisted", "BEGIN", "COMMIT", "ROLLBACK", "DELETE FROM 
   check(`upsertProps contains ${frag}`, upsPropsBody.includes(frag), true);
 }
 check("upsertProps THROWS when the ledger is unreachable — it does not return early",
-  /if \(!pool \|\| !connected\) throw new NotPersisted/.test(upsPropsBody), true);
+  /throw new NotPersisted/.test(upsPropsBody) && !/if \(!pool \|\| !connected\) return/.test(upsPropsBody), true);
+// QA-1: `connected` is latched false by pool.on("error") and nothing flipped it back, so a routine
+// Postgres failover refused every write until the PROCESS restarted — while the panel printed
+// «أعد المحاولة», an instruction it could not honour. A human's typed fact must re-test the pool
+// before being refused.
+check("…and it RE-PROBES a latched-off pool before refusing a human's fact",
+  /await reprobe\(\)/.test(upsPropsBody), true);
+check("reprobe actually re-tests the connection rather than just reading the flag",
+  /async function reprobe[\s\S]{0,400}SELECT 1[\s\S]{0,200}connected = true/.test(src.db), true);
 
 // writeProp must delegate to the guard, or the behaviour half above tests dead code.
 const wpBody = src.tracker.slice(src.tracker.indexOf("export async function writeProp("),
@@ -298,7 +306,12 @@ check("dist/tracker.js has no runtime reference to gupshup",
 
 // The panel must be able to tell the operator that a save is impossible, rather than 503-ing later.
 check("/admin/customer/:phone reports propsWritable",
-  src.index.includes("propsWritable: db.enabled() && db.isConnected()"), true);
+  /propsWritable: db\.enabled\(\)/.test(src.index), true);
+// …and does NOT key it on the transient latch: greying out every editor because of a blip locks the
+// operator out of a ledger that may already be back. The write re-probes and reports honestly at the
+// moment of saving instead of pre-emptively disabling the panel.
+check("…and does not gate the editors on the transient isConnected latch",
+  /propsWritable: db\.enabled\(\) && db\.isConnected\(\)/.test(src.index), false);
 
 // --- (c) the panel, EXECUTED ------------------------------------------------
 // dashboard.ts is ONE template literal, so tsc sees none of the client code and every gate on it so

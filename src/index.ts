@@ -368,7 +368,13 @@ app.get("/admin/customer/:phone", async (req, reply) => {
     // NFR-3 made visible: with no DATABASE_URL (or a dropped pool) a property write CANNOT persist,
     // so the panel renders its editors disabled with the reason stated rather than offering a save
     // that will 503. A local dev with no database is a visible disabled state, never a green save.
-    propsWritable: db.enabled() && db.isConnected(),
+    // `enabled()`, deliberately NOT `&& isConnected()`. isConnected can be latched false by a
+    // transient pool error; disabling every editor on that basis locks the operator out of a
+    // ledger that may already be back. upsertProps re-probes on write and reports honestly if it
+    // is genuinely down, so the failure is surfaced at the moment of saving rather than
+    // pre-emptively greying out the panel. With no DATABASE_URL at all, this is false and the
+    // editors correctly render disabled with the reason stated.
+    propsWritable: db.enabled(),
     context: insights.contextScore(contact, entity),
     // What the conversation actually WAS. `contextScore` measures fields we hold and can read full
     // on a contact whose only real sentence was «ماني مهتم لا تتصل علي»; this reads the transcript.
@@ -518,8 +524,8 @@ app.post("/admin/contact/props", async (req, reply) => {
     if (r.reason === "not_persisted") {
       return reply.code(503).send({ ok: false, persisted: false, error: "not_persisted", key });
     }
-    if (r.reason === "too_long") {
-      return reply.code(400).send({ ok: false, error: "too_long", key });
+    if (r.reason === "too_long" || r.reason === "bad_date") {
+      return reply.code(400).send({ ok: false, error: r.reason, key });
     }
     if (!r.applied) return reply.code(400).send({ ok: false, error: r.reason, key });
     written[key] = r.prop ?? null;   // null → the key was cleared back to «ناقص»

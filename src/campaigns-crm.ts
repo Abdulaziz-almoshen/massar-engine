@@ -73,7 +73,6 @@ export const CAMPAIGNS_CRM_CSS = `
   .kcol.over { border-color:#3FB6B0; background:#F0FAF9; }
   .kcolh { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 4px; }
   .kcolh .lb { font-size:12.5px; font-weight:700; color:#101828; }
-  .kcolh .why { font-size:10.5px; color:#98A2B3; margin-top:2px; }
   .kcard { background:#fff; border:1px solid #EAECF0; border-radius:11px; padding:12px; margin-bottom:9px;
     cursor:pointer; }
   .kcard:hover { border-color:#3FB6B0; }
@@ -106,21 +105,27 @@ export const CAMPAIGNS_CRM_CSS = `
      phone: ONE dom for both, never a parallel mobile row. */
   .crmgrid { min-width: 940px; }
   .crow { display:grid; grid-template-columns: 40px 2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;
-    gap:12px; align-items:center; }
+    gap:12px; align-items:center; padding:16px 22px; }
   .crow .c-fig, .crow .c-meta { display: contents; }
   .fig { display:flex; gap:12px; font-size:11px; color:#475467; }
   .crow .c-num { text-align:center; font-size:13px; font-weight:700; color:#101828; font-variant-numeric:tabular-nums; }
+  /* The wide layout has a column header saying exactly this, and a leading Arabic label also
+     destroys the tabular-nums alignment the cell exists for. Hidden here, revealed on the phone. */
+  .crow .c-num .lbl-ph { display:none; }
   /* display lives in CSS, never inline: an inline display:flex beats a media query and
      kept التقدّم rendering as a squeezed 40px stub on the phone row. */
   .crow .c-prog { display:flex; align-items:center; gap:9px; }
   .cedge { display:none; }
+  /* Authored BEFORE the media query so the reveal inside it wins on source order, without !important. */
+  .thead-narrow { display:none; align-items:center; gap:10px; padding:12px 16px; background:#F9FAFB;
+    border-block-end:1px solid #EAECF0; font-size:11.5px; font-weight:700; color:#667085; }
 
-  @media (max-width: 599px) {
+  @media (max-width: 939px) {
     /* The nine-column grid cannot answer "which campaign, did it work" on a phone — at 375 every
        figure sat behind a sideways drag. Three stacked lines, same DOM, same cells. */
     .crmgrid { min-width: 0; }
     .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:6px; column-gap:10px;
-      align-items:start; position:relative; padding-block-end:16px !important; }
+      align-items:start; position:relative; padding-block-end:16px; }
     .crow .selcell { grid-row: 1 / 4; grid-column: 1; align-self:center; }
     .crow .c-name  { grid-row: 1; grid-column: 2; }
     .crow .c-act   { grid-row: 1; grid-column: 3; }
@@ -133,6 +138,7 @@ export const CAMPAIGNS_CRM_CSS = `
     .crow .c-meta .c-state { flex:none; }
     .crow .c-fig   { display:flex; grid-row: 3; grid-column: 2 / 4; flex-wrap:wrap; }
     .crow .c-num   { text-align:start; }
+    .crow .c-num .lbl-ph { display:inline; color:#98A2B3; font-weight:600; }
     /* التقدّم is the one column that cannot survive as text here: it becomes a hairline meter on
        the row's block-end edge, so stacked rows read as a scannable column of bars. */
     .crow .c-prog  { display:none; }
@@ -140,10 +146,9 @@ export const CAMPAIGNS_CRM_CSS = `
       background:#EAECF0; }
     .crow .cedge > i { display:block; height:100%; background:#1F7A73; }
     .thead-wide { display:none; }
-    .thead-narrow { display:flex !important; }
+    .thead-narrow { display:flex; }
   }
-  .thead-narrow { display:none; align-items:center; gap:10px; padding:12px 16px; background:#F9FAFB;
-    border-block-end:1px solid #EAECF0; font-size:11.5px; font-weight:700; color:#667085; }
+
 `;
 
 export const CAMPAIGNS_CRM_JS = `
@@ -317,9 +322,9 @@ function crmRow(c, st) {
   var actTitle = isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية";
   /* The km class is not decoration: dashboard.ts:229 applies a legacy 4-column mobile grid to
      .trow:not(.km) below 900px, with nth-child(4) and (5) hidden. That selector is (0,2,0) and
-     beat .crow, which is why the phone row rendered four tracks with the figures line missing.
+     beat .crow, which is why the row rendered four tracks with the figures line missing.
      The original vKmon row carries km for exactly this reason. */
-  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;kmon/' + c.id + '&quot;" style="padding:16px 22px;">' +
+  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;kmon/' + c.id + '&quot;">' +
     '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(c.name) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggle(' + c.id + ')"></div>' +
     '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ';box-shadow:0 0 0 3px ' + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
     '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
@@ -361,8 +366,11 @@ function crmHeaderRow(withSelectAll, allOn, nOver, nTotal) {
         '<div class="c-num" style="color:#667085;font-size:11.5px;">ردود</div>' +
       '</div>' +
       '<div>التقدّم</div><div></div></div>' +
-    '<div class="thead-narrow">' + (withSelectAll ? '<span class="selcell" style="opacity:1;">' + box + '</span><span>تحديد المعروض</span>' : "") +
-      '<span style="flex:1"></span>' + selAll + '</div>';
+    /* Only emit the narrow strip when it has controls to carry: crmGroupView passes
+       withSelectAll=false, which otherwise left a ~40px empty grey bar under every group heading. */
+    (withSelectAll
+      ? '<div class="thead-narrow"><span class="selcell" style="opacity:1;">' + box + '</span><span>تحديد المعروض</span><span style="flex:1"></span>' + selAll + '</div>'
+      : "");
 }
 
 function crmListView(withStAll) {

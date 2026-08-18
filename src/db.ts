@@ -15,6 +15,29 @@ let connected = false;
 export function enabled(): boolean { return Boolean(process.env.DATABASE_URL); }
 export function isConnected(): boolean { return connected; }
 
+/**
+ * Re-test a pool that the error handler latched OFF.
+ *
+ * `connected` was one-way: `pool.on("error")` flips it false when the backend drops, and nothing
+ * flipped it back, so a routine Postgres failover left every write refused until the PROCESS
+ * restarted — while the panel printed «أعد المحاولة», an instruction it could not honour. QA
+ * measured this: three retries after a verified `pg_isready`, three 503s.
+ *
+ * One cheap round trip, only on the path that would otherwise refuse. Returns the live state.
+ */
+async function reprobe(): Promise<boolean> {
+  if (connected) return true;
+  if (!pool || !enabled()) return false;
+  try {
+    await pool.query("SELECT 1");
+    connected = true;
+    console.log(JSON.stringify({ at: "db", msg: "reconnected after a pool error" }));
+  } catch {
+    connected = false;                                  // still down; the caller reports it honestly
+  }
+  return connected;
+}
+
 const MIGRATION = `
 CREATE TABLE IF NOT EXISTS contacts (
   phone          TEXT PRIMARY KEY,
@@ -210,7 +233,9 @@ export async function upsertProps(
   del: string[],
   tags?: { product: string; level: string; ts: number }[],
 ): Promise<boolean> {
-  if (!pool || !connected) throw new NotPersisted(enabled() ? "db_unreachable" : "no_database_url");
+  // A human just typed a fact. Before refusing it, re-test a pool the error handler latched off —
+  // otherwise «أعد المحاولة» is a lie until the next deploy.
+  if (!pool || !(await reprobe())) throw new NotPersisted(enabled() ? "db_unreachable" : "no_database_url");
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
