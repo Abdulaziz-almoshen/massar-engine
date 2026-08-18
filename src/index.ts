@@ -704,6 +704,11 @@ app.post("/admin/tasks", async (req, reply) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const bad = db.validateTask(body);
   if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
+  // Refuse a dangling ref rather than creating a row that points at nothing. There is no FK here
+  // (contacts are phone-keyed, campaigns are BIGSERIAL), so this check IS the constraint.
+  if (body.ref_kind && !(await db.refExists(String(body.ref_kind), String(body.ref_id)))) {
+    return reply.code(400).send({ ok: false, error: "unknown_ref", kind: body.ref_kind, id: body.ref_id });
+  }
   const row = await db.createTask(body as never);
   if (!row) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });
   return { ok: true, task: row };
@@ -744,6 +749,9 @@ app.post("/admin/notes", async (req, reply) => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   if (typeof body.content !== "string" || !body.content.trim()) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "content" });
+  }
+  if (body.ref_kind && !(await db.refExists(String(body.ref_kind), String(body.ref_id)))) {
+    return reply.code(400).send({ ok: false, error: "unknown_ref", kind: body.ref_kind, id: body.ref_id });
   }
   const row = await db.createNote(body as never);
   if (!row) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });

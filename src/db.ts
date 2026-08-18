@@ -125,8 +125,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   status      TEXT NOT NULL DEFAULT 'todo'
               CHECK (status IN ('backlog','todo','in_progress','done','canceled')),
-  priority    TEXT NOT NULL DEFAULT 'medium'
-              CHECK (priority IN ('low','medium','high')),
+  -- nullable ON PURPOSE: a defaulted priority is a value nobody chose. NULL renders «—».
+  priority    TEXT CHECK (priority IN ('low','medium','high')),
   start_at    BIGINT,
   due_at      BIGINT,
   assigned_to TEXT,
@@ -553,7 +553,7 @@ export async function listCampaigns(): Promise<{
 export type TaskRow = {
   id: number; title: string; description: string | null;
   status: "backlog" | "todo" | "in_progress" | "done" | "canceled";
-  priority: "low" | "medium" | "high";
+  priority: "low" | "medium" | "high" | null;
   start_at: number | null; due_at: number | null; assigned_to: string | null;
   ref_kind: "contact" | "campaign" | null; ref_id: string | null;
   created_at: number; updated_at: number; done_at: number | null;
@@ -608,7 +608,7 @@ export async function createTask(t: Partial<TaskRow>): Promise<TaskRow | null> {
   const q = await pool.query(
     `INSERT INTO tasks (title, description, status, priority, start_at, due_at, assigned_to,
        ref_kind, ref_id, created_at, updated_at)
-     VALUES ($1,$2,COALESCE($3,'todo'),COALESCE($4,'medium'),$5,$6,$7,$8,$9,$10,$10) RETURNING *`,
+     VALUES ($1,$2,COALESCE($3,'todo'),$4,$5,$6,$7,$8,$9,$10,$10) RETURNING *`,
     [t.title, t.description ?? null, t.status ?? null, t.priority ?? null, t.start_at ?? null,
      t.due_at ?? null, t.assigned_to ?? null, t.ref_kind ?? null, t.ref_id ?? null, now]);
   return rowToTask(q.rows[0]);
@@ -637,6 +637,34 @@ export async function deleteTask(id: number): Promise<boolean> {
   if (!pool || !connected) return false;
   const q = await pool.query(`DELETE FROM tasks WHERE id = $1`, [id]);
   return (q.rowCount ?? 0) > 0;
+}
+
+/** With no FK on (ref_kind, ref_id) — contacts are phone-keyed and campaigns are BIGSERIAL, so one
+ *  column cannot reference both — the cascade is an app-level obligation. Without it a deleted
+ *  contact leaves tasks and notes pointing at a record that no longer exists. */
+export async function deleteRefRecords(kind: "contact" | "campaign", id: string): Promise<{ tasks: number; notes: number }> {
+  if (!pool || !connected) return { tasks: 0, notes: 0 };
+  const t = await pool.query(`DELETE FROM tasks WHERE ref_kind = $1 AND ref_id = $2`, [kind, id]);
+  const n = await pool.query(`DELETE FROM notes WHERE ref_kind = $1 AND ref_id = $2`, [kind, id]);
+  return { tasks: t.rowCount ?? 0, notes: n.rowCount ?? 0 };
+}
+
+/** Obligation 1: the write path refuses an unknown ref rather than creating a dangling row.
+ *  A contact ref is accepted if it exists in EITHER contacts or entities — an imported audience
+ *  row has an entities record long before it has a contacts one, and a task on a prospect you
+ *  have not messaged yet is a legitimate thing to write. */
+export async function refExists(kind: string, id: string): Promise<boolean> {
+  if (!pool || !connected) return false;
+  if (kind === "contact") {
+    const q = await pool.query(
+      `SELECT 1 FROM contacts WHERE phone = $1 UNION ALL SELECT 1 FROM entities WHERE phone = $1 LIMIT 1`, [id]);
+    return q.rows.length > 0;
+  }
+  if (kind === "campaign") {
+    const q = await pool.query(`SELECT 1 FROM campaigns WHERE id = $1 LIMIT 1`, [Number(id)]);
+    return q.rows.length > 0;
+  }
+  return false;
 }
 
 export async function listNotes(ref?: { kind: string; id: string }): Promise<NoteRow[]> {
