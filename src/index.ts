@@ -60,6 +60,15 @@ app.get("/dashboard", async (_req, reply) => {
   return DASHBOARD_HTML;
 });
 
+// The portal lives at /dashboard, so the bare hostname returned a raw 404 JSON body — which is
+// what an operator gets when they type the domain from memory or follow a link without the path.
+// Redirect instead, carrying any ?token= and the #hash (the fragment is preserved by the browser
+// across a 302, so #kmon survives). 302, not 301: the root is not permanently this page.
+app.get("/", async (req, reply) => {
+  const qs = (req.raw.url || "").split("?")[1];
+  return reply.redirect("/dashboard" + (qs ? "?" + qs : ""), 302);
+});
+
 // ------------------------------ health ------------------------------
 
 app.get("/health", async () => ({

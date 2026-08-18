@@ -346,6 +346,9 @@ export async function writeProp(
 ): Promise<{ applied: boolean; persisted: boolean; reason?: PropReject; prop?: Prop }> {
   const c = findContact(phone);
   const current = c && (PROP_KEYS as readonly string[]).includes(key) ? c.props[key as PropKey] : undefined;
+  // Read BEFORE the write: whether the standing appointment is one a human typed decides whether an
+  // erase may clear it (see the reconciliation below).
+  const heldBefore = c ? humanDue(c) : undefined;
   const d = decideProp({ key, value, source, by, known: Boolean(c), current, due: opts?.due });
 
   // Nothing to store: a refusal that changes no state (an unknown key, a refused agent write, an
@@ -372,6 +375,26 @@ export async function writeProp(
   const mp = propsOf(c);
   if (d.remove) delete mp[k];
   else if (d.prop) mp[k] = d.prop;
+
+  // M3 — ONE APPOINTMENT, ONE PLACE. A day typed into الخطوة التالية IS the appointment the rest of
+  // the portal reads (قائمة الصباح, the status strip, the record); it used to be a second,
+  // unreconciled store, so قائمة الصباح never learned the operator's date and the strip printed
+  // «لم تُؤكَّد بعد» forever on a meeting a human had confirmed. The one door writes both, in one
+  // call, so they cannot drift. `by`/`source` are NOT copied onto the contact: «مؤكَّد» is derived
+  // from this property, which keeps the provenance in exactly one place.
+  if (d.applied && k === "nextStep" && source === "human") {
+    const due = d.prop?.due;
+    if (due !== undefined) {
+      c.scheduledAt = Number(due);
+      persist(c);
+    } else if (heldBefore !== undefined) {
+      // He cleared HIS OWN day (or erased the step). The agent's reading of the customer's words is
+      // not his to delete by accident, so the appointment is cleared only when it was his. Its own
+      // statement: upsertContact COALESCEs scheduled_at, so `persist` alone cannot erase it.
+      c.scheduledAt = undefined;
+      db.clearSchedule(phone);
+    }
+  }
   if (nextTags) {
     c.tags = nextTags;
     persist(c);   // bump last_event_at; `props` is NOT in upsertContact and never will be
@@ -425,6 +448,15 @@ export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: 
   logEvent(`outcome:${outcome}`, phone, reason ?? "");
 }
 
+/** M3 — THE APPOINTMENT HAS ONE HOME: `c.scheduledAt`. `props.nextStep.due` is not a second store;
+ *  it is the PROVENANCE of that same moment, written by the same door in the same call, which is
+ *  what lets the portal derive «مؤكَّد» instead of storing it twice. This reads back the day a human
+ *  typed, so BR-1 can govern the appointment exactly as it governs every other value. */
+function humanDue(c: Contact): number | undefined {
+  const p = c.props.nextStep;
+  return p && p.source === "human" && p.due !== undefined ? Number(p.due) : undefined;
+}
+
 /**
  * Record a time the CUSTOMER stated, in their own words.
  *
@@ -436,7 +468,13 @@ export function setOutcome(phone: string, outcome: Contact["outcome"], reason?: 
 export function setSchedule(phone: string, said: string) {
   const c = getContact(phone);
   c.scheduledSaid = said;
-  c.scheduledAt = readTime(said);
+  // BR-1 on the appointment itself: the customer's WORDS are always a fact and always stored, but a
+  // machine reading of them never overwrites a day a human already typed. Without this, one new
+  // sentence from the customer would silently replace the operator's confirmed date with a guess —
+  // and the disagreement is not lost: the nextStep write that follows this call is refused by
+  // decideProp and kept as `contested`, which the record renders as «قراءة مختلفة من المساعد».
+  const held = humanDue(c);
+  c.scheduledAt = held !== undefined ? held : readTime(said);
   c.outcome = "scheduled";
   c.outcomeEvidence = said;
   persist(c);

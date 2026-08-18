@@ -34,6 +34,12 @@ if (js) {
   assert("emitted client script parses", parsed, err);
 }
 
+const { CAMPAIGNS_CRM_JS } = await import("../dist/campaigns-crm.js");
+const crmBlock = CAMPAIGNS_CRM_JS;
+assert("campaigns-crm module is non-empty", crmBlock.length > 0);
+assert("the emitted script contains the module verbatim", js.includes(CAMPAIGNS_CRM_JS),
+  "interpolation altered or truncated the module");
+
 // ---- 2. the seam is wired: views, guard, styles ----
 assert("vKmonCrm defined", /function vKmonCrm\s*\(/.test(js));
 assert("vKmonDetailCrm defined", /function vKmonDetailCrm\s*\(/.test(js));
@@ -46,18 +52,34 @@ assert("bulk bar styles injected", DASHBOARD_HTML.includes(".bulkbar"));
 // The row chip and the board column must never disagree, so campPerfState is the only place the
 // three labels may be written. A label appearing outside it is the drift this asserts against.
 assert("campPerfState defined", /function campPerfState\s*\(/.test(js));
-const perfBody = (js.match(/function campPerfState[\s\S]*?\n\}/) || [""])[0];
-for (const label of ["تجريبية", "فيها ردود", "بلا ردود بعد"]) {
-  assert("campPerfState owns label " + label, perfBody.includes(label));
+// The labels moved OUT of campPerfState's body into a single CRM_PERF table, which is stronger:
+// the kanban seeds its columns from the same table, so a rename cannot desync board and chip.
+const perfTable = (js.match(/var CRM_PERF = \[[\s\S]*?\n\];/) || [""])[0];
+assert("CRM_PERF table defined", perfTable.length > 0);
+for (const label of ["تجريبية", "بلا جمهور", "لم تُرسل بعد", "فيها ردود", "بلا ردود بعد"]) {
+  assert("CRM_PERF owns label " + label, perfTable.includes(label));
 }
+assert("campPerfState selects from the table rather than writing labels",
+  !/label:\s*"/.test((js.match(/function campPerfState[\s\S]*?\n\}/) || [""])[0]));
 
-// ---- 4. the retired lifecycle claim is gone from the campaigns surface ----
-// One occurrence is legitimate and expected: the service-readiness card («N من M مكتملة»), which is
-// a count of completed KB docs, not a campaign state. Assert the count AND that the survivor is it.
-const completedHits = [...js.matchAll(/مكتملة/g)].map((x) => js.slice(Math.max(0, x.index - 80), x.index + 12));
-assert("retired campaign label «مكتملة» does not survive on a campaign surface",
-  completedHits.length === 1 && /جاهزية الخدمة|rows\.length/.test(completedHits[0]),
-  completedHits.length + " occurrence(s): " + JSON.stringify(completedHits));
+// ---- 4. the retired lifecycle claim is gone from the CAMPAIGN surface ----
+// Scoped, not counted. The first version asserted «مكتملة» appeared exactly ONCE in the whole
+// script and that the survivor was the service-readiness card — which assumed I could enumerate
+// every future legitimate use of a common Arabic word. It went red the moment another module
+// shipped «الحقول الأساسية مكتملة» on the contact record, a correct use. What actually matters is
+// that no CAMPAIGN state label says it, so that is what is measured: the campaigns-crm module and
+// the campaign row/chip path in dashboard.ts.
+const campaignSurfaces = crmBlock + "\n" + (js.match(/function vKmon\b[\s\S]*?\n\}/) || [""])[0]
+  + "\n" + (js.match(/function vKmonDetail\b[\s\S]*?\n\}/) || [""])[0];
+const retiredOnCampaign = [...campaignSurfaces.matchAll(/مكتملة/g)];
+assert("the retired lifecycle label «مكتملة» appears on no campaign surface",
+  retiredOnCampaign.length === 0,
+  retiredOnCampaign.length + " occurrence(s) inside campaigns-crm / vKmon / vKmonDetail");
+// and campPerfState remains the only emitter of the three campaign state labels
+assert("campaign state labels have exactly one source",
+  (crmBlock.match(/"فيها ردود"/g) || []).length === 1 &&
+  (crmBlock.match(/"بلا ردود بعد"/g) || []).length === 1,
+  "a state label is written outside the CRM_PERF table");
 
 // ---- 5. no invented denominator ----
 // The zero-target rate must be unknown, not 0%. Both the old and new paths are asserted.
@@ -72,11 +94,6 @@ assert("crmRate returns null on a zero denominator", /function crmRate\([^)]*\)\
 // placed one line BELOW the end marker (exactly where the next handler naturally lands), and a
 // sendBeacon INSIDE the block. Importing the source removes the boundary entirely, and asserting
 // the emitted script still contains it verbatim proves the interpolation landed whole.
-const { CAMPAIGNS_CRM_JS } = await import("../dist/campaigns-crm.js");
-const crmBlock = CAMPAIGNS_CRM_JS;
-assert("campaigns-crm module is non-empty", crmBlock.length > 0);
-assert("the emitted script contains the module verbatim", js.includes(CAMPAIGNS_CRM_JS),
-  "interpolation altered or truncated the module");
 const fetches = [...crmBlock.matchAll(/fetch\(\s*("[^"]*"|'[^']*')/g)].map((x) => x[1].replace(/['"]/g, ""));
 assert("campaigns-crm calls only the reclassify endpoint",
   fetches.every((u) => u === "/admin/campaign/test"),

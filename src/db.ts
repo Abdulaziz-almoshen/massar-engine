@@ -201,6 +201,15 @@ export function upsertContact(c: {
   );
 }
 
+/** Clear a contact's appointment — the operator removing the day HE typed.
+ *  `upsertContact` COALESCEs `scheduled_at` on purpose (a later turn that carries no time must not
+ *  erase one the customer stated), so a deliberate clear needs its own statement or the day comes
+ *  back on the next redeploy. Its own call, never `persist` + this together: both are
+ *  fire-and-forget on a pool, so ordering between them is not guaranteed. */
+export function clearSchedule(phone: string): void {
+  fire(`UPDATE contacts SET scheduled_at = NULL WHERE phone = $1`, [phone]);
+}
+
 export function insertMessage(phone: string, role: string, text: string, ts: number): void {
   fire(`INSERT INTO messages (phone, role, text, ts) VALUES ($1,$2,$3,$4)`, [phone, role, text, ts]);
 }

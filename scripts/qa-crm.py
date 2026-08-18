@@ -246,6 +246,25 @@ SELECTION_LEAKS = [
         crmSetView('list');
         return bad.join('; ');
      }"""),
+    # The suite had NO wide-viewport row assertion, which is why a duplicated-label regression
+    # reached the default desktop view. s1-phone-row runs only at 375 and asserts the labels are
+    # PRESENT, so it is structurally silent about 1440.
+    ("s1-wide-row", "#kmon", """() => {
+        campaigns = window.__qaFixture('default'); render(false);
+        var hdr = document.querySelector('.crow.thead-wide'), row = document.querySelector('.krow.crow');
+        if (!hdr || !row) return 'wide header or row missing';
+        var hn = getComputedStyle(hdr).gridTemplateColumns.split(' ').length;
+        var rn = getComputedStyle(row).gridTemplateColumns.split(' ').length;
+        if (hn !== 9 || rn !== 9) return 'wide grid arity header=' + hn + ' row=' + rn + ', expected 9/9';
+        var bad = [];
+        [].slice.call(row.querySelectorAll('.c-num')).forEach(function (c) {
+          var t = c.innerText.trim();
+          if (/[\u0621-\u064A]/.test(t)) bad.push('numeric cell carries label text: «' + t + '»');
+          var lbl = c.querySelector('.lbl-ph');
+          if (lbl && getComputedStyle(lbl).display !== 'none') bad.push('.lbl-ph is visible on the wide layout');
+        });
+        return bad.length ? bad.slice(0, 2).join('; ') : '';
+     }"""),
     ("leak-navigate", "#kmon/1", """() => {
         campaigns = window.__qaFixture('default'); render(false);
         crmToggleD('96650000000010'); crmToggleD('96650000000011');

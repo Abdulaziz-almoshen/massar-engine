@@ -333,16 +333,43 @@ const fmtN = (n) => String(n).replace(/[0-9]/g, (x) => "٠١٢٣٤٥٦٧٨٩"[+x
 const fmtD = (t) => (t ? "١٢ أغسطس" : "—");
 
 const panelSrc = cut("const OPERATOR = ", "\nfunction vCustomer(ph) {");
-const postSrc = cut("async function propPost(key, value, keepOpen) {", "\nwindow.propOpen =");
+// The region starts at PROP_AUDIT, not at propPost: the carry-forward table and propCarry ARE the
+// M2 fix, and a region that began one line later would run the fix's caller without the fix.
+const postSrc = cut("const PROP_AUDIT = [", "\nwindow.propOpen =");
 const outSrc = cut("window.setOutcome = async (btn) => {", "\nwindow.refreshInsights =");
 const saveSrc = cut("window.propSave = async () => {", "\n// أكّد — one tap");
+const confirmSrc = cut("window.propConfirm = async (btn) => {", "\n// Clearing the date must be possible");
+const apptSrc = cut("function appt(c) {", "// --- end appointment");
+const morningSrc = cut("function vMorningList() {", "\nfunction vCustomers() {");
+// THE ONE READER, executed. appt() and fmtDay() are what M3 reconciles the appointment to, so the
+// three surfaces below are rendered against the REAL functions, not against a stub of them.
+const A = apptSrc ? new Function("return (" + "function () { " + apptSrc + " return { appt: appt, fmtDay: fmtDay }; }" + ")")()() : null;
+if (A) {
+  const DAYMS = 1_763_000_000_000;
+  check("M9 the shipped fmtDay emits a DAY, never a clock — 09:00 is dayToMs's sort key, not a fact",
+    A.fmtDay(DAYMS).indexOf(":"), -1);
+  check("M9 …and it is not empty (control)", A.fmtDay(DAYMS).length > 3, true);
+  const withHuman = { scheduledAt: DAYMS, props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DAYMS } } };
+  check("M9 a day a human typed reads as CONFIRMED, signed",
+    [A.appt(withHuman).confirmed, A.appt(withHuman).by, A.appt(withHuman).at], [true, "عبدالعزيز", DAYMS]);
+  check("M9 …the same day with the agent's signature does NOT",
+    A.appt({ scheduledAt: DAYMS, props: { nextStep: { value: "زيارة", source: "agent", by: "agent:x", ts: 1, due: DAYMS } } }).confirmed, false);
+  // The safety catch. If the two representations ever drifted, claiming a human confirmed a moment
+  // he did not is the one error this panel exists to prevent — so drift reads as UNCONFIRMED.
+  check("M9 …and a human day that DISAGREES with the stored appointment claims nothing",
+    A.appt({ scheduledAt: DAYMS, props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DAYMS + 86400e3 } } }).confirmed, false);
+  check("M9 …no appointment at all is null, never a zero rendered as a date", A.appt({ props: {} }), null);
+}
 if (panelSrc && postSrc && outSrc && saveSrc) {
+  // fmtT is deliberately a DIFFERENT string from fmtD here: M1's constraint is that a human's day
+  // renders WITHOUT the 09:00 dayToMs stores, and with one stub for both that would be unobservable.
+  const fmtTime = () => "٠٩:٠٠";
   const panel = (d) => new Function("ctx", `
-    const { esc, fmtN, fmtD, fmtT } = ctx;
+    const { esc, fmtN, fmtD, fmtT, appt, fmtDay } = ctx;
     let profileData = ctx.profileData, propEdit = null, propFlash = "";
     ${panelSrc}
-    return { vFactsPanel, interestPairs, propDraft, interestWire, interestUnread, propEditorHtml, isoDay, dayToMs };
-  `)({ esc, fmtN, fmtD, fmtT: fmtD, profileData: d });
+    return { vFactsPanel, interestPairs, propDraft, interestWire, interestUnread, propEditorHtml, isoDay, dayToMs, interestLatest };
+  `)({ esc, fmtN, fmtD, fmtT: fmtTime, appt: A && A.appt, fmtDay: A && A.fmtDay, profileData: d });
   const api = panel(null);
 
   // M1a — SYMMETRY. propDraft's output must parse back to the pairs it was drawn from.
@@ -381,12 +408,15 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   // M2 — AC-7: the tag set that ships is the one the operator typed.
   let sent = null;
   let dueVal = null;                      // null = no date input on screen; "" = present but empty
-  const post = new Function("ctx", `
+  // `setEdit` models the ONE thing that may change a stored value: an open editor. propPost nulls
+  // propEdit on every successful save (the editor closes), so a rig that set it once would silently
+  // test the closed-editor path from the second call onward.
+  const rig = new Function("ctx", `
     const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
     let propEdit = null, propFlash = "";
     const profileData = ctx.profileData;
     ${postSrc}
-    return propPost;
+    return { post: propPost, setEdit: (e) => { propEdit = e; } };
   `)({
     interestPairs: api.interestPairs, interestUnread: api.interestUnread, interestWire: api.interestWire, OPERATOR: "عبدالعزيز",
     profilePhone: P, TOKEN: "gate", fmtN, PROP_MAX: { productInterest: 800 },
@@ -399,6 +429,8 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     document: { getElementById: (id) => (id === "propdue" && dueVal !== null ? { value: dueVal } : null) },
     dayToMs: api.dayToMs,
   });
+  // Every call below opens the editor for the key it saves, which is what propSave does.
+  const post = async (k, v, keep) => { rig.setEdit({ key: k, val: String(v), err: "" }); return rig.post(k, v, keep); };
   await post("productInterest", "تقويم الأسنان: مهتم", true);
   check("a correction ships the TYPED set, never the unchanged c.tags",
     [sent.tags, sent.props.productInterest],
@@ -577,7 +609,212 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     formatInterest(PAIRSETS[2]));
   check("M7 …the panel READS what the server WRITES, back to the same pairs",
     api.interestPairs(formatInterest(PAIRSETS[3])), PAIRSETS[3]);
+
+  // M8 — «أكّد» MUST NOT NARROW THE VALUE IT CONFIRMS. (CPO round-33 M2.)
+  // The shipped propConfirm is executed against the shipped propPost with getElementById returning
+  // null for EVERYTHING — which is what a confirm IS, because a confirm opens no editor. Before the
+  // fix the request body was {"props":{"nextStep":"زيارة الفرع"}}: the day the operator was
+  // confirming was deleted BY the act of confirming it, and the product's most valuable action was
+  // its lossiest. Measured request bodies, not a source grep.
+  const DUE = 1_763_000_000_000;
+  let cBody = null;
+  const confirmRig = (props) => new Function("ctx", `
+    const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
+    let propEdit = ctx.propEdit || null, propFlash = "";
+    const profileData = ctx.profileData;
+    ${postSrc}
+    ${confirmSrc.replace("window.propConfirm =", "const propConfirm =")}
+    return propConfirm;
+  `)({
+    interestPairs: api.interestPairs, interestUnread: api.interestUnread, interestWire: api.interestWire,
+    OPERATOR: "عبدالعزيز", profilePhone: P, TOKEN: "gate", fmtN, PROP_MAX: { nextStep: 120 },
+    profileData: doc(props), propEdit: null,
+    fetch: async (_u, o) => { cBody = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ ok: true }) }; },
+    alertBar: () => {}, refresh: async () => {}, render: () => {}, setTimeout: () => {},
+    // A CONFIRM OPENS NO EDITOR. Every control is off screen, so every getElementById returns null —
+    // the exact browser state the old code read the date out of.
+    document: { getElementById: () => null },
+    dayToMs: api.dayToMs,
+  });
+  const AGENT_DATED = { nextStep: { value: "زيارة الفرع الرئيسي", source: "agent", by: "agent:record_schedule", ts: 1, due: DUE } };
+  cBody = null;
+  await confirmRig(AGENT_DATED)({ dataset: { k: "nextStep" } });
+  check("M8 «أكّد» ships the DAY it is confirming, not a bare string that drops it",
+    [typeof cBody.props.nextStep, cBody.props.nextStep.value, cBody.props.nextStep.due],
+    ["object", "زيارة الفرع الرئيسي", DUE]);
+  // THE GENERIC PROOF. A fix written as `key === "nextStep"` passes the assertion above and fails
+  // this one: the seventh property added next quarter must be preserved with no edit to the panel.
+  cBody = null;
+  await confirmRig({ nextStep: { value: "زيارة", source: "agent", by: "agent:x", ts: 1, due: DUE, owner: "قسم الأسنان" } })({ dataset: { k: "nextStep" } });
+  check("M8 …and a field this panel has never heard of survives the confirm too (the seventh property)",
+    [cBody.props.nextStep.due, cBody.props.nextStep.owner], [DUE, "قسم الأسنان"]);
+  check("M8 …while the LEDGER's own provenance is never echoed back as if the panel owned it",
+    ["source", "by", "ts", "prior", "contested"].filter((f) => cBody.props.nextStep[f] !== undefined), []);
+  cBody = null;
+  await confirmRig({ nextStep: { value: "زيارة", source: "agent", by: "agent:x", ts: 1 } })({ dataset: { k: "nextStep" } });
+  check("M8 …a DATELESS reading still confirms as a bare string — no date is invented (control)",
+    typeof cBody.props.nextStep, "string");
+  cBody = null;
+  await confirmRig({ nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE,
+    contested: { value: "اتصال", by: "agent:x", ts: 2 } } })({ dataset: { k: "nextStep", use: "c" } });
+  check("M8 «اعتمدها» adopts the contested TEXT and still keeps the day on the record",
+    [cBody.props.nextStep.value, cBody.props.nextStep.due], ["اتصال", DUE]);
+
+
+  // M13 — «أكّد» ON A READING WITH NO BACKING PROPERTY MUST NOT BE A DEAD BUTTON.
+  // propState renders a reading from c.tags or c.scheduledSaid alone (a hydrated contact), and
+  // propRow puts «أكّد» beside it — but propConfirm opened with a bare early return, so the button
+  // was reachable and did NOTHING. A control that is drawn is a promise. It now confirms exactly the
+  // value on screen: the same tag reduction the row drew itself from, or the customer's own sentence.
+  let cAlert = null;
+  const rigTags = (contact) => new Function("ctx", `
+    const { interestPairs, interestUnread, interestWire, interestLatest, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
+    let propEdit = null, propFlash = "";
+    const profileData = ctx.profileData;
+    ${postSrc}
+    ${confirmSrc.replace("window.propConfirm =", "const propConfirm =")}
+    return propConfirm;
+  `)({
+    interestPairs: api.interestPairs, interestUnread: api.interestUnread, interestWire: api.interestWire,
+    interestLatest: api.interestLatest,
+    OPERATOR: "عبدالعزيز", profilePhone: P, TOKEN: "gate", fmtN, PROP_MAX: { nextStep: 120, productInterest: 800 },
+    profileData: { contact }, propEdit: null,
+    // The request body and the toast are captured SEPARATELY: alertBar also fires on SUCCESS, so
+    // sharing one variable let the success toast overwrite the very body under test.
+    fetch: async (_u, o) => { cBody = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ ok: true }) }; },
+    alertBar: (m) => { cAlert = m; }, refresh: async () => {}, render: () => {}, setTimeout: () => {},
+    document: { getElementById: () => null }, dayToMs: api.dayToMs,
+  });
+  cBody = null; cAlert = null;
+  await rigTags({ phone: P, props: {}, tags: [{ product: "أشعة الأسنان", level: "hot", ts: 2 }] })({ dataset: { k: "productInterest" } });
+  check("M13 «أكّد» on a tag-only reading confirms the tags on screen, it does not silently do nothing",
+    [cBody && cBody.props ? cBody.props.productInterest : null, cBody && cBody.tags ? cBody.tags.length : null],
+    [formatInterest([{ product: "أشعة الأسنان", level: "hot" }]), 1]);
+  cBody = null; cAlert = null;
+  await rigTags({ phone: P, props: {}, tags: [], scheduledSaid: "الأحد صباحًا" })({ dataset: { k: "nextStep" } });
+  check("M13 …and on a scheduledSaid-only reading it confirms the customer's own sentence",
+    cBody && cBody.props ? cBody.props.nextStep : null, "الأحد صباحًا");
+  cBody = null; cAlert = null;
+  await rigTags({ phone: P, props: {}, tags: [] })({ dataset: { k: "productInterest" } });
+  check("M13 …and with genuinely nothing to confirm it SAYS so rather than failing mutely, and writes nothing",
+    [cAlert, cBody], ["لا توجد قراءة لتأكيدها.", null]);
+
+  // M9 — THE HUMAN'S DAY IS RENDERED, AND ONLY THE DAY. (CPO round-33 M1.)
+  // Measured by rendering the shipped vFactsPanel: the row used to print the value and its
+  // signature and NOTHING about the date, while the same fixture with source:'agent' printed the
+  // machine's guess at the day — the guess visible, the confirmed fact invisible.
+  const nsRow = (d) => { const h = panel(d).vFactsPanel(d); return h.slice(h.indexOf("الخطوة التالية"), h.indexOf("ملاحظة")); };
+  const DAYTXT = A.fmtDay(DUE);
+  const humanDoc = { contact: { phone: P, tags: [], scheduledAt: DUE,
+    props: { nextStep: { value: "زيارة الفرع الرئيسي", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } },
+    insights: {}, propsWritable: true };
+  const humanRow = nsRow(humanDoc);
+  check("M9 a human's dated next step RENDERS its day", humanRow.includes(DAYTXT), true);
+  check("M9 …signed, so a row lifted out of context still says who recorded it",
+    humanRow.includes("سجّله عبدالعزيز"), true);
+  check("M9 …and NEVER the 09:00 nobody typed — a fabricated fact under a human signature",
+    humanRow.includes("٠٩:٠٠"), false);
+  check("M9 …nor «لم تُؤكَّد بعد» over an appointment a human confirmed",
+    humanRow.includes("لم تُؤكَّد بعد"), false);
+  const agentDoc = { contact: { phone: P, tags: [], scheduledAt: DUE,
+    props: { nextStep: { value: "زيارة الفرع الرئيسي", source: "agent", by: "agent:record_schedule", ts: 1, due: DUE } } },
+    insights: {}, propsWritable: true };
+  const agentRow = nsRow(agentDoc);
+  check("M9 the agent's reading keeps its existing treatment — the hour it parsed, and unconfirmed",
+    [agentRow.includes("٠٩:٠٠"), agentRow.includes("لم تُؤكَّد بعد"), agentRow.includes("قراءتنا")], [true, true, true]);
+  const noneRow = nsRow({ contact: { phone: P, tags: [], scheduledSaid: "الصباح", props: {} }, insights: {}, propsWritable: true });
+  check("M9 a phrase we could not read a date from says so, and invents nothing (control)",
+    [noneRow.includes("قراءتنا لم تُؤكَّد بعد."), noneRow.includes(DAYTXT)], [true, false]);
+
+  // M10 — قائمة الصباح LEARNS THE OPERATOR'S DAY. (CPO round-33 M3a.) The screen whose own source
+  // comment quotes the founder's three questions read c.scheduledAt alone, so the answer he typed
+  // to the third question never reached the list he works from in the morning.
+  const morning = (rows) => new Function("ctx", `
+    const { esc, fmtN, fmtT, fmtDay, appt } = ctx;
+    const cache = { contacts: ctx.rows }, showTest = true;
+    ${morningSrc}
+    return vMorningList();
+  `)({ esc, fmtN, fmtT: fmtTime, fmtDay: A.fmtDay, appt: A.appt, rows: rows });
+  const mHuman = morning([{ phone: P, waName: "مجمع النور", outcome: "scheduled", scheduledSaid: "الأحد الصباح",
+    scheduledAt: DUE, props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }]);
+  check("M10 a day the operator confirmed reaches قائمة الصباح", [mHuman.includes(DAYTXT), mHuman.includes("مؤكَّد")], [true, true]);
+  check("M10 …and the list stops calling it unconfirmed", mHuman.includes("لم تُؤكَّد بعد"), false);
+  check("M10 …while the customer's own words still lead the row (control)", mHuman.includes("«الأحد الصباح»"), true);
+  const mAgent = morning([{ phone: P, waName: "مجمع النور", outcome: "scheduled", scheduledSaid: "الأحد الصباح",
+    scheduledAt: DUE, props: { nextStep: { value: "زيارة", source: "agent", by: "agent:x", ts: 1, due: DUE } } }]);
+  check("M10 an unconfirmed reading is still labelled as ours (control)",
+    [mAgent.includes("قراءتنا"), mAgent.includes("لم تُؤكَّد بعد"), mAgent.includes(DAYTXT)], [true, true, false]);
+  const mInterested = morning([{ phone: P, waName: "مجمع النور", outcome: "interested", scheduledAt: DUE,
+    props: { nextStep: { value: "زيارة", source: "human", by: "عبدالعزيز", ts: 1, due: DUE } } }]);
+  check("M10 …and a confirmed day answers «متى؟» outside موعد محدد too",
+    [mInterested.includes("موعد مؤكَّد"), mInterested.includes(DAYTXT)], [true, true]);
 }
+// --- (d) ONE APPOINTMENT, ONE PLACE ----------------------------------------
+// M3's structural half. M9/M10 above prove two surfaces render the confirmed day; this proves no
+// THIRD surface can go on reading the raw field behind their backs — which is how «مؤكَّد» reached
+// one screen and not the two others in the first place. The status strip is inside vCustomer (216
+// lines, not liftable), so it is pinned structurally with an inert-guard anchor.
+{
+  const i = H.indexOf("function appt(c) {"), j = H.indexOf("// --- end appointment");
+  if (i < 0 || j < 0) { console.log("FAIL [inert] the appointment reader is gone from the bundle"); failures++; }
+  else {
+    const outside = code(H.slice(0, i) + H.slice(j));
+    check("M11 c.scheduledAt is read in exactly ONE place in the shipped bundle — appt()",
+      (outside.match(/c\.scheduledAt/g) ?? []).length, 0);
+    check("M11 …and appt() is what the surfaces call instead",
+      (code(H).match(/appt\(c\)/g) ?? []).length >= 3, true);
+  }
+  const strip = cut('if (c.outcome === "scheduled" && c.scheduledSaid) {', "} else if (c.outcomeEvidence) {");
+  if (strip) {
+    // This line appended «لم تُؤكَّد بعد» unconditionally, so a meeting a human had confirmed 200px
+    // below read as unconfirmed forever.
+    check("M11 the status strip reads the ONE appointment", /appt\(c\)/.test(strip), true);
+    check("M11 …and «لم تُؤكَّد بعد» finally has a confirmed form beside it",
+      [strip.includes("مؤكَّد: "), strip.includes("لم تُؤكَّد بعد")], [true, true]);
+    check("M11 …and prints the DAY there too, never the 09:00", /fmtDay\(/.test(strip), true);
+  }
+}
+
+// M12 — BR-1 GOVERNS THE APPOINTMENT ITSELF. Executed against dist/tracker.js, no Postgres needed:
+// setSchedule mutates memory and persist() is a no-op with no DATABASE_URL. Without this, one new
+// sentence from the customer would replace the day the operator confirmed with a fresh guess — the
+// same class as M2, one layer down, and it would silently un-confirm the record.
+{
+  const SP = "966500000903";
+  const HUMANDAY = NOW + 6 * 24 * 3600e3;
+  const c1 = tracker.getContact(SP, "gate");
+  // props is Readonly to TypeScript only; the gate reaches past it deliberately to build the state
+  // an applied human write would leave, which is not observable without a database.
+  c1.props.nextStep = { value: "زيارة الفرع", source: "human", by: "عبدالعزيز", ts: NOW, due: HUMANDAY };
+  tracker.setSchedule(SP, "بكرة صباحًا");
+  // «بكرة صباحًا» is a phrase readTime CAN read, so there is a real competing reading to defeat.
+  check("M12 a customer's new phrase never overwrites the day a human typed",
+    [tracker.findContact(SP).scheduledAt, tracker.findContact(SP).scheduledSaid], [HUMANDAY, "بكرة صباحًا"]);
+  const SP2 = "966500000904";
+  tracker.getContact(SP2, "gate");
+  tracker.setSchedule(SP2, "بكرة صباحًا");
+  const read2 = tracker.findContact(SP2).scheduledAt;
+  check("M12 …with no human day, our reading of the phrase still lands (control)",
+    [typeof read2, read2 > Date.now()], ["number", true]);
+}
+// The write-through itself needs Postgres to observe, so it is pinned structurally — with the
+// clearing half named, because upsertContact COALESCEs scheduled_at and a clear that used persist()
+// alone would come back on the next redeploy.
+{
+  const wp = src.tracker.slice(src.tracker.indexOf("export async function writeProp("),
+    src.tracker.indexOf("export function humanFactsBlock("));
+  check("M12 writeProp writes the appointment a human typed onto the contact the portal reads",
+    /k === "nextStep" && source === "human"/.test(wp) && /c\.scheduledAt = Number\(due\)/.test(wp), true);
+  check("M12 …and an erase clears it only when the standing appointment was HIS",
+    /heldBefore !== undefined/.test(wp) && /db\.clearSchedule\(phone\)/.test(wp), true);
+  check("M12 …with its own statement, because upsertContact COALESCEs scheduled_at",
+    /export function clearSchedule/.test(src.db) && /SET scheduled_at = NULL/.test(src.db), true);
+  const ss = src.tracker.slice(src.tracker.indexOf("export function setSchedule("),
+    src.tracker.indexOf("/** Best-effort reading of an Arabic time phrase"));
+  check("M12 …and setSchedule asks humanDue before it writes a reading over anything",
+    /humanDue\(c\)/.test(code(ss)), true);
+}
+
 // The route must keep TELLING the panel: the honest message is only possible if the field arrives.
 if (propsRoute !== null) {
   const outRoute = block(src.index, 'app.post("/admin/contact/outcome"', "\n});");

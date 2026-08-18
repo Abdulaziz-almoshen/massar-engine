@@ -22,11 +22,13 @@ export const DASHBOARD_HTML = `<!doctype html>
 <title>مسار — نظام إدارة المبيعات</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;450;500;600;700&family=Cairo:wght@700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
-  body { font-family: 'Cairo', 'IBM Plex Sans Arabic', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #F4F6FA; color: #101828; font-size: 14px; }
+  /* IBM Plex Sans Arabic ships a Text 450 weight — the analogue of Frappe's regular 420, which
+     Cairo has no equivalent for. Cairo survives in the sidebar wordmark only (DESIGN.md §4). */
+  body { font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
   .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
@@ -67,96 +69,96 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* ===== main ===== */
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-  header { flex: none; height: 76px; background: #fff; border-bottom: 1px solid #EAECF0; display: flex; align-items: center; gap: 18px; padding: 0 32px; }
+  header { flex: none; height: 76px; background: #fff; border-bottom: 1px solid #EDEDED; display: flex; align-items: center; gap: 18px; padding: 0 32px; }
   header .tt { flex: 1; min-width: 0; }
-  header .t { font-size: 21px; font-weight: 700; color: #101828; letter-spacing: -.2px; }
-  header .s { font-size: 12.5px; color: #667085; margin-top: 3px; }
+  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: -.2px; }
+  header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
   .livechip { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; color: #2E7D77; background: #DCF1EF; border-radius: 999px; padding: 7px 14px; }
   .livechip .d { width: 7px; height: 7px; border-radius: 999px; background: #3FB6B0; }
   .body { flex: 1; overflow-y: auto; padding: 30px 32px 56px; }
 
   /* ===== components (reference-grade) ===== */
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .kpi { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
   .kpi .ico { width: 40px; height: 40px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #E9F7F6; color: #1F7A73; }
-  .kpi .k { font-size: 12.5px; color: #667085; font-weight: 600; }
-  .kpi .v { font-size: 30px; font-weight: 700; color: #101828; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .kpi .k { font-size: 12.5px; color: #7C7C7C; font-weight: 600; }
+  .kpi .v { font-size: 30px; font-weight: 700; color: #171717; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
   .kpi .dl { font-size: 11.5px; font-weight: 700; }
-  .kpi .v small { font-size: 12px; font-weight: 500; color: #98a2b3; }
-  .card { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #475467; letter-spacing: .1px; }
+  .kpi .v small { font-size: 12px; font-weight: 500; color: #999999; }
+  .card { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; padding: 24px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: .1px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 4px 12px; white-space: nowrap; border: 1px solid transparent; }
-  .c-grey { background: #F2F4F7; color: #475467; border-color: #E4E7EC; } .c-blue { background: #EFF4FB; color: #2F5F94; border-color: #D6E2F1; }
+  .c-grey { background: #F3F3F3; color: #525252; border-color: #E4E7EC; } .c-blue { background: #EFF4FB; color: #2F5F94; border-color: #D6E2F1; }
   .c-teal { background: #E9F7F6; color: #2E7D77; border-color: #C4E8E5; } .c-ok { background: #ECFDF3; color: #027A48; border-color: #C7EED8; }
   .c-warn { background: #FFFAEB; color: #B54708; border-color: #F5E3B7; } .c-bad { background: #FEF3F2; color: #B42318; border-color: #F7D4D1; }
   /* An assistant reading is not a confirmed tag. Same hue so the level still reads at a
      glance, but hollow with a dashed edge so it can never be mistaken for a recorded fact. */
   .c-read { background: transparent; border-style: dashed; font-weight: 600; }
   .c-read .rd { font-weight: 700; opacity: .72; font-size: 10px; }
-  .ptab { font-family: inherit; font-size: 13px; font-weight: 700; border: 1px solid #E4E7EC; background: #fff; color: #475467; border-radius: 999px; padding: 10px 20px; cursor: pointer; }
-  .ptab.on { background: #101828; color: #fff; border-color: #101828; }
-  .inp { font-family: inherit; font-size: 13px; color: #101828; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
+  .ptab { font-family: inherit; font-size: 13px; font-weight: 700; border: 1px solid #E4E7EC; background: #fff; color: #525252; border-radius: 999px; padding: 10px 20px; cursor: pointer; }
+  .ptab.on { background: #171717; color: #fff; border-color: #171717; }
+  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
   .inp:focus { border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.15); }
   .fun { margin-bottom: 13px; }
   .fun .r1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-  .fun .l { font-size: 12.5px; font-weight: 600; color: #101828; }
-  .fun .m { font-size: 11.5px; color: #667085; font-variant-numeric: tabular-nums; }
-  .fun .track { height: 9px; background: #F2F4F7; border-radius: 999px; overflow: hidden; }
+  .fun .l { font-size: 12.5px; font-weight: 600; color: #171717; }
+  .fun .m { font-size: 11.5px; color: #7C7C7C; font-variant-numeric: tabular-nums; }
+  .fun .track { height: 9px; background: #F3F3F3; border-radius: 999px; overflow: hidden; }
   .fun .fill { height: 100%; border-radius: 999px; min-width: 3%; }
   .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 90px 20px; text-align: center; }
   .empty .ic { width: 64px; height: 64px; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.08); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #D0D5DD; border-radius: 7px; }
-  .empty .t { font-size: 17px; font-weight: 700; color: #101828; }
-  .empty .s { font-size: 13px; color: #667085; margin-top: 6px; max-width: 380px; line-height: 1.8; }
+  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #E2E2E2; border-radius: 7px; }
+  .empty .t { font-size: 17px; font-weight: 700; color: #171717; }
+  .empty .s { font-size: 13px; color: #7C7C7C; margin-top: 6px; max-width: 380px; line-height: 1.8; }
 
   /* tables */
-  .tblwrap { background: #fff; border: 1px solid #EAECF0; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #EAECF0; }
+  .tblwrap { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #EDEDED; }
   .cntpill { font-size: 12px; font-weight: 700; color: #1F7A73; background: #E9F7F6; border-radius: 999px; padding: 4px 12px; }
   /* Sparse-state rule (portal-wide): a screen with few rows must read as DELIBERATE, not
      half-loaded. One line, directly under the controls, that says what is here and where the
      rest is. Real data is still thin on most screens, so this recurs — it lives once. */
-  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #475467; }
-  .sparse b { color: #101828; font-weight: 700; }
+  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
+  .sparse b { color: #171717; font-weight: 700; }
   .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
-  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid #EAECF0; background: #F9FAFB; font-size: 11.5px; color: #667085; }
-  .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EAECF0; background: #fff; color: #475467; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-  .pgbtn.on { background: #101828; color: #fff; border-color: #101828; }
-  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #98A2B3; font-size: 17px; cursor: pointer; line-height: 1; }
-  .kebab:hover { background: #F2F4F7; color: #475467; }
-  .swt { width: 38px; height: 22px; border-radius: 999px; background: #EAECF0; position: relative; flex: none; transition: background .18s ease; }
+  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 22px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 11.5px; color: #7C7C7C; }
+  .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EDEDED; background: #fff; color: #525252; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .pgbtn.on { background: #171717; color: #fff; border-color: #171717; }
+  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #999999; font-size: 17px; cursor: pointer; line-height: 1; }
+  .kebab:hover { background: #F3F3F3; color: #525252; }
+  .swt { width: 38px; height: 22px; border-radius: 999px; background: #EDEDED; position: relative; flex: none; transition: background .18s ease; }
   .swt.on { background: #1F7A73; }
   .swt i { position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 999px; background: #fff; transition: inset-inline-start .18s ease; box-shadow: 0 1px 2px rgba(16,24,40,.2); }
   .swt.on i { inset-inline-start: 19px; }
   .thead, .trow { display: grid; grid-template-columns: 1.6fr 1.6fr 1.5fr 1.4fr 0.7fr 0.8fr; gap: 12px; padding: 15px 22px; align-items: center; }
-  .thead { background: #F9FAFB; border-bottom: 1px solid #EAECF0; font-size: 11.5px; font-weight: 700; color: #667085; }
-  .trow { border-bottom: 1px solid #F2F4F7; cursor: pointer; min-height: 62px; }
-  .trow:hover { background: #F9FAFB; }
+  .thead { background: #F8F8F8; border-bottom: 1px solid #EDEDED; font-size: 11.5px; font-weight: 700; color: #7C7C7C; }
+  .trow { border-bottom: 1px solid #F3F3F3; cursor: pointer; min-height: 62px; }
+  .trow:hover { background: #F8F8F8; }
   .trow:last-child { border-bottom: none; }
   .cust { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EFF4FB; display: flex; align-items: center; justify-content: center; color: #2F5F94; font-weight: 700; font-size: 15px; }
-  .cust .nm { font-size: 13.5px; font-weight: 700; color: #101828; }
-  .cust .ph { font-size: 11px; color: #98a2b3; direction: ltr; text-align: right; }
-  .lastm { font-size: 12px; color: #667085; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tm { font-size: 11px; color: #98a2b3; font-variant-numeric: tabular-nums; }
+  .cust .nm { font-size: 13.5px; font-weight: 700; color: #171717; }
+  .cust .ph { font-size: 11px; color: #999999; direction: ltr; text-align: right; }
+  .lastm { font-size: 12px; color: #7C7C7C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tm { font-size: 11px; color: #999999; font-variant-numeric: tabular-nums; }
   .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 18px; }
   .statc { background: #fff; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(16,24,40,.06); }
-  .statc .l { font-size: 11.5px; color: #667085; margin-bottom: 8px; font-weight: 600; }
-  .statc .v { font-size: 24px; font-weight: 700; color: #101828; line-height: 1; font-variant-numeric: tabular-nums; }
+  .statc .l { font-size: 11.5px; color: #7C7C7C; margin-bottom: 8px; font-weight: 600; }
+  .statc .v { font-size: 24px; font-weight: 700; color: #171717; line-height: 1; font-variant-numeric: tabular-nums; }
   .statc .p { font-size: 10.5px; color: #2E7D77; font-weight: 700; margin-top: 6px; }
-  .statc .mb { height: 4px; background: #F2F4F7; border-radius: 999px; overflow: hidden; margin-top: 9px; }
+  .statc .mb { height: 4px; background: #F3F3F3; border-radius: 999px; overflow: hidden; margin-top: 9px; }
   .statc .mb i { display: block; height: 100%; border-radius: 999px; }
   .backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.4); z-index: 69; }
   .convo { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(430px, 94vw); background: #fff; z-index: 70; display: flex; flex-direction: column; box-shadow: 12px 0 32px rgba(16,24,40,.18); }
-  .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid #EAECF0; }
+  .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid #EDEDED; }
   .convo .hd .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EFF4FB; color: #2F5F94; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
   .convo .msgs { flex: 1; overflow-y: auto; background: #E5DDD4; padding: 16px; }
-  .convo .ft { flex: none; padding: 13px 18px; border-top: 1px solid #EAECF0; }
+  .convo .ft { flex: none; padding: 13px 18px; border-top: 1px solid #EDEDED; }
   @media (prefers-reduced-motion: no-preference) { .convo { animation: slideIn .18s ease; } @keyframes slideIn { from { transform: translateX(-30px); opacity: .6; } to { transform: none; opacity: 1; } } }
-  .bub { max-width: 76%; border-radius: 12px; padding: 9px 13px; font-size: 12.5px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #101828; }
+  .bub { max-width: 76%; border-radius: 12px; padding: 9px 13px; font-size: 12.5px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #171717; }
   .b-a { background: #DCF8C6; border-top-left-radius: 3px; margin-inline-start: auto; }
   .b-c { background: #fff; border-top-right-radius: 3px; margin-inline-end: auto; }
-  .b-s { background: rgba(255,255,255,.65); font-size: 11px; color: #475467; max-width: 100%; text-align: center; }
+  .b-s { background: rgba(255,255,255,.65); font-size: 11px; color: #525252; max-width: 100%; text-align: center; }
   .bt { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 4px; direction: ltr; }
 
   /* wizard */
@@ -164,42 +166,42 @@ export const DASHBOARD_HTML = `<!doctype html>
   .step .hd { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
   .step .num { width: 32px; height: 32px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: #2E8F89; color: #fff; }
   .step .num.done { background: #E9F7F6; color: #2E7D77; }
-  .step .ht { font-size: 15.5px; font-weight: 700; color: #101828; }
-  .step .hs { font-size: 12.5px; color: #667085; margin-top: 4px; }
+  .step .ht { font-size: 15.5px; font-weight: 700; color: #171717; }
+  .step .hs { font-size: 12.5px; color: #7C7C7C; margin-top: 4px; }
   .prods { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 14px; }
-  .prod { text-align: right; font-family: inherit; background: #fff; border: 1.5px solid #EAECF0; border-radius: 16px; padding: 18px; cursor: pointer; }
+  .prod { text-align: right; font-family: inherit; background: #fff; border: 1.5px solid #EDEDED; border-radius: 16px; padding: 18px; cursor: pointer; }
   .prod.on { background: #F6FCFB; border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
-  .prod .pn { font-size: 13.5px; font-weight: 700; color: #101828; margin-bottom: 12px; }
+  .prod .pn { font-size: 13.5px; font-weight: 700; color: #171717; margin-bottom: 12px; }
   .prod .sc { font-size: 21px; font-weight: 700; }
-  .prod .scl { font-size: 10.5px; color: #98a2b3; }
-  .prod .bar { height: 6px; background: #F2F4F7; border-radius: 999px; overflow: hidden; margin: 10px 0; }
+  .prod .scl { font-size: 10.5px; color: #999999; }
+  .prod .bar { height: 6px; background: #F3F3F3; border-radius: 999px; overflow: hidden; margin: 10px 0; }
   .prod .bar i { display: block; height: 100%; border-radius: 999px; }
   .wa-prev { background: #E5DDD4; border-radius: 16px; padding: 18px; max-width: 480px; }
-  .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12.5px; color: #101828; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+  .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12.5px; color: #171717; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
   .wa-prev .t { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 6px; }
   .btn { font-family: inherit; font-size: 13.5px; font-weight: 700; border: none; border-radius: 12px; padding: 12px 20px; cursor: pointer; }
   .btn-teal { color: #fff; background: #1F7A73; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
-  .btn-dark { color: #fff; background: #101828; }
-  .btn-ghost { color: #344054; background: #fff; border: 1px solid #D0D5DD; }
+  .btn-dark { color: #fff; background: #171717; }
+  .btn-ghost { color: #383838; background: #fff; border: 1px solid #E2E2E2; }
   .btn:hover { filter: brightness(1.04); }
-  .btn-dis { color: #98a2b3; background: #F2F4F7; cursor: not-allowed; }
+  .btn-dis { color: #999999; background: #F3F3F3; cursor: not-allowed; }
   .note { display: flex; align-items: center; gap: 9px; background: #FFFAEB; border: 1px solid #F5E3B7; border-radius: 12px; padding: 12px 16px; font-size: 12px; color: #B54708; font-weight: 600; margin-top: 14px; }
 
   /* kb */
-  .kbrow { display: flex; align-items: center; gap: 14px; padding: 17px 22px; border-bottom: 1px solid #F2F4F7; }
+  .kbrow { display: flex; align-items: center; gap: 14px; padding: 17px 22px; border-bottom: 1px solid #F3F3F3; }
   .kbrow:last-child { border-bottom: none; }
   .kbrow .dt { width: 9px; height: 9px; flex: none; border-radius: 999px; }
   .kbrow .ti { flex: 1; min-width: 0; }
-  .kbrow .t1 { font-size: 13.5px; font-weight: 700; color: #101828; }
-  .kbrow .t2 { font-size: 11.5px; color: #98a2b3; margin-top: 4px; }
-  .kbrow .ct { font-size: 11.5px; color: #98A2B3; }
+  .kbrow .t1 { font-size: 13.5px; font-weight: 700; color: #171717; }
+  .kbrow .t2 { font-size: 11.5px; color: #999999; margin-top: 4px; }
+  .kbrow .ct { font-size: 11.5px; color: #999999; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E4E7EC; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-  .ptitle h1 { margin: 0; font-size: 30px; font-weight: 700; color: #101828; letter-spacing: -.6px; line-height: 1.2; }
-  .ptitle p { margin: 6px 0 0; font-size: 13.5px; color: #667085; }
+  .ptitle h1 { margin: 0; font-size: 30px; font-weight: 700; color: #171717; letter-spacing: -.6px; line-height: 1.2; }
+  .ptitle p { margin: 6px 0 0; font-size: 13.5px; color: #7C7C7C; }
   .ptitle .acts { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
-  .sec { font-size: 14px; font-weight: 700; color: #475467; margin: 4px 0 14px; }
+  .sec { font-size: 14px; font-weight: 700; color: #525252; margin: 4px 0 14px; }
   /* motion */
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -212,8 +214,8 @@ export const DASHBOARD_HTML = `<!doctype html>
     .livechip .d { animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
   }
-  .skel { background: linear-gradient(90deg, #F2F4F7 25%, #EAECF0 37%, #F2F4F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
-  .sec .meta { font-size: 11.5px; font-weight: 600; color: #98a2b3; margin-inline-start: 8px; }
+  .skel { background: linear-gradient(90deg, #F3F3F3 25%, #EDEDED 37%, #F3F3F3 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
+  .sec .meta { font-size: 11.5px; font-weight: 600; color: #999999; margin-inline-start: 8px; }
   /* The launch bar is docked chrome; on a phone it must not eat the step it sits under. */
   @media (max-width: 430px) {
     .lbar { gap: 8px !important; padding: 12px 14px !important; }
@@ -224,7 +226,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      orphaned 210px strip with a floating vertical hairline. */
   @media (max-width: 900px) {
     .convled { width: 100% !important; border-inline-start: 0 !important; padding-inline-start: 0 !important;
-               border-top: 1px solid #F2F4F7; padding-top: 14px; }
+               border-top: 1px solid #F3F3F3; padding-top: 14px; }
   }
   /* ===== ملف العميل — the enrichable client record (cycle crm-record; DESIGN.md) =====
      The provenance mark is an 8px SHAPE in a fixed start-side column: shape carries the meaning,
@@ -235,27 +237,27 @@ export const DASHBOARD_HTML = `<!doctype html>
   .pm-h { background: #1F7A73; border-radius: 2px; }
   .pm-a { border: 1.5px dashed #B54708; border-radius: 999px; background: transparent; }
   .pm-i { background: #2F5F94; border-radius: 2px; opacity: .55; }
-  .pm-m { border: 1px dashed #D0D5DD; border-radius: 2px; background: transparent; }
-  .frow { display: flex; gap: 11px; padding: 13px 0; border-bottom: 1px solid #F2F4F7; position: relative; }
+  .pm-m { border: 1px dashed #E2E2E2; border-radius: 2px; background: transparent; }
+  .frow { display: flex; gap: 11px; padding: 13px 0; border-bottom: 1px solid #F3F3F3; position: relative; }
   .frow:last-child { border-bottom: none; }
   /* the only tinted rows in the panel, and lighter than any chip: a reading never outranks a fact */
   .frow.rdrow { background: #FFFDF7; margin: 0 -8px; padding: 13px 8px; border-radius: 10px; }
   .fbody { flex: 1; min-width: 0; }
-  .flab { font-size: 10.5px; font-weight: 700; color: #667085; letter-spacing: .02em; }
-  .fval { font-size: 13.5px; font-weight: 700; color: #101828; line-height: 1.75; margin-top: 3px; }
-  .fval-a { font-size: 13px; font-weight: 600; color: #475467; }
-  .fval-m { font-size: 12.5px; font-weight: 500; color: #98A2B3; margin-top: 3px; }
-  .sig { font-size: 10.5px; color: #98A2B3; margin-top: 4px; font-weight: 600; }
-  .quote { font-size: 11.5px; color: #667085; margin-top: 4px; line-height: 1.8; }
+  .flab { font-size: 10.5px; font-weight: 700; color: #7C7C7C; letter-spacing: .02em; }
+  .fval { font-size: 13.5px; font-weight: 700; color: #171717; line-height: 1.75; margin-top: 3px; }
+  .fval-a { font-size: 13px; font-weight: 600; color: #525252; }
+  .fval-m { font-size: 12.5px; font-weight: 500; color: #999999; margin-top: 3px; }
+  .sig { font-size: 10.5px; color: #999999; margin-top: 4px; font-weight: 600; }
+  .quote { font-size: 11.5px; color: #7C7C7C; margin-top: 4px; line-height: 1.8; }
   .ferr { font-size: 11.5px; color: #B42318; font-weight: 700; margin-top: 6px; line-height: 1.7; }
-  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #98A2B3; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
+  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #999999; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
-  .pen[disabled] { cursor: not-allowed; color: #D0D5DD; }
+  .pen[disabled] { cursor: not-allowed; color: #E2E2E2; }
   @media (hover: none) { .pen { opacity: 1; } }
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
   .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
   .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
-  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #98A2B3; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F2F4F7; }
+  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #999999; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F3F3F3; }
   .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
   .crec :focus-visible { outline: 2px solid #2E7D77; outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
@@ -497,7 +499,7 @@ function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 
 /** Arabic-Indic digits, matching every other number on these screens. */
 function fmtN(n) { return Number(n || 0).toLocaleString("ar-SA"); }
 function interestChips(c) {
-  if (!c) return '<span style="color:#D0D5DD;">—</span>';
+  if (!c) return '<span style="color:#E2E2E2;">—</span>';
   const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
@@ -518,9 +520,29 @@ function interestChips(c) {
   if (c.outcome === "handoff") return '<span class="chip c-warn">طلب تواصلًا</span>';
   if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
   if (c.outcome === "not_interested") return '<span class="chip c-grey">غير مهتم</span>';
-  return '<span style="color:#D0D5DD;">—</span>';
+  return '<span style="color:#E2E2E2;">—</span>';
 }
 function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
+// --- THE APPOINTMENT — one moment, one reader ------------------------------
+// M3. c.scheduledAt is the ONLY stored appointment moment: tracker.writeProp writes it whenever a
+// human types a day into الخطوة التالية, and tracker.setSchedule never overwrites a day a human
+// typed. props.nextStep carries the PROVENANCE of that same moment — so «مؤكَّد» is DERIVED, never
+// a second store. Every surface that speaks about the appointment (قائمة الصباح · شريط الفرز ·
+// ملف العميل) reads it here and nowhere else, so a fourth surface cannot invent a fourth opinion.
+function appt(c) {
+  const at = c && c.scheduledAt ? Number(c.scheduledAt) : 0;
+  if (!at) return null;
+  const p = ((c || {}).props || {}).nextStep;
+  // Equality is the safety catch. If the two ever drifted we report UNCONFIRMED: claiming a human
+  // confirmed a moment he did not is the one error this panel exists to prevent.
+  const human = Boolean(p && p.source === "human" && p.due !== undefined && Number(p.due) === at);
+  return { at: at, confirmed: human, by: human ? String(p.by || "") : "" };
+}
+// The DAY a human typed, and ONLY the day. dayToMs stores 09:00 Riyadh because a day needs an hour
+// to sort by; printing that hour back would be a time no human ever typed — a fabricated fact
+// wearing a human signature, which is the exact class this cycle exists to kill.
+function fmtDay(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" }); }
+// --- end appointment -------------------------------------------------------
 function contactRowsHtml(rows, win) {
   let h = "";
   rows.forEach((r) => {
@@ -575,10 +597,10 @@ function renderConvo() {
   el.innerHTML = '<div class="backdrop" onclick="closeConvo()"></div>' +
     '<aside class="convo" role="dialog" aria-label="المحادثة">' +
     '<div class="hd"><div class="av">' + esc(nm.trim().charAt(0)) + '</div>' +
-    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#101828;">' + esc(nm) + '</div>' +
-    '<div style="font-size:11px;color:#98A2B3;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
-    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#98A2B3;background:#F2F4F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
-    '<div style="padding:9px 16px;border-bottom:1px solid #F2F4F7;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#171717;">' + esc(nm) + '</div>' +
+    '<div style="font-size:11px;color:#999999;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
+    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#999999;background:#F3F3F3;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
+    '<div style="padding:9px 16px;border-bottom:1px solid #F3F3F3;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
       // Sandbox plumbing is not conversation. The handshake «Proxy massar» and the replies the
       // model produced when it read that as a product name are shown as a muted note, not as the
@@ -593,7 +615,7 @@ function renderConvo() {
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد" : "إيقاف المساعد") + "</button>" +
     '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:11.5px;' +
-    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#667085;background:#fff;border:1px solid #D0D5DD;') +
+    (c.test ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
     (c.test ? "تجريبي" : "تصنيف كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
@@ -614,7 +636,7 @@ function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#98A2B3;background:#fff;border:1px dashed #d5dae2;') +
+    (showTest ? 'color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);' : 'color:#999999;background:#fff;border:1px dashed #d5dae2;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -656,15 +678,15 @@ function vKmon(d) {
   }
   h += '<div class="tblwrap rise">';
   h += '<div class="ttoolbar"><span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:220px;max-width:380px;">' +
-    '<span style="position:absolute;inset-inline-start:14px;color:#98A2B3;display:flex;">' + ic("search", 18) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:14px;color:#999999;display:flex;">' + ic("search", 18) + "</span>" +
     '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:42px;height:46px;border-radius:999px;"></span>' +
-    '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#344054;">' +
+    '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#383838;">' +
     '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
     '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
     '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>' +
     '<span style="flex:1"></span><span class="cntpill">' + fmtN(withStAll.length) + " حملة</span></div>";
   h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
-    '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F9FAFB;border-bottom:1px solid #EAECF0;font-size:11.5px;font-weight:700;color:#667085;">' +
+    '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F8F8F8;border-bottom:1px solid #EDEDED;font-size:11.5px;font-weight:700;color:#7C7C7C;">' +
     '<div>الحملة</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
   withSt.forEach(({ c, st }, i) => {
     const prog = pct(st.delivered, st.targeted);
@@ -677,15 +699,15 @@ function vKmon(d) {
       : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>فيها ردود</span>'
         : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>بلا ردود بعد</span>');
     h += '<div class="trow km" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D0D5DD" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
-      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
-      '<div style="font-size:11px;color:#98A2B3;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
-      '<div style="font-size:12.5px;color:#475467;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#E2E2E2" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
+      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
+      '<div style="font-size:11px;color:#999999;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
+      '<div style="font-size:12.5px;color:#525252;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
       "<div>" + stChip + "</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + "</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.seen, st.targeted)) + "٪</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.replied, st.targeted)) + "٪</div>" +
-      '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#667085;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + "٪</span></div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + "</div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.seen, st.targeted)) + "٪</div>" +
+      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.replied, st.targeted)) + "٪</div>" +
+      '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#7C7C7C;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + "٪</span></div>" +
       '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") +
       '" onclick="event.stopPropagation();setCampClass(' + c.id + "," + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + "</button></div></div>";
   });
@@ -693,10 +715,10 @@ function vKmon(d) {
     // Say which of the two reasons this is: an empty class, or a search that matched nothing.
     // Rendering «لا نتائج مطابقة» beside a «تعرض ٠ حملة فعلية» explainer gave two answers at once.
     h += campQ.trim()
-      ? '<div style="padding:44px;text-align:center;color:#667085;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#98A2B3;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
+      ? '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#999999;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
       : (campTab === "real"
-        ? '<div style="padding:44px;text-align:center;color:#667085;font-size:13px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#1F7A73;font-weight:700;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
-        : '<div style="padding:44px;text-align:center;color:#98A2B3;font-size:13px;">لا حملات في هذا التبويب</div>');
+        ? '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#1F7A73;font-weight:700;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
+        : '<div style="padding:44px;text-align:center;color:#999999;font-size:13px;">لا حملات في هذا التبويب</div>');
   }
   h += "</div></div>";
   // The page control was hardcoded to «1», so one row sat under a pager implying more pages
@@ -750,7 +772,7 @@ function vKmonDetail(id, d) {
   const pctTxt = (v) => { const r = pct(v); return r === null ? "—" : fmtN(r) + "٪"; };
   const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
   const yieldPer100 = st.targeted ? Math.round(st.interested / st.targeted * 100) : 0;
-  let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#475467;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
+  let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#525252;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
     '<div class="ptitle rise"><div><h1 style="font-size:26px;">' + esc(camp.name) + "</h1>" +
     '<p>' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</p></div>" +
     '<div class="acts">' + (campIsTest(camp) ? '<span class="chip c-warn">حملة تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div></div>";
@@ -790,9 +812,9 @@ function vKmonDetail(id, d) {
     h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "الخطوة التالية لهذه الحملة</h3>" +
       '<span class="cntpill">' + fmtN(moves.length) + " توصية</span></div>" +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px;">' +
-      moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #EAECF0;border-radius:13px;padding:14px 16px;">' +
+      moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #EDEDED;border-radius:13px;padding:14px 16px;">' +
         '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';">' + esc(m[0]) + "</div>" +
-        '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">' + esc(m[1]) + "</div></div>").join("") + "</div></div>";
+        '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.8;">' + esc(m[1]) + "</div></div>").join("") + "</div></div>";
   }
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
@@ -810,18 +832,18 @@ function vKmonDetail(id, d) {
     label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
     targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
   };
-  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EAECF0;background:#fff;">' +
-    '<span style="font-size:13px;font-weight:700;color:#101828;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#98A2B3;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
+  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EDEDED;background:#fff;">' +
+    '<span style="font-size:13px;font-weight:700;color:#171717;flex:none;">جهات الاستهداف</span>' +
+    '<span style="font-size:11px;color:#999999;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="padding:7px 14px;font-size:11.5px;border-radius:999px;color:#8a6d10;background:rgba(201,162,39,.14);border:1px solid rgba(201,162,39,.45);font-weight:700;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
-      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
+      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + fmtN(f[2]) + ")</button>").join("") +
-    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EAECF0;border-radius:999px;padding:7px 13px;background:#F9FAFB;width:130px;">' +
+    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EDEDED;border-radius:999px;padding:7px 13px;background:#F8F8F8;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج</div>') + "</div>";
+    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
@@ -839,12 +861,12 @@ function vHome(d) {
   const kpi = (icon, label, value, tint, delta) =>
     '<div class="kpi rise"><div class="ico" style="background:' + tint[0] + ';color:' + tint[1] + ';">' + ic(icon, 20) + "</div>" +
     '<div><div class="v">' + (typeof value === "number" ? fmtN(value) : value) + '</div><div class="k" style="margin-top:5px;">' + label + "</div>" +
-    (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#667085") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
+    (delta ? '<div class="dl" style="color:' + (delta[0] ? "#027A48" : "#7C7C7C") + ';margin-top:6px;">' + esc(delta[1]) + "</div>" : "") + "</div></div>";
   let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   h += '<div class="kpis">' +
-    kpi("send", "الحملات الفعلية", fmtN(realCampaigns.length) + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#98A2B3;font-weight:600;">+' + fmtN(campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
+    kpi("send", "الحملات الفعلية", fmtN(realCampaigns.length) + (campaigns.length > realCampaigns.length ? ' <small style="font-size:12px;color:#999999;font-weight:600;">+' + fmtN(campaigns.length - realCampaigns.length) + " تجريبية</small>" : ""), ["#EFF4FB", "#2F5F94"]) +
     // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
     // reached (4), while this counts the whole imported book (15). One label, two numbers, one
     // screen is exactly the contradiction the funnel fix just removed.
@@ -862,26 +884,26 @@ function vHome(d) {
           const tg = hotOf(c) || (c.tags || [])[0];
           const last = [...(c.transcript || [])].reverse().find((t) => t.role === "customer");
           const ci = insCache[c.phone];
-          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F2F4F7;cursor:pointer;">' +
-            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.waName || "غير معروف") + " " +
+          return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;cursor:pointer;">' +
+            '<div class="avatar" style="width:34px;height:34px;flex:none;border-radius:9px;background:#171717;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc((c.waName || "؟").trim().charAt(0)) + "</div>" +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(c.waName || "غير معروف") + " " +
             (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '" style="font-weight:700;">' + esc(tg.product) + (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : (c.outcome === "handoff" ? '<span class="chip c-warn">طلب تواصلًا</span>' : "")) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
             (ci && ci.next_action ? '<div style="font-size:11px;color:#2E7D77;font-weight:600;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">← ' + esc(ci.next_action) + '</div>'
-              : (last ? '<div style="font-size:11px;color:#667085;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
+              : (last ? '<div style="font-size:11px;color:#7C7C7C;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">«' + esc(last.text.slice(0, 70)) + '»</div>' : "")) + "</div>" +
             '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;flex:none;">الملف ←</span></div>';
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;line-height:1.9;">حين يرصد المساعد فرصة مؤهلة سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
-    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F2F4F7;font-size:11px;color:#667085;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#101828;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
+      : '<div style="font-size:12px;color:#999999;margin-top:12px;line-height:1.9;">حين يرصد المساعد فرصة مؤهلة سيظهر هنا فورًا — ويصلك تنبيه واتساب مباشرة.</div>') +
+    (d.notifyNumber ? '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #F3F3F3;font-size:11px;color:#7C7C7C;">🔔 تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج: <b style="color:#171717;direction:ltr;">+' + esc(d.notifyNumber) + "</b></div>" : "") + "</div>";
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
-          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F2F4F7;">' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#101828;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
-            '<div style="font-size:10.5px;color:#98A2B3;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
+          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;">' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبية</span>' : "") + "</div>" +
+            '<div style="font-size:10.5px;color:#999999;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#98A2B3;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
+      : '<div style="font-size:12px;color:#999999;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
   h += "</div>";
   return h;
 }
@@ -913,7 +935,7 @@ function attrChips(e, max) {
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
-    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#475467;background:#fff;border:1px solid #EAECF0;') +
+    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
 // Indexes only in onclick (Arabic keys/values stay out of attribute strings);
@@ -1069,7 +1091,7 @@ function vSegBuilder() {
   // Presets FILL the rows rather than hiding behind a label — a segment the founder cannot read
   // is a segment he cannot trust, and every benchmarked tool that hides it gets distrusted.
   if (segPresets && segPresets.length) {
-    h += '<div style="font-size:11.5px;color:#667085;margin-bottom:9px;">اختيار الفئة يملأ الشروط أدناه، ويمكنكم تعديلها.</div>' +
+    h += '<div style="font-size:11.5px;color:#7C7C7C;margin-bottom:9px;">اختيار الفئة يملأ الشروط أدناه، ويمكنكم تعديلها.</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:18px;">' +
       segPresets.map((p) => {
         const extra = [];
@@ -1077,36 +1099,36 @@ function vSegBuilder() {
         // Forecast rather than excuse: say WHEN the zero becomes a number.
         if (p.tooNew && p.entersInDays > 0) extra.push(fmtN(p.tooNew) + " جهة تدخل نطاق الفحص بعد " + fmtN(p.entersInDays) + (p.entersInDays >= 11 ? " يومًا" : " أيام"));
         else if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
-        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EAECF0;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
-          '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(p.label) + '</span>' +
+        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EDEDED;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
+          '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(p.label) + '</span>' +
           '<span class="chip ' + (p.matched ? "c-ok" : "c-grey") + '">' + fmtN(p.matched) + "</span></div>" +
-          '<div style="font-size:11px;color:#667085;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
+          '<div style="font-size:11px;color:#7C7C7C;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
           (extra.length ? '<div style="font-size:10.5px;color:#B54708;margin-top:5px;">' + esc(extra.join(" · ")) + "</div>" : "") +
           "</button>";
       }).join("") + "</div>";
   }
   h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
-    '<span style="font-size:11.5px;font-weight:700;color:#667085;">المطابقة:</span>' +
+    '<span style="font-size:11.5px;font-weight:700;color:#7C7C7C;">المطابقة:</span>' +
     chipBtn("تنطبق كل الشروط", !segDef || segDef.match === "all", "segSetMatch(\\'all\\')") +
     chipBtn("ينطبق أي شرط", segDef && segDef.match === "any", "segSetMatch(\\'any\\')") +
-    '<span style="flex:1"></span><span style="font-size:11.5px;font-weight:700;color:#667085;">النافذة:</span>' +
+    '<span style="flex:1"></span><span style="font-size:11.5px;font-weight:700;color:#7C7C7C;">النافذة:</span>' +
     [3, 5, 7, 14].map((d) => chipBtn(fmtN(d) + (d >= 11 ? " يومًا" : " أيام"), segWindow === d, "segSetWindow(" + d + ")")).join("") + "</div>";
 
   const conds = (segDef && segDef.conditions) || [];
   h += conds.map((c, i) =>
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #EAECF0;border-radius:12px;background:#fff;margin-bottom:8px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #EDEDED;border-radius:12px;background:#fff;margin-bottom:8px;">' +
     (i ? '<span class="chip c-grey" style="font-size:10.5px;">' + (segDef.match === "any" ? "أو" : "و") + "</span>" : "") +
     '<select class="inp" style="height:40px;flex:1;min-width:150px;" onchange="segSetField(' + i + ',\\'signal\\',this.value)">' +
       SEG_SIGNALS.map((sg) => '<option value="' + sg[0] + '"' + (c.signal === sg[0] ? " selected" : "") + ">" + sg[1] + "</option>").join("") + "</select>" +
     '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\\'comparator\\',this.value)">' +
       '<option value="happened"' + (c.comparator === "happened" ? " selected" : "") + ">حدث</option>" +
       '<option value="never_happened"' + (c.comparator === "never_happened" ? " selected" : "") + ">لم يحدث</option></select>" +
-    '<span style="font-size:11px;color:#98A2B3;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
+    '<span style="font-size:11px;color:#999999;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
     '<button class="btn" style="height:36px;padding:0 12px;color:#B42318;background:#fff;border:1px solid #F7D4D1;" onclick="segDelCond(' + i + ')">حذف</button></div>').join("");
   h += '<button class="btn" style="font-size:12px;color:#1F7A73;background:#E9F7F6;border:1px solid #C4E8E5;margin-bottom:14px;" onclick="segAddCond()">+ أضف شرطًا</button>';
 
   // The result. Every zero explains itself — that distinction is the whole feature.
-  if (segBusy) h += '<div style="font-size:12.5px;color:#667085;padding:10px 0;">جارٍ الحساب…</div>';
+  if (segBusy) h += '<div style="font-size:12.5px;color:#7C7C7C;padding:10px 0;">جارٍ الحساب…</div>';
   else if (segPreview && segPreview.error) h += '<div class="sparse" style="border-inline-start-color:#B42318;">' + ic("eye", 16, "#B42318") + "<div>" + esc(segPreview.error) + "</div></div>";
   else if (segPreview) {
     const pv = segPreview;
@@ -1130,7 +1152,7 @@ function vSegBuilder() {
         ". أول تطابق متوقع بعد " + fmtN(Math.max(0, pv.requiredDays - pv.oldestContactDays)) + " أيام. " +
         '<span class="lnk" onclick="segSetWindow(3)">اضبط النافذة إلى ٣ أيام</span></div></div>';
     } else if (!pv.matched && !(pv.suppressed || []).length) {
-      h += '<div class="sparse">' + ic("eye", 16, "#667085") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
+      h += '<div class="sparse">' + ic("eye", 16, "#7C7C7C") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
     }
   }
   // The constraint that makes this different from an email tool.
@@ -1221,7 +1243,7 @@ function vAimkt() {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
       chipBtn("حسب الملف", audMode === "file", "setAudMode(\\'file\\')") +
       chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\\'behaviour\\')") +
-      '<span style="flex:1"></span><span style="font-size:11.5px;color:#98A2B3;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
+      '<span style="flex:1"></span><span style="font-size:11.5px;color:#999999;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
   }
   if (!retargetCohort && audMode === "behaviour") {
     h += vSegBuilder();
@@ -1229,39 +1251,39 @@ function vAimkt() {
   if (retargetCohort) {
     h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid rgba(201,162,39,.45);background:rgba(201,162,39,.08);border-radius:14px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
-      '<div style="font-size:13.5px;font-weight:700;color:#101828;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
-      '<div style="font-size:11.5px;color:#667085;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
-      '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
+      '<div style="font-size:13.5px;font-weight:700;color:#171717;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
+      '<div style="font-size:11.5px;color:#7C7C7C;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
+      '<button class="btn" style="font-size:12px;color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
   } else if (!entities.length) {
-    h += '<div style="border:1.5px dashed #D0D5DD;border-radius:12px;padding:26px;text-align:center;color:#667085;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
+    h += '<div style="border:1.5px dashed #E2E2E2;border-radius:12px;padding:26px;text-align:center;color:#7C7C7C;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
-      '<span style="font-size:11.5px;font-weight:700;color:#667085;min-width:52px;">' + esc(g.key) + ":</span>" +
+      '<span style="font-size:11.5px;font-weight:700;color:#7C7C7C;min-width:52px;">' + esc(g.key) + ":</span>" +
       chipBtn("الكل", !entFilters[g.key], "entSetAttr(" + ki + ",-1)") +
       g.values.map(([v, n], vi) => chipBtn(v + " (" + fmtN(n) + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
-      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#F9FAFB;">' +
+      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EDEDED;border-radius:10px;padding:9px 13px;background:#F8F8F8;">' +
       '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
-      (selN ? '<button class="btn" style="font-size:12px;color:#667085;background:#fff;border:1px solid #D0D5DD;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
+      (selN ? '<button class="btn" style="font-size:12px;color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     const shown = m.slice(0, LIST_CAP);
     if (m.length > LIST_CAP) {
       h += '<div style="display:flex;align-items:center;gap:12px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:12px;padding:12px 16px;margin-bottom:10px;">' +
         '<span style="font-size:19px;font-weight:700;color:#2E7D77;">' + fmtN(m.length) + '</span>' +
         '<span style="font-size:12px;color:#2E7D77;line-height:1.8;">جهة مطابقة للشرائح الحالية — القائمة أدناه معاينة لأول ' + fmtN(LIST_CAP) + '. «تحديد المطابقين» يختارهم <b>جميعًا</b> دون الحاجة لتصفحهم.</span></div>';
     }
-    h += '<div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
+    h += '<div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;max-height:300px;overflow-y:auto;" class="ms-scroll">' +
       shown.map((e) => {
         const on = entSel.has(e.id);
-        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F2F4F7;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
-          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #D0D5DD;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
-          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#101828;">' + esc(e.name) + "</span>" +
+        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F3F3F3;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
+          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #E2E2E2;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
+          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#171717;">' + esc(e.name) + "</span>" +
           attrChips(e, 3) +
-          '<span style="font-size:11px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span></div>";
+          '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + fmtN(m.length - LIST_CAP) + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
-      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+      (m.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7C7C7C;font-size:12px;background:#fafbfc;">+ ' + fmtN(m.length - LIST_CAP) + ' آخرون مطابقون — ضيّق بالشرائح أو البحث لاستعراضهم</div>' : "") +
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   h += "</div>";
 
@@ -1273,24 +1295,24 @@ function vAimkt() {
       tpls.map((t, i) => {
         const on = tplId === t.id;
         return '<div role="radio" tabindex="0" aria-checked="' + (on ? "true" : "false") +
-          '" onclick="tplPick(' + i + ')" onkeydown="tplKey(event,' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#3FB6B0" : "#EAECF0") +
+          '" onclick="tplPick(' + i + ')" onkeydown="tplKey(event,' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#3FB6B0" : "#EDEDED") +
           ";background:" + (on ? "#F6FCFB" : "#fff") + ';border-radius:16px;padding:18px;transition:.18s ease;' + (on ? "box-shadow:0 0 0 3px rgba(63,182,176,.12);" : "") + '">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-          '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#1F7A73" : "#D0D5DD") +
+          '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#1F7A73" : "#E2E2E2") +
           ";background:" + (on ? "#1F7A73" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
-          '<span style="font-size:12.5px;font-weight:700;color:#101828;">' + esc(t.label) + "</span></div>" +
-          '<div style="font-size:11.5px;color:#667085;line-height:1.75;">' + esc(t.hint) + "</div>" +
-          '<div style="font-size:10.5px;color:#98A2B3;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
+          '<span style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(t.label) + "</span></div>" +
+          '<div style="font-size:11.5px;color:#7C7C7C;line-height:1.75;">' + esc(t.hint) + "</div>" +
+          '<div style="font-size:10.5px;color:#999999;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
           '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;">' +
           t.buttons.map((b) => '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;background:#E3ECF8;border-radius:999px;padding:4px 12px;">' + esc(b) + "</span>").join("") +
           "</div></div>";
       }).join("") + "</div>" : "") +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
-    '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#667085;font-weight:600;">نص الرسالة</span>' +
+    '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#7C7C7C;font-weight:600;">نص الرسالة</span>' +
     '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
-    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#101828;border:1.5px solid #EAECF0;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
+    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#171717;border:1.5px solid #EDEDED;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
     "</div>" +
-    '<div><div style="font-size:11.5px;color:#667085;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
+    '<div><div style="font-size:11.5px;color:#7C7C7C;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
     // The opener no longer carries the file — it offers it, so no attachment is drawn here.
@@ -1307,8 +1329,8 @@ function vAimkt() {
 
   const can = selN > 0 && campMsg.trim();
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
-    '<label style="font-size:12.5px;font-weight:700;color:#101828;flex:none;">اسم الحملة</label>' +
-    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#101828;border:1.5px solid #EAECF0;border-radius:11px;padding:11px 14px;">' +
+    '<label style="font-size:12.5px;font-weight:700;color:#171717;flex:none;">اسم الحملة</label>' +
+    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#171717;border:1.5px solid #EDEDED;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   // Docked, not floating, and compact on a phone. He reviews on his own device and briefs by
   // screenshot: at 390px this bar was three lines tall, occupied about a quarter of the viewport,
@@ -1321,23 +1343,23 @@ function vAimkt() {
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
       ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#8a6d10;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
-        '<div style="font-size:10.5px;color:#98A2B3;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
-      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#101828;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
+        '<div style="font-size:10.5px;color:#999999;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
+      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#171717;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
     // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
     // State what will actually be sent, next to the button that sends it.
     (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
-        '<div class="lsub" style="font-size:10.5px;color:#98A2B3;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+        '<div class="lsub" style="font-size:10.5px;color:#999999;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
-    '<div style="font-size:17px;font-weight:700;color:#101828;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:13px;color:#475467;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    '<div style="font-size:17px;font-weight:700;color:#171717;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
+    '<div style="font-size:13px;color:#525252;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
     (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
-    '<button class="btn" style="color:#475467;background:#F2F4F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
+    '<button class="btn" style="color:#525252;background:#F3F3F3;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
 }
 
@@ -1345,10 +1367,10 @@ function mdRender(md) {
   return md.split("\\n").map((raw) => {
     const l = raw.trim();
     if (!l) return "";
-    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#101828;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
+    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#171717;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
     if (l.startsWith("## ")) return '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;margin:14px 0 6px;">' + esc(l.slice(3)) + "</div>";
-    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#475467;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
-    return '<div style="font-size:12.5px;color:#475467;line-height:1.9;">' + esc(l) + "</div>";
+    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#525252;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
+    return '<div style="font-size:12.5px;color:#525252;line-height:1.9;">' + esc(l) + "</div>";
   }).join("");
 }
 window.kbPick = () => document.getElementById("kbfile").click();
@@ -1398,10 +1420,10 @@ function kbRegistry() {
   return reg;
 }
 function uploadZone(scopedProduct) {
-  return '<div onclick="kbPick()" style="border:1.5px dashed #D0D5DD;background:#F9FAFB;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
+  return '<div onclick="kbPick()" style="border:1.5px dashed #E2E2E2;background:#F8F8F8;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
     '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#101828;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
-    '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذه الخدمة ويقرأه المساعد فورًا" : "<br>يُستخرج اسم الخدمة من الملف تلقائيًا") + "</div></div>" +
+    '<div style="font-size:13.5px;font-weight:700;color:#171717;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
+    '<div style="font-size:11.5px;color:#7C7C7C;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذه الخدمة ويقرأه المساعد فورًا" : "<br>يُستخرج اسم الخدمة من الملف تلقائيًا") + "</div></div>" +
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
@@ -1412,8 +1434,8 @@ function vKb() {
   const skill = prodAssets.find((a) => a.product === "__skill__");
   if (skill) {
     h0 = '<div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#F4FBFA;border-color:#B9E4E0;">' +
-      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#101828;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
-      '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض الخدمات (PDF) ثم ارفعها هنا في صفحة كل خدمة. <span style="direction:ltr;color:#98A2B3;">' + esc(skill.filename) + '</span></div></div>' +
+      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#171717;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
+      '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض الخدمات (PDF) ثم ارفعها هنا في صفحة كل خدمة. <span style="direction:ltr;color:#999999;">' + esc(skill.filename) + '</span></div></div>' +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
   }
   let h = h0 + '<div class="sec">خدمات المساعد <span class="meta">' + fmtN(reg.length) + ' خدمة · اضغط خدمةً لعرض معرفته وإدارتها</span></div>';
@@ -1443,42 +1465,42 @@ function vKbProduct(name) {
   const ready = r.sc !== null ? r.sc : (r.hub ? 100 : 0);
   const readyTone = ready >= 80 ? "#027A48" : ready >= 60 ? "#B54708" : "#B42318";
 
-  let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#475467;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
+  let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#525252;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
 
   // ── Hero: identity, readiness ring, and the primary action together ──
   h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
     '<div style="width:56px;height:56px;flex:none;border-radius:16px;background:linear-gradient(135deg,#1F4470,#2F5F94);display:flex;align-items:center;justify-content:center;color:#7FE3DC;font-weight:700;font-size:24px;">' + esc(name.trim().charAt(0)) + "</div>" +
     '<div style="flex:1;min-width:220px;">' +
-    '<h1 style="margin:0;font-size:23px;font-weight:700;color:#101828;letter-spacing:-.3px;">' + esc(name) + "</h1>" +
+    '<h1 style="margin:0;font-size:23px;font-weight:700;color:#171717;letter-spacing:-.3px;">' + esc(name) + "</h1>" +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
-    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#98A2B3;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#999999;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div>" +
     '<div style="flex:none;display:flex;align-items:center;gap:12px;">' +
     '<div style="position:relative;width:64px;height:64px;flex:none;">' +
-    '<svg viewBox="0 0 36 36" style="width:64px;height:64px;transform:rotate(-90deg);"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#EAECF0" stroke-width="3.2"/>' +
+    '<svg viewBox="0 0 36 36" style="width:64px;height:64px;transform:rotate(-90deg);"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#EDEDED" stroke-width="3.2"/>' +
     '<circle cx="18" cy="18" r="15.5" fill="none" stroke="' + readyTone + '" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="' + (ready * 0.974) + ' 100"/></svg>' +
-    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#101828;">' + fmtN(ready) + "٪</span></div></div>" +
-    '<div style="font-size:11px;color:#667085;font-weight:600;line-height:1.6;max-width:78px;">جاهزية<br>معرفة المساعد</div></div>' +
+    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#171717;">' + fmtN(ready) + "٪</span></div></div>" +
+    '<div style="font-size:11px;color:#7C7C7C;font-weight:600;line-height:1.6;max-width:78px;">جاهزية<br>معرفة المساعد</div></div>' +
     '<button class="btn btn-teal" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
     "</div>";
 
   // ── Performance row: one scoreboard, not scattered chips ──
   const cells = [
-    ["حملات الخدمة", prodCamps.length, "#101828"],
+    ["حملات الخدمة", prodCamps.length, "#171717"],
     ["صفقات مكتسبة", (wlProd && wlProd.won) || 0, "#027A48"],
     ["غير مكتسبة", (wlProd && wlProd.lost) || 0, "#B42318"],
     ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#2F5F94"],
   ];
   h += '<div class="card rise" style="padding:0;overflow:hidden;">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
-    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #EAECF0;" : "") + '">' +
-      '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
+    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #EDEDED;" : "") + '">' +
+      '<div style="font-size:11.5px;color:#7C7C7C;font-weight:600;">' + c[0] + "</div>" +
       '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + fmtN(c[1]) + "</div></div>").join("") +
     "</div>" +
     (prodCamps.length || prodCauses.length
-      ? '<div style="border-top:1px solid #EAECF0;background:#F9FAFB;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+      ? '<div style="border-top:1px solid #EDEDED;background:#F8F8F8;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
         (prodCauses.length ? '<span style="font-size:11.5px;font-weight:700;color:#B42318;">أبرز سبب لعدم الإغلاق: ' + esc(prodCauses[0].cause) + '</span><span style="flex:1"></span>' : '<span style="flex:1"></span>') +
         prodCamps.slice(0, 3).map((c) => '<a href="#kmon/' + c.id + '" class="chip c-blue" title="' + esc(c.name) + '" style="text-decoration:none;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;">' + esc(c.name) + "</a>").join("") +
         "</div>"
@@ -1486,13 +1508,13 @@ function vKbProduct(name) {
     "</div>";
   const pa = prodAssets.find((a) => a.product === name);
   const fileRow = (title, sub, chip, btnLabel, onclick) =>
-    '<div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #F2F4F7;flex-wrap:wrap;">' +
-    '<div style="width:40px;height:40px;flex:none;border-radius:11px;background:#F2F4F7;display:flex;align-items:center;justify-content:center;color:#475467;">' + ic("doc", 19) + "</div>" +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13.5px;font-weight:700;color:#101828;">' + title + "</div>" +
-    '<div style="font-size:11.5px;color:#667085;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
+    '<div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #F3F3F3;flex-wrap:wrap;">' +
+    '<div style="width:40px;height:40px;flex:none;border-radius:11px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;">' + ic("doc", 19) + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:13.5px;font-weight:700;color:#171717;">' + title + "</div>" +
+    '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
     chip + '<button class="btn btn-ghost" style="font-size:12px;padding:9px 16px;" onclick="' + onclick + '">' + btnLabel + "</button></div>";
   h += '<div class="card" style="padding:0;overflow:hidden;"><div style="padding:18px 22px 0;"><h3 style="margin:0 0 4px;">ملفات الخدمة</h3>' +
-    '<div style="font-size:11.5px;color:#98A2B3;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
+    '<div style="font-size:11.5px;color:#999999;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
     fileRow("الملف التعريفي", "يُرسل مع افتتاحية الحملة وعند طلب العميل للتفاصيل" + (pa ? ' · <span style="direction:ltr;">' + esc(pa.filename) + "</span>" : ""),
       (pa ? '<span class="chip c-ok">مرفق</span>' : '<span class="chip c-grey">غير مرفق</span>'),
       (pa ? "استبدال" : "رفع PDF"), "paPick()") +
@@ -1505,10 +1527,10 @@ function vKbProduct(name) {
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
-      '<div style="border-top:1px solid #F2F4F7;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
+      '<div style="border-top:1px solid #F3F3F3;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
   }
   if (seedP) {
-    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
+    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;">' +
       [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["ملائم لـ", seedP.best.join("، ")], ["التسعير المعتمد", seedP.pricing]]
         .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
   }
@@ -1530,8 +1552,8 @@ function vKbProduct(name) {
     ];
     const done = rows.filter((r) => r[2]).length;
     h += '<div class="card"><h3>جاهزية الخدمة <span class="meta">' + fmtN(done) + " من " + fmtN(rows.length) + " مكتملة</span></h3>" +
-      '<div style="border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">' +
-      rows.map((r) => '<div class="kbrow"><span class="dt" style="background:' + (r[2] ? "#2e9e6b" : "#D0D5DD") + ';"></span>' +
+      '<div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;">' +
+      rows.map((r) => '<div class="kbrow"><span class="dt" style="background:' + (r[2] ? "#2e9e6b" : "#E2E2E2") + ';"></span>' +
         '<div class="ti"><div class="t1">' + esc(r[0]) + '</div><div class="t2">' + r[1] + "</div></div>" +
         '<span class="chip ' + (r[2] ? "c-ok" : "c-grey") + '">' + (r[2] ? "جاهز" : "ناقص") + "</span></div>").join("") +
       "</div></div>";
@@ -1619,7 +1641,7 @@ window.entFileUpload = async (input) => {
     let msg = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> ";
     if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> ";
     if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + fmtN(d.skippedCount) + "</span> ";
-    msg += '<div style="font-size:11px;color:#667085;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
+    msg += '<div style="font-size:11px;color:#7C7C7C;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
     if (d.skippedRows && d.skippedRows.length) {
       msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
@@ -1652,45 +1674,60 @@ function vMorningList() {
     ["scheduled", "موعد محدد", "#027A48", "#ECFDF3", "اتصل بهم اليوم"],
     ["handoff", "بانتظار المختص", "#B54708", "#FFFAEB", "أجاب المساعد وينتظرون مكالمة"],
     ["interested", "مهتم بلا موعد", "#2F5F94", "#EFF6FF", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
-    ["later", "مؤجل", "#667085", "#F2F4F7", "طلبوا التأجيل"],
+    ["later", "مؤجل", "#7C7C7C", "#F3F3F3", "طلبوا التأجيل"],
     ["stopped", "لا يرغب في التواصل", "#B42318", "#FEF3F2", "توقّف الإرسال إليهم"],
   ];
   const of = (k) => cs.filter((c) => c.outcome === k || (k === "stopped" && (c.outcome === "not_interested" || c.optedOut)));
   const unsorted = cs.filter((c) => !c.outcome && !c.optedOut);
   let h = '<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
     '<h3 style="margin:0;flex:1;min-width:180px;">قائمة الصباح</h3>' +
-    '<span style="font-size:11.5px;color:#98A2B3;">' + fmtN(cs.length) + " جهة" + "</span></div>" +
-    '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;line-height:1.8;">من تتصل به اليوم، ومن توقّف التواصل معه. الوقت معروض بكلمات العميل نفسه.</div>';
+    '<span style="font-size:11.5px;color:#999999;">' + fmtN(cs.length) + " جهة" + "</span></div>" +
+    '<div style="font-size:11.5px;color:#999999;margin-top:8px;line-height:1.8;">من تتصل به اليوم، ومن توقّف التواصل معه. الوقت معروض بكلمات العميل نفسه.</div>';
   for (const [key, label, ink, bg, hint] of GROUPS) {
     const rows = of(key);
     h += '<div style="margin-top:16px;">' +
       '<div style="display:flex;align-items:baseline;gap:8px;">' +
       '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + label + "</span>" +
-      '<span style="font-size:12px;color:#98A2B3;">' + fmtN(rows.length) + "</span>" +
-      '<span style="font-size:11px;color:#98A2B3;">· ' + hint + "</span></div>";
+      '<span style="font-size:12px;color:#999999;">' + fmtN(rows.length) + "</span>" +
+      '<span style="font-size:11px;color:#999999;">· ' + hint + "</span></div>";
     if (!rows.length) {
-      h += '<div style="font-size:11.5px;color:#98A2B3;margin-top:6px;">لا أحد في هذه المجموعة بعد.</div></div>';
+      h += '<div style="font-size:11.5px;color:#999999;margin-top:6px;">لا أحد في هذه المجموعة بعد.</div></div>';
       continue;
     }
     h += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' + rows.map((c) => {
       const nm = c.waName || "غير معروف";
+      // M3 — this function's own comment above quotes the founder's three questions, and this was
+      // the one surface that never learned his answer to the third: it read c.scheduledAt alone, so
+      // a day typed into ملف العميل changed nothing here. It reads the ONE appointment now, and
+      // carries the same word every other surface uses — مؤكَّد for a day a human typed,
+      // «لم تُؤكَّد بعد» for our reading of the customer's phrase. The DAY only: 09:00 is dayToMs's
+      // sort key, not a time anybody stated.
+      const ap = appt(c);
+      const conf = ap && ap.confirmed
+        ? esc(fmtDay(ap.at)) + (ap.by ? " · سجّله " + esc(ap.by) : "")
+        : "";
       const when = key === "scheduled" && c.scheduledSaid
-        ? '<span style="font-size:12.5px;font-weight:700;color:#101828;">«' + esc(c.scheduledSaid) + "»</span>" +
-          (c.scheduledAt ? '<span style="font-size:11px;color:#98A2B3;"> · قراءتنا ' + esc(fmtT(c.scheduledAt)) + "</span>"
-                         : '<span style="font-size:11px;color:#98A2B3;"> · لم نقرأ تاريخًا</span>')
-        : c.outcomeReason
-          ? '<span style="font-size:11.5px;color:#667085;">«' + esc(String(c.outcomeReason).slice(0, 70)) + "»</span>"
-          : "";
+        ? '<span style="font-size:12.5px;font-weight:700;color:#171717;">«' + esc(c.scheduledSaid) + "»</span>" +
+          (conf ? '<span style="font-size:11.5px;font-weight:700;color:#027A48;"> · مؤكَّد ' + conf + "</span>"
+            : ap ? '<span style="font-size:11px;color:#999999;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
+                 : '<span style="font-size:11px;color:#999999;"> · لم نقرأ تاريخًا</span>')
+        // A confirmed day answers «متى؟» in EVERY group, not only in موعد محدد: an interested
+        // clinic with a day the operator wrote down is exactly what his third question asks for.
+        : conf
+          ? '<span style="font-size:11.5px;font-weight:700;color:#027A48;">موعد مؤكَّد: ' + conf + "</span>"
+          : c.outcomeReason
+            ? '<span style="font-size:11.5px;color:#7C7C7C;">«' + esc(String(c.outcomeReason).slice(0, 70)) + "»</span>"
+            : "";
       return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="cursor:pointer;background:' + bg +
-        ';border:1px solid #EAECF0;border-inline-start:3px solid ' + ink + ';border-radius:10px;padding:10px 13px;' +
+        ';border:1px solid #EDEDED;border-inline-start:3px solid ' + ink + ';border-radius:10px;padding:10px 13px;' +
         'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;">' +
-        '<span style="font-size:13px;font-weight:700;color:#101828;min-width:130px;">' + esc(nm) + "</span>" +
-        '<span style="font-size:11px;color:#98A2B3;direction:ltr;">+' + esc(c.phone) + "</span>" +
+        '<span style="font-size:13px;font-weight:700;color:#171717;min-width:130px;">' + esc(nm) + "</span>" +
+        '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(c.phone) + "</span>" +
         '<span style="flex:1"></span>' + when + "</div>";
     }).join("") + "</div></div>";
   }
   if (unsorted.length) {
-    h += '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #F2F4F7;font-size:11.5px;color:#98A2B3;">' +
+    h += '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #F3F3F3;font-size:11.5px;color:#999999;">' +
       fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة." + "</div>";
   }
   return h + "</div>";
@@ -1702,19 +1739,19 @@ function vCustomers() {
     '<h3 style="margin:0;flex:1;min-width:180px;">جهات الاستهداف</h3>' +
     '<button class="btn btn-teal" style="font-size:12.5px;padding:11px 18px;" onclick="entFilePick()">⬆ رفع ملف Excel/CSV</button>' +
     '<a href="/assets/audience-template.xlsx" download class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;text-decoration:none;">القالب الجاهز</a></div>' +
-    '<div style="font-size:11px;color:#98A2B3;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
+    '<div style="font-size:11px;color:#999999;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
     '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
     '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
-    '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" style="margin-top:10px;"><summary style="font-size:11.5px;color:#667085;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
-    '<div style="font-size:11.5px;color:#98A2B3;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · الحجم والمدينة يصبحان شريحتَي استهداف</div>' +
+    '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" style="margin-top:10px;"><summary style="font-size:11.5px;color:#7C7C7C;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
+    '<div style="font-size:11.5px;color:#999999;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · الحجم والمدينة يصبحان شريحتَي استهداف</div>' +
     '<div id="manualrows">' + manualRowsHtml() + '</div>' +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-teal" style="font-size:12.5px;" onclick="entManualSave()">حفظ الجهات ←</button>' +
     '<button class="btn btn-ghost" style="font-size:12px;" onclick="entAddRow()">+ صف آخر</button>' +
     '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
-    '<button class="btn" style="font-size:11.5px;background:transparent;color:#667085;padding:8px 4px;" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
+    '<button class="btn" style="font-size:11.5px;background:transparent;color:#7C7C7C;padding:8px 4px;" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
     '<div id="pastebox" style="display:none;margin-top:12px;">' +
-    '<div style="font-size:11.5px;color:#667085;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#101828;">الاسم، الجوال، الحجم، المدينة</b></div>' +
+    '<div style="font-size:11.5px;color:#7C7C7C;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#171717;">الاسم، الجوال، الحجم، المدينة</b></div>' +
     '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12.5px;line-height:2;resize:vertical;"></textarea>' +
     '<button class="btn btn-ghost" style="font-size:12px;margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
     '</details></div>';
@@ -1727,18 +1764,18 @@ function vCustomers() {
   if (!entities.length) {
     h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
   } else {
-    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #EAECF0;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
+    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #EDEDED;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
     h += '<div class="tblwrap">' + cshown.map((e) => {
       const hasConvo = Boolean(contactByPhone(e.phone));
-      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F2F4F7;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F2F4F7;"') + '>' +
-      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#101828;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#101828;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
+      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F3F3F3;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F3F3F3;"') + '>' +
+      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#171717;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#171717;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
       '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
-      '<span style="font-size:11.5px;color:#98A2B3;direction:ltr;">+' + esc(e.phone) + "</span>" +
+      '<span style="font-size:11.5px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span>" +
       '<button onclick="event.stopPropagation();entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>';
     }).join("") +
-    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#667085;font-size:12px;background:#fafbfc;">+ ' + fmtN(cm.length - LIST_CAP) + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
-    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#98A2B3;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7C7C7C;font-size:12px;background:#fafbfc;">+ ' + fmtN(cm.length - LIST_CAP) + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
+    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
   }
   return h;
 }
@@ -1754,9 +1791,9 @@ function ratesStrip(agg) {
   ];
   return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;">' +
     cards.map((c) => '<div class="card rise" style="margin:0;padding:16px 18px;">' +
-      '<div style="font-size:11.5px;color:#667085;font-weight:600;">' + c[0] + "</div>" +
-      '<div style="font-size:26px;font-weight:700;color:#101828;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + fmtN(c[1]) + '<span style="font-size:14px;color:#98A2B3;">٪</span></div>' +
-      '<div style="height:5px;background:#F2F4F7;border-radius:999px;overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:' + Math.min(100, c[1]) + "%;background:" + c[2] + ';border-radius:999px;"></i></div></div>').join("") + "</div>";
+      '<div style="font-size:11.5px;color:#7C7C7C;font-weight:600;">' + c[0] + "</div>" +
+      '<div style="font-size:26px;font-weight:700;color:#171717;margin-top:8px;font-variant-numeric:tabular-nums;letter-spacing:-.4px;">' + fmtN(c[1]) + '<span style="font-size:14px;color:#999999;">٪</span></div>' +
+      '<div style="height:5px;background:#F3F3F3;border-radius:999px;overflow:hidden;margin-top:10px;"><i style="display:block;height:100%;width:' + Math.min(100, c[1]) + "%;background:" + c[2] + ';border-radius:999px;"></i></div></div>').join("") + "</div>";
 }
 function stageBars(rows) {
   const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
@@ -1765,10 +1802,10 @@ function stageBars(rows) {
     const prev = i > 0 ? rows[i - 1][1] : r[1];
     const drop = prev > 0 && i > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
     return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
-      '<span style="font-size:12.5px;font-weight:600;color:#344054;">' + esc(r[0]) + "</span>" +
-      '<span style="font-size:12.5px;font-weight:700;color:#101828;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) +
+      '<span style="font-size:12.5px;font-weight:600;color:#383838;">' + esc(r[0]) + "</span>" +
+      '<span style="font-size:12.5px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) +
       (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + fmtN(drop) + "٪</span>" : "") + "</span></div>" +
-      '<div style="height:10px;background:#F2F4F7;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
+      '<div style="height:10px;background:#F3F3F3;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
   }).join("") + "</div>";
 }
 function funnelSvgUnused(rows) {
@@ -1786,31 +1823,31 @@ function funnelSvgUnused(rows) {
   return '<div style="display:flex;gap:14px;align-items:stretch;margin-top:12px;">' +
     '<div dir="ltr" style="flex:1;min-width:0;"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار تحويل الحملات">' + shapes + "</svg></div>" +
     '<div style="flex:none;display:flex;flex-direction:column;gap:5px;justify-content:space-between;padding:2px 0;">' +
-    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#344054;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
+    rows.map((r) => '<div style="height:40px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#383838;">' + esc(r[0]) + "</div>").join("") + "</div></div>";
 }
 function colChart(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:14px;">' +
     rows.map((r) => '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;">' +
-      '<div style="font-size:11px;font-weight:700;color:#101828;">' + fmtN(r[1]) + "</div>" +
+      '<div style="font-size:11px;font-weight:700;color:#171717;">' + fmtN(r[1]) + "</div>" +
       '<div style="width:100%;max-width:44px;height:' + Math.max(6, Math.round(r[1] / mx * 78)) + 'px;background:' + color + ';border-radius:4px 4px 2px 2px;"></div>' +
-      '<div style="font-size:10px;color:#667085;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
+      '<div style="font-size:10px;color:#7C7C7C;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">' + esc(String(r[0])) + "</div></div>").join("") + "</div>";
 }
 function treemapTiles(rows) {
   const total = Math.max(1, rows.reduce((a, r) => a + r[1], 0));
-  const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#101828"], ["#AFC6DE", "#101828"], ["#D6E2F1", "#101828"], ["#EFF4FB", "#101828"], ["#F9FAFB", "#101828"]];
+  const tones = [["#1F4470", "#fff"], ["#2F5F94", "#fff"], ["#4E7EAE", "#fff"], ["#7FA3C8", "#171717"], ["#AFC6DE", "#171717"], ["#D6E2F1", "#171717"], ["#EFF4FB", "#171717"], ["#F8F8F8", "#171717"]];
   return '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;">' +
     rows.map((r, i) => { const tn = tones[i % tones.length]; return '<div style="flex:' + Math.max(8, Math.round(r[1] / total * 100)) + ' 1 90px;min-height:78px;border-radius:12px;background:' + tn[0] + ';color:' + tn[1] + ';padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;">' +
       '<div style="font-size:11.5px;font-weight:700;opacity:.92;">' + esc(String(r[0])) + '</div><div style="font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) + "</div></div>"; }).join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
-  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#98A2B3;">' + sub + "</span></div>" + inner + "</div>";
+  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#999999;">' + sub + "</span></div>" + inner + "</div>";
 }
 function hbarRows(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">' + rows.map((r) =>
-    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#344054;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#101828;">' + fmtN(r[1]) + "</span></div>" +
-    '<div style="height:8px;background:#EAECF0;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
+    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#383838;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#171717;">' + fmtN(r[1]) + "</span></div>" +
+    '<div style="height:8px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
 }
 function dailyActivitySvg(cs) {
   const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -1825,13 +1862,13 @@ function dailyActivitySvg(cs) {
   days.forEach((d, i) => {
     const x = 8 + i * (bw + 14);
     const hOut = Math.round(d.outN / mx * 96), hIn = Math.round(d.inN / mx * 96);
-    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#D0D5DD"/>' +
+    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#E2E2E2"/>' +
       '<rect x="' + x + '" y="' + (104 - hOut - hIn) + '" width="' + bw + '" height="' + hIn + '" rx="3" fill="#2E8F89"/>' +
-      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#98A2B3">' + d.label + "</text>";
+      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#999999">' + d.label + "</text>";
   });
   return '<div dir="ltr" style="overflow-x:auto;" class="ms-scroll"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;min-width:520px;height:auto;display:block;margin-top:10px;" role="img" aria-label="نشاط الرسائل ١٤ يومًا">' +
-    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#EAECF0" stroke-width="1"/>' + bars + "</svg></div>" +
-    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#667085;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#D0D5DD;margin-inline-end:5px;"></i>صادرة</span></div>';
+    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#EDEDED" stroke-width="1"/>' + bars + "</svg></div>" +
+    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#7C7C7C;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#E2E2E2;margin-inline-end:5px;"></i>صادرة</span></div>';
 }
 function vHomeCharts(cs) {
   // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
@@ -1879,15 +1916,15 @@ function vHomeCharts(cs) {
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   h += chartCard("التوزيع حسب الحجم والقطاع", "من أعمدة ملفك", (sizeRows.length || secRows.length)
     ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">' +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
-      '<div><div style="font-size:10.5px;font-weight:700;color:#98A2B3;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
-    : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
-  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#98A2B3;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
+      '<div><div style="font-size:10.5px;font-weight:700;color:#999999;margin-top:10px;">الحجم</div>' + colChart(sizeRows, "#2F5F94") + "</div>" +
+      '<div><div style="font-size:10.5px;font-weight:700;color:#999999;margin-top:10px;">القطاع</div>' + colChart(secRows, "#3FB6B0") + "</div></div>"
+    : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة بأعمدة الحجم/القطاع.</div>');
+  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2E7D77") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? treemapTiles(cityRows) : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
   h += "</div>";
   return h;
 }
@@ -1928,10 +1965,10 @@ function vActionQueue(cs) {
     '<h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("clock", 18, "#B54708") + "ما يستحق المتابعة الآن</h3>" +
     '<span class="cntpill">' + fmtN(items.length) + " إجراء</span></div>" +
     '<div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;">' +
-    items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EAECF0;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
+    items.map((it) => '<div onclick="location.hash=\\'' + it[4] + '\\'" style="display:flex;align-items:center;gap:13px;padding:13px 15px;border:1px solid #EDEDED;border-radius:13px;cursor:pointer;background:' + it[6] + ';">' +
       '<span style="width:8px;height:8px;border-radius:999px;background:' + it[5] + ';flex:none;"></span>' +
-      '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#101828;">' + it[1] + ' <span style="font-weight:600;color:#667085;">— ' + esc(it[2]) + "</span></div>" +
-      '<div style="font-size:11.5px;color:#475467;margin-top:4px;line-height:1.7;">' + esc(it[3]) + "</div></div>" +
+      '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:#171717;">' + it[1] + ' <span style="font-weight:600;color:#7C7C7C;">— ' + esc(it[2]) + "</span></div>" +
+      '<div style="font-size:11.5px;color:#525252;margin-top:4px;line-height:1.7;">' + esc(it[3]) + "</div></div>" +
       '<span style="font-size:12px;font-weight:700;color:' + it[5] + ';flex:none;">افتح التفاصيل ←</span></div>').join("") + "</div></div>";
 }
 function vWinLoss() {
@@ -1943,24 +1980,24 @@ function vWinLoss() {
     '<h3 style="margin:0;">لماذا نكسب — ولماذا نخسر</h3>' +
     '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
     ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + fmtN(t[k] || 0) + "</span>").join("") + "</div></div>" +
-    '<div style="font-size:11px;color:#98a2b3;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
+    '<div style="font-size:11px;color:#999999;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
   if (!judged && !(t.active || 0)) {
-    h += '<div style="font-size:12.5px;color:#667085;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
+    h += '<div style="font-size:12.5px;color:#7C7C7C;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
     return h;
   }
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
   h += '<div><div style="font-size:11.5px;font-weight:700;color:#027A48;margin-bottom:9px;">✓ ما يكسب لنا الصفقات</div>' +
     ((winloss.win_drivers || []).length
-      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F2F4F7;"><span style="flex:1;font-size:12.5px;color:#101828;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + fmtN(w.count) + "</span></div>").join("")
-      : '<div style="font-size:12px;color:#98a2b3;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
+      ? winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid #F3F3F3;"><span style="flex:1;font-size:12.5px;color:#171717;line-height:1.8;">' + esc(w.driver) + '</span><span class="chip c-ok">' + fmtN(w.count) + "</span></div>").join("")
+      : '<div style="font-size:12px;color:#999999;">تظهر مع أول صفقة تتقدم.</div>') + "</div>";
   h += '<div><div style="font-size:11.5px;font-weight:700;color:#B42318;margin-bottom:9px;">✕ ما يخسّرنا الصفقات</div>' +
     ((winloss.loss_causes || []).length
-      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F2F4F7;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#101828;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + fmtN(c.count) + "</span></div>" +
-        (c.example ? '<div style="font-size:11.5px;color:#667085;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("")
-      : '<div style="font-size:12px;color:#98a2b3;">لا خسائر محكومة بعد — وهذا خبر جيد.</div>') + "</div>";
+      ? winloss.loss_causes.map((c) => '<div style="padding:8px 0;border-bottom:1px solid #F3F3F3;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:700;color:#171717;">' + esc(c.cause) + '</span>' + (c.products || []).map((pd) => '<span class="chip c-grey">' + esc(pd) + "</span>").join("") + '<span class="chip c-bad">' + fmtN(c.count) + "</span></div>" +
+        (c.example ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("")
+      : '<div style="font-size:12px;color:#999999;">لا خسائر محكومة بعد — وهذا خبر جيد.</div>') + "</div>";
   h += "</div>";
   if ((winloss.by_product || []).length) {
-    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F2F4F7;">' +
+    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid #F3F3F3;">' +
       winloss.by_product.slice(0, 4).map((pr) => '<span class="chip c-blue" title="' + esc(pr.product) + '">' + esc(clip(pr.product, 24)) + ": " + fmtN(pr.won) + " مكتسبة · " + fmtN(pr.lost) + " غير مكتسبة</span>").join("") + "</div>";
   }
   h += "</div>";
@@ -1975,12 +2012,11 @@ function vWinLoss() {
 // tone badge that read it are both gone from the record, and a table nothing reads is an invented
 // vocabulary waiting to be re-rendered. Interest now has exactly one home per provenance —
 // solid chips in ملف العميل (fact) and the status strip's «قراءة» chip (reading).
-function toneBadge(label, color) {
-  return '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #EAECF0;border-radius:999px;padding:4px 11px;font-size:11px;font-weight:700;color:#344054;">' +
-    '<span style="width:8px;height:8px;border-radius:999px;background:' + color + ';"></span>' + esc(label) + "</span>";
-}
+// toneBadge is DELETED with its last caller (the ins.learning branch of فهم المساعد). A renderer
+// with no reader is an invented vocabulary waiting to be re-called, which is how the badge row
+// survived §5's deletion in one state after being removed from the other.
 function tlDot(kind) {
-  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#98A2B3", sys: "#D0D5DD" }[kind] || "#D0D5DD";
+  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#999999", sys: "#E2E2E2" }[kind] || "#E2E2E2";
 }
 // ---------------------------------------------------------------------------
 // ملف العميل — the enrichable client record (cycle crm-record; design plan §3/§4).
@@ -2010,6 +2046,15 @@ function pmSpan(kind, style) {
 }
 // ONE reading of a field's state, used by BOTH the «ناقص N» chip and the row it describes — so the
 // header can never claim two gaps while three rows render the missing mark.
+// Last tag per product, hottest first — the same reduction the status strip and the panel already
+// do inline. Named once here so «أكّد» confirms EXACTLY the set the operator can see, rather than a
+// second, subtly different reading of c.tags.
+function interestLatest(tags) {
+  const latest = new Map();
+  (tags || []).forEach((tg) => latest.set(tg.product, tg));
+  const order = { hot: 0, warm: 1, cold: 2 };
+  return [...latest.values()].sort((a, b) => (order[a.level] ?? 3) - (order[b.level] ?? 3) || (b.ts || 0) - (a.ts || 0));
+}
 function propState(d, key) {
   const c = d.contact || {};
   const p = (c.props || {})[key];
@@ -2152,7 +2197,7 @@ function propEditorHtml(key, val, err) {
     const cur = (((profileData || {}).contact || {}).props || {}).nextStep;
     const dv = propEdit && propEdit.due !== undefined ? propEdit.due : (cur && cur.due ? isoDay(cur.due) : "");
     h += '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">' +
-      '<label for="propdue" style="font-size:11.5px;color:#667085;font-weight:600;">التاريخ (اختياري)</label>' +
+      '<label for="propdue" style="font-size:11.5px;color:#7C7C7C;font-weight:600;">التاريخ (اختياري)</label>' +
       '<input id="propdue" type="date" class="inp" style="padding:8px 10px;direction:ltr;" value="' + esc(dv) + '">' +
       (dv ? '<button class="btn btn-ghost mini" onclick="propClearDue()">امسح التاريخ</button>' : "") + "</div>";
   }
@@ -2169,7 +2214,7 @@ function propRow(o) {
   const open = propEdit && propEdit.key === o.key;
   const reading = st === "reading" && !open;
   let body = '<div class="flab">' + o.label +
-    (o.suffix ? ' <span style="color:#98A2B3;font-weight:600;">' + o.suffix + "</span>" : "") + "</div>";
+    (o.suffix ? ' <span style="color:#999999;font-weight:600;">' + o.suffix + "</span>" : "") + "</div>";
   if (open) {
     body += propEditorHtml(o.key, propEdit.val, propEdit.err);
   } else if (st === "missing") {
@@ -2208,8 +2253,13 @@ function vFactsPanel(d) {
   let h = '<div class="card" style="margin:0;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
     '<h3 style="margin:0;">ملف العميل</h3>' +
-    (gaps ? '<span class="chip c-warn">ناقص ' + fmtN(gaps) + "</span>" : '<span class="chip c-teal">لا نواقص</span>') + "</div>" +
-    '<div style="font-size:11.5px;color:#667085;margin:6px 0 4px;line-height:1.8;">ما تكتبه هنا لا يستطيع المساعد تغييره.</div>' +
+    // S2 — the chip read «ناقص ٥» above SIX visibly dashed rows, because سبب الاستبعاد is shown and
+    // deliberately not counted. He checks a number against what he can see within seconds, so the
+    // denominator is named here and the uncounted row says «· اختياري» below. The count and the
+    // rows agree now without pretending an un-excluded customer is a gap.
+    (gaps ? '<span class="chip c-warn">ناقص ' + fmtN(gaps) + " من " + fmtN(GAP_KEYS.length) + " حقول أساسية</span>"
+          : '<span class="chip c-teal">الحقول الأساسية مكتملة</span>') + "</div>" +
+    '<div style="font-size:11.5px;color:#7C7C7C;margin:6px 0 4px;line-height:1.8;">ما تكتبه هنا لا يستطيع المساعد تغييره.</div>' +
     '<div class="plgnd"><span class="i">' + pmSpan("h", "margin:0") + "بخط الفريق</span>" +
     '<span class="i">' + pmSpan("a", "margin:0") + "قراءة المساعد</span>" +
     '<span class="i">' + pmSpan("i", "margin:0") + "مستورد</span>" +
@@ -2265,13 +2315,24 @@ function vFactsPanel(d) {
   // 4 · الخطوة التالية — TWO marks on purpose: the customer's sentence is a fact, our parse of it
   // is not. That distinction is the whole reason this panel exists.
   const s4 = S("nextStep"), p4 = s4.prop;
-  const due = (p4 && p4.due) || c.scheduledAt;
+  // M1/M3 — ONE appointment, read through the one reader. The date used to render ONLY when the row
+  // was a machine READING, so the assistant's guess at the day was on screen and the day the
+  // OPERATOR confirmed was on no screen at all — backwards from this panel's whole thesis.
+  const ap4 = appt(c);
   const said = c.scheduledSaid
     ? '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:5px;">' + pmSpan("h", "margin-top:5px") +
       '<div class="quote" style="margin:0;">قال العميل: «' + esc(c.scheduledSaid) + "»</div></div>" : "";
-  const parsed = s4.state === "reading"
-    ? '<div class="quote" style="color:#B54708;">' + (due ? "قراءتنا: " + fmtD(due) + " " + fmtT(due) + " · لم تُؤكَّد بعد"
-      : "قراءتنا لم تُؤكَّد بعد.") + "</div>" : "";
+  // A confirmed day is a FACT and gets the fact's mark and the fact's signature — and the DAY only.
+  // dayToMs stores 09:00 Riyadh so a bare date has an hour to sort by; printing that hour back
+  // would put a time nobody typed under a human's name. The agent's reading keeps its own
+  // «قراءتنا: … · لم تُؤكَّد بعد» treatment, unchanged, including the hour it actually parsed.
+  const parsed = !ap4
+    ? (s4.state === "reading" ? '<div class="quote" style="color:#B54708;">قراءتنا لم تُؤكَّد بعد.</div>' : "")
+    : ap4.confirmed
+      ? '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:5px;">' + pmSpan("h", "margin-top:5px") +
+        '<div style="margin:0;font-size:12.5px;font-weight:700;color:#171717;">الموعد: ' + esc(fmtDay(ap4.at)) +
+        (ap4.by ? " · سجّله " + esc(ap4.by) : "") + "</div></div>"
+      : '<div class="quote" style="color:#B54708;">قراءتنا: ' + fmtD(ap4.at) + " " + fmtT(ap4.at) + " · لم تُؤكَّد بعد</div>";
   h += propRow({ key: "nextStep", label: "الخطوة التالية", state: s4.state, writable: w,
     html: '<div class="fval' + (s4.state === "fact" ? "" : " fval-a") + '">' + esc(p4 ? p4.value : (c.scheduledSaid || "")) + "</div>",
     support: said + parsed, sig: p4 ? propSig(p4) : "",
@@ -2287,7 +2348,7 @@ function vFactsPanel(d) {
 
   // 6 · سبب الاستبعاد — shown, never counted as a gap.
   const s6 = S("disqualifyReason"), p6 = s6.prop;
-  h += propRow({ key: "disqualifyReason", label: "سبب الاستبعاد", state: s6.state, writable: w,
+  h += propRow({ key: "disqualifyReason", label: "سبب الاستبعاد", suffix: "· اختياري", state: s6.state, writable: w,
     html: '<div class="fval' + (s6.state === "fact" ? "" : " fval-a") + '">' + esc(p6 ? dqRead(p6.value) : "") + "</div>",
     sig: p6 ? propSig(p6) : "", contested: p6 && p6.contested ? p6.contested : null,
     // «استبعد هذا العميل…» promised a stop. This records a judgement and moves the outcome; it
@@ -2314,20 +2375,20 @@ function vCustomer(ph) {
   // «ماني مهتم». ملف العميل replaces it with a count of named gaps that an operator can close.
   const d = profileData; const c = d.contact; const ins = d.insights || {};
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
-  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#101828;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
+  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#171717;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
     // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
-    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#101828;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;color:#171717;">' + esc(nm) + (c.test ? ' <span class="chip" style="color:#8a6d10;background:rgba(201,162,39,.14);">تجريبي</span>' : "") + "</div>" +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' +
     (d.entity ? attrChips(d.entity, 4) : '<span class="chip c-grey">غير مستورد في القوائم</span>') +
     // «واتساب ✓» deleted: every contact on this screen arrived by WhatsApp, so the chip carries no
     // information. Designer's call.
     (c.human ? '<span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
-    '<div style="font-size:11.5px;color:#98A2B3;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
+    '<div style="font-size:11.5px;color:#999999;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
     // «أول ظهور» deleted — it never changed a decision. Last activity stays: it tells you whether
     // this person is warm right now.
-    '<div style="font-size:11px;color:#98A2B3;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
+    '<div style="font-size:11px;color:#999999;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
     // PROVENANCE, not analytics. These used to be a row of identical blue chips in arbitrary
     // order, so the founder could not say which campaign started the conversation in front of him.
     // The payload now arrives newest-first with launch times: the most recent is stated as a
@@ -2346,16 +2407,16 @@ function vCustomer(ph) {
       // ONE campaign is named. Everything else is a COUNT, so the line cannot grow — it read as a
       // comma-joined wall of 20+ names on any contact used for testing.
       const others = (scoped ? cps.length : real.length) - 1;
-      return '<div style="margin-top:10px;font-size:12.5px;color:#475467;line-height:1.7;">' +
+      return '<div style="margin-top:10px;font-size:12.5px;color:#525252;line-height:1.7;">' +
         (scoped ? "مقصور على حملة: " : "بدأت هذه المحادثة من: ") +
         '<a href="#customer/' + esc(c.phone) + "/" + first.id + '" style="color:#2E7D77;font-weight:700;text-decoration:none;">' +
         esc(String(first.name).slice(0, 40)) + "</a>" +
-        (known ? ' <span style="color:#98A2B3;">· ' + esc(when) + "</span>"
-               : ' <span style="color:#98A2B3;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
-        (others > 0 ? ' <span style="color:#98A2B3;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
-        (testN > 0 && showTest ? ' <span style="color:#98A2B3;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
-        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#98A2B3;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
-        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#98A2B3;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
+        (known ? ' <span style="color:#999999;">· ' + esc(when) + "</span>"
+               : ' <span style="color:#999999;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
+        (others > 0 ? ' <span style="color:#999999;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
+        (testN > 0 && showTest ? ' <span style="color:#999999;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
+        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#999999;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
+        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#999999;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
         "</div>";
     })() : "") +
     "</div></div>" +
@@ -2373,7 +2434,7 @@ function vCustomer(ph) {
       const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
       const idle = it.hoursSinceCustomer !== null && it.hoursSinceCustomer !== undefined
         ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "";
-      return turn ? '<div style="font-size:11.5px;color:#98A2B3;margin-top:6px;">' + turn + idle + "</div>" : "";
+      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + idle + "</div>" : "";
     })() +
     "</div></div>";
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
@@ -2404,22 +2465,29 @@ function vCustomer(ph) {
       not_interested: ["لا يرغب في التواصل", "#B42318", "#FEF3F2"],
       handoff: ["بانتظار المختص", "#B54708", "#FFFAEB"],
       opted_out: ["أوقف الرسائل", "#B42318", "#FEF3F2"],
-      closed: ["مغلق", "#667085", "#F2F4F7"],
+      closed: ["مغلق", "#7C7C7C", "#F3F3F3"],
     };
     const o = OUT[c.outcome] || null;
-    const ink = o ? o[1] : "#667085", bg = o ? o[2] : "#F9FAFB";
+    const ink = o ? o[1] : "#7C7C7C", bg = o ? o[2] : "#F8F8F8";
     const row = (label, body) =>
       '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:9px;">' +
-      '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#667085;min-width:92px;">' + label + "</span>" +
+      '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
       '<span style="flex:1;min-width:180px;">' + body + "</span></div>";
 
     // 1 — OUTCOME
     let outBody = '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + (o ? o[0] : "لم يُفرز بعد") + "</span>";
     if (c.outcome === "scheduled" && c.scheduledSaid) {
-      outBody += '<div style="font-size:13px;font-weight:700;color:#101828;margin-top:3px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
-        '<div style="font-size:11.5px;color:#667085;">' + (c.scheduledAt ? "قراءتنا: " + esc(fmtT(c.scheduledAt)) + " · لم تُؤكَّد بعد" : "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل.") + "</div>";
+      // M3 — this line appended «لم تُؤكَّد بعد» UNCONDITIONALLY, so an appointment a human had
+      // confirmed 200px below read as unconfirmed forever. It reads the ONE appointment now, and
+      // «مؤكَّد» is a state the sentence finally has a form for.
+      const ap = appt(c);
+      outBody += '<div style="font-size:13px;font-weight:700;color:#171717;margin-top:3px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
+        '<div style="font-size:11.5px;color:' + (ap && ap.confirmed ? "#027A48;font-weight:700;" : "#7C7C7C;") + '">' +
+        (!ap ? "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل."
+          : ap.confirmed ? "مؤكَّد: " + esc(fmtDay(ap.at)) + (ap.by ? " · سجّله " + esc(ap.by) : "")
+          : "قراءتنا: " + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد") + "</div>";
     } else if (c.outcomeEvidence) {
-      outBody += '<div style="font-size:12.5px;color:#475467;margin-top:3px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 130)) + "»</div>";
+      outBody += '<div style="font-size:12.5px;color:#525252;margin-top:3px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 130)) + "»</div>";
     }
 
     // 2 — INTEREST, one chip PER PRODUCT. Never averaged: two hot products are two deals, not a
@@ -2438,9 +2506,9 @@ function vCustomer(ph) {
     } else if (ins.intent && ins.intent !== "none") {
       const rd = ins.intent === "high" ? ["c-ok", "نية مرتفعة"] : ins.intent === "medium" ? ["c-warn", "اهتمام مبدئي"] : ["c-grey", "فاتر"];
       interestBody = '<span class="chip c-read ' + rd[0] + '"><span class="rd">قراءة</span>' + rd[1] + "</span>" +
-        '<div style="font-size:11.5px;color:#98A2B3;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
+        '<div style="font-size:11.5px;color:#999999;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
     } else {
-      interestBody = '<span style="color:#98A2B3;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
+      interestBody = '<span style="color:#999999;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
     }
 
     // 3 — STAGE, one chip. An unjustified reading renders visibly WEAKER than a justified one:
@@ -2453,14 +2521,14 @@ function vCustomer(ph) {
       stageBody = '<span class="chip ' + (justified ? "c-teal" : "c-grey") + '">' + esc(ins.stage) +
         "</span>" +
         (justified
-          ? '<div style="font-size:12.5px;color:#475467;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
-          : '<div style="font-size:11.5px;color:#98A2B3;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
+          ? '<div style="font-size:12.5px;color:#525252;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
+          : '<div style="font-size:11.5px;color:#999999;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
             '<a href="javascript:void(0)" onclick="refreshInsights()" style="color:#2E7D77;font-weight:700;">حدّث القراءة</a></div>');
     } else {
-      stageBody = '<span style="color:#98A2B3;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
+      stageBody = '<span style="color:#999999;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
     }
 
-    return '<div style="background:' + bg + ';border:1px solid #EAECF0;border-inline-start:3px solid ' + ink +
+    return '<div style="background:' + bg + ';border:1px solid #EDEDED;border-inline-start:3px solid ' + ink +
       ';border-radius:12px;padding:13px 16px;margin:2px 0 14px;">' +
       row("الفرز", outBody) + row("درجة الاهتمام", interestBody) + row("مرحلة البيع", stageBody) + "</div>";
   })();
@@ -2468,9 +2536,9 @@ function vCustomer(ph) {
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
     '<span style="flex:1"></span>' +
-    '<span style="font-size:11.5px;color:#667085;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
-    [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#667085"]]
-      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;border-radius:999px;' + (o[0] === "meeting_booked" ? "color:#fff;background:" + o[2] + ";border:1px solid " + o[2] + ";font-weight:700;" : "color:" + o[2] + ";background:#fff;border:1px solid #EAECF0;") + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "55;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
+    '<span style="font-size:11.5px;color:#7C7C7C;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
+    [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#7C7C7C"]]
+      .map((o) => '<button class="btn" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)" style="font-size:12px;padding:9px 14px;border-radius:999px;' + (o[0] === "meeting_booked" ? "color:#fff;background:" + o[2] + ";border:1px solid " + o[2] + ";font-weight:700;" : "color:" + o[2] + ";background:#fff;border:1px solid #EDEDED;") + (activeBtn === o[0] ? "box-shadow:0 0 0 2px " + o[2] + "55;font-weight:700;" : "") + '">' + o[1] + "</button>").join("") + "</div>";
   // The 6-node sales-path rail is DELETED from the record (design-plan.md section 5): it paints
   // five stages nobody reached and a check mark nobody verified. The stage now appears exactly
   // once, as a reading, inside the status region. The renderer itself is gone too, so no future
@@ -2484,21 +2552,23 @@ function vCustomer(ph) {
     // The intent badge is DELETED here: interest already renders in the status strip and, with
     // provenance, in ملف العميل. The hollow .pm-a mark replaces it and says what this card is.
     '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#1F4470;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3></div>" +
-    '<div style="font-size:11px;color:#667085;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
+    '<div style="font-size:11px;color:#7C7C7C;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
   if (ins.learning) {
-    h += '<div style="font-size:13px;color:#475467;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
-      ((ins.product_interest || []).length ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">' + ins.product_interest.map((p) => toneBadge(p.product, p.level === "high" ? "#1f8a52" : p.level === "medium" ? "#b5810f" : "#667085")).join("") + "</div>" : "") +
-      '<div style="font-size:11.5px;color:#667085;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
+    // S4 — the product_interest badge row is DELETED here too. §5 deleted it from the other branch
+    // only, so the third, unsourced rendering of interest survived in the state a brand-new
+    // conversation actually lands in. Enumerate STATES, not just screens.
+    h += '<div style="font-size:13px;color:#525252;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
+      '<div style="font-size:11.5px;color:#7C7C7C;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
     h += '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
       '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
-      '<div style="font-size:14px;font-weight:700;color:#101828;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
+      '<div style="font-size:14px;font-weight:700;color:#171717;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
     // DELETED (design plan §5): the 2×2 mcards grid and the product_interest badge row.
     // «القناة المفضّلة: واتساب» is a constant on a WhatsApp-only platform, and «نية الشراء»,
     // «حكم الصفقة» and the interest badges each rendered a THIRD and FOURTH time on this one
     // page — the status strip and ملف العميل already carry them, and carry them with a source.
-    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#344054;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
-    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#667085;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
+    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#7C7C7C;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#383838;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
+    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#7C7C7C;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
     const dm = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
     h += '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
       '<span class="chip" style="background:' + dm[2] + ';color:' + dm[1] + ';font-size:12px;padding:6px 14px;">حكم الصفقة: ' + dm[0] + "</span>" +
@@ -2506,28 +2576,28 @@ function vCustomer(ph) {
       // Only when it differs from c.outcomeEvidence: the same sentence printed twice on one
       // screen reads as two independent pieces of evidence for the same claim.
       (ins.evidence && String(ins.evidence).trim() !== String(c.outcomeEvidence || "").trim()
-        ? '<div style="font-size:11.5px;color:#667085;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
+        ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
       (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
     h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
       // Renamed: two blocks called الخطوة التالية with different provenance — one a stored fact
       // in ملف العميل, one a model suggestion — is the exact confusion this cycle exists to kill.
       '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">اقتراح المساعد للخطوة التالية</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#101828;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
-      (ins.why ? '<div style="font-size:11.5px;color:#475467;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
+      '<div style="font-size:13px;font-weight:700;color:#171717;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
+      (ins.why ? '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
       (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">وقت التواصل: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
   }
   h += "</div>";
   // timeline
   h += '<div class="card" style="margin:0;"><h3 style="margin:0 0 4px;">سجل التفاعل</h3>' +
-    '<div style="font-size:11px;color:#98A2B3;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
+    '<div style="font-size:11px;color:#999999;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
     '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
     ((d.timeline || []).length ? d.timeline.map((ev) =>
       '<div style="display:flex;gap:13px;padding:11px 2px;position:relative;">' +
-      '<span style="position:absolute;inset-inline-start:5px;top:24px;bottom:-11px;width:2px;background:#EAECF0;"></span>' +
+      '<span style="position:absolute;inset-inline-start:5px;top:24px;bottom:-11px;width:2px;background:#EDEDED;"></span>' +
       '<span style="width:12px;height:12px;flex:none;margin-top:5px;border-radius:999px;background:#fff;border:2.5px solid ' + tlDot(ev.kind) + ';position:relative;z-index:1;"></span>' +
       '<div style="flex:1;min-width:0;"><div style="font-size:10.5px;font-weight:700;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
-      '<div style="font-size:12.5px;color:#101828;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
-      : '<div style="padding:20px;text-align:center;color:#98A2B3;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
+      '<div style="font-size:12.5px;color:#171717;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
+      : '<div style="padding:20px;text-align:center;color:#999999;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
   h += "</div></div>";
   return h;
 }
@@ -2670,14 +2740,53 @@ async function refresh(force) {
 // human door onto the six properties and reaches no sender (BR-4). Nothing here can send WhatsApp.
 // The operator name rides the JSON BODY as «by» — Arabic cannot travel in an HTTP header.
 // ---------------------------------------------------------------------------
+// M2 — «أكّد» MUST NOT NARROW THE VALUE IT CONFIRMS.
+// propPost used to read #propdue straight out of the document and key the read on «nextStep». A
+// confirm opens no editor, so getElementById returned null, the due came out undefined, the request
+// shipped a bare string, and decideProp built a fresh prop with NO date: tapping «أكّد» on a dated
+// next step DELETED the date. The most valuable action in the product was lossy, and it lost
+// exactly the datum the founder's third question asks for.
+//
+// The fix is at the source and it is generic, so a seventh property added next quarter cannot
+// re-open the hole. Two rules:
+//   1. DEFAULT IS PRESERVE. Everything a stored prop carries that is not provenance is a value the
+//      operator owns, and it is carried forward untouched. The closed list below is what the
+//      LEDGER writes (tracker.ts Prop) — naming provenance rather than naming values means a new
+//      field is preserved the day it is added, with no edit to this file.
+//   2. ONLY AN OPEN EDITOR MAY CHANGE A VALUE. A control that is not on screen changes nothing.
+const PROP_AUDIT = ["value", "source", "by", "ts", "prior", "contested"];
+// field -> [the control that owns it while the editor is open, how to read that control].
+const PROP_CTRL = { nextStep: { due: ["propdue", "day"] } };
+function propCarry(key) {
+  const c = (profileData || {}).contact || {};
+  const stored = (c.props || {})[key] || null;
+  const out = {};
+  if (stored) {
+    Object.keys(stored).forEach((f) => {
+      if (PROP_AUDIT.indexOf(f) < 0 && stored[f] !== undefined && stored[f] !== null) out[f] = stored[f];
+    });
+  }
+  // Not our editor open (or none at all — which is what a confirm IS): the stored value stands.
+  if (!propEdit || propEdit.key !== key) return out;
+  const ctrl = PROP_CTRL[key] || {};
+  Object.keys(ctrl).forEach((f) => {
+    const el = document.getElementById(ctrl[f][0]);
+    if (!el) return;                       // the control is not rendered: it cannot have an opinion
+    const v = ctrl[f][1] === "day" ? dayToMs(el.value) : String(el.value || "");
+    // An emptied control is the operator DELETING the value — propClearDue's whole purpose. That is
+    // the only path that drops a stored field, and it takes a human clearing a visible box.
+    if (v === undefined || v === "") delete out[f]; else out[f] = v;
+  });
+  return out;
+}
 async function propPost(key, value, keepOpen) {
   const ph = profilePhone;
   if (!ph) return false;
   const body = { phone: ph, props: {}, by: OPERATOR };
-  // FR-4's optional date. Sent only for nextStep and only when the operator set one; an absent
-  // date must stay absent rather than becoming today, which would be an invented fact.
-  const dueEl = document.getElementById("propdue");
-  const dueMs = key === "nextStep" && dueEl ? dayToMs(dueEl.value) : undefined;
+  // Everything this property carries BESIDES its text — today that is FR-4's optional date. Read
+  // through propCarry so the default is PRESERVE and only an open editor can change a value; an
+  // absent date still stays absent rather than becoming today, which would be an invented fact.
+  const extra = propCarry(key);
   let val = value;
   // BR-2 + AC-7: the tag set and its provenance commit in ONE transaction, and the set that ships is
   // the one the OPERATOR just typed — parsed by interestPairs, the same reader that draws the chips.
@@ -2711,9 +2820,10 @@ async function propPost(key, value, keepOpen) {
     // not name is cleared rather than left on screen contradicting it.
     if (pairs.length) val = interestWire(pairs);
   }
-  // The route accepts either a bare string or {value, due}. Send the object form only when a date
-  // exists, so a field with no date keeps the simpler shape and stores no date at all.
-  body.props[key] = dueMs !== undefined ? { value: val, due: dueMs } : val;
+  // The route accepts either a bare string or {value, …}. Send the object form only when the
+  // property actually carries something beyond its text, so a dateless field keeps the simpler
+  // shape and stores no date at all.
+  body.props[key] = Object.keys(extra).length ? Object.assign({ value: val }, extra) : val;
   try {
     const r = await fetch("/admin/contact/props", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
@@ -2795,15 +2905,29 @@ window.propSave = async () => {
 // أكّد — one tap, no dialog. It re-writes the SAME value as a human, which is exactly what a
 // confirmation is: tracker.decideProp stamps «prior» with the reading it confirms, and that stamp
 // is the only thing that makes a confirmation rate computable later.
+// It carries the WHOLE prop forward, not just its text: propPost's propCarry defaults to preserving
+// every stored field and lets only an OPEN editor change one, and a confirm opens no editor. A
+// confirmation that narrowed what it confirmed would be the worst possible shape for this button.
 // «اعتمدها» writes the contested reading instead; «تجاهل» re-writes the standing fact, which
 // clears the stale «قراءة مختلفة» line without inventing a new value.
 window.propConfirm = async (btn) => {
   const key = btn.dataset.k;
   const c = (profileData || {}).contact || {};
   const p = (c.props || {})[key];
-  if (!p) return;
-  const val = btn.dataset.use === "c" && p.contested ? p.contested.value : p.value;
-  await propPost(key, val, false);
+  // A reading can be on screen with NO backing property — a hydrated contact whose interest lives
+  // only in c.tags, or whose next step is only the customer's own sentence in c.scheduledSaid.
+  // propState renders those as readings with «أكّد» beside them, and this used to open with a bare
+  // early return — a button that was reachable and did nothing. «أكّد» can only mean one thing:
+  // confirm the value the operator is LOOKING AT. So the fallback is the same source the row drew
+  // itself from, never an invented value, and if there is genuinely nothing to confirm we say so
+  // rather than failing mutely.
+  const shown = p
+    ? (btn.dataset.use === "c" && p.contested ? p.contested.value : p.value)
+    : key === "productInterest" ? interestWire(interestLatest(c.tags))
+    : key === "nextStep" ? String(c.scheduledSaid || "")
+    : "";
+  if (!shown) { alertBar("لا توجد قراءة لتأكيدها.", true); return; }
+  await propPost(key, shown, false);
 };
 // Clearing the date must be possible without clearing the step itself: an operator who learns the
 // meeting slipped should be able to drop the date and keep «زيارة الفرع». Blanking the input and

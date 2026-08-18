@@ -120,7 +120,15 @@ console.log("scrub + morning list: green");
 let h2 = 0;
 const c3 = (n, cond) => { if (!cond) h2++; console.log(`${cond ? "ok  " : "FAIL"} ${n}`); };
 const dash3 = readFileSync(join(root, "src/dashboard.ts"), "utf8");
-const rec = dash3.slice(dash3.indexOf("CRM STATUS REGION"), dash3.indexOf("CRM STATUS REGION") + 5200);
+// Bounded by a START and an END anchor, never by a character window. It WAS a 5200-char window,
+// and five lines of comment added inside the region pushed the three row() calls past the cut: all
+// three indexOf calls returned -1 and the ordering checks compared -1 < -1. This one failed loudly
+// (the good direction) but the identical shape passes VACUOUSLY the moment a comparison is `<=` or
+// a check is an `includes`. check-props.mjs states the rule; this file now follows it.
+const recStart = dash3.indexOf("CRM STATUS REGION");
+const recEnd = dash3.indexOf('row("مرحلة البيع", stageBody)', recStart);
+if (recStart < 0 || recEnd < 0) { console.log("FAIL [inert] the CRM status region anchors moved in src/dashboard.ts"); h2++; }
+const rec = recStart < 0 || recEnd < 0 ? "" : dash3.slice(recStart, recEnd + 200);
 c3("the record reads the real interest tags", rec.includes("(c.tags || []).forEach"));
 c3("…one chip per product, never averaged", rec.includes("latest.set(tg.product, tg)"));
 c3("…sorted hot before warm before cold", rec.includes("{ hot: 0, warm: 1, cold: 2 }"));
