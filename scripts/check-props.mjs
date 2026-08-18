@@ -341,7 +341,7 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     const { esc, fmtN, fmtD, fmtT } = ctx;
     let profileData = ctx.profileData, propEdit = null, propFlash = "";
     ${panelSrc}
-    return { vFactsPanel, interestPairs, propDraft, interestWire, interestUnread, propEditorHtml };
+    return { vFactsPanel, interestPairs, propDraft, interestWire, interestUnread, propEditorHtml, isoDay, dayToMs };
   `)({ esc, fmtN, fmtD, fmtT: fmtD, profileData: d });
   const api = panel(null);
 
@@ -380,8 +380,9 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
 
   // M2 — AC-7: the tag set that ships is the one the operator typed.
   let sent = null;
+  let dueVal = null;                      // null = no date input on screen; "" = present but empty
   const post = new Function("ctx", `
-    const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout } = ctx;
+    const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
     let propEdit = null, propFlash = "";
     const profileData = ctx.profileData;
     ${postSrc}
@@ -392,6 +393,11 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     profileData: doc({ productInterest: { value: "أشعة الأسنان:hot", source: "agent", by: "agent:tag_interest", ts: 1 } }, TAGS),
     fetch: async (_u, o) => { sent = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ ok: true }) }; },
     alertBar: () => {}, refresh: async () => {}, render: () => {}, setTimeout: () => {},
+    // FR-4's date control. The gate models the browser: getElementById returns the element when the
+    // editor is open and null when it is not — exactly the branch propPost must survive. dueVal is
+    // empty by default, so every existing assertion also proves a dateless save stays dateless.
+    document: { getElementById: (id) => (id === "propdue" && dueVal !== null ? { value: dueVal } : null) },
+    dayToMs: api.dayToMs,
   });
   await post("productInterest", "تقويم الأسنان: مهتم", true);
   check("a correction ships the TYPED set, never the unchanged c.tags",
@@ -400,6 +406,26 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   await post("productInterest", "   ", true);
   check("clearing the field ships [] — the deletion AC-7 exists for",
     [sent.tags, sent.props.productInterest.trim()], [[], ""]);
+
+  // FR-4 — the optional date. It had NO control on the panel at all (QA-5): the operator could not
+  // record WHEN, which is the third thing this product exists to answer, and the bad_date validation
+  // in decideProp was unreachable dead code. These prove the control reaches the ledger and that an
+  // absent date stays absent rather than defaulting to today — an invented fact.
+  dueVal = "2026-09-03";
+  await post("nextStep", "زيارة الفرع", true);
+  check("a date the operator picked reaches the route as {value, due}",
+    [typeof sent.props.nextStep === "object", sent.props.nextStep.value,
+     api.isoDay(sent.props.nextStep.due)],
+    [true, "زيارة الفرع", "2026-09-03"]);
+  dueVal = "";
+  await post("nextStep", "زيارة الفرع", true);
+  check("…an emptied date sends NO date, never today", typeof sent.props.nextStep, "string");
+  dueVal = null;
+  await post("nextStep", "زيارة الفرع", true);
+  check("…and a save with no date control on screen is unaffected", typeof sent.props.nextStep, "string");
+  check("dayToMs and isoDay round-trip the operator's day", api.isoDay(api.dayToMs("2026-09-03")), "2026-09-03");
+  check("dayToMs refuses anything that is not a day", api.dayToMs("bogus"), undefined);
+
   await post("productInterest", "ما عاد مهتم", true);
   check("free text ships [] rather than leaving stale chips in the table",
     [sent.tags, sent.props.productInterest], [[], "ما عاد مهتم"]);
@@ -491,7 +517,7 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
   let asked = false, sent3 = null;
   const edit3 = { key: "productInterest", val: "", err: "", sel: false };
   const post3 = new Function("ctx", `
-    const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout } = ctx;
+    const { interestPairs, interestUnread, interestWire, OPERATOR, profilePhone, TOKEN, fetch, alertBar, fmtN, PROP_MAX, refresh, render, setTimeout, document, dayToMs } = ctx;
     let propEdit = ctx.propEdit, propFlash = "";
     const profileData = ctx.profileData;
     ${postSrc}
@@ -502,6 +528,11 @@ if (panelSrc && postSrc && outSrc && saveSrc) {
     profileData: doc(null, TAGS), propEdit: edit3,
     fetch: async (_u, o) => { asked = true; sent3 = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ ok: true }) }; },
     alertBar: () => {}, refresh: async () => {}, render: () => {}, setTimeout: () => {},
+    // FR-4's date control. The gate models the browser: getElementById returns the element when the
+    // editor is open and null when it is not — exactly the branch propPost must survive. dueVal is
+    // empty by default, so every existing assertion also proves a dateless save stays dateless.
+    document: { getElementById: (id) => (id === "propdue" && dueVal !== null ? { value: dueVal } : null) },
+    dayToMs: api.dayToMs,
   });
   const attempt = async (typed) => { asked = false; sent3 = null; edit3.err = ""; const r = await post3("productInterest", typed, true); return { r, asked, sent: sent3, err: edit3.err }; };
   const partial = await attempt("منتج أ: مهتم، منتج ب: مهتم جدا");

@@ -86,9 +86,13 @@ export const CAMPAIGNS_CRM_CSS = `
   .spec { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; background:#F9FAFB;
     border:1px solid #EAECF0; border-radius:13px; padding:16px 18px; margin-bottom:16px; }
   .spec .wa { flex:1; min-width:260px; background:#E5DDD4; border-radius:11px; padding:11px; }
+  /* line-height and the clamp height are both in PX on purpose. -webkit-line-clamp only works on
+     display:-webkit-box, and the computed display here resolves to flow-root, so the clamp never
+     engaged and overflow:hidden cut the text mid-line — a ragged half-row of Arabic under the
+     bubble. An explicit max-height of exactly 2 line-heights clips on a line boundary regardless. */
   .spec .bub2 { background:#DCF8C6; border-radius:9px; padding:10px 12px; font-size:12.5px; color:#101828;
-    line-height:1.9; white-space:pre-wrap; word-break:break-word; }
-  .spec .clamp { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    line-height:24px; white-space:pre-wrap; word-break:break-word; }
+  .spec .clamp { max-height:48px; overflow:hidden; }
   .spec .facts { flex:none; display:flex; flex-direction:column; gap:10px; min-width:150px; }
   .spec .facts .k { font-size:10.5px; color:#98A2B3; font-weight:700; }
   .spec .facts .v { font-size:12.5px; color:#101828; font-weight:700; margin-top:2px; }

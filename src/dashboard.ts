@@ -2104,6 +2104,21 @@ function propDraft(key, p) {
   }
   return String(p.value || "");
 }
+// epoch ms -> «YYYY-MM-DD» for an <input type="date">, in Riyadh, so a late-evening moment does not
+// display as the previous day. Returns "" for anything unreadable rather than a wrong date.
+function isoDay(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return "";
+  const d = new Date(n + 3 * 3600e3);
+  return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+}
+// «YYYY-MM-DD» -> epoch ms at 09:00 Riyadh. A date with no time is a DAY, and 09:00 is the working
+// hour a human means by it; never midnight, which reads as the day before in some clients.
+function dayToMs(iso) {
+  const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(String(iso || "").trim());
+  if (!m) return undefined;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 6, 0, 0, 0);
+}
 function propEditorHtml(key, val, err) {
   const cap = PROP_MAX[key] || 120;
   let h = "";
@@ -2129,6 +2144,18 @@ function propEditorHtml(key, val, err) {
   h += key === "note"
     ? '<textarea id="propinp" class="inp" rows="3" maxlength="' + cap + '" style="margin-top:6px;width:100%;" onkeydown="propKey(event)" placeholder="ما لا يظهر في المحادثة: من قابلته، ما وعدت به، ما يمنع الشراء.">' + esc(val) + "</textarea>"
     : '<input id="propinp" class="inp" maxlength="' + cap + '" style="margin-top:6px;width:100%;" value="' + esc(val) + '" onkeydown="propKey(event)">';
+  // FR-4 promises «نص + تاريخ اختياري», and there was no date control at all — so the operator could
+  // not record WHEN, which is the third thing this whole product exists to answer, and the bad_date
+  // validation in tracker.decideProp was unreachable dead code. A date input renders LTR by nature;
+  // label carries the meaning in Arabic beside it.
+  if (key === "nextStep") {
+    const cur = (((profileData || {}).contact || {}).props || {}).nextStep;
+    const dv = propEdit && propEdit.due !== undefined ? propEdit.due : (cur && cur.due ? isoDay(cur.due) : "");
+    h += '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">' +
+      '<label for="propdue" style="font-size:11.5px;color:#667085;font-weight:600;">التاريخ (اختياري)</label>' +
+      '<input id="propdue" type="date" class="inp" style="padding:8px 10px;direction:ltr;" value="' + esc(dv) + '">' +
+      (dv ? '<button class="btn btn-ghost mini" onclick="propClearDue()">امسح التاريخ</button>' : "") + "</div>";
+  }
   h += '<div class="cbar"><button class="btn btn-teal mini" onclick="propSave()">حفظ</button>' +
     '<button class="btn btn-ghost mini" onclick="propCancel()">إلغاء</button></div>';
   // The save that did not reach the ledger keeps the editor OPEN with the typed text in it. A
@@ -2647,6 +2674,10 @@ async function propPost(key, value, keepOpen) {
   const ph = profilePhone;
   if (!ph) return false;
   const body = { phone: ph, props: {}, by: OPERATOR };
+  // FR-4's optional date. Sent only for nextStep and only when the operator set one; an absent
+  // date must stay absent rather than becoming today, which would be an invented fact.
+  const dueEl = document.getElementById("propdue");
+  const dueMs = key === "nextStep" && dueEl ? dayToMs(dueEl.value) : undefined;
   let val = value;
   // BR-2 + AC-7: the tag set and its provenance commit in ONE transaction, and the set that ships is
   // the one the OPERATOR just typed — parsed by interestPairs, the same reader that draws the chips.
@@ -2680,7 +2711,9 @@ async function propPost(key, value, keepOpen) {
     // not name is cleared rather than left on screen contradicting it.
     if (pairs.length) val = interestWire(pairs);
   }
-  body.props[key] = val;
+  // The route accepts either a bare string or {value, due}. Send the object form only when a date
+  // exists, so a field with no date keeps the simpler shape and stores no date at all.
+  body.props[key] = dueMs !== undefined ? { value: val, due: dueMs } : val;
   try {
     const r = await fetch("/admin/contact/props", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
@@ -2771,6 +2804,15 @@ window.propConfirm = async (btn) => {
   if (!p) return;
   const val = btn.dataset.use === "c" && p.contested ? p.contested.value : p.value;
   await propPost(key, val, false);
+};
+// Clearing the date must be possible without clearing the step itself: an operator who learns the
+// meeting slipped should be able to drop the date and keep «زيارة الفرع». Blanking the input and
+// saving does exactly that, because an absent date is simply never sent.
+window.propClearDue = () => {
+  const el = document.getElementById("propdue");
+  if (el) el.value = "";
+  if (propEdit) propEdit.due = "";
+  render(false);
 };
 window.propKey = (e) => {
   if (e.key === "Escape") { e.preventDefault(); propCancel(); }
