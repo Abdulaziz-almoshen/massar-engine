@@ -340,7 +340,7 @@ const outSrc = cut("window.setOutcome = async (btn) => {", "\nwindow.refreshInsi
 const saveSrc = cut("window.propSave = async () => {", "\n// أكّد — one tap");
 const confirmSrc = cut("window.propConfirm = async (btn) => {", "\n// Clearing the date must be possible");
 const apptSrc = cut("function appt(c) {", "// --- end appointment");
-const morningSrc = cut("function vMorningList() {", "\nfunction vCustomers() {");
+const morningSrc = cut("function vMorningList() {", "\nwindow.entDel = async (id) => {");
 // THE ONE READER, executed. appt() and fmtDay() are what M3 reconciles the appointment to, so the
 // three surfaces below are rendered against the REAL functions, not against a stub of them.
 const A = apptSrc ? new Function("return (" + "function () { " + apptSrc + " return { appt: appt, fmtDay: fmtDay }; }" + ")")()() : null;

@@ -17,6 +17,7 @@ import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
+import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -121,11 +122,30 @@ export const DASHBOARD_HTML = `<!doctype html>
   .aqd { width: 8px; height: 8px; border-radius: 999px; flex: none; }
   .aqav { width: 32px; height: 32px; flex: none; border-radius: 8px; background: #F3F3F3; color: #525252; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px; }
   .aqic { background: #F8F8F8; }
-  .aqt { flex: 1 1 44%; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .aqt { flex: 0 0 min(42%, 360px); min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .aqn { font-size: 13.5px; font-weight: 500; color: #171717; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .aqw { font-size: 12px; color: #7C7C7C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .aqa { flex: 1 1 34%; min-width: 0; font-size: 12.5px; color: #525252; line-height: 1.6; }
+  .aqa { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: #525252; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  /* لوحة الفرز rows: the same flush-row grid as every other table here. Five tinted fills read as
+     five alert levels; none of these is an alert, so the colour is the group's dot, once. */
+  .oprow { display: grid; grid-template-columns: 28px minmax(0,1.5fr) 1.05fr minmax(0,2fr) auto;
+    align-items: center; gap: 12px; padding: 11px 20px 11px 12px; border-top: 1px solid #EDEDED;
+    cursor: pointer; transition: background .14s ease; }
+  .oprow:first-of-type { border-top: 0; }
+  .oprow:hover { background: #F8F8F8; }
+  .oprow .av { width: 28px; height: 28px; border-radius: 7px; background: #F3F3F3; color: #525252;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .oprow .nm { font-size: 13.5px; font-weight: 450; color: #171717; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oprow .ph { font-size: 12.5px; color: #7C7C7C; direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
+  .oprow .wh { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oprow .go { font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  .oprow:hover .go, .oprow:focus-within .go { opacity: 1; }
+  @media (max-width: 860px) {
+    .oprow { grid-template-columns: 28px minmax(0,1fr) auto; row-gap: 4px; }
+    .oprow .ph { grid-row: 2; grid-column: 2 / 4; }
+    .oprow .wh { grid-row: 3; grid-column: 2 / 4; white-space: normal; }
+  }
   .aq:hover .aqgo, .aq:focus-within .aqgo { opacity: 1; }
   @media (max-width: 860px) { .aqa { display: none; } }
   .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
@@ -350,6 +370,7 @@ ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
+${TARGETS_CRM_CSS}
 </style>
 </head>
 <body>
@@ -417,7 +438,7 @@ let cache = null; let selProd = 0;
 let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = false; let segWindow = 5;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
-let manualOpen = false; let manualStat = ""; let custQ = "";
+let manualOpen = false; let manualStat = "";
 const LIST_CAP = 60;   // never render huge audiences — filter/search narrows, «تحديد المطابقين» selects all matches
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
@@ -451,7 +472,7 @@ const TITLES = {
   kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
-  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "ضمن المرحلة القادمة"],
+  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "من مهتم، ومن غير مهتم، ومتى موعد المهتمين"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
@@ -1744,7 +1765,7 @@ window.entFileUpload = async (input) => {
       msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
         d.skippedRows.map((s) => "صف " + fmtN(s.row) + ": " + esc(s.reason)).join(" · ") + "</div>";
     }
-    entImportSummary = msg;   // survives the re-render (the status div is rebuilt by vCustomers)
+    entImportSummary = msg;   // survives the re-render (the status div is rebuilt by vTargetsCrm)
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
     render(false);
@@ -1752,27 +1773,31 @@ window.entFileUpload = async (input) => {
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الاستيراد</span>'; }
   input.value = "";
 };
-window.entDel = async (id) => {
-  await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-  entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
-};
 /**
- * THE MORNING LIST. The founder's own definition of what he is buying: "we want to know who are
- * interested, who are not interested, and if interested, when are we going to schedule them."
+ * THE OUTCOME BOARD — «لوحة الفرز». The founder's own definition of what he is buying: "we want to
+ * know who are interested, who are not interested, and if interested, when are we going to
+ * schedule them." Three questions, five groups, one screen.
  *
- * One row per contact, grouped by outcome, actionable before standup. The scheduled group leads
- * and shows the CUSTOMER'S OWN WORDS for the time — our parse is secondary and labelled as ours.
- * Counts are real: a group with nothing in it says so rather than being hidden, because an empty
- * «موعد محدد» column is the honest measure of whether the agent is working.
+ * WHERE IT LIVES, and why it moved. This board used to sit on TOP of #targets, above the imported
+ * book, which made #targets answer two unrelated questions at once — and made this the third
+ * rendering of a ranked contact list, after #home's action queue and #customers' group-by-outcome
+ * view. It has its own route now: «فرص البيع», which until this cycle was a «ضمن المرحلة القادمة»
+ * placeholder. The pipeline IS the founder's three questions; there was never a second thing for
+ * that route to be.
+ *
+ * An empty group STILL says so rather than hiding — an empty «موعد محدد» is the honest measure of
+ * whether the agent is working, and it is the one number a board that only renders what exists can
+ * never show. That is also why this is not merely #customers' تجميع view, which derives its groups
+ * from the rows present.
  */
 function vMorningList() {
   const cs = (cache && cache.contacts || []).filter((c) => showTest || !c.test);
   const GROUPS = [
-    ["scheduled", "موعد محدد", "#027A48", "#ECFDF3", "اتصل بهم اليوم"],
-    ["handoff", "بانتظار المختص", "#B54708", "#FFFAEB", "أجاب المساعد وينتظرون مكالمة"],
-    ["interested", "مهتم بلا موعد", "#2F5F94", "#EFF6FF", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
-    ["later", "مؤجل", "#7C7C7C", "#F3F3F3", "طلبوا التأجيل"],
-    ["stopped", "لا يرغب في التواصل", "#B42318", "#FEF3F2", "توقّف الإرسال إليهم"],
+    ["scheduled", "موعد محدد", "#027A48", "اتصل بهم اليوم"],
+    ["handoff", "بانتظار المختص", "#B54708", "أجاب المساعد وينتظرون مكالمة"],
+    ["interested", "مهتم بلا موعد", "#2F5F94", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
+    ["later", "مؤجل", "#7C7C7C", "طلبوا التأجيل"],
+    ["stopped", "لا يرغب في التواصل", "#B42318", "توقّف الإرسال إليهم"],
   ];
   // A confirmed day decides the bucket, not c.outcome. An interested clinic whose day the operator
   // typed was rendering «موعد مؤكَّد: الثلاثاء ٢٥ أغسطس» UNDER the heading «مهتم بلا موعد» — the
@@ -1789,22 +1814,23 @@ function vMorningList() {
     return c.outcome === k;
   });
   const unsorted = cs.filter((c) => !c.outcome && !c.optedOut);
-  let h = '<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-    '<h3 style="margin:0;flex:1;min-width:180px;">قائمة الصباح</h3>' +
-    '<span style="font-size:11.5px;color:#999999;">' + fmtN(cs.length) + " جهة" + "</span></div>" +
-    '<div style="font-size:11.5px;color:#999999;margin-top:8px;line-height:1.8;">من تتصل به اليوم، ومن توقّف التواصل معه. الوقت معروض بكلمات العميل نفسه.</div>';
-  for (const [key, label, ink, bg, hint] of GROUPS) {
+  let h = "";
+  for (const [key, label, ink, hint] of GROUPS) {
     const rows = of(key);
-    h += '<div style="margin-top:16px;">' +
-      '<div style="display:flex;align-items:baseline;gap:8px;">' +
-      '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + label + "</span>" +
-      '<span style="font-size:12px;color:#999999;">' + fmtN(rows.length) + "</span>" +
-      '<span style="font-size:11px;color:#999999;">· ' + hint + "</span></div>";
+    // Group header on the same #F8F8F8 bar as #customers' group view — one grouped-list idiom in
+    // the product, not one per screen. The five tinted row fills that used to be here are gone:
+    // five pastels down one page read as five alert levels, and none of these is an alert.
+    h += '<div class="tblwrap crmflat rise" style="margin-bottom:14px;">' +
+      '<div style="display:flex;align-items:center;gap:9px;padding:9px 20px 9px 12px;border-bottom:1px solid #EDEDED;background:#F8F8F8;">' +
+      '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + ink + ';"></span>' +
+      '<span style="font-size:13px;font-weight:500;color:#171717;">' + label + "</span>" +
+      '<span class="cntpill">' + fmtN(rows.length) + "</span>" +
+      '<span style="font-size:12px;color:#999999;">' + hint + "</span></div>";
     if (!rows.length) {
-      h += '<div style="font-size:11.5px;color:#999999;margin-top:6px;">لا أحد في هذه المجموعة بعد.</div></div>';
+      h += '<div style="padding:16px 20px;font-size:12.5px;color:#999999;">لا أحد في هذه المجموعة بعد.</div></div>';
       continue;
     }
-    h += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' + rows.map((c) => {
+    h += rows.map((c) => {
       const nm = c.waName || "غير معروف";
       // M3 — this function's own comment above quotes the founder's three questions, and this was
       // the one surface that never learned his answer to the third: it read c.scheduledAt alone, so
@@ -1817,79 +1843,36 @@ function vMorningList() {
         ? esc(fmtDay(ap.at)) + (ap.by ? " · سجّله " + esc(ap.by) : "")
         : "";
       const when = key === "scheduled" && c.scheduledSaid
-        ? '<span style="font-size:12.5px;font-weight:700;color:#171717;">«' + esc(c.scheduledSaid) + "»</span>" +
-          (conf ? '<span style="font-size:11.5px;font-weight:700;color:#027A48;"> · مؤكَّد ' + conf + "</span>"
-            : ap ? '<span style="font-size:11px;color:#999999;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
-                 : '<span style="font-size:11px;color:#999999;"> · لم نقرأ تاريخًا</span>')
+        ? '<span style="font-size:12.5px;font-weight:500;color:#171717;">«' + esc(c.scheduledSaid) + "»</span>" +
+          (conf ? '<span style="font-size:12px;color:#027A48;"> · مؤكَّد ' + conf + "</span>"
+            : ap ? '<span style="font-size:12px;color:#999999;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
+                 : '<span style="font-size:12px;color:#999999;"> · لم نقرأ تاريخًا</span>')
         // A confirmed day answers «متى؟» in EVERY group, not only in موعد محدد: an interested
         // clinic with a day the operator wrote down is exactly what his third question asks for.
         : conf
-          ? '<span style="font-size:11.5px;font-weight:700;color:#027A48;">موعد مؤكَّد: ' + conf + "</span>"
+          ? '<span style="font-size:12px;color:#027A48;">موعد مؤكَّد: ' + conf + "</span>"
           : c.outcomeReason
-            ? '<span style="font-size:11.5px;color:#7C7C7C;">«' + esc(String(c.outcomeReason).slice(0, 70)) + "»</span>"
-            : "";
-      return '<div onclick="location.hash=\\'customer/' + esc(c.phone) + '\\'" style="cursor:pointer;background:' + bg +
-        ';border:1px solid #EDEDED;border-inline-start:3px solid ' + ink + ';border-radius:10px;padding:10px 13px;' +
-        'display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;">' +
-        '<span style="font-size:13px;font-weight:700;color:#171717;min-width:130px;">' + esc(nm) + "</span>" +
-        '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(c.phone) + "</span>" +
-        '<span style="flex:1"></span>' + when + "</div>";
-    }).join("") + "</div></div>";
+            ? '<span style="font-size:12px;color:#7C7C7C;">«' + esc(String(c.outcomeReason).slice(0, 80)) + "»</span>"
+            : '<span style="font-size:12px;color:#C7C7C7;">—</span>';
+      return '<div class="oprow" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
+        '<span class="av">' + esc(nm.trim().charAt(0)) + "</span>" +
+        '<span class="nm">' + esc(nm) + "</span>" +
+        '<span class="ph">+' + esc(c.phone) + "</span>" +
+        '<span class="wh">' + when + "</span>" +
+        '<span class="go">افتح ←</span></div>';
+    }).join("") + "</div>";
   }
   if (unsorted.length) {
-    h += '<div style="margin-top:18px;padding-top:12px;border-top:1px solid #F3F3F3;font-size:11.5px;color:#999999;">' +
-      fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة." + "</div>";
-  }
-  return h + "</div>";
-}
-
-function vCustomers() {
-  let h = '<div class="card">' +
-    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-    '<h3 style="margin:0;flex:1;min-width:180px;">جهات الاستهداف</h3>' +
-    '<button class="btn btn-teal" style="font-size:12.5px;padding:11px 18px;" onclick="entFilePick()">⬆ رفع ملف Excel/CSV</button>' +
-    '<a href="/assets/audience-template.xlsx" download class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;text-decoration:none;">القالب الجاهز</a></div>' +
-    '<div style="font-size:11px;color:#999999;margin-top:9px;line-height:1.8;">قائمتك كما هي: عمود اسم + عمود جوال، وكل عمود إضافي (المدينة، الحجم…) يصبح <b style="color:#2E7D77;">شريحة استهداف</b> · التكرار يُحدَّث · أرقام 05 تتحول لـ966</div>' +
-    '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">' +
-    '<div id="entfstat" style="margin-top:10px;">' + entImportSummary + "</div>" +
-    '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" style="margin-top:10px;"><summary style="font-size:11.5px;color:#7C7C7C;cursor:pointer;font-weight:600;">إضافة جهة يدويًا</summary>' +
-    '<div style="font-size:11.5px;color:#999999;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · الحجم والمدينة يصبحان شريحتَي استهداف</div>' +
-    '<div id="manualrows">' + manualRowsHtml() + '</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
-    '<button class="btn btn-teal" style="font-size:12.5px;" onclick="entManualSave()">حفظ الجهات ←</button>' +
-    '<button class="btn btn-ghost" style="font-size:12px;" onclick="entAddRow()">+ صف آخر</button>' +
-    '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
-    '<button class="btn" style="font-size:11.5px;background:transparent;color:#7C7C7C;padding:8px 4px;" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
-    '<div id="pastebox" style="display:none;margin-top:12px;">' +
-    '<div style="font-size:11.5px;color:#7C7C7C;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#171717;">الاسم، الجوال، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12.5px;line-height:2;resize:vertical;"></textarea>' +
-    '<button class="btn btn-ghost" style="font-size:12px;margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
-    '</details></div>';
-  const groups = segGroups();
-  const cq = custQ.trim();
-  const cm = cq ? entities.filter((e) => e.name.includes(cq) || e.phone.includes(cq)) : entities;
-  const cshown = cm.slice(0, LIST_CAP);
-  h += '<div class="sec">جهات الاستهداف <span class="meta">' + fmtN(entities.length) + " جهة" +
-    (groups.length ? " · شرائح: " + groups.map((g) => esc(g.key)).join("، ") : "") + "</span></div>";
-  if (!entities.length) {
-    h += '<div class="empty"><div class="ic"><span></span></div><div class="t">لا مستهدفين بعد</div><div class="s">ارفع ملفك أعلاه — ثم اخترهم بالشرائح أو فردًا في «إنشاء حملة».</div></div>';
-  } else {
-    h += '<div style="margin-bottom:10px;"><input id="cq" value="' + esc(custQ) + '" oninput="custSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;width:100%;font-size:12.5px;border:1px solid #EDEDED;border-radius:10px;padding:9px 13px;background:#fff;"></div>';
-    h += '<div class="tblwrap">' + cshown.map((e) => {
-      const hasConvo = Boolean(contactByPhone(e.phone));
-      return '<div ' + (hasConvo ? 'onclick="location.hash=\\'customer/' + esc(e.phone) + '\\'" style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F3F3F3;"' : 'style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #F3F3F3;"') + '>' +
-      '<div class="avatar" style="width:34px;height:34px;border-radius:9px;background:#171717;color:#3FB6B0;display:flex;align-items:center;justify-content:center;font-weight:700;">' + esc(e.name.trim().charAt(0)) + "</div>" +
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#171717;">' + esc(e.name) + (hasConvo ? ' <span style="font-size:10.5px;color:#2E7D77;font-weight:700;">ملف ←</span>' : "") + "</span>" +
-      '<span class="hidemob" style="display:flex;gap:6px;align-items:center;">' + attrChips(e, 3) + "</span>" +
-      '<span style="font-size:11.5px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span>" +
-      '<button onclick="event.stopPropagation();entDel(' + e.id + ')" style="font-family:inherit;font-size:15px;font-weight:700;color:#c43d3d;background:#fbe9e9;border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;line-height:1;">×</button></div>';
-    }).join("") +
-    (cm.length > LIST_CAP ? '<div style="padding:12px;text-align:center;color:#7C7C7C;font-size:12px;background:#fafbfc;">+ ' + fmtN(cm.length - LIST_CAP) + ' آخرون — استخدم البحث للوصول إليهم</div>' : "") +
-    (cm.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>";
+    h += '<div style="font-size:12.5px;color:#999999;padding:4px 2px 8px;">' +
+      fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة.</div>";
   }
   return h;
 }
-window.custSearch = (el) => { custQ = el.value; clearTimeout(window.__cq); window.__cq = setTimeout(() => render(false), 250); };
+
+window.entDel = async (id) => {
+  await fetch("/admin/entities/delete", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+  entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
+};
 
 function ratesStrip(agg) {
   // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
@@ -1905,13 +1888,13 @@ function ratesStrip(agg) {
     '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:4px;">' +
     '<h3 style="margin:0;">معدلات الأداء</h3>' +
     '<span style="font-size:10.5px;color:#999999;">كل نسبة ومقامها معها</span></div>' +
-    rows.map((r) => '<div style="display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid #EDEDED;">' +
-      '<span style="flex:0 0 108px;font-size:12.5px;color:#383838;">' + r[0] + "</span>" +
-      '<span style="flex:1;min-width:80px;height:6px;background:#F3F3F3;border-radius:999px;overflow:hidden;">' +
-        (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#1F7A73;border-radius:999px;"></i>') + "</span>" +
-      '<span style="flex:0 0 92px;text-align:start;font-size:12px;color:#999999;">' + r[2] + "</span>" +
-      '<span style="flex:0 0 56px;text-align:end;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#C7C7C7" : "#171717") +
-        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#999999;font-weight:450;">٪</span>') + "</span></div>").join("") + "</div>";
+    rows.map((r) => '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #EDEDED;">' +
+      '<span style="flex:0 0 106px;font-size:12.5px;color:#383838;">' + r[0] + "</span>" +
+      '<span style="flex:0 0 52px;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#C7C7C7" : "#171717") +
+        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#999999;font-weight:450;">٪</span>') + "</span>" +
+      '<span style="flex:0 0 88px;font-size:12px;color:#999999;">' + r[2] + "</span>" +
+      '<span style="flex:1;min-width:60px;height:6px;background:#F3F3F3;border-radius:999px;overflow:hidden;">' +
+        (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#1F7A73;border-radius:999px;"></i>') + "</span></div>").join("") + "</div>";
 }
 function stageBars(rows) {
   const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
@@ -2008,10 +1991,12 @@ function vHomeCharts(cs) {
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
   h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += chartCard("جهات الاستهداف حسب المدينة", fmtN(entities.length) + " جهة", cityRows.length ? hbarRows(cityRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود المدينة.</div>');
-  h += chartCard("حسب الحجم", "من أعمدة ملفك", sizeRows.length ? hbarRows(sizeRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود الحجم.</div>');
-  h += chartCard("حسب القطاع", "من أعمدة ملفك", secRows.length ? hbarRows(secRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها عمود القطاع.</div>');
   h += "</div>";
+  const facets = [["المدينة", cityRows], ["الحجم", sizeRows], ["القطاع", secRows]].filter((f) => f[1].length);
+  h += chartCard("تركيبة قائمتك", fmtN(entities.length) + " جهة · من أعمدة ملفك", facets.length
+    ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:4px;">' +
+      facets.map((f) => '<div><div style="font-size:11.5px;font-weight:500;color:#7C7C7C;padding-bottom:2px;">' + f[0] + "</div>" + hbarRows(f[1], "#1F7A73") + "</div>").join("") + "</div>"
+    : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
   return h;
 }
 const DEAL_META = { won: ["صفقة مكتسبة", "#027A48", "#ECFDF3"], lost: ["غير مكتسبة", "#B42318", "#FEF3F2"], stalled: ["متوقفة", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
@@ -2091,7 +2076,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
             (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : "") +
           (c && c.test ? '<span class="chip">تجريبي</span>' : "") + "</span>" +
         '<span class="aqw">' + esc(it.why) + "</span></span>" +
-        '<span class="aqa">' + esc(clip(it.act, 64)) + "</span>" +
+        '<span class="aqa">' + esc(clip(it.act, 150)) + "</span>" +
         '<span class="aqgo">افتح ←</span></div>';
     }).join("");
   }
@@ -2134,9 +2119,11 @@ function vWinLoss() {
       (!nWin && !nLoss ? "لا محرّكات محكومة بعد على أي من الجانبين."
         : !nLoss ? "لا خسائر محكومة بعد — وهذا خبر جيد." : "لا مكاسب محكومة بعد.") + "</div>";
   }
-  if ((winloss.by_product || []).length) {
+  // a bordered block that renders nothing is still a border: decide from the filtered rows, not the raw list
+  const judgedProducts = (winloss.by_product || []).filter((pr) => (pr.won || 0) + (pr.lost || 0) > 0).slice(0, 4);
+  if (judgedProducts.length) {
     h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDEDED;">' +
-      winloss.by_product.slice(0, 4).map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
+      judgedProducts.map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
         '<span style="flex:1;min-width:0;color:#383838;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
         '<span style="color:#027A48;">' + fmtN(pr.won) + ' مكتسبة</span><span style="color:#C7C7C7;">·</span>'  +
         '<span style="color:#B42318;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
@@ -2876,10 +2863,10 @@ function dataSignature() {
     campaigns.length, entities.length, kbDocs.length, prodAssets.length,
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
-    showTest, campTab, campSortKey, campQ, entQ, custQ, campFilter, rQ, selProd,
+    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
-    JSON.stringify(entFilters), [...entSel].join(","),
+    JSON.stringify(entFilters), JSON.stringify(tgtFilters), [...entSel].join(","),
   ].join("~");
 }
 function render(fetchNew) {
@@ -2912,7 +2899,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline" || cur === "tasks" || cur === "notes") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -2920,7 +2907,8 @@ function render(fetchNew) {
     // the importer, and there was no list to click a customer FROM.
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
-      : cur === "targets" ? (vMorningList() + vCustomers())
+      : cur === "targets" ? vTargetsCrm()
+      : cur === "opps" ? vMorningList()
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()
@@ -3263,6 +3251,7 @@ ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
+${TARGETS_CRM_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */

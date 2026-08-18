@@ -8,7 +8,11 @@
 // customer's own operation — the sharpest form of user-model Rule 2, and the exact thing that
 // makes it read as a bot pretending to know them.
 // ---------------------------------------------------------------------------
-process.env.ACCOUNTS_JSON = JSON.stringify([{
+// Seeded through `accounts.snapshot()`, not an env blob: since 2026-08-18 the account graph lives
+// in the entities table, and the env registry it replaced was the reason this file's "known"
+// state never once occurred in production.
+const accounts = await import("../dist/accounts.js");
+const seedKnown = () => accounts.snapshot([{
   phone: "966500000111",
   customerName: "مجموعة طبية",
   customerType: "مجموعة طبية",
@@ -20,7 +24,14 @@ process.env.ACCOUNTS_JSON = JSON.stringify([{
   hisArchitecture: "مركزي",
   integrationStatus: "لا يوجد",
   manualUsage: "الإصدار يتم من المنصة يدويًا",
+  facts: {
+    hisName: { value: "نظام المجموعة", source: "human", by: "import", ts: 1 },
+    branches: { value: "10", source: "human", by: "import", ts: 1 },
+    hisArchitecture: { value: "مركزي", source: "human", by: "import", ts: 1 },
+    integrationStatus: { value: "لا يوجد", source: "human", by: "import", ts: 1 },
+  },
 }]);
+seedKnown();
 
 const { systemPrompt } = await import("../dist/agent.js");
 
@@ -139,7 +150,7 @@ console.log("founder-review rules: green");
 // --- price cannot cross products; scope questions come first -----------------
 // The prompt-level lock stopped the wrong FILE but left every other product's PRICING in context.
 // A model cannot quote a price it was never given, so the knowledge block is narrowed too.
-process.env.ACCOUNTS_JSON = "[]";
+accounts.snapshot([]);
 const nvrConvo = {
   phone: "966500000777", tags: [], statusTimes: {},
   optedOut: false, human: false, test: true, agentTurns: 0,

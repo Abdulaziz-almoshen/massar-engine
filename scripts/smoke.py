@@ -25,6 +25,8 @@ ROUTES = [
     # is why both routes are asserted now — the old landmark would still pass on the wrong screen.
     ("#customers", "العملاء"),
     ("#targets", "جهات الاستهداف"),
+    # فرص البيع stopped being a «ضمن المرحلة القادمة» placeholder this cycle; it is the outcome board.
+    ("#opps", "موعد محدد"),
     ("#pipeline", "لوحة المتابعة"),
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),
