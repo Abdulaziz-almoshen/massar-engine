@@ -121,6 +121,13 @@ export const CAMPAIGNS_CRM_CSS = `
   .crmflat { background:#fff; border:0; border-radius:0; box-shadow:none; margin-bottom:18px; }
   .crmflat .crow { border-top:1px solid #EDEDED; }
   .crmflat .crow:first-of-type { border-top:0; }
+  /* targets table: seven cells, seven tracks */
+  .tgtrow { grid-template-columns: 40px 1.8fr 1fr 1.9fr 1.5fr .55fr .85fr; border-top:1px solid #EDEDED; }
+  /* every cell clips: an interest chip wider than its track was overlapping آخر رسالة */
+  .tgtrow > div { min-width:0; overflow:hidden; }
+  .tgtrow .chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; display:inline-block;
+    line-height:1.7; }
+  @media (max-width: 939px) { .tgtrow { grid-template-columns: 40px minmax(0,1fr) auto; } }
   .crmgrid { min-width: 940px; }
   .crow { display:grid; grid-template-columns: 40px 2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;
     gap:12px; align-items:center; padding:8px 20px 8px 12px; min-height:36px; }
@@ -734,27 +741,71 @@ function vKmonDetailCrm(id, d) {
     }).join("") +
     '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EDEDED;border-radius:999px;padding:7px 13px;background:#F8F8F8;width:130px;">' +
     '</div>';
-  var allOnD = shown.length > 0 && shown.every(function (r) { return crmSelD[r.phone]; });
-  h += '<div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid #F3F3F3;background:#F8F8F8;">' +
-    '<span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOnD ? " checked" : "") + ' onclick="crmTogglePageD()"></span>' +
-    '<span style="font-size:11px;color:#7C7C7C;">حدِّد جهات بعينها لإعادة استهدافها — بدل الفئة كاملة.</span></div>';
-  h += (shown.length ? crmTargetRows(shown, cwin) : '<div style="padding:30px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج</div>') + '</div>';
+  h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
+    (shown.length ? crmTargetRows(shown, cwin) : '<div style="padding:30px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج</div>') +
+    '</div></div></div>';
   h += crmDetailBulkBar(camp);
   return h;
 }
 
 /* The existing contactRowsHtml owns the row's visual language and its status/interest logic. We keep
    it as the single source and only prepend the selection cell, rather than forking that markup. */
+/* The targets table is a LIST, so it uses the same chrome as every other list: a real column
+   header, 40px rows, one grid. The previous version wrapped dashboard.ts's contactRowsHtml in a
+   flex row to bolt a checkbox on, which broke its 6-column grid alignment and left the table with
+   NO header at all — the founder caught both. Interest chips are capped at two with a +N overflow;
+   three stacked chips were what made rows ~90px tall. */
+function crmTargetHeader(allOn) {
+  return '<div class="crow tgtrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePageD()"></div>' +
+    '<div>العميل</div><div>الحالة</div><div>اهتمام المساعد</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
+    '<div class="thead-narrow"><span>العميل</span><span style="flex:1"></span><span>الحالة</span></div>';
+}
+
 function crmTargetRows(shown, cwin) {
-  var out = '<div>';
+  var allOn = shown.length > 0 && shown.every(function (r) { return crmSelD[r.phone]; });
+  var out = crmTargetHeader(allOn);
   shown.forEach(function (r) {
+    var c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
+    var nm = c.waName || r.name || "غير معروف";
+    var tr = c.transcript || [];
+    var last = tr[tr.length - 1];
+    var ci = insCache[c.phone] || {};
     var on = !!crmSelD[r.phone];
-    out += '<div style="display:flex;align-items:stretch;" class="krow' + (on ? " sel" : "") + '">' +
-      '<div class="selcell" style="border-bottom:1px solid #F3F3F3;"><input type="checkbox" aria-label="تحديد ' + esc(r.phone) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggleD(&quot;' + esc(r.phone) + '&quot;)"></div>' +
-      '<div style="flex:1;min-width:0;">' + contactRowsHtml([r], cwin) + '</div></div>';
+    /* cap the interest chips: three stacked chips is what made these rows 90px */
+    var tags = (c.tags || []).slice();
+    var chips = interestChips({ tags: tags.slice(0, 2), phone: c.phone });
+    var extra = tags.length > 2 ? '<span style="font-size:12px;color:#999999;">+' + fmtN(tags.length - 2) + '</span>' : "";
+    out += '<div class="trow km krow crow tgtrow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
+      '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(nm) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggleD(&quot;' + esc(c.phone) + '&quot;)"></div>' +
+      '<div class="c-name" style="display:flex;align-items:center;gap:10px;min-width:0;">' +
+        '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</div></div>' +
+        '<span style="font-size:12px;color:#7C7C7C;flex:none;direction:ltr;">' + esc(c.phone) + '</span></div>' +
+      '<div style="display:flex;gap:5px;flex-wrap:wrap;min-width:0;">' + chipRow(c, cwin) + '</div>' +
+      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-width:0;">' + chips + extra + '</div>' +
+      '<div style="font-size:12.5px;color:#525252;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' +
+        (ci.next_action ? '<span style="color:#1F7A73;">← ' + esc(ci.next_action) + '</span>' : esc(last ? clip(last.text, 60) : "—")) + '</div>' +
+      '<div style="font-size:12px;color:#7C7C7C;white-space:nowrap;">' + (last ? fmtT(last.ts) : "—") + '</div>' +
+      '<div style="text-align:center;"><span class="lnk" style="font-size:12px;color:#1F7A73;font-weight:500;" onclick="event.stopPropagation();openConvo(&quot;' + esc(c.phone) + '&quot;)">المحادثة ←</span></div>' +
+    '</div>';
   });
-  out += '</div>';
   return out;
+}
+
+/* Writes the breadcrumb's view label and its primary action. Called after render() has replaced
+   #body, because the header lives outside #body and nav() only sets #pt/#ps by route. */
+function crmPaintCrumb() {
+  var ps = document.getElementById("ps");
+  var act = document.getElementById("crumbact");
+  var id = (location.hash || "").split("/")[1];
+  if (ps) {
+    ps.textContent = id ? "حملة" :
+      (crmView === "kanban" ? "كانبان" : crmView === "group" ? "تجميع" : "قائمة");
+  }
+  if (act) {
+    act.innerHTML = '<a href="#aimkt" class="btn" style="text-decoration:none;color:#fff;background:#1F7A73;">' +
+      ic("send", 15, "#fff") + ' إنشاء حملة</a>';
+  }
 }
 
 /* Measured after layout, again once the webfont swaps (the swap is the real reason a length proxy
@@ -769,24 +820,6 @@ window.addEventListener("resize", function () {
   clearTimeout(window.__crmrz); window.__crmrz = setTimeout(crmMeasureMsg, 150);
 });
 try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(crmMeasureMsg); } catch (e) {}
-
-/* Writes the breadcrumb's view label and its primary action. Called after render() has replaced
-   #body, because the header lives outside #body and nav() only sets #pt/#ps by route. */
-function crmPaintCrumb() {
-  var ps = document.getElementById("ps");
-  var act = document.getElementById("crumbact");
-  var id = (location.hash || "").split("/")[1];
-  if (ps) {
-    ps.textContent = id ? "حملة" :
-      (crmView === "kanban" ? "كانبان" : crmView === "group" ? "تجميع" : "قائمة");
-  }
-  if (act) {
-    act.innerHTML = '<a href="#aimkt" class="btn" style="text-decoration:none;display:inline-flex;' +
-      'align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:13px;' +
-      'font-weight:500;color:#fff;background:#1F7A73;border:none;">' + ic("send", 15, "#fff") +
-      ' إنشاء حملة</a>';
-  }
-}
 
 /* ============================== the guarded entry ==============================
    dashboard.ts's render() calls ONLY this. Two jobs:
