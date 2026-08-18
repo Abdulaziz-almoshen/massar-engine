@@ -129,6 +129,25 @@ export const DASHBOARD_HTML = `<!doctype html>
   .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
   /* لوحة الفرز rows: the same flush-row grid as every other table here. Five tinted fills read as
      five alert levels; none of these is an alert, so the colour is the group's dot, once. */
+  /* معرفة الخدمة rows. SIX cells, six tracks — the arity is stated in both directions here so a
+     later column cannot be added on one side only. */
+  .kbrow { display: grid; grid-template-columns: minmax(0,1.8fr) 1fr minmax(0,1.4fr) .55fr .7fr auto;
+    align-items: center; gap: 14px; padding: 12px 20px 12px 12px; border-top: 1px solid #EDEDED;
+    text-decoration: none; transition: background .14s ease; }
+  .kbrow:first-of-type { border-top: 0; }
+  a.kbrow:hover { background: #F8F8F8; }
+  .kbrow .nm { font-size: 13.5px; font-weight: 450; color: #171717; display: flex; align-items: center;
+    gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kbrow .st { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #525252; min-width: 0; }
+  .kbrow .st .d { width: 6px; height: 6px; border-radius: 999px; flex: none; }
+  .kbrow .st .fn { direction: ltr; color: #7C7C7C; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kbrow .fig { font-size: 13px; color: #171717; font-variant-numeric: tabular-nums; }
+  .kbrow .go { font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  a.kbrow:hover .go { opacity: 1; }
+  @media (max-width: 860px) {
+    .kbrow { grid-template-columns: minmax(0,1fr) auto; row-gap: 5px; }
+    .kbrow .st, .kbrow .fig { grid-column: 1 / 3; }
+  }
   .oprow { display: grid; grid-template-columns: 28px minmax(0,1.5fr) 1.05fr minmax(0,2fr) auto;
     align-items: center; gap: 12px; padding: 11px 20px 11px 12px; border-top: 1px solid #EDEDED;
     cursor: pointer; transition: background .14s ease; }
@@ -1047,8 +1066,10 @@ function attrChips(e, max) {
   const a = e.attrs || {}; const keys = Object.keys(a).slice(0, max);
   return keys.map((k) => {
     const v = a[k];
-    const cls = v === "كبيرة" || v === "كبير" ? "c-blue" : v === "متوسطة" || v === "متوسط" ? "c-teal" : "c-grey";
-    return '<span class="chip ' + cls + '" title="' + esc(k) + '">' + esc(v) + "</span>";
+    // Neutral, all of them. Colouring كبيرة teal and متوسطة amber built a traffic light out of a
+    // facility's SIZE — amber reads as caution, and a mid-size clinic is not a warning. These are
+    // imported column values, not states; the only thing they have to be is legible.
+    return '<span class="chip" title="' + esc(k) + '">' + esc(clip(v, 20)) + "</span>";
   }).join("");
 }
 function chipBtn(label, on, fn) {
@@ -1545,30 +1566,51 @@ function uploadZone(scopedProduct) {
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
+// معرفة الخدمة. WAS eight cards, each ~180px tall, five of which said «لا معرفة بعد» and nothing
+// else — a 5+3 grid that left a third of its own row empty and a thousand pixels of white below it.
+// It is a list, because that is what eight comparable rows are, and it carries the four facts a
+// service actually has in the ledger instead of a chip that reads the same on every card.
 function vKb() {
-  let h0 = "";
   const reg = kbRegistry();
-  const tone = (sc) => sc >= 80 ? "#1f8a52" : sc >= 60 ? "#b5810f" : "#c43d3d";
   const skill = prodAssets.find((a) => a.product === "__skill__");
+  // A service's real signals, all read from the ledger, none derived: an approved knowledge doc,
+  // an attached profile file, the campaigns that ran on it, and the contacts the assistant tagged
+  // as interested in it. Nothing here is scored — the six authored «درجة معرفة» numbers were
+  // scrubbed in round 22 and the score bar has rendered a null on every row since.
+  const rows = reg.map((r) => {
+    const asset = prodAssets.find((a) => a.product === r.name) || null;
+    const camps = campaigns.filter((c) => (c.product || "") === r.name).length;
+    let warm = 0;
+    ((cache && cache.contacts) || []).forEach((c) => {
+      if (c.test && !showTest) return;
+      if ((c.tags || []).some((t) => t.product === r.name)) warm++;
+    });
+    return { r, asset, camps, warm };
+  });
+  let h = "";
   if (skill) {
-    h0 = '<div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#F4FBFA;border-color:#B9E4E0;">' +
-      '<div style="flex:1;min-width:220px;"><div style="font-size:13.5px;font-weight:700;color:#171717;">مهارة إنشاء العروض — lean-proposal-deck</div>' +
-      '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.8;">حمّلها وأنتج بها عروض الخدمات (PDF) ثم ارفعها هنا في صفحة كل خدمة. <span style="direction:ltr;color:#999999;">' + esc(skill.filename) + '</span></div></div>' +
-      '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة ⬇</a></div>';
+    h += '<div class="crmbar rise"><span style="flex:1;min-width:220px;font-size:12.5px;color:#525252;line-height:1.8;">' +
+      '<b style="color:#171717;font-weight:500;">مهارة إنشاء العروض</b> — أنتج بها عروض الخدمات (PDF) ثم ارفعها في صفحة كل خدمة.' +
+      ' <span style="direction:ltr;color:#999999;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
+      '<a class="btn btn-ghost" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
   }
-  let h = h0 + '<div class="sec">خدمات المساعد <span class="meta">' + fmtN(reg.length) + ' خدمة · اضغط خدمةً لعرض معرفته وإدارتها</span></div>';
-  h += '<div class="prods" style="margin-bottom:20px;">' + reg.map((r) => {
-    const inner =
-      '<div class="pn">' + esc(r.name) + "</div>" +
-      (r.sc !== null
-        ? '<span class="sc" style="color:' + tone(r.sc) + '">' + fmtN(r.sc) + '٪</span> <span class="scl">درجة معرفة المساعد</span><div class="bar"><i style="width:' + r.sc + '%;background:' + tone(r.sc) + ';"></i></div>'
-        : '<div style="height:6px;"></div>') +
-      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
-      (r.hub ? '<span class="chip c-ok">معرفة ✓</span>' : '<span class="chip c-grey">لا معرفة بعد</span>') +
-      (prodAssets.some((a) => a.product === r.name) ? '<span class="chip c-teal">ملف تعريفي 📎</span>' : "") +
-      '<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:#2F5F94;">افتح التفاصيل ←</span></div>';
-    return '<a href="#kb/' + encodeURIComponent(r.name) + '" style="text-decoration:none;"><div class="prod" style="cursor:pointer;">' + inner + "</div></a>";
-  }).join("") + "</div>";
+  h += '<div class="tblwrap crmflat kbflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
+    '<div class="kbrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;cursor:default;">' +
+    "<div>الخدمة</div><div>معرفة المساعد</div><div>الملف التعريفي</div><div>حملات</div><div>جهات مهتمة</div><div></div></div>" +
+    '<div class="thead-narrow"><span>الخدمة</span><span style="flex:1"></span><span>الحالة</span></div>';
+  h += rows.map((x) =>
+    '<a class="kbrow" href="#kb/' + encodeURIComponent(x.r.name) + '">' +
+    '<span class="nm">' + esc(x.r.name) + (x.r.seed ? "" : '<span class="chip">مضافة برفع ملف</span>') + "</span>" +
+    '<span class="st"><span class="d" style="background:' + (x.r.hub ? "#027A48" : "#E2E2E2") + ';"></span>' +
+      (x.r.hub ? "معتمدة" : "لا معرفة بعد") + "</span>" +
+    '<span class="st">' + (x.asset
+      ? '<span class="d" style="background:#1F7A73;"></span><span class="fn">' + esc(clip(x.asset.filename, 30)) + "</span>"
+      : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.camps ? fmtN(x.camps) : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.warm ? fmtN(x.warm) : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
+    '<span class="go">افتح ←</span></a>').join("");
+  h += '</div></div><div class="tfoot"><span>' + ic("book", 14) + " " + fmtN(rows.length) + " خدمة · " +
+    fmtN(rows.filter((x) => x.r.hub).length) + " منها بمعرفة معتمدة</span></div></div>";
   return h;
 }
 function vKbProduct(name) {
@@ -1580,28 +1622,25 @@ function vKbProduct(name) {
   const wlProd = ((winloss && winloss.by_product) || []).find((x) => x.product === name);
   const prodCauses = ((winloss && winloss.loss_causes) || []).filter((c) => (c.products || []).includes(name));
   const pa0 = prodAssets.find((a) => a.product === name);
-  const ready = r.sc !== null ? r.sc : (r.hub ? 100 : 0);
-  const readyTone = ready >= 80 ? "#027A48" : ready >= 60 ? "#B54708" : "#B42318";
+  // The readiness ring is DELETED. r.sc has been null on every row since round 22 scrubbed the six
+  // authored knowledge scores, so the ring resolved to (r.hub ? 100 : 0) and drew a two-state
+  // boolean as a percentage — «١٠٠٪ جاهزية معرفة المساعد» meaning nothing more than «a file was
+  // uploaded». A percentage that can only ever be 0 or 100 is an invented number wearing a gauge.
+  // The same two states are already stated in words by the chip beside the title.
 
   let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#525252;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
 
   // ── Hero: identity, readiness ring, and the primary action together ──
   h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
-    '<div style="width:56px;height:56px;flex:none;border-radius:16px;background:linear-gradient(135deg,#1F4470,#2F5F94);display:flex;align-items:center;justify-content:center;color:#7FE3DC;font-weight:700;font-size:24px;">' + esc(name.trim().charAt(0)) + "</div>" +
+    '<div style="width:44px;height:44px;flex:none;border-radius:10px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;font-weight:500;font-size:18px;">' + esc(name.trim().charAt(0)) + "</div>" +
     '<div style="flex:1;min-width:220px;">' +
-    '<h1 style="margin:0;font-size:23px;font-weight:700;color:#171717;letter-spacing:-.3px;">' + esc(name) + "</h1>" +
+    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:-.2px;">' + esc(name) + "</h1>" +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
     (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#999999;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div>" +
-    '<div style="flex:none;display:flex;align-items:center;gap:12px;">' +
-    '<div style="position:relative;width:64px;height:64px;flex:none;">' +
-    '<svg viewBox="0 0 36 36" style="width:64px;height:64px;transform:rotate(-90deg);"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#EDEDED" stroke-width="3.2"/>' +
-    '<circle cx="18" cy="18" r="15.5" fill="none" stroke="' + readyTone + '" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="' + (ready * 0.974) + ' 100"/></svg>' +
-    '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;"><span style="font-size:14px;font-weight:700;color:#171717;">' + fmtN(ready) + "٪</span></div></div>" +
-    '<div style="font-size:11px;color:#7C7C7C;font-weight:600;line-height:1.6;max-width:78px;">جاهزية<br>معرفة المساعد</div></div>' +
-    '<button class="btn btn-teal" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
+    '<button class="btn btn-dark" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
     "</div>";
 
   // ── Performance row: one scoreboard, not scattered chips ──
