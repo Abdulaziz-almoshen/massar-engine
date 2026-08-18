@@ -25,17 +25,25 @@ export const RECORD_TABS_CSS = `
   .rpanel > .card { margin:0; border:0; padding:0; }
   .rpanel > .card > h3, .rpanel > .card > div > h3 { display:none; }
 
-  /* conversation tab — the transcript inline, not in a slide-over */
-  .rconv { display:flex; flex-direction:column; gap:10px; max-height:560px; overflow-y:auto; padding:2px; }
-  .rconv .b { max-width:76%; min-width:120px; padding:9px 12px; border-radius:10px; font-size:13px; line-height:1.85;
-    white-space:pre-wrap; word-break:break-word; }
+  /* conversation tab — the transcript inline, not in a slide-over.
+     A chat is read in a NARROW column. The pane is ~1100px wide here, so an unconstrained bubble
+     ran 800px per line — three times a comfortable measure and genuinely hard to read. The thread
+     is capped at 640px and sits on a wallpaper, the way every messaging client does it. */
+  .rconv { display:flex; flex-direction:column; gap:8px; max-height:560px; overflow-y:auto;
+    padding:16px; background:#F8F8F8; border:1px solid #EDEDED; border-radius:10px; }
+  .rconv .b { max-width:min(78%, 460px); padding:8px 11px; border-radius:10px; font-size:13.5px;
+    line-height:1.75; white-space:pre-wrap; word-break:break-word; position:relative;
+    box-shadow:0 1px 1px rgba(0,0,0,.04); }
   /* Arabic WhatsApp: OUR outgoing sits at the end (left) in green, THEIR incoming at the start
-     (right) in white. Both were inverted — the customer's words were green on the left and ours
-     grey on the right, which reads as the customer talking to themselves. */
-  .rconv .b.ag { align-self:flex-end;   background:#DCF8C6; color:#171717; border:1px solid #CFEBB4; }
-  .rconv .b.cu { align-self:flex-start; background:#fff;    color:#171717; border:1px solid #EDEDED; }
-  .rconv .b.sy { align-self:center; background:#fff; border:1px solid #EDEDED; color:#7C7C7C; font-size:12px; }
-  .rconv .t { font-size:11px; color:#999999; margin-top:4px; text-align:end; }
+     (right) in white. Both were inverted before — the customer's words were green on the left. */
+  .rconv .b.ag { align-self:flex-end;   background:#DCF8C6; color:#171717; border-end-end-radius:3px; }
+  .rconv .b.cu { align-self:flex-start; background:#fff;    color:#171717; border:1px solid #EDEDED;
+    border-end-start-radius:3px; }
+  .rconv .b.sy { align-self:center; background:transparent; border:0; color:#7C7C7C; font-size:12px;
+    box-shadow:none; text-align:center; max-width:80%; }
+  /* no min-width: «نعم» should be a small bubble, not a 150px box with the word pushed to one edge */
+  .rconv .t { font-size:10.5px; color:#8a8a8a; margin-top:3px; text-align:end; }
+  .rconv .b.sy .t { display:none; }
 
   /* Frappe's side panel sections collapse. The rail was 856px beside a 456px main. */
   .rsec > h3, .rsec > div > h3 { cursor:pointer; user-select:none; }

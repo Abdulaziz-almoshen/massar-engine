@@ -297,8 +297,9 @@ export const DASHBOARD_HTML = `<!doctype html>
      restructuring propRow's markup, which emits value/sig/quote as siblings. */
   .fbody > .flab { grid-column:1; grid-row:1; }
   .fbody > :not(.flab) { grid-column:2; min-width:0; }
-  /* chips wrap and clip inside their column instead of spilling past the panel edge */
-  .fbody .chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+  /* Chips WRAP inside their column. Clipping produced «نية مرتفد» — a word cut in half, which is
+     worse than two lines. The panel is 352px and these labels are long by nature. */
+  .fbody .chip { max-width:100%; white-space:normal; line-height:1.6; align-items:flex-start; }
   .flab { font-size:13px; font-weight:450; color:#7C7C7C; letter-spacing:0; line-height:1.5; }
   .fval { font-size:14px; font-weight:450; color:#171717; line-height:1.5; min-height:28px;
     margin-top:0; }
@@ -2718,13 +2719,18 @@ function vCustomer(ph) {
   })();
   /* The actions floated loose between sections with no container, which is most of why this page
      read as unorganised. They belong in one bounded toolbar, as Frappe's record header does. */
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #EDEDED;border-radius:10px;padding:10px 14px;">' +
+  /* Two groups with a real gap, not eight controls in one row. The outcome buttons are the
+     operator's actual job here, so they get their own labelled cluster instead of being squeezed
+     against «فتح المحادثة» with the label wedged between them. */
+  h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #EDEDED;border-radius:10px;padding:10px 14px;">' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
     '<button class="btn btn-teal" data-ph="' + esc(c.phone) + '" onclick="openConvo(this.dataset.ph)">فتح المحادثة</button>' +
-    '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button>' +
-    '<span style="flex:1"></span>' +
-    '<span style="font-size:11.5px;color:#7C7C7C;font-weight:600;">سجّل النتيجة الفعلية:</span>' +
+    '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button></div>' +
+    '<span style="flex:1;min-width:8px;"></span>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+    '<span style="font-size:12px;color:#7C7C7C;white-space:nowrap;">سجّل النتيجة الفعلية</span>' +
     [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#7C7C7C"]]
-      .map((o) => '<button class="ptab' + (activeBtn === o[0] ? " on" : "") + '" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)">' + o[1] + "</button>").join("") + "</div>";
+      .map((o) => '<button class="ptab' + (activeBtn === o[0] ? " on" : "") + '" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)">' + o[1] + "</button>").join("") + "</div></div>";
   // The 6-node sales-path rail is DELETED from the record (design-plan.md section 5): it paints
   // five stages nobody reached and a check mark nobody verified. The stage now appears exactly
   // once, as a reading, inside the status region. The renderer itself is gone too, so no future
