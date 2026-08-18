@@ -115,6 +115,47 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
   .kpi .dl { font-size: 11.5px; font-weight: 450; color: #7C7C7C; }
   .kpi .v small { font-size: 12px; font-weight: 450; color: #999999; }
+
+  /* ===== the hero band =====
+     Five identical white boxes is a spreadsheet, not a command centre: every figure carries the
+     same weight, so the eye has nowhere to land and the page opens with no point of view. One
+     figure leads — the pipeline the operator is actually judged on — with its own seven-day
+     movement and a fourteen-day shape behind it; everything else supports it at a smaller size. */
+  .hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(230px, .65fr); gap: 0;
+    background: #fff; border: 1px solid #EDEDED; border-radius: 12px; overflow: hidden; margin-bottom: 18px; }
+  .hero .hmain { padding: 22px 24px 16px; min-width: 0; display: flex; flex-direction: column; }
+  .hero .hlab { font-size: 12.5px; color: #7C7C7C; }
+  .hero .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+  .hero .hfig { font-size: 44px; line-height: 1; font-weight: 600; color: #171717;
+    font-variant-numeric: tabular-nums; letter-spacing: -1.4px; }
+  .hero .hd { font-size: 13px; font-weight: 500; color: #027A48; background: #ECFDF3;
+    border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+  .hero .hd.flat { color: #7C7C7C; background: #F3F3F3; }
+  .hero .hnote { font-size: 12.5px; color: #7C7C7C; margin-top: 8px; line-height: 1.7; }
+  .hero .hspark { margin-top: auto; padding-top: 14px; }
+  .hero .haxis { display: flex; justify-content: space-between; font-size: 11px; color: #C7C7C7; margin-top: 4px; }
+  .hero .hside { border-inline-start: 1px solid #EDEDED; background: #FCFCFC; display: flex; flex-direction: column; }
+  .hero .hs { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 13px 20px; border-top: 1px solid #EDEDED; }
+  .hero .hs:first-child { border-top: 0; }
+  .hero .hs .k { font-size: 12.5px; color: #7C7C7C; min-width: 0; }
+  .hero .hs .v { font-size: 19px; font-weight: 600; color: #171717; font-variant-numeric: tabular-nums; }
+  .hero .hs .v em { font-style: normal; font-size: 12px; font-weight: 450; color: #999999; margin-inline-start: 5px; }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero .hside { border-inline-start: 0; border-top: 1px solid #EDEDED; }
+    .hero .hfig { font-size: 36px; }
+  }
+
+  /* The funnel is drawn as a funnel. Six equal-length bars encode the ONE thing a funnel exists to
+     show — the narrowing — as nothing at all; when the stages are genuinely equal this draws a
+     column, which is the honest picture of a campaign that lost nobody. */
+  .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
+  .fnl .lg { display: flex; flex-direction: column; gap: 6px; }
+  .fnl .lgr { display: flex; align-items: baseline; gap: 8px; height: 44px; }
+  .fnl .lgr .nm { font-size: 12.5px; color: #383838; white-space: nowrap; }
+  .fnl .lgr .vl { font-size: 14px; font-weight: 600; color: #171717; font-variant-numeric: tabular-nums; }
+  .fnl .lgr .dp { font-size: 11.5px; color: #B42318; white-space: nowrap; }
   /* ما يستحق المتابعة الآن. Flush rows on a hairline, not four pastel cards — four tinted fills
      read as four alarms and the eye cannot rank four alarms. Urgency is the dot. */
   .aq { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid #EDEDED; cursor: pointer; transition: background .14s ease; }
@@ -589,11 +630,33 @@ function nav() {
   // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
   const raw = (location.hash || "#kmon").slice(1).split("/")[0];
   const cur = raw === "customer" ? "customers" : raw;
-  document.getElementById("nav").innerHTML = NAV.map((x) => x.grp
-    ? '<div class="grp">' + x.grp + "</div>"
-    : '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
-      '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#525252" : "#999999") + '</span><span class="lbl">' + x.l + '</span></button>'
-  ).join("");
+  // Two badges, both counts of work OWED and both derived from data already in memory — no extra
+  // request, and nothing that can be stale in a way the screen behind it is not.
+  //   فرص البيع  — appointments confirmed for today: the calls you owe before the day ends.
+  //   المهام     — tasks past due, only once the tasks route has actually loaded them; a badge
+  //                that guesses «٠» before the fetch is a lie for the whole session.
+  const badges = {};
+  try {
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const t1 = t0.getTime() + 864e5;
+    const due = ((cache && cache.contacts) || []).filter((c) => {
+      if (c.optedOut || c.outcome === "stopped" || c.outcome === "not_interested") return false;
+      const a = appt(c);
+      return a && a.confirmed && a.at >= t0.getTime() && a.at < t1;
+    }).length;
+    if (due) badges.opps = [fmtN(due), "q", "مواعيد مؤكَّدة اليوم"];
+    if (typeof tskRows !== "undefined" && tskRows) {
+      const late = tskRows.filter((t) => t.status !== "done" && t.status !== "canceled" && t.due_at && t.due_at < Date.now()).length;
+      if (late) badges.tasks = [fmtN(late), "", "مهام تجاوزت موعدها"];
+    }
+  } catch (e) { /* a badge is an ornament on top of the route; it must never stop nav() painting */ }
+  document.getElementById("nav").innerHTML = NAV.map((x) => {
+    if (x.grp) return '<div class="grp">' + x.grp + "</div>";
+    const b = badges[x.id];
+    return '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
+      '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#1F7A73" : "#999999") + '</span><span class="lbl">' + x.l + "</span>" +
+      (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
+  }).join("");
   // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
   // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
   // الاستهداف وأدرها للحملات» — the import list's title — above every CLIENT RECORD, and made
@@ -1088,27 +1151,37 @@ function vHome(d) {
   const interestedList = cs.filter((c) => interestedOf(c, 0) || c.outcome === "handoff");
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
-  // Label first, then the figure: you read what it is before you read how much. The old order put a
-  // bare «٦» above «الحملات الفعلية», which forces a second pass to find out what six means.
-  const kpi = (label, value, note) =>
-    '<div class="kpi rise"><div class="k">' + label + "</div>" +
-    '<div class="v">' + (typeof value === "number" ? fmtN(value) : value) + "</div>" +
-    (note ? '<div class="dl">' + note + "</div>" : "") + "</div>";
+  // The hero. One figure leads with its own seven-day movement and a fourteen-day shape; the rest
+  // support it. «+٢٤ خلال ٧ أيام» is a COUNT of contacts newly qualified inside that window — not a
+  // percentage change against a period nobody chose, and not a projection.
+  const WEEK = 7 * 864e5;
+  const newQual = cs.filter((c) => interestedOf(c, Date.now() - WEEK)).length;
+  const newReplied = cs.filter((c) => ((c.statusTimes || {}).replied || 0) >= Date.now() - WEEK).length;
+  const series = qualSeries(cs, 14);
+  const heroSide = [
+    ["الحملات الفعلية", fmtN(realCampaigns.length),
+      campaigns.length > realCampaigns.length ? "و" + fmtN(campaigns.length - realCampaigns.length) + " تجريبية" : ""],
+    ["جهات في قوائمك", fmtN(entities.length), ""],
+    ["وصلت الرسائل", fmtN(delivered), ""],
+    ["ردّوا", fmtN(replied), newReplied ? "+" + fmtN(newReplied) + " هذا الأسبوع" : ""],
+  ];
   let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
-  h += '<div class="kpis">' +
-    // The «+٣٢ تجريبية» used to be inlined into the figure, so the value line read «٦ +٣٢ تجريبية»
-    // — two numbers of different kinds in one glance. It is a note under the figure now.
-    kpi("الحملات الفعلية", realCampaigns.length,
-      campaigns.length > realCampaigns.length ? "و" + fmtN(campaigns.length - realCampaigns.length) + " تجريبية" : "") +
-    // Not «جهات الاستهداف» — the funnel below uses that label for the people a campaign actually
-    // reached (4), while this counts the whole imported book (15). One label, two numbers, one
-    // screen is exactly the contradiction the funnel fix just removed.
-    kpi("جهات في قوائمك", entities.length) +
-    kpi("وصلت الرسائل", delivered) +
-    kpi("ردّوا", replied) +
-    kpi("مهتمة ومؤهلة", interestedList.length) + "</div>";
+  // «جهات في قوائمك» is deliberately NOT called «جهات الاستهداف»: the funnel below uses that label
+  // for the people a campaign actually reached, while this counts the whole imported book. One
+  // label over two different numbers on one screen is the contradiction that rule exists to stop.
+  h += '<div class="hero rise"><div class="hmain">' +
+    '<div class="hlab">جهات مهتمة ومؤهلة</div>' +
+    '<div class="hrow"><span class="hfig">' + fmtN(interestedList.length) + "</span>" +
+    '<span class="hd' + (newQual ? "" : " flat") + '">' +
+      (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
+    '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
+    '<div class="hspark">' + sparkArea(series, 320, 62) +
+    '<div class="haxis"><span>قبل ١٤ يومًا</span><span>مؤهلون جدد يوميًا</span><span>اليوم</span></div></div></div>' +
+    '<div class="hside">' + heroSide.map((r) =>
+      '<div class="hs"><span class="k">' + r[0] + '</span><span class="v">' + r[1] +
+      (r[2] ? "<em>" + r[2] + "</em>" : "") + "</span></div>").join("") + "</div></div>";
   h += vActionQueue(cs, d.notifyNumber, nTest);
   h += vHomeCharts(cs);
   h += vWinLoss();
@@ -2024,6 +2097,68 @@ window.entDel = async (id) => {
   entities = entities.filter((e) => e.id !== id); entSel.delete(id); render(false);
 };
 
+// Fourteen days of newly-qualified contacts. Every point is a COUNT OF PEOPLE whose first hot or
+// warm reading landed that day — not a smoothed curve, not a projection, and zero days are drawn
+// as zero rather than skipped, so a quiet week looks quiet.
+function qualSeries(cs, days) {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const start = d0.getTime() - (days - 1) * 864e5;
+  const out = new Array(days).fill(0);
+  cs.forEach((c) => {
+    const first = (c.tags || []).filter((t) => (t.level === "hot" || t.level === "warm") && t.ts)
+      .reduce((a, t) => (a === null || t.ts < a ? t.ts : a), null);
+    if (first === null || first < start) return;
+    const i = Math.floor((first - start) / 864e5);
+    if (i >= 0 && i < days) out[i]++;
+  });
+  return out;
+}
+function sparkArea(vals, w, hgt) {
+  const mx = Math.max(1, ...vals);
+  const n = vals.length;
+  const x = (i) => (n === 1 ? w : (i / (n - 1)) * w);
+  const y = (v) => hgt - (v / mx) * (hgt - 6) - 2;
+  const line = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
+  const area = line + " L" + w + "," + hgt + " L0," + hgt + " Z";
+  const last = vals[n - 1];
+  return '<svg dir="ltr" viewBox="0 0 ' + w + " " + hgt + '" preserveAspectRatio="none" ' +
+    'style="width:100%;height:' + hgt + 'px;display:block;overflow:visible;" role="img" aria-label="جهات مؤهلة جديدة يوميًا">' +
+    '<defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#1F7A73" stop-opacity=".20"/>' +
+    '<stop offset="100%" stop-color="#1F7A73" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + area + '" fill="url(#spg)"/>' +
+    '<path d="' + line + '" fill="none" stroke="#1F7A73" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) + '" r="3" fill="#1F7A73"/></svg>';
+}
+// A funnel, drawn as one. Each band's TOP edge is the stage above it and its BOTTOM edge is its own
+// value, so the slope between two bands IS the drop between them — the single thing the six equal
+// bars this replaces could not show. The teal ramp encodes depth, which is the stage order and
+// nothing else; it is not a second meaning smuggled in as colour.
+function funnelSvg(rows) {
+  const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
+  const W = 300, segH = 44, gap = 6;
+  const H = rows.length * (segH + gap) - gap;
+  const ramp = ["#1F7A73", "#2A8B84", "#3B9C95", "#5AB0AA", "#84C7C2", "#B2DDD9"];
+  let shapes = "";
+  rows.forEach((r, i) => {
+    const wT = Math.max(0.08, (i === 0 ? r[1] : rows[i - 1][1]) / mx) * W;
+    const wB = Math.max(0.08, r[1] / mx) * W;
+    const y = i * (segH + gap);
+    shapes += '<path d="M' + ((W - wT) / 2).toFixed(1) + "," + y + " L" + ((W + wT) / 2).toFixed(1) + "," + y +
+      " L" + ((W + wB) / 2).toFixed(1) + "," + (y + segH) + " L" + ((W - wB) / 2).toFixed(1) + "," + (y + segH) +
+      ' Z" fill="' + ramp[i % ramp.length] + '"/>';
+  });
+  const legend = rows.map((r, i) => {
+    const prev = i > 0 ? rows[i - 1][1] : r[1];
+    const drop = i > 0 && prev > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
+    return '<div class="lgr"><span class="vl">' + fmtN(r[1]) + "</span>" +
+      '<span class="nm">' + esc(r[0]) + "</span>" +
+      (drop > 0 ? '<span class="dp">−' + fmtN(drop) + "٪</span>" : "") + "</div>";
+  }).join("");
+  return '<div class="fnl"><div dir="ltr" style="min-width:0;"><svg viewBox="0 0 ' + W + " " + H +
+    '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار التحويل التسويقي">' + shapes + "</svg></div>" +
+    '<div class="lg">' + legend + "</div></div>";
+}
 function ratesStrip(agg) {
   // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
   // stops «٠٪ من جهات الاستهداف» appearing under a hero that honestly reads «—».
@@ -2046,19 +2181,6 @@ function ratesStrip(agg) {
       '<span style="flex:1;min-width:60px;height:6px;background:#F3F3F3;border-radius:999px;overflow:hidden;">' +
         (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#1F7A73;border-radius:999px;"></i>') + "</span></div>").join("") + "</div>";
 }
-function stageBars(rows) {
-  const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
-  return '<div style="margin-top:14px;display:flex;flex-direction:column;gap:11px;">' + rows.map((r, i) => {
-    const w = Math.max(4, Math.round(r[1] / mx * 100));
-    const prev = i > 0 ? rows[i - 1][1] : r[1];
-    const drop = prev > 0 && i > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
-    return '<div><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px;">' +
-      '<span style="font-size:12.5px;font-weight:600;color:#383838;">' + esc(r[0]) + "</span>" +
-      '<span style="font-size:12.5px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(r[1]) +
-      (i > 0 && drop > 0 ? ' <span style="font-size:10.5px;font-weight:600;color:#B42318;">-' + fmtN(drop) + "٪</span>" : "") + "</span></div>" +
-      '<div style="height:10px;background:#F3F3F3;border-radius:6px;overflow:hidden;"><i style="display:block;height:100%;width:' + w + "%;background:" + r[2] + ';border-radius:6px;"></i></div></div>';
-  }).join("") + "</div>";
-}
 function chartCard(title, sub, inner) {
   return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#999999;">' + sub + "</span></div>" + inner + "</div>";
 }
@@ -2068,26 +2190,44 @@ function hbarRows(rows, color) {
     '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#383838;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#171717;">' + fmtN(r[1]) + "</span></div>" +
     '<div style="height:8px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
 }
+// نشاط الرسائل — fourteen days, stacked areas. It was 28 grey-and-teal stubs 30px wide with a
+// label under each; at one message a day the bars were 3px tall and the chart said nothing you
+// could not have read from a sentence. An area shows the SHAPE of a fortnight, which is the only
+// question this card is asked: is it picking up or dying down.
 function dailyActivitySvg(cs) {
   const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
-  for (let i = 0; i <= 13; i++) { const d = new Date(now.getTime() - i * 864e5); days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0, label: i === 0 ? "اليوم" : d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) }); }
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 864e5);
+    days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0,
+      label: i === 0 ? "اليوم" : d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) });
+  }
   cs.forEach((c) => (c.transcript || []).forEach((t) => {
     const d = days.find((x) => t.ts >= x.t0 && t.ts < x.t1);
     if (d) { if (t.role === "customer") d.inN++; else if (t.role === "agent") d.outN++; }
   }));
   const mx = Math.max(1, ...days.map((d) => d.inN + d.outN));
-  const W = 616, H = 132, bw = 30;
-  let bars = "";
-  days.forEach((d, i) => {
-    const x = 8 + i * (bw + 14);
-    const hOut = Math.round(d.outN / mx * 96), hIn = Math.round(d.inN / mx * 96);
-    bars += '<rect x="' + x + '" y="' + (104 - hOut) + '" width="' + bw + '" height="' + hOut + '" rx="3" fill="#E2E2E2"/>' +
-      '<rect x="' + x + '" y="' + (104 - hOut - hIn) + '" width="' + bw + '" height="' + hIn + '" rx="3" fill="#2E8F89"/>' +
-      '<text x="' + (x + bw / 2) + '" y="122" text-anchor="middle" font-size="8.5" fill="#999999">' + d.label + "</text>";
-  });
-  return '<div dir="ltr" style="overflow-x:auto;" class="ms-scroll"><svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;min-width:520px;height:auto;display:block;margin-top:10px;" role="img" aria-label="نشاط الرسائل ١٤ يومًا">' +
-    '<line x1="4" y1="104" x2="' + (W - 4) + '" y2="104" stroke="#EDEDED" stroke-width="1"/>' + bars + "</svg></div>" +
-    '<div style="display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:#7C7C7C;"><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#2E8F89;margin-inline-end:5px;"></i>واردة من العملاء</span><span><i style="display:inline-block;width:9px;height:9px;border-radius:3px;background:#E2E2E2;margin-inline-end:5px;"></i>صادرة</span></div>';
+  const W = 320, H = 96, n = days.length;
+  const x = (i) => (i / (n - 1)) * W;
+  const y = (v) => H - (v / mx) * (H - 8) - 2;
+  const path = (get) => days.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(get(d)).toFixed(1)).join(" ");
+  const areaOf = (p) => p + " L" + W + "," + H + " L0," + H + " Z";
+  const total = days.reduce((a, d) => a + d.inN + d.outN, 0);
+  if (!total) return '<div style="font-size:12px;color:#999999;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
+  const stack = path((d) => d.inN + d.outN), inner = path((d) => d.inN);
+  return '<div dir="ltr" style="margin-top:12px;"><svg viewBox="0 0 ' + W + " " + H +
+    '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block;" role="img" aria-label="نشاط الرسائل خلال ١٤ يومًا">' +
+    '<defs><linearGradient id="agr" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#1F7A73" stop-opacity=".22"/><stop offset="100%" stop-color="#1F7A73" stop-opacity="0"/></linearGradient></defs>' +
+    '<line x1="0" y1="' + (H - 2) + '" x2="' + W + '" y2="' + (H - 2) + '" stroke="#EDEDED" stroke-width="1"/>' +
+    '<path d="' + areaOf(stack) + '" fill="#F3F3F3"/>' +
+    '<path d="' + stack + '" fill="none" stroke="#C7C7C7" stroke-width="1.2" stroke-linejoin="round"/>' +
+    '<path d="' + areaOf(inner) + '" fill="url(#agr)"/>' +
+    '<path d="' + inner + '" fill="none" stroke="#1F7A73" stroke-width="1.6" stroke-linejoin="round"/></svg></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#C7C7C7;margin-top:4px;">' +
+    '<span>' + esc(days[0].label) + '</span><span>' + esc(days[days.length - 1].label) + "</span></div>" +
+    '<div style="display:flex;gap:16px;margin-top:9px;font-size:12px;color:#7C7C7C;">' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#1F7A73;margin-inline-end:6px;"></i>واردة من العملاء</span>' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C7C7C7;margin-inline-end:6px;"></i>الإجمالي مع الصادرة</span></div>';
 }
 function vHomeCharts(cs) {
   // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
@@ -2135,7 +2275,7 @@ function vHomeCharts(cs) {
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
   h += ratesStrip(agg);
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? stageBars(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
