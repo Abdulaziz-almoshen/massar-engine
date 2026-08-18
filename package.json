@@ -27,7 +27,8 @@
     "check:contactwin": "npm run build && node scripts/check-contactwin.mjs",
     "check:outcomes": "npm run build && node scripts/check-outcomes.mjs",
     "check:props": "npm run build && node scripts/check-props.mjs",
-    "check:facts": "npm run build && node scripts/check-facts.mjs"
+    "check:facts": "npm run build && node scripts/check-facts.mjs",
+    "qa:scale": "./.venv/bin/python scripts/qa-scale.py"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",
