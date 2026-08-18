@@ -52,7 +52,15 @@ window.__qaFixture = function (kind) {
 # collapses (measured: 499 chars at 1440, 235 at 375, with the landmark and both actions present in
 # the capture). Holding a deliberately-sparse screen to the same floor as a data-bearing one would
 # fail it forever, so the floor is per-case and stated. 180 still catches a truly blank body.
-FLOORS = {"list-empty": 180}
+# The floor exists to catch a BLANK render. After the .ptitle band was removed (the breadcrumb
+# now carries the module name, Frappe-style) the empty state legitimately holds ~128 chars at 768,
+# where the sidebar is also hidden — measured, with heading, explanation, action link and icon all
+# present in the capture. Rather than just relaxing the number, the empty case is additionally
+# asserted on its CONTENT below, which is a stronger check than a character count.
+FLOORS = {"list-empty": 90}
+# case id -> substrings that must ALL be present. Char counts cannot tell a sparse screen from a
+# broken one; these can.
+CONTENT = {"list-empty": ["لا حملات بعد", "إنشاء حملة", "أطلق أول حملة"]}
 
 # (id, fixture kind, hash route, setup js, landmark that must be present)
 CASES = [
@@ -416,6 +424,9 @@ def main() -> int:
                 )
                 floor = FLOORS.get(case_id, MIN_CHARS)
                 ok_render = len(text) >= floor
+                missing_content = [w for w in CONTENT.get(case_id, []) if w not in text]
+                if missing_content:
+                    ok_render = False
                 ok_landmark = landmark in text
                 ok_console = len(errors) == 0
                 ok_overflow = overflow <= 1
@@ -423,6 +434,7 @@ def main() -> int:
                 rec = {
                     "case": case_id, "viewport": vp_name, "route": route, "fixture": kind,
                     "chars": len(text), "blank_floor": floor, "landmark": landmark,
+                    "missing_content": missing_content,
                     "render_ok": ok_render, "landmark_ok": ok_landmark,
                     "console_errors": errors[:3], "console_ok": ok_console,
                     "page_h_overflow_px": overflow, "overflow_ok": ok_overflow,
@@ -458,6 +470,7 @@ def main() -> int:
     for f in failures:
         why = []
         if f.get("kind") == "regression": why.append(f["detail"])
+        elif f.get("missing_content"): why.append("missing required content: " + ", ".join(f["missing_content"]))
         elif not f["render_ok"]: why.append(f"blank ({f[chr(39)+chr(39)] if False else f[chr(99)+chr(104)+chr(97)+chr(114)+chr(115)]} chars)")
         if not f["landmark_ok"]: why.append(f"missing landmark «{f['landmark']}»")
         if not f["console_ok"]: why.append(f"console: {f['console_errors']}")
