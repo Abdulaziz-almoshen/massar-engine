@@ -90,7 +90,8 @@ export const DASHBOARD_HTML = `<!doctype html>
 
   /* ===== main ===== */
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
-  header.crumb { height:48px; flex:none; display:flex; align-items:center; gap:8px;
+  /* EXACT-1: header is h-10.5 = 42px, padding-inline 20 (pl-5). */
+  header.crumb { height:42px; flex:none; display:flex; align-items:center; gap:8px;
     padding-inline:20px; background:#fff; border-bottom:1px solid #EDEDED; }
   header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
   header.crumb .sep { font-size:13px; color:#C7C7C7; }
@@ -267,24 +268,34 @@ export const DASHBOARD_HTML = `<!doctype html>
      colour only reinforces it, and the mark never renders without its word. */
   /* Frappe's record is main + a narrower side rail. 372px was too wide for a rail and too narrow
      for a column, so the two panels fought for the same space and left a ragged edge. */
-  .crec { display:grid; grid-template-columns: 340px minmax(0,1fr); gap:16px; align-items:start; }
+  /* EXACT-1: side panel default 352px, min 256, max 480. */
+  .crec { display:grid; grid-template-columns: 352px minmax(0,1fr); gap:16px; align-items:start; }
   .crecmain { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
   .pm { width: 8px; height: 8px; flex: none; margin-top: 7px; }
   .pm-h { background: #1F7A73; border-radius: 2px; }
   .pm-a { border: 1.5px dashed #B54708; border-radius: 999px; background: transparent; }
   .pm-i { background: #2F5F94; border-radius: 2px; opacity: .55; }
   .pm-m { border: 1px dashed #E2E2E2; border-radius: 2px; background: transparent; }
-  .frow { display: flex; gap: 11px; padding: 13px 0; border-bottom: 1px solid #F3F3F3; position: relative; }
+  /* EXACT-1: two columns, 35/65, not a stacked pair. min-w-20 = 80px floor on the label. */
+  .frow { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #F3F3F3; position:relative; }
   .frow:last-child { border-bottom: none; }
   /* the only tinted rows in the panel, and lighter than any chip: a reading never outranks a fact */
   .frow.rdrow { background: #FFFDF7; margin: 0 -8px; padding: 13px 8px; border-radius: 10px; }
-  .fbody { flex: 1; min-width: 0; }
-  .flab { font-size: 10.5px; font-weight: 700; color: #7C7C7C; letter-spacing: .02em; }
-  .fval { font-size: 13.5px; font-weight: 700; color: #171717; line-height: 1.75; margin-top: 3px; }
-  .fval-a { font-size: 13px; font-weight: 600; color: #525252; }
-  .fval-m { font-size: 12.5px; font-weight: 500; color: #999999; margin-top: 3px; }
-  .sig { font-size: 10.5px; color: #999999; margin-top: 4px; font-weight: 600; }
-  .quote { font-size: 11.5px; color: #7C7C7C; margin-top: 4px; line-height: 1.8; }
+  /* EXACT-1: the field row is two columns, 35/65, with an 80px floor on the label — that split is
+     what makes Frappe's panel scan as a form instead of a stack of caption-and-value pairs. */
+  .fbody { flex:1; min-width:0; display:grid; grid-template-columns: minmax(80px,35%) minmax(0,65%);
+    column-gap:10px; row-gap:2px; align-items:start; }
+  /* the label owns column 1; every other child stacks down column 2. Doing this in CSS avoids
+     restructuring propRow's markup, which emits value/sig/quote as siblings. */
+  .fbody > .flab { grid-column:1; grid-row:1; }
+  .fbody > :not(.flab) { grid-column:2; }
+  .flab { font-size:13px; font-weight:450; color:#7C7C7C; letter-spacing:0; line-height:1.5; }
+  .fval { font-size:14px; font-weight:450; color:#171717; line-height:1.5; min-height:28px;
+    margin-top:0; }
+  .fval-a { font-size:14px; font-weight:450; color:#525252; }
+  .fval-m { font-size:14px; font-weight:450; color:#999999; margin-top:0; min-height:28px; }
+  .sig { font-size:11px; color:#999999; margin-top:3px; font-weight:450; }
+  .quote { font-size:12px; color:#7C7C7C; margin-top:4px; line-height:1.7; }
   .ferr { font-size: 11.5px; color: #B42318; font-weight: 700; margin-top: 6px; line-height: 1.7; }
   .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #999999; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
@@ -2290,7 +2301,7 @@ function propRow(o) {
   const open = propEdit && propEdit.key === o.key;
   const reading = st === "reading" && !open;
   let body = '<div class="flab">' + o.label +
-    (o.suffix ? ' <span style="color:#999999;font-weight:600;">' + o.suffix + "</span>" : "") + "</div>";
+    (o.suffix ? ' <span style="color:#999999;font-weight:450;">' + o.suffix + "</span>" : "") + "</div>";
   if (open) {
     body += propEditorHtml(o.key, propEdit.val, propEdit.err);
   } else if (st === "missing") {

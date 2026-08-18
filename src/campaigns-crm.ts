@@ -106,8 +106,10 @@ export const CAMPAIGNS_CRM_CSS = `
   .spec .facts .k { font-size:10.5px; color:#999999; font-weight:700; }
   .spec .facts .v { font-size:12.5px; color:#171717; font-weight:700; margin-top:2px; }
   .spec .ro { flex-basis:100%; font-size:11px; color:#999999; }
-  .ctabs { display:flex; gap:22px; border-bottom:1px solid #EDEDED; margin-bottom:16px; flex-wrap:wrap; }
-  .ctabs button { font-family:inherit; font-size:13px; font-weight:700; color:#7C7C7C; background:none;
+  /* EXACT-1: tab list min-height 45px, gap-7.5 = 30px, px-5 */
+  .ctabs { display:flex; gap:30px; min-height:45px; align-items:center; padding-inline:20px;
+    border-bottom:1px solid #EDEDED; margin-bottom:16px; flex-wrap:wrap; }
+  .ctabs button { font-family:inherit; font-size:13px; font-weight:500; color:#7C7C7C; background:none;
     border:none; border-bottom:2px solid transparent; padding:0 0 11px; cursor:pointer; white-space:nowrap; }
   .ctabs button.on { color:#1F7A73; border-bottom-color:#1F7A73; }
 
