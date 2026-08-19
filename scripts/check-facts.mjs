@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 
 const facts = await import("../dist/facts.js");
 const accounts = await import("../dist/accounts.js");
+const audience = await import("../dist/audience.js");
 
 let failures = 0;
 const c = (name, cond) => { if (!cond) failures++; console.log(`${cond ? "ok  " : "FAIL"} ${name}`); };
@@ -212,6 +213,48 @@ const NOW = 1_700_000_000_000;
   ]);
   c("a name-only row does NOT count as a known account",
     accounts.count() === 2 && accounts.withFacts() === 1);
+}
+
+// --- the import's TAG column -------------------------------------------------
+// Founder: «other departments want to use Massar to market their products.» A department does not
+// tick 3,000 checkboxes — it imports a sheet whose column already names its line. What is asserted
+// here is the parse, because everything downstream trusts it.
+{
+  const XLSX = await import("xlsx");
+  const sheet = (rows) => {
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "s");
+    return audience.parseAudienceFile(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }), "t.xlsx");
+  };
+
+  const p1 = sheet([["الاسم", "الجوال", "المدينة", "خط المنتجات"],
+                    ["أ", "966500000001", "الرياض", "تأمين المركبات، تأمين طبي"]]);
+  c("a «خط المنتجات» column is read as tags, not as a segment column",
+    p1.columns.tags.includes("خط المنتجات") && !p1.columns.attrs.includes("خط المنتجات"));
+  c("…and one cell may name several, split on the Arabic comma",
+    JSON.stringify(p1.rows[0].tags) === JSON.stringify(["تأمين المركبات", "تأمين طبي"]));
+  // Landing in both stores would give one spreadsheet column two filters with two counts.
+  c("…and the tag column does NOT also become an attribute",
+    p1.rows[0].attrs["خط المنتجات"] === undefined && p1.rows[0].attrs["المدينة"] === "الرياض");
+
+  // «المنتجات» stays with facts.currentProducts: one header cannot honestly mean both what an
+  // account owns and who we plan to approach.
+  const p2 = sheet([["الاسم", "الجوال", "المنتجات"], ["ب", "966500000002", "الإجازات المرضية"]]);
+  c("«المنتجات» is still a FACT column, not a tag column",
+    !p2.columns.tags.includes("المنتجات") && p2.rows[0].tags.length === 0);
+  c("…and it still lands as currentProducts",
+    facts.factsFromAttrs(p2.rows[0].attrs, NOW).currentProducts?.value === "الإجازات المرضية");
+
+  // An unrecognised column is left alone rather than guessed into the vocabulary every filter reads.
+  const p3 = sheet([["الاسم", "الجوال", "ملاحظات المندوب"], ["ج", "966500000003", "زرناهم مرتين"]]);
+  c("an unrecognised column stays a segment column and mints no tag",
+    p3.columns.tags.length === 0 && p3.rows[0].tags.length === 0 &&
+    p3.columns.attrs.includes("ملاحظات المندوب"));
+
+  c("a value too long to be a label is dropped, not truncated into a near-duplicate",
+    audience.tagsFromCell("x".repeat(61)).length === 0 && audience.tagsFromCell("x".repeat(60)).length === 1);
+  c("blank and repeated values collapse", JSON.stringify(audience.tagsFromCell("أ، ، أ , ب")) === JSON.stringify(["أ", "ب"]));
 }
 
 console.log(`\n${failures ? failures + " FAILURES" : "account graph: all green"}`);

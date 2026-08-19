@@ -148,6 +148,25 @@ app.post("/admin/entities/import", async (req, reply) => {
   const buf = await file.toBuffer();
   try {
     const parsed = audience.parseAudienceFile(buf, file.filename || "audience.xlsx");
+    // A tag column arrives as a NAME, and a name can only be applied once it exists in the
+    // registry — so the import creates what it needs first. The cap is the safety valve: a free
+    // text column mistaken for a tag column would otherwise mint one tag per row, and the vocabulary
+    // that every filter in the product reads would be unusable. Over the cap we create NOTHING and
+    // say so, which is recoverable; creating 3,000 tags is not.
+    const NEW_TAG_CAP = 60;
+    const have = new Set((await db.listTags()).map((t) => t.name));
+    const wanted = [...new Set(parsed.rows.flatMap((r) => r.tags))].filter((t) => !have.has(t));
+    let tagsCreated = 0;
+    let tagsRefused = 0;
+    if (wanted.length > NEW_TAG_CAP) {
+      tagsRefused = wanted.length;
+      // Drop the unknown names from the rows: an unknown tag would be written to an account and
+      // then fail the registry check every time anyone edited it afterwards.
+      const known = have;
+      for (const r of parsed.rows) r.tags = r.tags.filter((t) => known.has(t));
+    } else {
+      for (const t of wanted) if (await db.createTag(t, "import")) tagsCreated++;
+    }
     const res = await db.addEntities(parsed.rows);
     // Imported columns became typed facts inside the upsert; the agent must see them on the very
     // next inbound message, not after the next restart.
@@ -157,6 +176,8 @@ app.post("/admin/entities/import", async (req, reply) => {
       ...res,
       totalRows: parsed.totalRows,
       columns: parsed.columns,
+      tagsCreated,
+      tagsRefused,
       skippedRows: parsed.skipped.slice(0, 10),
       skippedCount: parsed.skipped.length,
     };

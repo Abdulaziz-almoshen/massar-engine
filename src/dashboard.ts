@@ -1279,7 +1279,22 @@ function entUses(e, product) {
   if (!product) return true;
   return factProducts(e).some((p) => p === product || p.includes(product) || product.includes(p));
 }
-/** Operator-applied. Catalogue name, exact match — written and read by the same string. */
+/** The reverse of contactByPhone: a conversation back to the account it belongs to, indexed for
+ *  the same reason — العملاء filters 1,700 contacts by their account's tag on every keystroke. */
+let _ebpSrc = null, _ebpMap = null;
+function entityByPhone(phone) {
+  if (_ebpSrc !== entities) { _ebpSrc = entities; _ebpMap = new Map(); entities.forEach((e) => _ebpMap.set(e.phone, e)); }
+  return _ebpMap.get(phone);
+}
+/** Does the ACCOUNT behind this conversation carry the tag? A contact has no tags of its own — the
+ *  label lives on the account, and asking the contact directly would silently answer «no» for
+ *  every one of them. */
+function contactTagged(c, tag) {
+  if (!tag) return true;
+  const e = entityByPhone(c.phone);
+  return Boolean(e && (e.productTags || []).indexOf(tag) >= 0);
+}
+/** Operator-applied. Registry name, exact match — written and read by the same string. */
 function entTagged(e, product) {
   if (!product) return true;
   return (e.productTags || []).indexOf(product) >= 0;
@@ -2150,8 +2165,17 @@ window.entFileUpload = async (input) => {
     let msg = '<span class="chip c-ok">أُضيف ' + fmtN(d.added) + "</span> ";
     if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> ";
     if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + fmtN(d.skippedCount) + "</span> ";
+    if (d.tagsCreated) msg += '<span class="chip c-blue">أُنشئ ' + fmtN(d.tagsCreated) + " وسم</span> ";
     msg += '<div style="font-size:11px;color:#7C7C7C;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
+      ((d.columns.tags || []).length ? ' · وسوم: <b style="color:#2F5F94;">' + d.columns.tags.map(esc).join("، ") + "</b>" : "") +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
+    // The cap fired: say what was refused and why, because the alternative is an import that looks
+    // clean while a whole column silently landed nowhere.
+    if (d.tagsRefused) {
+      msg += '<div style="font-size:11.5px;color:#B54708;margin-top:6px;line-height:1.9;">عمود الوسوم يحمل ' +
+        fmtN(d.tagsRefused) + ' اسمًا جديدًا — أكثر من أن يكون قائمة وسوم. لم يُنشأ أي وسم، والأسماء غير المعروفة لم تُطبَّق. ' +
+        'راجع العمود أو أنشئ الوسوم يدويًا من «الوسوم».</div>';
+    }
     if (d.skippedRows && d.skippedRows.length) {
       msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
         d.skippedRows.map((s) => "صف " + fmtN(s.row) + ": " + esc(s.reason)).join(" · ") + "</div>";
@@ -2160,7 +2184,11 @@ window.entFileUpload = async (input) => {
     const er = await fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } });
     if (er.ok) entities = await er.json();
     render(false);
-    alertBar("استُورد الملف — " + fmtN(d.added) + " جديد، " + fmtN(d.updated) + " محدّث", false);
+    const tr = await fetch("/admin/tags", { headers: { "x-admin-token": TOKEN } });
+    if (tr.ok) tagReg = await tr.json();
+    render(false);
+    alertBar("استُورد الملف — " + fmtN(d.added) + " جديد، " + fmtN(d.updated) + " محدّث" +
+      (d.tagsCreated ? " · " + fmtN(d.tagsCreated) + " وسم جديد" : ""), false);
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ في الاستيراد</span>'; }
   input.value = "";
 };
@@ -3369,7 +3397,7 @@ function dataSignature() {
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
     showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, tgtTagsOpen,
-    tgtTagEdit, tgtTagArm,
+    tgtTagEdit, tgtTagArm, cusTagF,
     tagReg.length, oppTab, oppQ, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",

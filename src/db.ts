@@ -425,7 +425,7 @@ export async function listEntities(): Promise<EntityRow[]> {
   }));
 }
 
-export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string; attrs?: Record<string, string> }[]):
+export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string; attrs?: Record<string, string>; tags?: string[] }[]):
   Promise<{ added: number; updated: number; skipped: number }> {
   if (!pool || !connected) return { added: 0, updated: 0, skipped: rows.length };
   let added = 0, updated = 0, skipped = 0;
@@ -438,17 +438,24 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
       const imported = facts.factsFromAttrs(
         { ...(r.attrs ?? {}), ...(r.size ? { "الحجم": r.size } : {}), ...(r.city ? { "المدينة": r.city } : {}) },
         Date.now());
+      // Tags UNION rather than replace, matching the `||` merge on attrs and facts one line up: a
+      // re-import adds the lines its column names and leaves every tag an operator applied by hand
+      // standing. jsonb_agg(DISTINCT …) is what stops a re-import doubling a tag already present.
       const res = await pool.query(
-        `INSERT INTO entities (name, phone, size, city, attrs, facts, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `INSERT INTO entities (name, phone, size, city, attrs, facts, product_tags, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT (phone) DO UPDATE SET
            name = EXCLUDED.name,
            size = COALESCE(EXCLUDED.size, entities.size),
            city = COALESCE(EXCLUDED.city, entities.city),
            attrs = entities.attrs || EXCLUDED.attrs,
-           facts = entities.facts || EXCLUDED.facts
+           facts = entities.facts || EXCLUDED.facts,
+           product_tags = (
+             SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb)
+               FROM jsonb_array_elements(entities.product_tags || EXCLUDED.product_tags) AS v)
          RETURNING (xmax = 0) AS inserted`,
         [r.name, r.phone, r.size ?? null, r.city ?? null, JSON.stringify(r.attrs ?? {}),
-         JSON.stringify(imported), Date.now()]);
+         JSON.stringify(imported), JSON.stringify(r.tags ?? []), Date.now()]);
       res.rows[0]?.inserted ? added++ : updated++;
     } catch { skipped++; }
   }

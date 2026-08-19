@@ -64,6 +64,10 @@ function cusTopTag(c) {
   for (var i = 0; i < tags.length; i++) if (!best || (rank[tags[i].level] || 0) > (rank[best.level] || 0)) best = tags[i];
   return best;
 }
+/* «مَن عملائي أنا؟» on the clients screen. The tab counts stay whole-book on purpose: narrowing to
+   one department's list must not change what the pills report the ledger contains. Its own state,
+   because a filter set while reading العملاء must not follow you into the campaign wizard. */
+var cusTagF = "";
 function cusContacts() {
   var all = ((cache && cache.contacts) || []).slice();
   var q = cusQ.trim();
@@ -76,6 +80,7 @@ function cusContacts() {
     if (cusTab === "engaged" && !(c.transcript || []).some(function (t) { return t.role === "customer"; })) return false;
     if (cusTab === "interested" && !cusTopTag(c) && c.outcome !== "interested") return false;
     if (cusTab === "stopped" && !(c.optedOut || c.outcome === "stopped")) return false;
+    if (cusTagF && !contactTagged(c, cusTagF)) return false;
     if (!q) return true;
     return (c.waName || "").includes(q) || (c.phone || "").includes(q) ||
       (c.tags || []).some(function (t) { return (t.product || "").includes(q); });
@@ -175,6 +180,16 @@ function cusControlBar(nTotal) {
       '<option value="interest"' + (cusGroupKey === "interest" ? " selected" : "") + '>تجميع حسب: اهتمام المساعد</option>' +
       '<option value="product"' + (cusGroupKey === "product" ? " selected" : "") + '>تجميع حسب: الخدمة</option></select>';
   }
+  var tags = tagList();
+  if (tags.length) {
+    h += '<select onchange="cusSetTag(this.value)" class="crmsel"' +
+      (cusTagF ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + '>' +
+      '<option value="">الوسم: الكل</option>' +
+      tags.map(function (t) {
+        return '<option value="' + esc(t.name) + '"' + (cusTagF === t.name ? " selected" : "") + '>' +
+          esc(clip(t.name, 26)) + "</option>";
+      }).join("") + "</select>";
+  }
   h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12.5px;" onclick="cusExport()">' + ic("doc", 15) + ' تصدير CSV</button>';
   h += '<span class="cntpill">' + fmtN(nTotal) + " جهة</span></div>";
   return h;
@@ -266,6 +281,7 @@ window.cusSetView = function (v) { cusView = v; cusDropSel(); render(false); };
 window.cusSetTab = function (t) { cusTab = t; cusDropSel(); render(false); };
 window.cusSetGroup = function (k) { cusGroupKey = k; render(false); };
 window.cusSetSort = function (v) { cusSort = v; render(false); };
+window.cusSetTag = function (v) { cusTagF = v; cusDropSel(); render(false); };
 window.cusSearch = function (el) { cusQ = el.value; cusDropSel(); clearTimeout(window.__cq3); window.__cq3 = setTimeout(function () { render(false); }, 250); };
 window.cusToggle = function (ph) { if (cusSel[ph]) delete cusSel[ph]; else cusSel[ph] = true; render(false); };
 window.cusClear = function () { cusSel = {}; render(false); };

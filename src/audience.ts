@@ -59,10 +59,32 @@ export function buildTemplateXlsx(): Buffer {
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
-export type ImportRow = { name: string; phone: string; attrs: Record<string, string> };
+export type ImportRow = { name: string; phone: string; attrs: Record<string, string>; tags: string[] };
+
+/**
+ * Header → «this column is a tag». Deliberately NARROW: an unrecognised column stays an attribute,
+ * where the segment chips already read it, rather than being guessed into the tag vocabulary.
+ *
+ * «المنتجات» is NOT here on purpose — facts.ts already claims it for currentProducts (what the
+ * account BUYS), and one header cannot honestly mean both what they own and who we plan to
+ * approach. A department naming its own line uses «خط المنتجات» or «القسم» or plain «الوسم».
+ */
+const TAG_HEADERS = /^\s*(الوسم|الوسوم|وسم|وسوم|القسم|الفئة|خط\s*المنتجات|المنتج\s*المستهدف|الخدمة\s*المستهدفة|tags?|label|line)\s*$/i;
+
+/** A cell may name several, in either comma. Values are trimmed and de-duplicated; anything longer
+ *  than a tag has any business being is dropped rather than truncated into a near-duplicate. */
+const TAG_MAX_LEN = 60;
+export function tagsFromCell(v: string): string[] {
+  const out: string[] = [];
+  for (const part of String(v ?? "").split(/[،,;|]/)) {
+    const t = part.trim().replace(/\s+/g, " ");
+    if (t && t.length <= TAG_MAX_LEN && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
 export type ImportParse = {
   rows: ImportRow[];
-  columns: { name: string; phone: string; attrs: string[] };
+  columns: { name: string; phone: string; attrs: string[]; tags: string[] };
   skipped: { row: number; reason: string }[];
   totalRows: number;
 };
@@ -107,11 +129,16 @@ export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse
     if (!name) { skipped.push({ row: rowNo, reason: "بدون اسم" }); continue; }
     if (phone.length < 8) { skipped.push({ row: rowNo, reason: `جوال غير صالح: ${formattedPhone || "(فارغ)"}` }); continue; }
     const attrs: Record<string, string> = {};
+    const tags: string[] = [];
     for (const { h, i } of attrIdx) {
       const v = String(line[i] ?? "").trim();
-      if (v) attrs[h] = v;
+      if (!v) continue;
+      // A tag column becomes tags and NOT an attribute. Landing in both would give one spreadsheet
+      // column two filters with two counts — the same label wearing two numbers.
+      if (TAG_HEADERS.test(h)) { for (const t of tagsFromCell(v)) if (!tags.includes(t)) tags.push(t); continue; }
+      attrs[h] = v;
     }
-    rows.push({ name, phone, attrs });
+    rows.push({ name, phone, attrs, tags });
   }
   if (grid.length - 1 > MAX_ROWS) {
     skipped.push({ row: MAX_ROWS + 2, reason: `تجاوز الحد (${MAX_ROWS} صف) — تم تجاهل الباقي` });
@@ -119,7 +146,11 @@ export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse
   console.log(JSON.stringify({ at: "audience", msg: "file parsed", filename, sheet: sheetName, rows: rows.length, skipped: skipped.length }));
   return {
     rows,
-    columns: { name: headers[nameIdx], phone: headers[phoneIdx], attrs: attrIdx.map((a) => a.h) },
+    columns: {
+      name: headers[nameIdx], phone: headers[phoneIdx],
+      attrs: attrIdx.filter((a) => !TAG_HEADERS.test(a.h)).map((a) => a.h),
+      tags: attrIdx.filter((a) => TAG_HEADERS.test(a.h)).map((a) => a.h),
+    },
     skipped,
     totalRows: grid.length - 1,
   };
