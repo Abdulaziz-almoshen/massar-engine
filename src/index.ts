@@ -165,6 +165,35 @@ app.post("/admin/entities/import", async (req, reply) => {
   }
 });
 
+/**
+ * Tag / untag a set of accounts with ONE product — «مرشّح لـ X».
+ *
+ * The name is validated against a CLOSED list the server can already enumerate: the service
+ * catalogue plus any product that has a knowledge document. Free text would create a facet that
+ * exists in the filter dropdown and matches nothing anybody meant — the emitted-value-must-be-
+ * readable defect this codebase has shipped before. The value is stored verbatim, because the
+ * filter reads it back by exact match.
+ *
+ * No WhatsApp path is touched: this writes a label on accounts and nothing else.
+ */
+app.post("/admin/entities/tag", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { ids, product, add } = (req.body ?? {}) as { ids?: unknown; product?: string; add?: boolean };
+  const list = Array.isArray(ids) ? ids.map(Number).filter((n) => Number.isFinite(n) && n > 0) : [];
+  const name = String(product ?? "").trim();
+  if (!list.length) return reply.code(400).send({ error: "body: { ids: number[], product, add }" });
+  if (!name) return reply.code(400).send({ error: "product is required" });
+  const known = new Set<string>([
+    ...(insights.SERVICE_CATALOGUE as readonly string[]),
+    ...(await db.listKb()).map((d) => d.product).filter((p) => p && p !== "__skill__"),
+  ]);
+  if (!known.has(name)) {
+    return reply.code(400).send({ error: "unknown_product", known: [...known] });
+  }
+  const n = await db.setProductTag(list, name, add !== false);
+  return { status: "ok", updated: n, product: name, add: add !== false };
+});
+
 app.post("/admin/entities/delete", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { id } = (req.body ?? {}) as { id?: number };

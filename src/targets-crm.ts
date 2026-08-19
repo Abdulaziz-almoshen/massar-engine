@@ -22,7 +22,7 @@
 export const TARGETS_CRM_CSS = `
   /* SIX cells, six tracks. Nothing here is display:contents, so cell count and track count are
      the same number in both directions — the arity bug class that wrapped three earlier tables. */
-  .tgtflat .crow { grid-template-columns: 2.1fr 2fr 1.15fr 1.05fr 44px; padding-inline:20px 12px; }
+  .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.4fr 1.1fr 1fr 52px; padding-inline:20px 12px; }
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
   .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#F3F3F3;
     color:#525252; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
@@ -39,12 +39,13 @@ export const TARGETS_CRM_CSS = `
   .tgtdel:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
   .tgtdel.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; opacity:1 !important; }
   @media (max-width: 939px) {
-    .tgtflat .crow { grid-template-columns: minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
-    .tgtflat .crow .t-nm { grid-row:1; grid-column:1; }
-    .tgtflat .crow .c-act { grid-row:1; grid-column:2; }
-    .tgtflat .crow .t-st { grid-row:2; grid-column:1 / 3; }
-    .tgtflat .crow .t-seg { grid-row:3; grid-column:1 / 3; flex-wrap:wrap; }
-    .tgtflat .crow .t-ph { grid-row:4; grid-column:1 / 3; }
+    .tgtflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
+    .tgtflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
+    .tgtflat .crow .t-nm { grid-row:1; grid-column:2; }
+    .tgtflat .crow .c-act { grid-row:1; grid-column:3; }
+    .tgtflat .crow .t-st { grid-row:2; grid-column:2 / 4; }
+    .tgtflat .crow .t-seg { grid-row:3; grid-column:2 / 4; flex-wrap:wrap; }
+    .tgtflat .crow .t-ph { grid-row:4; grid-column:2 / 4; }
   }
 `;
 
@@ -61,6 +62,16 @@ var tgtFilters = {};
    here rather than three; «who owns what» is the question you ask of a list, and the negation and the
    interest reading belong where an audience is being chosen. */
 var tgtProd = "";
+/* Selection lives here, keyed by id, and is INTERSECTED with the visible match on read — the same
+   structural rule the reviewer forced on the campaigns list after a selection survived navigation
+   and staged one campaign's phones under another campaign's name. */
+var tgtSel = {};
+var tgtTagBusy = false;
+function tgtSelIds() {
+  var live = {};
+  tgtMatches().forEach(function (e) { live[e.id] = true; });
+  return Object.keys(tgtSel).map(Number).filter(function (id) { return live[id]; });
+}
 function tgtMatches() {
   var q = tgtQ.trim();
   return entities.filter(function (e) {
@@ -107,10 +118,13 @@ function tgtFacetBar() {
   return h;
 }
 
-function tgtHeader() {
+function tgtHeader(allOn) {
   return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
+      (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></div>' +
     "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>الحالة</div><div></div></div>" +
-    '<div class="thead-narrow"><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
+    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
+      (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></span><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
 }
 
 function tgtRow(e) {
@@ -122,10 +136,16 @@ function tgtRow(e) {
   var st = c ? cusOutcome(c) : { label: "لم تُراسل بعد", dot: "#E2E2E2" };
   var armed = tgtArm === e.id;
   var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'style="cursor:default;"';
-  return '<div class="trow km crow" ' + open + ">" +
+  return '<div class="trow km krow crow' + (tgtSel[e.id] ? " sel" : "") + '" ' + open + ">" +
+    '<div class="selcell" onclick="event.stopPropagation()"><input type="checkbox"' +
+      (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')"></div>' +
     '<div class="t-nm"><span class="av">' + esc(e.name.trim().charAt(0)) + "</span>" +
       '<span class="lb">' + esc(e.name) + "</span></div>" +
-    '<div class="t-seg">' + (prodChips(e) + attrChips(e, 2) || '<span style="color:#C7C7C7;font-size:12px;">—</span>') + "</div>" +
+    '<div class="t-seg">' + (function () {
+      var pc = prodChips(e);
+      var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
+      return pc + attrChips(e, budget) || '<span style="color:#C7C7C7;font-size:12px;">—</span>';
+    })() + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
     '<div class="c-act">' + (armed
@@ -173,14 +193,35 @@ function vTargetsCrm() {
   h += tgtFacetBar();
   h += '<div id="entfstat">' + entImportSummary + "</div>";
   h += tgtImportBox();
-  h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader();
+  var allOn = shown.length > 0 && shown.every(function (e) { return tgtSel[e.id]; });
+  h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
   shown.forEach(function (e) { h += tgtRow(e); });
   if (!shown.length) {
     h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;">لا جهة تطابق هذا الفرز.</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
+  h += tgtBulkBar();
   return h;
+}
+
+/* «وسم كمرشّح» — the whole point of this screen for someone building a target list by hand. It
+   writes the OPERATOR dimension (entities.productTags) and nothing else: not the account's facts,
+   not the assistant's reading. Those two have their own writers and neither of them is a decision.
+   NOTHING HERE SENDS A MESSAGE — the only call is a label write. */
+function tgtBulkBar() {
+  var ids = tgtSelIds();
+  if (!ids.length) return "";
+  var prods = affinityProducts();
+  return '<div class="bulkbar"><div>' +
+    '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
+    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#171717;border-radius:999px;">' +
+    prods.map(function (p) { return '<option value="' + esc(p.name) + '">' + esc(clip(p.name, 30)) + "</option>"; }).join("") +
+    "</select>" +
+    '<button class="pri"' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(true)">' +
+      (tgtTagBusy ? "جارٍ…" : "وسم كمرشّح") + "</button>" +
+    '<button' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(false)">إزالة الوسم</button>' +
+    '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
 }
 
 function tgtPaintCrumb() {
@@ -193,6 +234,40 @@ function tgtPaintCrumb() {
    Arming is a separate click on a separate button, and only one row can be armed at a time. */
 window.tgtArmDel = function (id) { tgtArm = id; render(false); };
 window.tgtSetProd = function (v) { tgtProd = v; render(false); };
+window.tgtToggle = function (id) { if (tgtSel[id]) delete tgtSel[id]; else tgtSel[id] = true; render(false); };
+window.tgtClearSel = function () { tgtSel = {}; render(false); };
+window.tgtTogglePage = function () {
+  var shown = pageSlice("tgt", tgtMatches());
+  var allOn = shown.length > 0 && shown.every(function (e) { return tgtSel[e.id]; });
+  shown.forEach(function (e) { if (allOn) delete tgtSel[e.id]; else tgtSel[e.id] = true; });
+  render(false);
+};
+window.tgtTag = function (add) {
+  var ids = tgtSelIds();
+  var el = document.getElementById("tgtagsel");
+  var product = el ? el.value : "";
+  if (!ids.length || !product || tgtTagBusy) return;
+  tgtTagBusy = true; render(false);
+  fetch("/admin/entities/tag", { method: "POST",
+    headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: ids, product: product, add: add }) })
+    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (res) {
+      if (!res.ok) { alertBar("تعذّر الوسم: " + esc(String(res.j.error || "")), true); return; }
+      /* Mirror locally on the SAME string the server stored, so the filter that reads the tag back
+         and the row that displays it cannot disagree until the next fetch. */
+      entities.forEach(function (e) {
+        if (ids.indexOf(e.id) < 0) return;
+        var t = (e.productTags || []).filter(function (x) { return x !== product; });
+        if (add) t.push(product);
+        e.productTags = t;
+      });
+      tgtSel = {};
+      alertBar((add ? "وُسمت " : "أُزيل الوسم عن ") + fmtN(res.j.updated) + " جهة · " + product);
+    })
+    .catch(function () { alertBar("تعذّر الوسم — تحقّق من الاتصال.", true); })
+    .finally(function () { tgtTagBusy = false; render(false); });
+};
 window.tgtSearch = function (el) { tgtQ = el.value; clearTimeout(window.__tq); window.__tq = setTimeout(function () { render(false); }, 250); };
 /* Indexes only in the attribute string — Arabic keys stay out of onchange, and both sides re-derive
    the same ordering from segGroups(), exactly as entSetAttr does for the wizard. */

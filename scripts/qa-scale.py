@@ -164,6 +164,50 @@ with sync_playwright() as p:
     ck("[aimkt] clearing the service filter restores the whole book",
        pg.evaluate("() => entMatches().length"), total)
 
+    # --- 5c. THE OPERATOR'S OWN TAG ------------------------------------------
+    # Founder: «I want to tag the clients to product so… I can easily find them.» The defect class
+    # this guards is the one this codebase has shipped before — a value the system WRITES but
+    # cannot READ BACK, because the two sides spell it differently.
+    go("targets")
+    T = "تكامل الأنظمة (HIS/ERP)"
+    tagged = pg.evaluate("(p) => entities.filter(e => (e.productTags||[]).indexOf(p) >= 0).length", T)
+    ck("[targets] the book carries operator tags distinct from ownership", tagged > 0, True)
+
+    go("aimkt")
+    pg.evaluate("(p) => setProdFilter('candidate', p)", T); pg.wait_for_timeout(700)
+    ck("[aimkt] «مرشّح لـ» narrows the audience to exactly the tagged accounts",
+       pg.evaluate("() => entMatches().length"), tagged)
+    ck("[aimkt] …and it is NOT the same set as «يستخدم» (the two would agree by accident otherwise)",
+       pg.evaluate("(p) => entMatches().every(e => entUses(e, p))", T), False)
+    pg.evaluate("() => clearProdFilter()"); pg.wait_for_timeout(400)
+
+    # The round trip, through the real client handler with the write intercepted: whatever string
+    # the UI offers must be the string the filter finds afterwards.
+    go("targets")
+    sent = {}
+    def tagroute(route):
+        import json as _j
+        sent.update(_j.loads(route.request.post_data or "{}"))
+        route.fulfill(status=200, content_type="application/json; charset=utf-8",
+                      body=_j.dumps({"status": "ok", "updated": len(sent.get("ids", [])),
+                                     "product": sent.get("product"), "add": True}))
+    ctx.route("**/admin/entities/tag", tagroute)
+    picked = pg.evaluate("""() => { const rows = pageSlice('tgt', tgtMatches()).slice(0, 3);
+        rows.forEach(e => tgtSel[e.id] = true); render(false); return rows.map(e => e.id); }""")
+    pg.wait_for_timeout(600)
+    offered = pg.evaluate("() => { const s=document.getElementById('tgtagsel'); return s ? s.options[0].value : null; }")
+    ck("[targets] selecting rows raises a bulk bar offering a real product name", bool(offered), True)
+    pg.evaluate("() => tgtTag(true)"); pg.wait_for_timeout(1200)
+    ck("[targets] the tag POSTed is the exact name the control offered", sent.get("product"), offered)
+    ck("[targets] …and the rows it names are the ones selected", sorted(sent.get("ids", [])), sorted(picked))
+    readback = pg.evaluate("""(a) => a.ids.filter(id => {
+        const e = entities.find(x => x.id === id);
+        return e && (e.productTags || []).indexOf(a.p) >= 0; }).length""", {"ids": picked, "p": offered})
+    ck("[targets] …and every tagged row reads that same string back", readback, len(picked))
+    ck("[targets] tagging clears the selection so the bar cannot fire twice",
+       pg.evaluate("() => tgtSelIds().length"), 0)
+    ctx.unroute("**/admin/entities/tag")
+
     # --- 6. REPAINT COST -----------------------------------------------------
     # contactByPhone was a linear scan: #kmon repainted in 110-123ms EVERY paint — a visible
     # stutter on every keystroke in its search box — while #customers repainted in 4ms.

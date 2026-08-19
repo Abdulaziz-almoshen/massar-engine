@@ -1258,7 +1258,13 @@ function segGroups() {
 // A fact absent is «unknown», NOT «does not use it» — so notUses deliberately matches unknowns
 // too, and the UI says so. Claiming to know who does not own a product, when the column was simply
 // never imported, would be exactly the invented value this codebase spent three cycles removing.
-let prodFilter = { uses: "", notUses: "", interest: "" };
+//   candidate ← entities.productTags            OPERATOR. «مرشّح لـ X» — a decision, not a claim.
+//
+// The fourth is the only one a person sets directly, and the only one that says nothing about the
+// customer: it records that YOU decided these accounts are the ones to approach about a service.
+// Mailchimp draws this exact line between a Group (the customer selects it) and a Tag (your team
+// applies it), and collapsing the two is what makes an audience nobody can defend.
+let prodFilter = { uses: "", notUses: "", interest: "", candidate: "" };
 
 /** Values are stored as one string; accounts.ts splits on both comma forms, so this must too. */
 function factProducts(e) {
@@ -1270,6 +1276,11 @@ function entUses(e, product) {
   if (!product) return true;
   return factProducts(e).some((p) => p === product || p.includes(product) || product.includes(p));
 }
+/** Operator-applied. Catalogue name, exact match — written and read by the same string. */
+function entTagged(e, product) {
+  if (!product) return true;
+  return (e.productTags || []).indexOf(product) >= 0;
+}
 function entInterested(e, product) {
   if (!product) return true;
   const c = contactByPhone(e.phone);
@@ -1279,20 +1290,20 @@ function entInterested(e, product) {
  *  that is not in it — a service we sell but never seeded must still be filterable. */
 function affinityProducts() {
   const seen = new Map();
-  PRODUCTS.forEach((p) => seen.set(p.n, { uses: 0, interest: 0 }));
-  entities.forEach((e) => factProducts(e).forEach((p) => {
-    if (!seen.has(p)) seen.set(p, { uses: 0, interest: 0 });
-    seen.get(p).uses++;
-  }));
+  PRODUCTS.forEach((p) => seen.set(p.n, { uses: 0, interest: 0, tagged: 0 }));
+  const bump = (p, k) => { if (!seen.has(p)) seen.set(p, { uses: 0, interest: 0, tagged: 0 }); seen.get(p)[k]++; };
+  entities.forEach((e) => {
+    factProducts(e).forEach((p) => bump(p, "uses"));
+    (e.productTags || []).forEach((p) => bump(p, "tagged"));
+  });
   ((cache && cache.contacts) || []).forEach((c) => (c.tags || []).forEach((t) => {
-    if (!t.product) return;
-    if (!seen.has(t.product)) seen.set(t.product, { uses: 0, interest: 0 });
-    seen.get(t.product).interest++;
+    if (t.product) bump(t.product, "interest");
   }));
-  return [...seen.entries()].map(([name, n]) => ({ name, uses: n.uses, interest: n.interest }));
+  return [...seen.entries()].map(([name, n]) => ({ name, uses: n.uses, interest: n.interest, tagged: n.tagged }));
 }
-function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest); }
+function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate); }
 function entMatchesProduct(e) {
+  if (prodFilter.candidate && !entTagged(e, prodFilter.candidate)) return false;
   if (prodFilter.uses && !entUses(e, prodFilter.uses)) return false;
   if (prodFilter.notUses && entUses(e, prodFilter.notUses)) return false;
   if (prodFilter.interest && !entInterested(e, prodFilter.interest)) return false;
@@ -1330,10 +1341,18 @@ function attrChips(e, max) {
 /** What this account already buys. Silent when unknown — «ناقص» on every row of a book nobody has
  *  enriched yet is noise, and the band above already reports how many rows have no record. */
 function prodChips(e) {
+  let h = "";
+  const tg = e.productTags || [];
+  if (tg.length) {
+    h += '<span class="chip c-blue" title="مرشّح لـ · وسم وضعه الفريق">◆ ' +
+      esc(clip(tg[0], 16)) + (tg.length > 1 ? " +" + fmtN(tg.length - 1) : "") + "</span>";
+  }
   const ps = factProducts(e);
-  if (!ps.length) return "";
-  return '<span class="chip c-teal" title="الخدمات المستخدمة حاليًا · من ملف الحساب">' +
-    esc(clip(ps[0], 18)) + (ps.length > 1 ? " +" + fmtN(ps.length - 1) : "") + "</span>";
+  if (ps.length) {
+    h += '<span class="chip c-teal" title="الخدمات المستخدمة حاليًا · من ملف الحساب">' +
+      esc(clip(ps[0], 16)) + (ps.length > 1 ? " +" + fmtN(ps.length - 1) : "") + "</span>";
+  }
+  return h;
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
@@ -1631,7 +1650,7 @@ function vAffinityBand(selName, matched) {
         esc(clip(p.name, 26)) + " (" + fmtN(count(p)) + ")</option>").join("") + "</select></span>";
   };
   let h = '<div class="affin"><div class="ah"><span class="t">حسب الخدمة</span>' +
-    '<span class="s">«يستخدم» من ملف الحساب — بشري ومؤرَّخ · «أبدى اهتمامًا» من قراءة المساعد للمحادثة</span></div>';
+    '<span class="s">«مرشّح لـ» وسمٌ تضعه أنت · «يستخدم» من ملف الحساب · «أبدى اهتمامًا» من قراءة المساعد</span></div>';
   if (selName) {
     const owners = entities.filter((e) => entUses(e, selName)).length;
     h += '<div class="row"><button class="excl' + (prodFilter.notUses === selName ? " on" : "") +
@@ -1641,6 +1660,7 @@ function vAffinityBand(selName, matched) {
       '<span style="font-size:12px;color:#7C7C7C;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
   }
   h += '<div class="row">' +
+    sel("candidate", "مرشّح لـ:", "قائمة وسمتَها بنفسك من شاشة جهات الاستهداف", (p) => p.tagged) +
     sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
     sel("notUses", "لا يستخدم:", "من ليس لدينا سجل بأنه يستخدمها", (p) => p.uses) +
     sel("interest", "أبدى اهتمامًا بـ:", "من وسم المساعد اهتمامه بها في المحادثة", (p) => p.interest) +
@@ -1657,7 +1677,7 @@ function vAffinityBand(selName, matched) {
   }
   return h + "</div>";
 }
-window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "" }; entSel.clear(); render(false); };
+window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "", candidate: "" }; entSel.clear(); render(false); };
 function wizProducts() { return kbRegistry(); }
 function vAimkt() {
   const reg = wizProducts();
@@ -3323,10 +3343,12 @@ function dataSignature() {
     campaigns.length, entities.length, kbDocs.length, prodAssets.length,
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
-    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, oppTab, oppQ, campFilter, rQ, selProd,
+    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, oppTab, oppQ, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
-    JSON.stringify(entFilters), JSON.stringify(tgtFilters), JSON.stringify(prodFilter), [...entSel].join(","),
+    JSON.stringify(entFilters), JSON.stringify(tgtFilters), JSON.stringify(prodFilter),
+    [...entSel].join(","), Object.keys(tgtSel).join(","),
+    entities.reduce((a, e) => a + (e.productTags || []).length, 0),
     JSON.stringify(PAGE), PAGE_SIZE,
   ].join("~");
 }

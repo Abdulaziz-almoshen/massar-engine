@@ -98,6 +98,13 @@ ALTER TABLE entities ADD COLUMN IF NOT EXISTS attrs JSONB NOT NULL DEFAULT '{}';
 -- whatever columns the spreadsheet happened to carry, facts are the TYPED, sourced things the
 -- agent is allowed to state back to a customer. See src/facts.ts for the contract.
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS facts JSONB NOT NULL DEFAULT '{}';
+-- Operator-applied product targeting. A THIRD store on purpose, and none of the other two can
+-- carry it: attrs is whatever the spreadsheet happened to contain, facts are typed claims about the
+-- customer's own operation that the agent may state back to them, and contacts.tags is the agent's
+-- reading of a conversation. This is none of those — it is «I decided these accounts are the ones
+-- to approach about X», an internal label with no claim about the customer at all. Mailchimp draws
+-- exactly this line between a Group (the customer selects it) and a Tag (your team applies it).
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS product_tags JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 -- The founder's primary outcome had nowhere to live: two of four real conversations already
 -- contained a customer-stated time («صباح», «صباحًا») and the system recorded neither.
@@ -383,15 +390,18 @@ export type EntityRow = {
   attrs: Record<string, string>;
   /** Raw JSONB. Callers pass it through `facts.readFacts` — this layer stores, it does not judge. */
   facts: Record<string, unknown>;
+  /** Product names an operator marked this account as a candidate for. Catalogue names verbatim. */
+  productTags: string[];
 };
 
 export async function listEntities(): Promise<EntityRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts FROM entities ORDER BY name`);
+  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts, product_tags FROM entities ORDER BY name`);
   // Legacy size/city columns fold into attrs so the UI reads one uniform attribute map.
   return r.rows.map((x) => ({
     ...x, id: Number(x.id),
     facts: x.facts ?? {},
+    productTags: Array.isArray(x.product_tags) ? x.product_tags.filter((t: unknown) => typeof t === "string") : [],
     attrs: {
       ...(x.size ? { "الحجم": x.size } : {}),
       ...(x.city ? { "المدينة": x.city } : {}),
@@ -428,6 +438,37 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
     } catch { skipped++; }
   }
   return { added, updated, skipped };
+}
+
+/**
+ * Add or remove ONE product tag across a set of accounts, in one statement.
+ *
+ * The value written is the catalogue name VERBATIM, because the filter reads it back by exact
+ * match — the emitted-value-must-be-readable rule this codebase has broken before. The caller
+ * validates the name against the catalogue; this layer refuses an empty one and nothing else.
+ *
+ * jsonb set semantics by hand: Postgres has no array-set type here, so add is a de-duplicating
+ * concat and remove is a filter. Both are idempotent, which is what makes a bulk action over a
+ * selection that partially already carries the tag behave the way the operator expects.
+ */
+export async function setProductTag(ids: number[], product: string, add: boolean): Promise<number> {
+  if (!pool || !connected) return 0;
+  if (!product.trim() || !ids.length) return 0;
+  const r = add
+    ? await pool.query(
+        `UPDATE entities
+            SET product_tags = (
+              SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb)
+                FROM jsonb_array_elements(product_tags || to_jsonb($2::text)) AS v)
+          WHERE id = ANY($1::bigint[])`, [ids, product])
+    : await pool.query(
+        `UPDATE entities
+            SET product_tags = (
+              SELECT COALESCE(jsonb_agg(v), '[]'::jsonb)
+                FROM jsonb_array_elements(product_tags) AS v
+               WHERE v <> to_jsonb($2::text))
+          WHERE id = ANY($1::bigint[])`, [ids, product]);
+  return r.rowCount ?? 0;
 }
 
 export async function deleteEntity(id: number): Promise<void> {

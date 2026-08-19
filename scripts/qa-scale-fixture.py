@@ -30,6 +30,10 @@ for i in range(3000):
         owned = random.sample(PRODUCTS, random.choice([1, 1, 2]))
         e["facts"] = {"currentProducts": {"value": "، ".join(owned), "source": "human",
                                           "by": "import", "ts": NOW - 30 * DAY}}
+    # Operator-applied targeting on a different slice than ownership, so the two filters cannot
+    # accidentally agree and pass a test that would fail on real data.
+    if i % 7 == 0:
+        e["productTags"] = [PRODUCTS[i % len(PRODUCTS)]]
     entities.append(e)
 
 # 1000 onboarded = a real conversation, a delivered/read/replied ledger and at least one tag
