@@ -166,16 +166,58 @@ app.post("/admin/entities/import", async (req, reply) => {
 });
 
 /**
- * Tag / untag a set of accounts with ONE product — «مرشّح لـ X».
+ * Tag / untag a set of accounts with ONE tag.
  *
- * The name is validated against a CLOSED list the server can already enumerate: the service
- * catalogue plus any product that has a knowledge document. Free text would create a facet that
- * exists in the filter dropdown and matches nothing anybody meant — the emitted-value-must-be-
- * readable defect this codebase has shipped before. The value is stored verbatim, because the
- * filter reads it back by exact match.
+ * The name is validated against the tag registry. Free text would let two spellings of one label
+ * split a list in silence — the emitted-value-must-be-readable defect this codebase has shipped
+ * before — so a tag must be CREATED before it can be APPLIED. The value is stored verbatim,
+ * because the filter reads it back by exact match.
  *
  * No WhatsApp path is touched: this writes a label on accounts and nothing else.
  */
+/** The tag vocabulary. Seeded once from Lean's own catalogue so existing behaviour is unchanged;
+ *  everything after that is the operator's. */
+app.get("/admin/tags", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return db.listTags();
+});
+
+app.post("/admin/tags", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const name = String((req.body as { name?: string })?.name ?? "").trim().replace(/\s+/g, " ");
+  if (!name) return reply.code(400).send({ error: "name is required" });
+  if (name.length > 60) return reply.code(400).send({ error: "too_long" });
+  const created = await db.createTag(name, "portal");
+  return { status: "ok", name, created };
+});
+
+app.post("/admin/tags/rename", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const { from, to } = (req.body ?? {}) as { from?: string; to?: string };
+  const a = String(from ?? "").trim();
+  const b = String(to ?? "").trim().replace(/\s+/g, " ");
+  if (!a || !b) return reply.code(400).send({ error: "body: { from, to }" });
+  if (b.length > 60) return reply.code(400).send({ error: "too_long" });
+  if (a === b) return { status: "ok", renamed: false };
+  // A rename ONTO an existing tag would merge two vocabularies; that is a different decision with a
+  // different blast radius, so it is refused here rather than done silently.
+  if ((await db.listTags()).some((t) => t.name === b)) {
+    return reply.code(409).send({ error: "tag_exists" });
+  }
+  const ok = await db.renameTag(a, b);
+  if (!ok) return reply.code(404).send({ error: "unknown_tag" });
+  return { status: "ok", renamed: true, from: a, to: b };
+});
+
+app.post("/admin/tags/delete", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const name = String((req.body as { name?: string })?.name ?? "").trim();
+  if (!name) return reply.code(400).send({ error: "name is required" });
+  const r = await db.deleteTag(name);
+  if (!r.ok) return reply.code(404).send({ error: "unknown_tag" });
+  return { status: "ok", name, cleared: r.cleared };
+});
+
 app.post("/admin/entities/tag", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { ids, product, add } = (req.body ?? {}) as { ids?: unknown; product?: string; add?: boolean };
@@ -183,12 +225,12 @@ app.post("/admin/entities/tag", async (req, reply) => {
   const name = String(product ?? "").trim();
   if (!list.length) return reply.code(400).send({ error: "body: { ids: number[], product, add }" });
   if (!name) return reply.code(400).send({ error: "product is required" });
-  const known = new Set<string>([
-    ...(insights.SERVICE_CATALOGUE as readonly string[]),
-    ...(await db.listKb()).map((d) => d.product).filter((p) => p && p !== "__skill__"),
-  ]);
+  // Validated against the REGISTRY, not against Lean's hard-coded service catalogue. Still a
+  // closed list at write time — but one the operator extends, which is the whole difference
+  // between a product filter and a tagging system.
+  const known = new Set((await db.listTags()).map((t) => t.name));
   if (!known.has(name)) {
-    return reply.code(400).send({ error: "unknown_product", known: [...known] });
+    return reply.code(400).send({ error: "unknown_tag", known: [...known] });
   }
   const n = await db.setProductTag(list, name, add !== false);
   return { status: "ok", updated: n, product: name, add: add !== false };
@@ -895,6 +937,19 @@ const main = async () => {
   tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
   if (db.isConnected()) await tracker.hydrate();
+  // Seed the tag vocabulary from Lean's own catalogue, once and idempotently, so the registry
+  // starts where the hard-coded list left off and nothing an operator already tagged stops
+  // validating. Everything added after this is theirs.
+  if (db.isConnected()) {
+    const have = new Set((await db.listTags()).map((t) => t.name));
+    const seed = [
+      ...(insights.SERVICE_CATALOGUE as readonly string[]),
+      ...(await db.listKb()).map((d) => d.product).filter((p) => p && p !== "__skill__"),
+    ];
+    let added = 0;
+    for (const name of seed) if (!have.has(name) && await db.createTag(name, "seed")) added++;
+    if (added) log({ at: "boot", msg: `tag registry seeded with ${added} name(s)` });
+  }
   if (db.isConnected()) await agent.refreshKb();
   // The agent's account facts. Loaded once at boot into a synchronous snapshot, then kept current
   // by every import and every fact write — systemPrompt is sync and must not wait on a query.

@@ -38,7 +38,8 @@ def ck(name, got, want):
 build_fixture()
 BODY = {"/admin/state": (FIXDIR/"state.json").read_text(),
         "/admin/entities": (FIXDIR/"entities.json").read_text(),
-        "/admin/campaigns": (FIXDIR/"campaigns.json").read_text()}
+        "/admin/campaigns": (FIXDIR/"campaigns.json").read_text(),
+        "/admin/tags": (FIXDIR/"tags.json").read_text()}
 N_ENT, N_CON = 3000, 1700
 
 def handler(route):
@@ -207,6 +208,65 @@ with sync_playwright() as p:
     ck("[targets] tagging clears the selection so the bar cannot fire twice",
        pg.evaluate("() => tgtSelIds().length"), 0)
     ctx.unroute("**/admin/entities/tag")
+
+    # --- 5d. THE TAG REGISTRY IS A VOCABULARY, NOT A CATALOGUE ---------------
+    # Founder: «maybe other departments want to use Massar to market their products. So tags are
+    # not there.» Correct as first shipped: the tag name was validated against Lean's hard-coded
+    # health-service catalogue, so no operator could name anything else. The registry has to offer
+    # a label that is NOT a service, and a brand-new tag with nobody in it has to be selectable —
+    # you create it before you use it, and it must exist in between.
+    OUTSIDE = "تأمين المركبات"
+    go("aimkt")
+    offered = pg.evaluate("() => tagList().map(t => t.name)")
+    ck("[aimkt] the tag vocabulary offers a label that is NOT in the product catalogue",
+       OUTSIDE in offered, True)
+    ck("[aimkt] …and it is genuinely outside the catalogue the agent is locked to",
+       pg.evaluate("(n) => PRODUCTS.some(p => p.n === n)", OUTSIDE), False)
+    ck("[aimkt] a tag with zero accounts is still selectable",
+       pg.evaluate("() => tagList().some(t => t.count === 0)"), True)
+    ck("[aimkt] every option in the tag select comes from the registry",
+       pg.evaluate("""() => { const reg = new Set(tagReg.map(t => t.name));
+         const sels = [...document.querySelectorAll('.affin select')];
+         const s = sels.find(x => [...x.options].some(o => o.value && reg.has(o.value)));
+         if (!s) return false;
+         return [...s.options].filter(o => o.value).every(o => reg.has(o.value)); }"""), True)
+
+    # Create → apply → filter, through the real handlers, with the writes intercepted. What the
+    # operator typed must be what the filter finds; nothing may normalise it in between.
+    import json as _json
+    posts = []
+    def tagsroute(route):
+        req = route.request
+        if req.method != "POST":
+            return route.fulfill(status=200, content_type="application/json; charset=utf-8",
+                                 body=BODY["/admin/tags"])
+        body = _json.loads(req.post_data or "{}")
+        posts.append((req.url.split("/admin/tags")[1] or "/", body))
+        reg = _json.loads(BODY["/admin/tags"])
+        if req.url.endswith("/admin/tags"):
+            reg.append({"id": 999, "name": body["name"], "created_at": 0, "created_by": "portal"})
+            BODY["/admin/tags"] = _json.dumps(reg, ensure_ascii=False)
+            return route.fulfill(status=200, content_type="application/json; charset=utf-8",
+                                 body=_json.dumps({"status": "ok", "name": body["name"], "created": True}))
+        return route.fulfill(status=200, content_type="application/json; charset=utf-8",
+                             body=_json.dumps({"status": "ok", "renamed": True, "cleared": 0}))
+    ctx.route("**/admin/tags**", tagsroute)
+
+    go("targets")
+    pg.evaluate("() => tgtOpenTags()"); pg.wait_for_timeout(600)
+    NEWTAG = "خط منتجات قسم آخر"
+    pg.evaluate("(n) => { document.getElementById('tgnew').value = n; tgtCreateTag(); }", NEWTAG)
+    pg.wait_for_timeout(1200)
+    ck("[targets] creating a tag POSTs exactly the name typed",
+       [b for (p_, b) in posts if p_ == "/"][-1].get("name"), NEWTAG)
+    ck("[targets] …and the new tag joins the vocabulary the controls offer",
+       pg.evaluate("(n) => tagList().some(t => t.name === n)", NEWTAG), True)
+    ck("[targets] …and the panel needs no browser dialog to rename or delete",
+       pg.evaluate("""() => { const b = [...document.querySelectorAll('.tagsheet .trow2 .btn')]
+           .map(x => x.getAttribute('onclick') || '').join(' ');
+         return /prompt\(|confirm\(/.test(b); }"""), False)
+    pg.evaluate("() => tgtCloseTags()"); pg.wait_for_timeout(400)
+    ctx.unroute("**/admin/tags**")
 
     # --- 6. REPAINT COST -----------------------------------------------------
     # contactByPhone was a linear scan: #kmon repainted in 110-123ms EVERY paint — a visible

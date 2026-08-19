@@ -78,5 +78,10 @@ for i in range(200):
 json.dump({"contacts": contacts, "notifyNumber": "966559402621"}, open("/tmp/fixture/state.json","w"), ensure_ascii=False)
 json.dump(entities, open("/tmp/fixture/entities.json","w"), ensure_ascii=False)
 json.dump(camps, open("/tmp/fixture/campaigns.json","w"), ensure_ascii=False)
+# The tag registry, INCLUDING a label that is not a Lean health service at all — the whole point of
+# the registry is that a second department can name its own product line and tag with it.
+tagreg = [{"id": i+1, "name": n, "created_at": NOW - 5 * DAY, "created_by": "seed"}
+          for i, n in enumerate(PRODUCTS + ["تأمين المركبات", "معرض الرياض الصحي"])]
+json.dump(tagreg, open("/tmp/fixture/tags.json","w"), ensure_ascii=False)
 print("contacts", len(contacts), "entities", len(entities), "campaigns", len(camps),
       "onboarded(replied)", sum(1 for c in contacts if c["statusTimes"].get("replied")))

@@ -38,6 +38,23 @@ export const TARGETS_CRM_CSS = `
     border-radius:6px; height:26px; padding:0 8px; cursor:pointer; white-space:nowrap; }
   .tgtdel:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
   .tgtdel.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; opacity:1 !important; }
+  /* إدارة الوسوم */
+  .tagsheet { position:fixed; inset:0; z-index:140; background:rgba(23,23,23,.32);
+    display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
+  .tagsheet .sheet { background:#fff; border:1px solid #EDEDED; border-radius:14px; width:100%;
+    max-width:520px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
+  .tagsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#171717; }
+  .tagsheet .hint { font-size:12.5px; color:#7C7C7C; line-height:1.8; margin-top:6px; }
+  .tagsheet .mk { display:flex; gap:8px; margin:14px 0 4px; }
+  .tagsheet .mk input { flex:1; min-width:0; height:34px; }
+  .tagsheet .tlist { margin-top:6px; max-height:52vh; overflow-y:auto; }
+  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #EDEDED; }
+  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:13.5px; color:#171717;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tagsheet .trow2 .ct { font-size:12px; color:#999999; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
+  .tagsheet .trow2 .dngr:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
   @media (max-width: 939px) {
     .tgtflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
     .tgtflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
@@ -67,6 +84,9 @@ var tgtProd = "";
    and staged one campaign's phones under another campaign's name. */
 var tgtSel = {};
 var tgtTagBusy = false;
+var tgtTagsOpen = false;
+var tgtTagEdit = "";   /* the tag whose name is being edited, inline */
+var tgtTagArm = "";    /* the tag armed for deletion — arm, then confirm, like the row delete */
 function tgtSelIds() {
   var live = {};
   tgtMatches().forEach(function (e) { live[e.id] = true; });
@@ -112,6 +132,8 @@ function tgtFacetBar() {
       }).join("") + "</select>";
   }
   h += '<span style="flex:1"></span><span class="hair"></span>';
+  h += '<button class="btn btn-ghost" onclick="tgtOpenTags()">الوسوم' +
+    (tagList().length ? " (" + fmtN(tagList().length) + ")" : "") + "</button>";
   h += '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>';
   h += '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
   h += "</div>";
@@ -202,6 +224,7 @@ function vTargetsCrm() {
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
   h += tgtBulkBar();
+  h += tgtTagsPanel();
   return h;
 }
 
@@ -212,16 +235,67 @@ function vTargetsCrm() {
 function tgtBulkBar() {
   var ids = tgtSelIds();
   if (!ids.length) return "";
-  var prods = affinityProducts();
+  var tags = tagList();
+  if (!tags.length) {
+    /* No vocabulary yet. Offering an empty dropdown and a live «وسم» button is a control that can
+       only fail; the bar says what is missing and where to fix it. */
+    return '<div class="bulkbar"><div>' +
+      '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
+      '<span style="font-size:12.5px;">لا وسوم بعد.</span>' +
+      '<button class="pri" onclick="tgtOpenTags()">أنشئ أول وسم</button>' +
+      '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
+  }
   return '<div class="bulkbar"><div>' +
     '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
     '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#171717;border-radius:999px;">' +
-    prods.map(function (p) { return '<option value="' + esc(p.name) + '">' + esc(clip(p.name, 30)) + "</option>"; }).join("") +
+    tags.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(clip(t.name, 30)) + "</option>"; }).join("") +
     "</select>" +
     '<button class="pri"' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(true)">' +
-      (tgtTagBusy ? "جارٍ…" : "وسم كمرشّح") + "</button>" +
+      (tgtTagBusy ? "جارٍ…" : "وسم") + "</button>" +
     '<button' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(false)">إزالة الوسم</button>' +
+    '<button onclick="tgtOpenTags()">إدارة الوسوم</button>' +
     '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
+}
+
+/* إدارة الوسوم — create, rename, delete, with the count each one carries.
+   Rename and delete exist because near-duplicates WILL be created («عيادات الأسنان» beside
+   «عيادات أسنان»), and without a way out the only remedy is retagging by hand. Both are single
+   transactions on the server across the registry and every account. */
+function tgtTagsPanel() {
+  if (!tgtTagsOpen) return "";
+  var tags = tagList();
+  return '<div class="tagsheet" onclick="if(event.target===this) tgtCloseTags()"><div class="sheet">' +
+    '<div class="sh"><span class="t">إدارة الوسوم</span>' +
+    '<button class="btn btn-ghost" onclick="tgtCloseTags()">إغلاق</button></div>' +
+    '<div class="hint">الوسم تسمّيه كما تشاء — خدمة، خط منتجات قسم آخر، أو فعالية. يُنشأ مرة، ثم يُختار.</div>' +
+    '<div class="mk"><input id="tgnew" class="inp" maxlength="60" placeholder="اسم الوسم الجديد…" ' +
+      'onkeydown="if(event.key===&quot;Enter&quot;) tgtCreateTag()">' +
+      '<button class="btn btn-dark" onclick="tgtCreateTag()">أضف</button></div>' +
+    (tags.length
+      ? '<div class="tlist">' + tags.map(function (t) {
+          var q = JSON.stringify(t.name).replace(/"/g, "&quot;");
+          /* Renaming happens IN the row and deleting arms before it fires — the same two-step this
+             screen already uses on a row, and no browser dialog anywhere. */
+          if (tgtTagEdit === t.name) {
+            return '<div class="trow2"><input id="tgedit" class="inp" maxlength="60" value="' + esc(t.name) + '" ' +
+              'onkeydown="if(event.key===&quot;Enter&quot;) tgtRenameSave(' + q + '); if(event.key===&quot;Escape&quot;) tgtRenameCancel()">' +
+              '<button class="btn btn-dark" onclick="tgtRenameSave(' + q + ')">حفظ</button>' +
+              '<button class="btn btn-ghost" onclick="tgtRenameCancel()">إلغاء</button></div>';
+          }
+          if (tgtTagArm === t.name) {
+            return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +
+              '<span class="ct" style="color:#B42318;">' +
+                (t.count ? "سيُزال عن " + fmtN(t.count) + " جهة" : "بلا جهات") + "</span>" +
+              '<button class="btn btn-ghost dngr" style="border-color:#B42318;color:#B42318;" onclick="tgtDeleteTag(' + q + ')">تأكيد الحذف</button>' +
+              '<button class="btn btn-ghost" onclick="tgtArmTag(&quot;&quot;)">تراجع</button></div>';
+          }
+          return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +
+            '<span class="ct">' + (t.count ? fmtN(t.count) + " جهة" : "بلا جهات") + "</span>" +
+            '<button class="btn btn-ghost" onclick="tgtEditTag(' + q + ')">إعادة تسمية</button>' +
+            '<button class="btn btn-ghost dngr" onclick="tgtArmTag(' + q + ')">حذف</button></div>';
+        }).join("") + "</div>"
+      : '<div class="hint" style="padding:18px 0;">لا وسوم بعد.</div>') +
+    "</div></div>";
 }
 
 function tgtPaintCrumb() {
@@ -242,6 +316,75 @@ window.tgtTogglePage = function () {
   shown.forEach(function (e) { if (allOn) delete tgtSel[e.id]; else tgtSel[e.id] = true; });
   render(false);
 };
+window.tgtOpenTags = function () { tgtTagsOpen = true; render(false);
+  setTimeout(function () { var el = document.getElementById("tgnew"); if (el) el.focus(); }, 0); };
+window.tgtCloseTags = function () { tgtTagsOpen = false; render(false); };
+
+/* Every registry write re-reads the registry from the server before repainting. The alternative —
+   mirroring locally — is how a vocabulary drifts from the one the write path validates against, and
+   this is the one screen where that divergence is invisible until a tag silently stops applying. */
+function tagPost(path, body, done) {
+  return fetch("/admin/tags" + path, { method: "POST",
+    headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify(body) })
+    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (res) {
+      if (!res.ok) { alertBar("تعذّر: " + esc(String(res.j.error || "")), true); return null; }
+      return fetch("/admin/tags", { headers: { "x-admin-token": TOKEN } })
+        .then(function (r) { return r.json(); })
+        .then(function (list) { tagReg = list; if (done) done(res.j); render(false); return res.j; });
+    })
+    .catch(function () { alertBar("تعذّر الاتصال.", true); return null; });
+}
+
+window.tgtCreateTag = function () {
+  var el = document.getElementById("tgnew");
+  var name = el ? el.value.trim() : "";
+  if (!name) return;
+  tagPost("", { name: name }, function (j) {
+    var e2 = document.getElementById("tgnew"); if (e2) e2.value = "";
+    alertBar(j.created ? "أُضيف الوسم «" + j.name + "»" : "«" + j.name + "» موجود مسبقًا");
+  });
+};
+
+window.tgtEditTag = function (name) { tgtTagEdit = name; tgtTagArm = ""; render(false);
+  setTimeout(function () { var el = document.getElementById("tgedit"); if (el) { el.focus(); el.select(); } }, 0); };
+window.tgtRenameCancel = function () { tgtTagEdit = ""; render(false); };
+window.tgtArmTag = function (name) { tgtTagArm = name; tgtTagEdit = ""; render(false); };
+
+window.tgtRenameSave = function (from) {
+  var el = document.getElementById("tgedit");
+  var to = el ? el.value.trim() : "";
+  if (!to || to === from) { tgtTagEdit = ""; render(false); return; }
+  tgtTagEdit = "";
+  tagPost("/rename", { from: from, to: to }, function () {
+    /* Mirror onto the accounts already loaded so the list and the filter agree before the next
+       full refresh — the server moved both stores in one transaction. */
+    entities.forEach(function (e) {
+      var t = e.productTags || [];
+      if (t.indexOf(from) < 0) return;
+      e.productTags = t.map(function (x) { return x === from ? to : x; })
+        .filter(function (x, i, a) { return a.indexOf(x) === i; });
+    });
+    if (prodFilter.candidate === from) prodFilter.candidate = to;
+    if (tgtProd === from) tgtProd = to;
+    alertBar("أُعيدت التسمية إلى «" + to + "»");
+  });
+};
+
+window.tgtDeleteTag = function (name) {
+  tgtTagArm = "";
+  tagPost("/delete", { name: name }, function (j) {
+    entities.forEach(function (e) {
+      var t = e.productTags || [];
+      if (t.indexOf(name) >= 0) e.productTags = t.filter(function (x) { return x !== name; });
+    });
+    if (prodFilter.candidate === name) prodFilter.candidate = "";
+    if (tgtProd === name) tgtProd = "";
+    alertBar("حُذف الوسم · أُزيل عن " + fmtN(j.cleared) + " جهة");
+  });
+};
+
 window.tgtTag = function (add) {
   var ids = tgtSelIds();
   var el = document.getElementById("tgtagsel");

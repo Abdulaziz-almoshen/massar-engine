@@ -105,6 +105,21 @@ ALTER TABLE entities ADD COLUMN IF NOT EXISTS facts JSONB NOT NULL DEFAULT '{}';
 -- to approach about X», an internal label with no claim about the customer at all. Mailchimp draws
 -- exactly this line between a Group (the customer selects it) and a Tag (your team applies it).
 ALTER TABLE entities ADD COLUMN IF NOT EXISTS product_tags JSONB NOT NULL DEFAULT '[]';
+-- THE TAG REGISTRY. entities.product_tags used to be validated against Lean's health-service
+-- catalogue, hard-coded in insights.ts — which made it a product FILTER, not a tagging system: no
+-- operator could add a label, so a second department with its own product line had nothing to tag
+-- with. Free text is not the fix; two people typing «عيادات الأسنان» and «عيادات أسنان» split one
+-- list in silence, which is the emitted-value-unreadable defect wearing a different hat.
+-- The registry gives both properties at once: creating a tag is a deliberate act, applying one is
+-- always a selection from what exists, and the write path still validates against a CLOSED list —
+-- one the operator can extend. Rename and delete exist because near-duplicates happen anyway and
+-- the way out must not lose the accounts already tagged.
+CREATE TABLE IF NOT EXISTS tags (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  created_at BIGINT NOT NULL,
+  created_by TEXT
+);
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS test BOOLEAN NOT NULL DEFAULT FALSE;
 -- The founder's primary outcome had nowhere to live: two of four real conversations already
 -- contained a customer-stated time («صباح», «صباحًا») and the system recorded neither.
@@ -469,6 +484,77 @@ export async function setProductTag(ids: number[], product: string, add: boolean
                WHERE v <> to_jsonb($2::text))
           WHERE id = ANY($1::bigint[])`, [ids, product]);
   return r.rowCount ?? 0;
+}
+
+// --------------------------------------------------------------------------- tag registry
+export type TagRow = { id: number; name: string; created_at: number; created_by: string | null };
+
+export async function listTags(): Promise<TagRow[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(`SELECT id, name, created_at, created_by FROM tags ORDER BY name`);
+  return r.rows.map((x) => ({ ...x, id: Number(x.id), created_at: Number(x.created_at) }));
+}
+
+/** Idempotent. Returns false when the name already exists — a duplicate is not an error, it is a
+ *  no-op, because the caller's intent («this label should exist») is already satisfied. */
+export async function createTag(name: string, by: string): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const r = await pool.query(
+    `INSERT INTO tags (name, created_at, created_by) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING`,
+    [name, Date.now(), by]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+/**
+ * Rename in ONE transaction across BOTH stores. The registry and every entity carrying the old name
+ * must move together: a crash between two separate commits leaves a tag that exists on accounts and
+ * not in the registry, which then fails its own write validation forever.
+ *
+ * DISTINCT is load-bearing. An account already carrying the destination name would otherwise end up
+ * holding it twice, and a duplicate inside the array makes every count off by one.
+ */
+export async function renameTag(from: string, to: string): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`UPDATE tags SET name = $2 WHERE name = $1`, [from, to]);
+    if (!(r.rowCount ?? 0)) { await client.query("ROLLBACK"); return false; }
+    await client.query(
+      `UPDATE entities
+          SET product_tags = (
+            SELECT COALESCE(jsonb_agg(DISTINCT CASE WHEN v = to_jsonb($1::text) THEN to_jsonb($2::text) ELSE v END), '[]'::jsonb)
+              FROM jsonb_array_elements(product_tags) AS v)
+        WHERE product_tags @> jsonb_build_array($1::text)`, [from, to]);
+    await client.query("COMMIT");
+    return true;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** Delete the tag AND strip it from every account, in one transaction. Returns how many accounts
+ *  lost it, so the UI can report a real number rather than «تم». */
+export async function deleteTag(name: string): Promise<{ ok: boolean; cleared: number }> {
+  if (!pool || !connected) return { ok: false, cleared: 0 };
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`DELETE FROM tags WHERE name = $1`, [name]);
+    const u = await client.query(
+      `UPDATE entities
+          SET product_tags = (
+            SELECT COALESCE(jsonb_agg(v), '[]'::jsonb)
+              FROM jsonb_array_elements(product_tags) AS v
+             WHERE v <> to_jsonb($1::text))
+        WHERE product_tags @> jsonb_build_array($1::text)`, [name]);
+    await client.query("COMMIT");
+    return { ok: (r.rowCount ?? 0) > 0, cleared: u.rowCount ?? 0 };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
 }
 
 export async function deleteEntity(id: number): Promise<void> {

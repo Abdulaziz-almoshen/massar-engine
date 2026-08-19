@@ -538,6 +538,9 @@ let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = fa
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
 let manualOpen = false; let manualStat = ""; let oppTab = "scheduled"; let oppQ = "";
+/** The tag vocabulary, from the server. The ONLY source the tag controls offer, so a name that
+ *  reaches a write always came from a name the write path will accept. */
+let tagReg = [];
 // Elapsed time in the unit a person would say it in. Below two days an hour count is what the
 // operator acts on («٩ ساعات بلا متابعة»); above it, hours stop being information.
 function fmtAgo(ms) {
@@ -1288,6 +1291,8 @@ function entInterested(e, product) {
 }
 /** Every product name the operator can filter by: the catalogue, plus anything the import wrote
  *  that is not in it — a service we sell but never seeded must still be filterable. */
+/** Product-shaped dimensions (ownership, interest). Names come from wherever they occur, because
+ *  these two are READ-only surfaces — nothing here is ever written back. */
 function affinityProducts() {
   const seen = new Map();
   PRODUCTS.forEach((p) => seen.set(p.n, { uses: 0, interest: 0, tagged: 0 }));
@@ -1300,6 +1305,13 @@ function affinityProducts() {
     if (t.product) bump(t.product, "interest");
   }));
   return [...seen.entries()].map(([name, n]) => ({ name, uses: n.uses, interest: n.interest, tagged: n.tagged }));
+}
+/** The tag vocabulary with live counts. Registry order, registry names — a tag with zero accounts
+ *  still appears, because you create it before you use it and it must be selectable in between. */
+function tagList() {
+  const n = {};
+  entities.forEach((e) => (e.productTags || []).forEach((t) => { n[t] = (n[t] || 0) + 1; }));
+  return tagReg.map((t) => ({ name: t.name, count: n[t.name] || 0 }));
 }
 function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate); }
 function entMatchesProduct(e) {
@@ -1344,7 +1356,7 @@ function prodChips(e) {
   let h = "";
   const tg = e.productTags || [];
   if (tg.length) {
-    h += '<span class="chip c-blue" title="مرشّح لـ · وسم وضعه الفريق">◆ ' +
+    h += '<span class="chip c-blue" title="وسم وضعه الفريق">◆ ' +
       esc(clip(tg[0], 16)) + (tg.length > 1 ? " +" + fmtN(tg.length - 1) : "") + "</span>";
   }
   const ps = factProducts(e);
@@ -1649,8 +1661,22 @@ function vAffinityBand(selName, matched) {
         '<option value="' + esc(p.name) + '"' + (on === p.name ? " selected" : "") + ">" +
         esc(clip(p.name, 26)) + " (" + fmtN(count(p)) + ")</option>").join("") + "</select></span>";
   };
-  let h = '<div class="affin"><div class="ah"><span class="t">حسب الخدمة</span>' +
-    '<span class="s">«مرشّح لـ» وسمٌ تضعه أنت · «يستخدم» من ملف الحساب · «أبدى اهتمامًا» من قراءة المساعد</span></div>';
+  // The tag select is fed by the REGISTRY, not by the product catalogue: a tag may be a service, a
+  // department's own product line, or an event — and a tag created a minute ago with nobody in it
+  // yet still has to be selectable.
+  const tagSel = () => {
+    const on = prodFilter.candidate;
+    const list = tagList();
+    if (!list.length) return "";
+    return '<span class="fld"><span>الوسم:</span>' +
+      '<select class="' + (on ? "on" : "") + '" onchange="setProdFilter(&quot;candidate&quot;, this.value)" ' +
+      'title="وسوم يضعها فريقك من شاشة جهات الاستهداف">' +
+      '<option value="">الكل</option>' +
+      list.map((t) => '<option value="' + esc(t.name) + '"' + (on === t.name ? " selected" : "") + ">" +
+        esc(clip(t.name, 26)) + " (" + fmtN(t.count) + ")</option>").join("") + "</select></span>";
+  };
+  let h = '<div class="affin"><div class="ah"><span class="t">حسب الوسم والخدمة</span>' +
+    '<span class="s">«الوسم» تضعه أنت وتسمّيه كما تشاء · «يستخدم» من ملف الحساب · «أبدى اهتمامًا» من قراءة المساعد</span></div>';
   if (selName) {
     const owners = entities.filter((e) => entUses(e, selName)).length;
     h += '<div class="row"><button class="excl' + (prodFilter.notUses === selName ? " on" : "") +
@@ -1659,8 +1685,7 @@ function vAffinityBand(selName, matched) {
       (owners ? " (" + fmtN(owners) + ")" : "") + "</button>" +
       '<span style="font-size:12px;color:#7C7C7C;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
   }
-  h += '<div class="row">' +
-    sel("candidate", "مرشّح لـ:", "قائمة وسمتَها بنفسك من شاشة جهات الاستهداف", (p) => p.tagged) +
+  h += '<div class="row">' + tagSel() +
     sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
     sel("notUses", "لا يستخدم:", "من ليس لدينا سجل بأنه يستخدمها", (p) => p.uses) +
     sel("interest", "أبدى اهتمامًا بـ:", "من وسم المساعد اهتمامه بها في المحادثة", (p) => p.interest) +
@@ -3343,7 +3368,9 @@ function dataSignature() {
     campaigns.length, entities.length, kbDocs.length, prodAssets.length,
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
-    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, oppTab, oppQ, campFilter, rQ, selProd,
+    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, tgtTagsOpen,
+    tgtTagEdit, tgtTagArm,
+    tagReg.length, oppTab, oppQ, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
     JSON.stringify(entFilters), JSON.stringify(tgtFilters), JSON.stringify(prodFilter),
@@ -3432,14 +3459,16 @@ async function refresh(force) {
         showTestDecided = true;
         showTest = !(cache.contacts || []).some((c) => !c.test);   // no real contacts → reveal sandbox
       }
-      const [er, kr, cr, ir, wr] = await Promise.all([
+      const [er, kr, cr, ir, wr, tr] = await Promise.all([
         fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/insights", { headers: { "x-admin-token": TOKEN } }),
         fetch("/admin/intel/winloss" + (showTest ? "?all=1" : ""), { headers: { "x-admin-token": TOKEN } }),
+        fetch("/admin/tags", { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
+      if (tr.ok) tagReg = await tr.json();
       if (kr.ok) kbDocs = await kr.json();
       if (cr.ok) campaigns = await cr.json();
       if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
