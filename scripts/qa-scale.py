@@ -127,6 +127,43 @@ with sync_playwright() as p:
     body = pg.evaluate("() => document.getElementById('body').innerText")
     ck("[home] the action queue says what it is a top-of", "أهمّ" in body and "لوحة الفرز الكاملة" in body, True)
 
+    # --- 5b. THE SERVICE FILTER ACTUALLY FILTERS ------------------------------
+    # Founder: «not every client will use every product… I need some filter». The failure mode this
+    # guards is a filter that RENDERS but does not filter — and worse, «تحديد المطابقين» selecting
+    # the unfiltered set, which would stage the wrong people into a launch.
+    go("aimkt")
+    P = "الإجازات المرضية"
+    total = pg.evaluate("() => entities.length")
+    owners = pg.evaluate("(p) => entities.filter(e => entUses(e, p)).length", P)
+    ck("[aimkt] the book knows who already owns a service", 0 < owners < total, True)
+
+    pg.evaluate("(p) => setProdFilter('uses', p)", P); pg.wait_for_timeout(700)
+    usesN = pg.evaluate("() => entMatches().length")
+    ck("[aimkt] «يستخدم» narrows the audience to exactly the owners", usesN, owners)
+    # every row on screen must actually carry the service — the filter and the list agree
+    allShown = pg.evaluate("(p) => pageSlice('aud', entMatches()).every(e => entUses(e, p))", P)
+    ck("[aimkt] …and every row rendered under it owns that service", allShown, True)
+
+    pg.evaluate("() => setProdFilter('uses','')")
+    pg.evaluate("(p) => setProdFilter('notUses', p)", P); pg.wait_for_timeout(700)
+    notUsesN = pg.evaluate("() => entMatches().length")
+    ck("[aimkt] «لا يستخدم» is the exact complement of «يستخدم»", usesN + notUsesN, total)
+
+    # THE HIGH-STAKES ONE. crmSelD-class bug: a selection computed from the wrong set.
+    pg.evaluate("() => entAllMatching()"); pg.wait_for_timeout(700)
+    staged = pg.evaluate("() => launchTargets().length")
+    ck("[aimkt] «تحديد المطابقين» stages the FILTERED set, never the whole book", staged, notUsesN)
+
+    # An absent record is «unknown», not «does not use it» — the screen has to say so.
+    known = pg.evaluate("() => entities.filter(e => factProducts(e).length).length")
+    caveat = pg.evaluate("() => (document.querySelector('.affin .why')||{}).textContent || ''")
+    ck("[aimkt] …and it warns that «لا يستخدم» includes accounts with no record at all",
+       ("غياب السجل" in caveat) if known < total else True, True)
+
+    pg.evaluate("() => { entClear(); clearProdFilter(); }"); pg.wait_for_timeout(500)
+    ck("[aimkt] clearing the service filter restores the whole book",
+       pg.evaluate("() => entMatches().length"), total)
+
     # --- 6. REPAINT COST -----------------------------------------------------
     # contactByPhone was a linear scan: #kmon repainted in 110-123ms EVERY paint — a visible
     # stutter on every keystroke in its search box — while #customers repainted in 4ms.

@@ -56,10 +56,16 @@ var tgtArm = 0;   /* id of the row whose delete is armed; 0 = none. One at a tim
    shape of leak the reviewer blocked when a campaign's selection survived navigation. */
 var tgtQ = "";
 var tgtFilters = {};
+/* The book is browsable by service too — same dimension as the wizard's band, its own state for the
+   same reason the search is: browsing the book must not silently narrow the next campaign. ONE field
+   here rather than three; «who owns what» is the question you ask of a list, and the negation and the
+   interest reading belong where an audience is being chosen. */
+var tgtProd = "";
 function tgtMatches() {
   var q = tgtQ.trim();
   return entities.filter(function (e) {
     return Object.keys(tgtFilters).every(function (k) { return !tgtFilters[k] || ((e.attrs || {})[k] || "") === tgtFilters[k]; }) &&
+      (!tgtProd || entUses(e, tgtProd)) &&
       (!q || e.name.includes(q) || e.phone.includes(q));
   });
 }
@@ -84,6 +90,16 @@ function tgtFacetBar() {
           esc(v[0]) + " (" + fmtN(v[1]) + ")</option>";
       }).join("") + "</select>";
   });
+  var withProd = affinityProducts().filter(function (p) { return p.uses > 0 || p.name === tgtProd; });
+  if (withProd.length) {
+    h += '<select class="crmsel' + (tgtProd ? " on" : "") + '" onchange="tgtSetProd(this.value)"' +
+      (tgtProd ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + '>' +
+      '<option value="">الخدمة المستخدمة: الكل</option>' +
+      withProd.map(function (p) {
+        return '<option value="' + esc(p.name) + '"' + (tgtProd === p.name ? " selected" : "") + '>' +
+          esc(clip(p.name, 26)) + " (" + fmtN(p.uses) + ")</option>";
+      }).join("") + "</select>";
+  }
   h += '<span style="flex:1"></span><span class="hair"></span>';
   h += '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>';
   h += '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
@@ -109,7 +125,7 @@ function tgtRow(e) {
   return '<div class="trow km crow" ' + open + ">" +
     '<div class="t-nm"><span class="av">' + esc(e.name.trim().charAt(0)) + "</span>" +
       '<span class="lb">' + esc(e.name) + "</span></div>" +
-    '<div class="t-seg">' + (attrChips(e, 3) || '<span style="color:#C7C7C7;font-size:12px;">—</span>') + "</div>" +
+    '<div class="t-seg">' + (prodChips(e) + attrChips(e, 2) || '<span style="color:#C7C7C7;font-size:12px;">—</span>') + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
     '<div class="c-act">' + (armed
@@ -176,6 +192,7 @@ function tgtPaintCrumb() {
 /* Deleting an imported target is irreversible and the row is one of sixteen on a scrolling page.
    Arming is a separate click on a separate button, and only one row can be armed at a time. */
 window.tgtArmDel = function (id) { tgtArm = id; render(false); };
+window.tgtSetProd = function (v) { tgtProd = v; render(false); };
 window.tgtSearch = function (el) { tgtQ = el.value; clearTimeout(window.__tq); window.__tq = setTimeout(function () { render(false); }, 250); };
 /* Indexes only in the attribute string — Arabic keys stay out of onchange, and both sides re-derive
    the same ordering from segGroups(), exactly as entSetAttr does for the wizard. */

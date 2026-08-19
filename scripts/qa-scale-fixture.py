@@ -22,8 +22,15 @@ def phone(i): return "9665" + str(10000000 + i * 7 % 89999999).zfill(8)
 entities, contacts = [], []
 for i in range(3000):
     nm = " ".join(x for x in (random.choice(NAME_A), random.choice(NAME_B), random.choice(NAME_C)) if x)
-    entities.append({"id": i+1, "name": nm + (" " + str(i//300+1) if i % 300 == 0 else ""), "phone": phone(i),
-        "attrs": {"المدينة": random.choice(CITIES), "الحجم": random.choice(SIZES), "القطاع": random.choice(SECTORS)}})
+    e = {"id": i+1, "name": nm + (" " + str(i//300+1) if i % 300 == 0 else ""), "phone": phone(i),
+        "attrs": {"المدينة": random.choice(CITIES), "الحجم": random.choice(SIZES), "القطاع": random.choice(SECTORS)}}
+    # Product affinity is KNOWN for only some accounts, which is the real state of the book: the
+    # «لا يستخدم» filter has to behave correctly when most rows have no record at all.
+    if i % 5 < 2:
+        owned = random.sample(PRODUCTS, random.choice([1, 1, 2]))
+        e["facts"] = {"currentProducts": {"value": "، ".join(owned), "source": "human",
+                                          "by": "import", "ts": NOW - 30 * DAY}}
+    entities.append(e)
 
 # 1000 onboarded = a real conversation, a delivered/read/replied ledger and at least one tag
 for i in range(1000):

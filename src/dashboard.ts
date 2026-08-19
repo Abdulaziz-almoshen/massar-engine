@@ -151,6 +151,24 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* The funnel is drawn as a funnel. Six equal-length bars encode the ONE thing a funnel exists to
      show — the narrowing — as nothing at all; when the stages are genuinely equal this draws a
      column, which is the honest picture of a campaign that lost nobody. */
+  /* حسب الخدمة — a band, not another chip row, because its three fields come from a different
+     place than the spreadsheet columns beneath them and must not read as more of the same. */
+  .affin { background: #F8F8F8; border: 1px solid #EDEDED; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .affin .ah { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .affin .ah .t { font-size: 13px; font-weight: 500; color: #171717; }
+  .affin .ah .s { font-size: 12px; color: #999999; }
+  .affin .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 11px; }
+  .affin .fld { display: flex; align-items: center; gap: 7px; }
+  .affin .fld > span { font-size: 12.5px; color: #7C7C7C; white-space: nowrap; }
+  .affin select { font-family: inherit; height: 32px; border: 1px solid #E2E2E2; border-radius: 6px;
+    background: #fff; color: #383838; font-size: 12.5px; padding: 0 10px; cursor: pointer; max-width: 210px; }
+  .affin select.on { border-color: #1F7A73; color: #1F7A73; background: #E9F7F6; }
+  .excl { font-family: inherit; font-size: 12.5px; font-weight: 500; border-radius: 999px; padding: 7px 14px;
+    cursor: pointer; border: 1px solid #E2E2E2; background: #fff; color: #525252; white-space: nowrap;
+    transition: background .14s ease, border-color .14s ease, color .14s ease; }
+  .excl:hover { background: #F3F3F3; border-color: #C7C7C7; }
+  .excl.on { background: #1F7A73; border-color: #1F7A73; color: #fff; }
+  .affin .why { font-size: 12px; color: #B54708; margin-top: 10px; line-height: 1.7; }
   .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
   @media (max-width: 900px) { .chgrid { grid-template-columns: 1fr !important; } }
   .fnl .lg { display: flex; flex-direction: column; gap: 6px; }
@@ -1216,12 +1234,84 @@ function segGroups() {
     return { key, values: [...valCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12) };
   });
 }
+// ---------------------------------------------------------------------------
+// PRODUCT AFFINITY — three dimensions, three different provenances, never one tag.
+//
+// Founder: «not every client will use every single product… when I create a new campaign and see
+// all the clients I have in the system, I need some filter.» The data to answer that has been in
+// the ledger since the account-graph cycle; nothing on this screen read it, so every launch still
+// started from the whole book.
+//
+// The market's own lesson, and the reason these stay three fields rather than one «product tag»:
+// Mailchimp splits Groups (what the customer selects about themselves) from Tags (what your team applies)
+// precisely because collapsing provenance makes the resulting segment untrustworthy. Here:
+//
+//   uses      ← entities.facts.currentProducts   HUMAN. Import or operator. The expansion BASE.
+//   notUses   ← the same fact, negated           The filter an expansion campaign actually wants.
+//   interest  ← contacts.tags[].product          MACHINE. The assistant's reading, with a level.
+//
+// A fact absent is «unknown», NOT «does not use it» — so notUses deliberately matches unknowns
+// too, and the UI says so. Claiming to know who does not own a product, when the column was simply
+// never imported, would be exactly the invented value this codebase spent three cycles removing.
+let prodFilter = { uses: "", notUses: "", interest: "" };
+
+/** Values are stored as one string; accounts.ts splits on both comma forms, so this must too. */
+function factProducts(e) {
+  const f = (e.facts || {}).currentProducts;
+  if (!f || !f.value) return [];
+  return String(f.value).split(/[،,]/).map((x) => x.trim()).filter(Boolean);
+}
+function entUses(e, product) {
+  if (!product) return true;
+  return factProducts(e).some((p) => p === product || p.includes(product) || product.includes(p));
+}
+function entInterested(e, product) {
+  if (!product) return true;
+  const c = contactByPhone(e.phone);
+  return Boolean(c && (c.tags || []).some((t) => t.product === product));
+}
+/** Every product name the operator can filter by: the catalogue, plus anything the import wrote
+ *  that is not in it — a service we sell but never seeded must still be filterable. */
+function affinityProducts() {
+  const seen = new Map();
+  PRODUCTS.forEach((p) => seen.set(p.n, { uses: 0, interest: 0 }));
+  entities.forEach((e) => factProducts(e).forEach((p) => {
+    if (!seen.has(p)) seen.set(p, { uses: 0, interest: 0 });
+    seen.get(p).uses++;
+  }));
+  ((cache && cache.contacts) || []).forEach((c) => (c.tags || []).forEach((t) => {
+    if (!t.product) return;
+    if (!seen.has(t.product)) seen.set(t.product, { uses: 0, interest: 0 });
+    seen.get(t.product).interest++;
+  }));
+  return [...seen.entries()].map(([name, n]) => ({ name, uses: n.uses, interest: n.interest }));
+}
+function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest); }
+function entMatchesProduct(e) {
+  if (prodFilter.uses && !entUses(e, prodFilter.uses)) return false;
+  if (prodFilter.notUses && entUses(e, prodFilter.notUses)) return false;
+  if (prodFilter.interest && !entInterested(e, prodFilter.interest)) return false;
+  return true;
+}
 function entMatches() {
   const q = entQ.trim();
   return entities.filter((e) =>
     Object.keys(entFilters).every((k) => !entFilters[k] || ((e.attrs || {})[k] || "") === entFilters[k]) &&
+    entMatchesProduct(e) &&
     (!q || e.name.includes(q) || e.phone.includes(q)));
 }
+window.setProdFilter = (which, v) => { prodFilter[which] = v; entSel.clear(); render(false); };
+/** The whole point of the feature in one control: the campaign's own service, excluded from its own
+ *  audience. Step 1 already knows which service this launch sells; step 2 should not make the
+ *  operator re-say it. */
+window.excludeOwners = () => {
+  const reg = wizProducts();
+  const name = reg[selProd] ? reg[selProd].name : "";
+  if (!name) return;
+  prodFilter.notUses = prodFilter.notUses === name ? "" : name;
+  entSel.clear();
+  render(false);
+};
 function attrChips(e, max) {
   const a = e.attrs || {}; const keys = Object.keys(a).slice(0, max);
   return keys.map((k) => {
@@ -1231,6 +1321,14 @@ function attrChips(e, max) {
     // imported column values, not states; the only thing they have to be is legible.
     return '<span class="chip" title="' + esc(k) + '">' + esc(clip(v, 20)) + "</span>";
   }).join("");
+}
+/** What this account already buys. Silent when unknown — «ناقص» on every row of a book nobody has
+ *  enriched yet is noise, and the band above already reports how many rows have no record. */
+function prodChips(e) {
+  const ps = factProducts(e);
+  if (!ps.length) return "";
+  return '<span class="chip c-teal" title="الخدمات المستخدمة حاليًا · من ملف الحساب">' +
+    esc(clip(ps[0], 18)) + (ps.length > 1 ? " +" + fmtN(ps.length - 1) : "") + "</span>";
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
@@ -1512,6 +1610,49 @@ window.alertBar = (txt, bad) => {
   document.body.appendChild(el); setTimeout(() => el.remove(), 3800);
 };
 
+/** The service filter. Its three fields answer three different questions with three different
+ *  sources, and the band says which is which — a filter whose provenance is invisible is a filter
+ *  the operator cannot argue with. */
+function vAffinityBand(selName, matched) {
+  const prods = affinityProducts();
+  const known = entities.filter((e) => factProducts(e).length).length;
+  const sel = (which, label, hint, count) => {
+    const on = prodFilter[which];
+    return '<span class="fld"><span>' + label + "</span>" +
+      '<select class="' + (on ? "on" : "") + '" onchange="setProdFilter(&quot;' + which + '&quot;, this.value)" title="' + hint + '">' +
+      '<option value="">الكل</option>' +
+      prods.filter((p) => count(p) > 0 || p.name === on).map((p) =>
+        '<option value="' + esc(p.name) + '"' + (on === p.name ? " selected" : "") + ">" +
+        esc(clip(p.name, 26)) + " (" + fmtN(count(p)) + ")</option>").join("") + "</select></span>";
+  };
+  let h = '<div class="affin"><div class="ah"><span class="t">حسب الخدمة</span>' +
+    '<span class="s">«يستخدم» من ملف الحساب — بشري ومؤرَّخ · «أبدى اهتمامًا» من قراءة المساعد للمحادثة</span></div>';
+  if (selName) {
+    const owners = entities.filter((e) => entUses(e, selName)).length;
+    h += '<div class="row"><button class="excl' + (prodFilter.notUses === selName ? " on" : "") +
+      '" onclick="excludeOwners()">' +
+      (prodFilter.notUses === selName ? "✓ مستبعَد من يستخدم «" : "استبعد من يستخدم «") + esc(clip(selName, 24)) + "» بالفعل" +
+      (owners ? " (" + fmtN(owners) + ")" : "") + "</button>" +
+      '<span style="font-size:12px;color:#7C7C7C;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
+  }
+  h += '<div class="row">' +
+    sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
+    sel("notUses", "لا يستخدم:", "من ليس لدينا سجل بأنه يستخدمها", (p) => p.uses) +
+    sel("interest", "أبدى اهتمامًا بـ:", "من وسم المساعد اهتمامه بها في المحادثة", (p) => p.interest) +
+    (prodFilterOn() ? '<button class="excl" onclick="clearProdFilter()">مسح فرز الخدمة</button>' : "") +
+    "</div>";
+  // The honest caveat, and only when it can actually mislead: «لا يستخدم» matches unknowns, and
+  // with almost nothing imported that is nearly everybody.
+  if (prodFilter.notUses && known < entities.length) {
+    h += '<div class="why">«لا يستخدم» يشمل من لا نملك عنه سجل خدمات أصلًا — ' +
+      fmtN(entities.length - known) + " من " + fmtN(entities.length) + " جهة. غياب السجل ليس دليلًا على عدم الاستخدام.</div>";
+  }
+  if (prodFilterOn()) {
+    h += '<div style="font-size:12.5px;color:#1F7A73;margin-top:10px;">' + fmtN(matched) + " جهة تطابق الفرز الحالي.</div>";
+  }
+  return h + "</div>";
+}
+window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "" }; entSel.clear(); render(false); };
 function wizProducts() { return kbRegistry(); }
 function vAimkt() {
   const reg = wizProducts();
@@ -1556,6 +1697,7 @@ function vAimkt() {
   } else if (!entities.length) {
     h += '<div style="border:1.5px dashed #E2E2E2;border-radius:12px;padding:26px;text-align:center;color:#7C7C7C;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
+    h += vAffinityBand(selName, m.length);
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
       '<span style="font-size:11.5px;font-weight:700;color:#7C7C7C;min-width:52px;">' + esc(g.key) + ":</span>" +
@@ -1578,7 +1720,7 @@ function vAimkt() {
         return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F3F3F3;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
           '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #E2E2E2;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
           '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#171717;">' + esc(e.name) + "</span>" +
-          attrChips(e, 3) +
+          prodChips(e) + attrChips(e, 2) +
           '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
       (m.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>" +
@@ -3176,10 +3318,10 @@ function dataSignature() {
     campaigns.length, entities.length, kbDocs.length, prodAssets.length,
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
-    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, oppTab, oppQ, campFilter, rQ, selProd,
+    showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, oppTab, oppQ, campFilter, rQ, selProd,
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
-    JSON.stringify(entFilters), JSON.stringify(tgtFilters), [...entSel].join(","),
+    JSON.stringify(entFilters), JSON.stringify(tgtFilters), JSON.stringify(prodFilter), [...entSel].join(","),
     JSON.stringify(PAGE), PAGE_SIZE,
   ].join("~");
 }
