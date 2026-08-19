@@ -399,10 +399,13 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* ===== ملف العميل — the enrichable client record (cycle crm-record; DESIGN.md) =====
      The provenance mark is an 8px SHAPE in a fixed start-side column: shape carries the meaning,
      colour only reinforces it, and the mark never renders without its word. */
-  /* Frappe's record is main + a narrower side rail. 372px was too wide for a rail and too narrow
-     for a column, so the two panels fought for the same space and left a ragged edge. */
-  /* EXACT-1: side panel default 352px, min 256, max 480. */
-  .crec { display:grid; grid-template-columns: 352px minmax(0,1fr); gap:16px; align-items:start; }
+  /* FIFTY-FIFTY, on the founder's call, and a deliberate divergence from Frappe's 352px rail.
+     Frappe's side panel holds short scalar fields, so a rail is right there. Ours holds ملف العميل —
+     six typed facts, each with its provenance line and its own editor — which is not a rail's worth
+     of content; at 352px its chips wrapped mid-phrase while the tab beside it left half its width
+     white (visible on every screenshot of this record). Two equal columns give the panel room for a
+     value column that does not wrap and the tab a measure that is actually filled. */
+  .crec { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
   .crecmain { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
   .pm { width: 8px; height: 8px; flex: none; margin-top: 7px; }
   .pm-h { background: #1F7A73; border-radius: 2px; }
@@ -453,7 +456,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
   /* one column below 900: ملف العميل comes BEFORE فهم المساعد on purpose — properties beat the
      AI card, and the 372px track would otherwise become an orphaned strip. */
-  @media (max-width: 900px) { .crec { grid-template-columns: 1fr; } }
+  /* Raised with the split: at 900px an even split is two ~430px halves, which is worse than one
+     full-width column for both panels. Stack sooner. */
+  @media (max-width: 1080px) { .crec { grid-template-columns: 1fr; } }
   @media (max-width: 600px) {
     .pen { opacity: 1; width: 40px; height: 40px; top: 6px; }
     .cbar .mini { flex: 1 1 44%; min-height: 40px; }
