@@ -18,6 +18,7 @@ import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
+import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -470,6 +471,7 @@ ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
 ${TARGETS_CRM_CSS}
+${PALETTE_CSS}
 </style>
 </head>
 <body>
@@ -501,6 +503,11 @@ ${TARGETS_CRM_CSS}
         <div class="t2">عبدالعزيز المحسن</div>
       </div>
       <span class="chev">⌄</span>
+    </button>
+    <button class="navsearch" onclick="palOpenBox()" aria-label="الانتقال السريع">
+      <svg width="15" height="15" style="flex:none;color:#999999"><use href="#i-search"/></svg>
+      <span class="lbl">الانتقال السريع…</span>
+      <kbd>⌘K</kbd>
     </button>
     <nav class="ms-scroll" id="nav"></nav>
     <button class="collapse" id="navcollapse" aria-label="طيّ القائمة">
@@ -626,6 +633,7 @@ const NAV = [
   { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "reports", l: "التقارير", i: "chart" },
   { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
 ];
+const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
@@ -656,6 +664,28 @@ const PRODUCTS = [
   { n: "تكامل الأنظمة (HIS/ERP)", gaps: ["التسعير التفصيلي"] },
 ];
 
+/** ONE definition of the rail's live counts, because the sidebar and the palette both show them and
+ *  two copies of a count is how two surfaces start disagreeing about one fact. Both are counts of
+ *  work OWED, never totals. Wrapped in a try: a badge is an ornament on top of a route and must
+ *  never stop the rail painting. */
+function PAL_BADGES() {
+  const out = {};
+  try {
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const t1 = t0.getTime() + 864e5;
+    const due = ((cache && cache.contacts) || []).filter((c) => {
+      if (c.optedOut || c.outcome === "stopped" || c.outcome === "not_interested") return false;
+      const a = appt(c);
+      return a && a.confirmed && a.at >= t0.getTime() && a.at < t1;
+    }).length;
+    if (due) out.opps = [fmtN(due), "q", "مواعيد مؤكَّدة اليوم"];
+    if (typeof tskRows !== "undefined" && tskRows) {
+      const late = tskRows.filter((t) => t.status !== "done" && t.status !== "canceled" && t.due_at && t.due_at < Date.now()).length;
+      if (late) out.tasks = [fmtN(late), "", "مهام تجاوزت موعدها"];
+    }
+  } catch (e) { /* never let a count stop a paint */ }
+  return out;
+}
 function nav() {
   // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
   const raw = (location.hash || "#kmon").slice(1).split("/")[0];
@@ -665,25 +695,11 @@ function nav() {
   //   فرص البيع  — appointments confirmed for today: the calls you owe before the day ends.
   //   المهام     — tasks past due, only once the tasks route has actually loaded them; a badge
   //                that guesses «٠» before the fetch is a lie for the whole session.
-  const badges = {};
-  try {
-    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-    const t1 = t0.getTime() + 864e5;
-    const due = ((cache && cache.contacts) || []).filter((c) => {
-      if (c.optedOut || c.outcome === "stopped" || c.outcome === "not_interested") return false;
-      const a = appt(c);
-      return a && a.confirmed && a.at >= t0.getTime() && a.at < t1;
-    }).length;
-    if (due) badges.opps = [fmtN(due), "q", "مواعيد مؤكَّدة اليوم"];
-    if (typeof tskRows !== "undefined" && tskRows) {
-      const late = tskRows.filter((t) => t.status !== "done" && t.status !== "canceled" && t.due_at && t.due_at < Date.now()).length;
-      if (late) badges.tasks = [fmtN(late), "", "مهام تجاوزت موعدها"];
-    }
-  } catch (e) { /* a badge is an ornament on top of the route; it must never stop nav() painting */ }
+  const badges = PAL_BADGES();
   document.getElementById("nav").innerHTML = NAV.map((x) => {
     if (x.grp) return '<div class="grp">' + x.grp + "</div>";
     const b = badges[x.id];
-    return '<button class="nv' + (x.id === cur ? " on" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
+    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
       '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#1F7A73" : "#999999") + '</span><span class="lbl">' + x.l + "</span>" +
       (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
   }).join("");
@@ -3889,9 +3905,11 @@ ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
 ${TARGETS_CRM_JS}
+${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */
+palInstall();   // one keydown listener and one overlay node, installed before the first paint
 if (!location.hash) location.hash = "kmon";
 refresh();
 tplLoad();

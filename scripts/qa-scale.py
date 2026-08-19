@@ -314,6 +314,48 @@ with sync_playwright() as p:
        pg.evaluate("""() => { const e = entities.find(x => !contactByPhone(x.phone));
           return e ? stageOfEntity(e).key : null; }"""), "new")
 
+    # --- 5f. THE COMMAND PALETTE ---------------------------------------------
+    # The navbar redesign is mostly this: at 3,000 accounts you do not scan a rail for a clinic, you
+    # type its name. Asserted against the SIMULATED book, because a launcher that is fast on 16 rows
+    # and useless on 3,000 is the exact failure the scale gate exists to catch.
+    go("customers")
+    pg.keyboard.press("Meta+k"); pg.wait_for_timeout(500)
+    ck("[palette] ⌘K opens it", pg.evaluate("() => palOn"), True)
+    ck("[palette] …and with no query it is a launcher, listing the live screens",
+       pg.evaluate("() => palRows.length > 5 && palRows.every(r => r.kind === 'route')"), True)
+    ck("[palette] …and it never offers a route that opens onto «قريبًا»",
+       pg.evaluate("() => palRows.some(r => PAL_SOON[r.id])"), False)
+
+    pg.keyboard.type("النور"); pg.wait_for_timeout(700)
+    ck("[palette] a name finds accounts", pg.evaluate("() => palRows.filter(r => r.kind === 'contact').length > 0"), True)
+    ck("[palette] …and every one carries its pipeline stage, so search doubles as a status lookup",
+       pg.evaluate("() => palRows.filter(r => r.kind === 'contact').every(r => r.stage && r.stage.label)"), True)
+    ck("[palette] …and the rendered rows match the model exactly",
+       pg.evaluate("() => document.querySelectorAll('.palrow').length"), pg.evaluate("() => palRows.length"))
+
+    n = pg.evaluate("() => palRows.length")
+    pg.keyboard.press("ArrowDown"); pg.keyboard.press("ArrowDown"); pg.wait_for_timeout(250)
+    ck("[palette] the arrows move the selection", pg.evaluate("() => palSel"), 2)
+    ck("[palette] …and the selection can never point past what is on screen",
+       pg.evaluate("(n) => palSel < n", n), True)
+    target = pg.evaluate("() => palRows[palSel].href")
+    pg.keyboard.press("Enter"); pg.wait_for_timeout(1000)
+    ck("[palette] Enter opens the row that was selected", pg.evaluate("() => location.hash.slice(1)"), target)
+    ck("[palette] …and closes on the way", pg.evaluate("() => palOn"), False)
+
+    # A phone number is how an operator identifies a client on WhatsApp; it has to be searchable.
+    pg.keyboard.press("Meta+k"); pg.wait_for_timeout(400)
+    pg.keyboard.type("96651000039"); pg.wait_for_timeout(700)
+    ck("[palette] a phone number finds the account",
+       pg.evaluate("() => palRows.filter(r => r.kind === 'contact').length > 0"), True)
+    pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+    ck("[palette] esc closes it", pg.evaluate("() => palOn"), False)
+
+    # The rail and the launcher read ONE badge source; two copies of a count is how two surfaces
+    # start disagreeing about one fact.
+    ck("[palette] the rail's live counts have exactly one definition",
+       pg.evaluate("() => typeof PAL_BADGES === 'function'"), True)
+
     # --- 6. REPAINT COST -----------------------------------------------------
     # contactByPhone was a linear scan: #kmon repainted in 110-123ms EVERY paint — a visible
     # stutter on every keystroke in its search box — while #customers repainted in 4ms.
