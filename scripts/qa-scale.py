@@ -268,6 +268,52 @@ with sync_playwright() as p:
     pg.evaluate("() => tgtCloseTags()"); pg.wait_for_timeout(400)
     ctx.unroute("**/admin/tags**")
 
+    # --- 5e. THE PIPELINE STAGE ----------------------------------------------
+    # Founder: «clients status in the pipeline… they move forward or backward depend on the messages
+    # we send.» Ported from frappe/crm's seeded ladders (crm/install.py), keeping the three
+    # structural ideas — ordered positions, a type above the stage, and Lost as a POSITION rather
+    # than an overlay — and none of the labels, which name things Massar cannot observe.
+    go("customers")
+    ladder = pg.evaluate("() => CRM_STAGE.map(s => [s.key, s.pos, s.type, s.label])")
+    ck("[stage] the ladder is ORDERED with no gaps or ties — «forward» has to mean something",
+       [r[1] for r in ladder], list(range(1, len(ladder) + 1)))
+    ck("[stage] every rung carries a type, from Frappe's own four",
+       sorted(set(r[2] for r in ladder)), ["lost", "ongoing", "open", "won"])
+    ck("[stage] a Lost rung sits ON the ladder, as in Frappe — not as a flag beside it",
+       [r[1] for r in ladder if r[2] == "lost"] == sorted([r[1] for r in ladder if r[2] == "lost"])
+       and max(r[1] for r in ladder if r[2] == "lost") == len(ladder), True)
+    ck("[stage] labels are unique — two rungs sharing a word would collapse the board",
+       len(set(r[3] for r in ladder)), len(ladder))
+
+    # EVERY contact lands in exactly one rung, and the derivation is total: no contact anywhere in
+    # 1,700 falls through to an undefined stage.
+    cover = pg.evaluate("""() => { const seen = {};
+        (cache.contacts || []).forEach(c => { const s = stageOf(c); seen[s && s.key] = (seen[s && s.key]||0) + 1; });
+        return seen; }""")
+    ck("[stage] every contact resolves to a real rung", "undefined" in cover, False)
+    ck("[stage] the derivation covers the book", sum(cover.values()), pg.evaluate("() => (cache.contacts||[]).length"))
+    ck("[stage] and the live book actually spans several rungs", len(cover) >= 4, True)
+
+    # ORDER IS THE CONTRACT: a terminal rung wins over forward progress. Someone who booked a
+    # meeting and then asked us to stop is «أوقف التواصل», not «موعد محدَّد».
+    ck("[stage] opting out after a meeting reads as stopped, not as the meeting",
+       pg.evaluate("""() => stageOf({ optedOut: true, outcome: "scheduled",
+          statusTimes: {sent:1, delivered:1, read:1, replied:1},
+          transcript:[{role:"customer",ts:1,text:"x"}], tags:[{product:"p",level:"hot",ts:1}] }).key"""), "stopped")
+    # …and BACKWARD needs no special case: remove the evidence, the stage falls back on its own.
+    ck("[stage] removing the evidence moves the contact BACK down the ladder",
+       pg.evaluate("""() => [
+          stageOf({ statusTimes:{sent:1,delivered:1}, transcript:[{role:"customer",ts:1,text:"x"}], tags:[] }).key,
+          stageOf({ statusTimes:{sent:1,delivered:1}, transcript:[], tags:[] }).key,
+          stageOf({ statusTimes:{}, transcript:[], tags:[] }).key ]"""),
+       ["engaged", "contacted", "new"])
+
+    # An account nobody has messaged is the ladder's first rung, not a private word on one screen.
+    go("targets")
+    ck("[targets] an unmessaged account reads as the ladder's first rung",
+       pg.evaluate("""() => { const e = entities.find(x => !contactByPhone(x.phone));
+          return e ? stageOfEntity(e).key : null; }"""), "new")
+
     # --- 6. REPAINT COST -----------------------------------------------------
     # contactByPhone was a linear scan: #kmon repainted in 110-123ms EVERY paint — a visible
     # stutter on every keystroke in its search box — while #customers repainted in 4ms.

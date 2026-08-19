@@ -32,7 +32,7 @@ export const CUSTOMERS_CRM_CSS = `
 export const CUSTOMERS_CRM_JS = `
 /* ============================ customers-crm (client) ============================ */
 var cusView = "list";       /* list | group */
-var cusGroupKey = "outcome";
+var cusGroupKey = "stage";
 var cusTab = "all";         /* all | engaged | interested | stopped | test */
 var cusQ = "";
 var cusSort = "recent";
@@ -99,7 +99,8 @@ function cusDropSel() {
 
 /* --------------------------------- the row --------------------------------- */
 function cusRow(c) {
-  var oc = cusOutcome(c);
+  var oc = stageOf(c);
+  var since = stageSince(c);
   var tag = cusTopTag(c);
   var lvl = tag ? CUS_LVL[tag.level] : null;
   var msgs = (c.transcript || []).length;
@@ -116,8 +117,9 @@ function cusRow(c) {
          contact was rendering the same number twice, at two different weights. */
       (c.waName ? '<span style="font-size:12px;color:#7C7C7C;flex:none;direction:ltr;">' + esc(c.phone) + '</span>' : "") + '</div>' +
     '<div class="c-meta">' +
-      '<div class="c-prod taglvl"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:13px;color:#525252;">' + oc.label + '</span></div>' +
-      '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#B54708;">تدخّل بشري</span>' : "") + '</div>' +
+      '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:13px;color:#525252;">' + oc.label + '</span></div>' +
+      '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#B54708;">تدخّل بشري</span>' :
+        (since ? '<span style="font-size:12px;color:#999999;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
     '</div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num" style="text-align:start;">' + (lvl
@@ -135,7 +137,7 @@ function cusHeader(allOn) {
   return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="cusTogglePage()"></div>' +
     '<div>العميل</div>' +
-    '<div class="c-meta"><div>الحالة</div><div></div></div>' +
+    '<div class="c-meta"><div>المرحلة</div><div></div></div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num" style="text-align:start;color:#7C7C7C;font-size:12px;">اهتمام المساعد</div>' +
       '<div class="c-num" style="color:#7C7C7C;font-size:12px;">الرسائل</div>' +
@@ -145,7 +147,7 @@ function cusHeader(allOn) {
     /* Below 940px .thead-wide is hidden, so without this the list had NO header at all on phone and
        tablet — the campaigns list got a narrow strip and this one did not. Caught by extending the
        pixel suite to #customers, which is exactly why the debt was worth closing before the next module. */
-    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="cusTogglePage()"></span><span>العميل</span><span style="flex:1"></span><span>الحالة</span></div>';
+    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="cusTogglePage()"></span><span>العميل</span><span style="flex:1"></span><span>المرحلة</span></div>';
 }
 
 /* ------------------------------- control bar ------------------------------- */
@@ -176,7 +178,8 @@ function cusControlBar(nTotal) {
       '<option value="name"' + (cusSort === "name" ? " selected" : "") + '>الاسم</option></select>';
   } else {
     h += '<select onchange="cusSetGroup(this.value)" class="crmsel">' +
-      '<option value="outcome"' + (cusGroupKey === "outcome" ? " selected" : "") + '>تجميع حسب: الحالة</option>' +
+      '<option value="stage"' + (cusGroupKey === "stage" ? " selected" : "") + '>تجميع حسب: المرحلة</option>' +
+      '<option value="outcome"' + (cusGroupKey === "outcome" ? " selected" : "") + '>تجميع حسب: النتيجة المسجَّلة</option>' +
       '<option value="interest"' + (cusGroupKey === "interest" ? " selected" : "") + '>تجميع حسب: اهتمام المساعد</option>' +
       '<option value="product"' + (cusGroupKey === "product" ? " selected" : "") + '>تجميع حسب: الخدمة</option></select>';
   }
@@ -207,7 +210,7 @@ function cusListView(rows) {
   }
   h += '</div></div>';
   h += '<div class="tfoot">' + pageBar("cus", rows.length, "جهة") +
-    '<span>' + ic("clock", 14) + ' الحالة تُقرأ من سجل المحادثة وحالات التسليم. لا تقديرات.</span></div></div>';
+    '<span>' + ic("clock", 14) + ' المرحلة مشتقّة من السجل — التسليم والردّ والوسم والنتيجة. لا تُكتب يدويًا ولا تُقدَّر.</span></div></div>';
   return h;
 }
 
@@ -215,12 +218,21 @@ function cusGroupView(rows) {
   var by = {}, order = [];
   rows.forEach(function (c) {
     var k;
-    if (cusGroupKey === "outcome") k = cusOutcome(c).label;
+    if (cusGroupKey === "stage") k = stageOf(c).label;
+    else if (cusGroupKey === "outcome") k = cusOutcome(c).label;
     else if (cusGroupKey === "interest") { var t = cusTopTag(c); k = t ? CUS_LVL[t.level].label : "بلا قراءة"; }
     else { var t2 = cusTopTag(c); k = t2 ? t2.product : "بلا خدمة"; }
     if (!by[k]) { by[k] = []; order.push(k); }
     by[k].push(c);
   });
+  /* A pipeline board has to run in LADDER order. order[] is first-seen order, which for stages is
+     whatever the ledger happened to return — and an out-of-order pipeline throws away the one
+     property (position) that makes «forward» and «backward» mean anything. */
+  if (cusGroupKey === "stage") {
+    var pos = {};
+    CRM_STAGE.forEach(function (st) { pos[st.label] = st.pos; });
+    order.sort(function (a, b) { return (pos[a] || 99) - (pos[b] || 99); });
+  }
   if (order.length <= 1) {
     return '<div class="sparse rise">' + ic("eye", 16, "#1F7A73") +
       '<div>كل الجهات في مجموعة واحدة — التجميع لا يضيف شيئًا هنا. ' +
@@ -292,10 +304,10 @@ window.cusTogglePage = function () {
   render(false);
 };
 function cusCsv(list) {
-  var rows = [["الاسم", "الرقم", "الحالة", "اهتمام المساعد", "الخدمة", "الرسائل", "آخر نشاط"]];
+  var rows = [["الاسم", "الرقم", "المرحلة", "اهتمام المساعد", "الخدمة", "الرسائل", "آخر نشاط"]];
   list.forEach(function (c) {
     var t = cusTopTag(c);
-    rows.push([c.waName || "", c.phone, cusOutcome(c).label, t ? CUS_LVL[t.level].label : "",
+    rows.push([c.waName || "", c.phone, stageOf(c).label, t ? CUS_LVL[t.level].label : "",
       t ? t.product : "", (c.transcript || []).length, c.lastEventAt ? fmtD(c.lastEventAt) : ""]);
   });
   crmDownloadCsv(rows, "massar-customers.csv");

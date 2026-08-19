@@ -1279,6 +1279,102 @@ function entUses(e, product) {
   if (!product) return true;
   return factProducts(e).some((p) => p === product || p.includes(product) || product.includes(p));
 }
+// ---------------------------------------------------------------------------
+// THE PIPELINE STAGE — «مرحلة العميل».
+//
+// Founder: «clients status in the pipeline is best standard in CRM… when we send a message to them
+// they [are] in a stage named potential, then they move forward or backward depend on the messages
+// we send. Check in the open source what the stages are named and implement them.»
+//
+// TAKEN FROM frappe/crm, crm/install.py — the two seeded ladders, read from source, not memory:
+//   CRM Lead Status: New · Contacted · Nurture · Qualified · Converted · Unqualified · Junk
+//   CRM Deal Status: Qualification · Demo/Making · Proposal/Quotation · Negotiation ·
+//                    Ready to Close · Won · Lost
+// Three structural ideas are worth having and are taken; the labels are not, because ours have to
+// name what Massar can actually observe:
+//   1. position — the stages are ORDERED. That is the only thing that makes «forward» and
+//      «backward» mean anything, and it is the founder's own word for what he wants.
+//   2. type — Open / Ongoing / Won / Lost above the stage, so «how many are still live» does not
+//      require enumerating rungs.
+//   3. A Lost stage is a STAGE, not an overlay. Frappe puts Unqualified and Junk at positions 6-7
+//      of the same ladder; so a contact is in exactly one stage, always.
+// Frappe's deal ladder is DROPPED whole: Demo · Proposal · Negotiation · Ready to Close each carry
+// a probability (25/50/70/90) that a salesperson sets by judgement. Massar has no such input and
+// inventing one would be a forecast dressed as a reading.
+//
+// DERIVED, NEVER STORED. Every rung is defined by evidence already in the ledger, so the stage
+// cannot drift from the record it describes — the failure this codebase has fixed repeatedly. It
+// also means «backward» needs no special handling: when the evidence changes, so does the stage.
+var CRM_STAGE = [
+  { key: "new",         pos: 1, type: "open",    label: "مستهدَف",       dot: "#C7C7C7", hint: "في قائمتك، ولم تُرسل له رسالة بعد" },
+  { key: "contacted",   pos: 2, type: "ongoing", label: "تم التواصل",    dot: "#999999", hint: "وصلته رسالة ولم يردّ بعد" },
+  { key: "engaged",     pos: 3, type: "ongoing", label: "متجاوب",        dot: "#2F5F94", hint: "ردّ مرة واحدة على الأقل" },
+  { key: "nurture",     pos: 4, type: "ongoing", label: "مؤجَّل",         dot: "#B54708", hint: "طلب التأجيل صراحةً" },
+  { key: "qualified",   pos: 5, type: "ongoing", label: "مؤهَّل",         dot: "#027A48", hint: "سجّل المساعد اهتمامًا واضحًا" },
+  { key: "meeting",     pos: 6, type: "ongoing", label: "موعد محدَّد",    dot: "#1F7A73", hint: "موعد أكّده إنسان" },
+  { key: "handoff",     pos: 7, type: "won",     label: "مع المندوب",    dot: "#1F7A73", hint: "سُلّم لمندوب المبيعات" },
+  { key: "unqualified", pos: 8, type: "lost",    label: "غير مؤهَّل",     dot: "#7C7C7C", hint: "أعلن عدم اهتمامه، أو أُغلق الملف" },
+  { key: "stopped",     pos: 9, type: "lost",    label: "أوقف التواصل",  dot: "#B42318", hint: "طلب إيقاف الرسائل" },
+];
+function stageByKey(k) { for (var i = 0; i < CRM_STAGE.length; i++) if (CRM_STAGE[i].key === k) return CRM_STAGE[i]; return CRM_STAGE[0]; }
+
+/**
+ * ORDER IS THE CONTRACT. A terminal stage wins over forward progress — someone who asked us to stop
+ * after booking a meeting is «أوقف التواصل», not «موعد محدَّد» — which is Frappe's own semantics,
+ * where Lost is a position on the ladder rather than a flag beside it. Below the terminals, the
+ * HIGHEST rung whose evidence exists is the answer.
+ */
+function stageOf(c) {
+  if (!c) return stageByKey("new");
+  var st = c.statusTimes || {};
+  if (c.optedOut || c.outcome === "stopped") return stageByKey("stopped");
+  if (c.outcome === "not_interested" || c.outcome === "closed") return stageByKey("unqualified");
+  if (c.outcome === "handoff") return stageByKey("handoff");
+  var a = appt(c);
+  if ((a && a.confirmed) || c.outcome === "scheduled") return stageByKey("meeting");
+  if (interestedOf(c, 0)) return stageByKey("qualified");
+  if (c.outcome === "later") return stageByKey("nurture");
+  if (st.replied || (c.transcript || []).some(function (t) { return t.role === "customer"; })) return stageByKey("engaged");
+  if (st.sent || st.delivered || st.read || (c.transcript || []).some(function (t) { return t.role === "agent"; })) return stageByKey("contacted");
+  return stageByKey("new");
+}
+
+/**
+ * When the evidence that put them at this rung landed. Frappe writes a CRM Status Change Log row on
+ * every save and reads duration off it; a derived stage needs no such table — the timestamp is the
+ * evidence's own. Returns null where the ledger genuinely holds no time, and the UI prints «—»:
+ * outcome carries no timestamp column, so an outcome set by an operator is dated only through the
+ * customer turn that justified it (outcomeEvidence), which is exactly the evidence rule this
+ * codebase applies everywhere else.
+ */
+function stageSince(c) {
+  if (!c) return null;
+  var st = c.statusTimes || {};
+  var s = stageOf(c);
+  var turns = c.transcript || [];
+  var evidenceTs = function () {
+    if (!c.outcomeEvidence) return null;
+    var hit = turns.filter(function (t) { return t.role === "customer" && t.text && String(t.text).indexOf(c.outcomeEvidence) >= 0; });
+    return hit.length ? hit[hit.length - 1].ts : null;
+  };
+  if (s.key === "stopped" || s.key === "unqualified" || s.key === "handoff" || s.key === "nurture") return evidenceTs();
+  if (s.key === "meeting") { var a = appt(c); return (a && a.setAt) || evidenceTs(); }
+  if (s.key === "qualified") {
+    var ts = (c.tags || []).filter(function (t) { return (t.level === "hot" || t.level === "warm") && t.ts; })
+      .map(function (t) { return t.ts; });
+    return ts.length ? Math.min.apply(null, ts) : evidenceTs();
+  }
+  if (s.key === "engaged") {
+    var first = turns.filter(function (t) { return t.role === "customer" && t.ts; })[0];
+    return (first && first.ts) || st.replied || null;
+  }
+  if (s.key === "contacted") return st.sent || st.delivered || st.read || null;
+  return null;
+}
+
+/** The stage of an ACCOUNT: its conversation's stage, or «مستهدَف» when it has never been messaged. */
+function stageOfEntity(e) { return stageOf(contactByPhone(e.phone)); }
+
 /** The reverse of contactByPhone: a conversation back to the account it belongs to, indexed for
  *  the same reason — العملاء filters 1,700 contacts by their account's tag on every keystroke. */
 let _ebpSrc = null, _ebpMap = null;
@@ -3124,14 +3220,15 @@ function vCustomer(ph) {
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
     '<div style="font-size:18px;font-weight:600;color:#171717;">' + esc(nm) + "</div>" +
     (function () {
-      const OM = { interested:["مهتم","#027A48"], scheduled:["موعد محدَّد","#1F7A73"],
-        handoff:["تحويل لمندوب","#2F5F94"], later:["لاحقًا","#B54708"],
-        not_interested:["غير مهتم","#7C7C7C"], closed:["مغلق","#7C7C7C"],
-        stopped:["أوقف الرسائل","#B42318"], opted_out:["ألغى الاشتراك","#B42318"] };
-      const o = c.optedOut ? OM.opted_out : (OM[c.outcome || ""] || ["جديد", "#C7C7C7"]);
-      return '<span class="chip" style="font-size:12.5px;padding:4px 10px;">' +
-        '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + o[1] + ';"></span>' +
-        o[0] + "</span>";
+      // ONE vocabulary. This pill held its own private outcome table, so a contact who had replied
+      // but carried no recorded outcome read «جديد» here and «متجاوب» on the list — two words for
+      // one person on two screens. It reads the ladder now, like every other surface.
+      const sg = stageOf(c);
+      const since = stageSince(c);
+      return '<span class="chip" style="font-size:12.5px;padding:4px 10px;" title="' + esc(sg.hint) + '">' +
+        '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + sg.dot + ';"></span>' +
+        sg.label + "</span>" +
+        (since ? '<span style="font-size:12px;color:#999999;">منذ ' + fmtAgo(Date.now() - since) + "</span>" : "");
     })() +
     (c.test ? ' <span class="chip">تجريبي</span>' : "") +
     (c.human ? ' <span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +

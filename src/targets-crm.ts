@@ -144,18 +144,20 @@ function tgtHeader(allOn) {
   return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
       (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></div>' +
-    "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>الحالة</div><div></div></div>" +
+    "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>المرحلة</div><div></div></div>" +
     '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
       (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></span><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
 }
 
 function tgtRow(e) {
   /* The state column reports what the ledger holds, in three cases only:
-     a conversation exists -> its own outcome word (one table, cusOutcome, shared with #customers);
-     no conversation       -> «لم تُراسل بعد», which is a fact about us, not about them;
-     and nothing is ever inferred from the attributes. */
+     the pipeline stage of its conversation, or «مستهدَف» when it has never been messaged — which is
+     the ladder's own first rung, so this screen invents no word of its own. Nothing is ever
+     inferred from the imported attributes. */
+  // The same ladder the clients list and the record use. «لم تُراسل بعد» was this screen's private
+  // third word for what the ladder already calls «مستهدَف».
+  var st = stageOfEntity(e);
   var c = contactByPhone(e.phone);
-  var st = c ? cusOutcome(c) : { label: "لم تُراسل بعد", dot: "#E2E2E2" };
   var armed = tgtArm === e.id;
   var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'style="cursor:default;"';
   return '<div class="trow km krow crow' + (tgtSel[e.id] ? " sel" : "") + '" ' + open + ">" +
