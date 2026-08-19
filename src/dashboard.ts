@@ -2125,7 +2125,7 @@ function vKbProduct(name) {
   // ── Performance row: one scoreboard, not scattered chips ──
   const cells = [
     ["حملات الخدمة", prodCamps.length, "#171717"],
-    ["صفقات مكتسبة", (wlProd && wlProd.won) || 0, "#027A48"],
+    ["محققة", (wlProd && wlProd.won) || 0, "#027A48"],
     ["غير مكتسبة", (wlProd && wlProd.lost) || 0, "#B42318"],
     ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#2F5F94"],
   ];
@@ -2183,7 +2183,7 @@ function vKbProduct(name) {
       ["الملف التعريفي", asset ? esc(asset.filename) : "لا ملف مرفق — لن يرسل المساعد مرفقًا لهذه الخدمة", Boolean(asset)],
       ["الحملات المطلقة", camps.length ? fmtN(camps.length) + " حملة تستخدم هذه الخدمة" : "لم تُطلق حملة بهذه الخدمة بعد", camps.length > 0],
       ["حكم السوق", wlProd && (wlProd.won || wlProd.lost)
-        ? fmtN(wlProd.won || 0) + " مكتسبة · " + fmtN(wlProd.lost || 0) + " غير مكتسبة"
+        ? fmtN(wlProd.won || 0) + " محققة · " + fmtN(wlProd.lost || 0) + " غير مكتسبة"
         : "يتعلّم — لا صفقات محكومة بعد", Boolean(wlProd && (wlProd.won || wlProd.lost))],
     ];
     const done = rows.filter((r) => r[2]).length;
@@ -2635,7 +2635,17 @@ function vHomeCharts(cs) {
     : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
   return h;
 }
-const DEAL_META = { won: ["صفقة مكتسبة", "#027A48", "#ECFDF3"], lost: ["غير مكتسبة", "#B42318", "#FEF3F2"], stalled: ["متوقفة", "#B54708", "#FFFAEB"], active: ["نشطة", "#2F5F94", "#EFF4FB"] };
+// The founder's own wording, and his own note that it must read «محققة», not «محققة محاسبية».
+// The fourth entry is the JUDGE'S definition, verbatim from the prompt in insights.ts, carried onto
+// the chip as its tooltip: «محققة» stands for an explicit commitment to subscribe or to a final
+// meeting, NOT for a payment. Massar holds no money field of any kind, so the screen has to say
+// which of the two it means rather than let the reader assume the stronger one.
+const DEAL_META = {
+  won:     ["محققة",      "#027A48", "#ECFDF3", "التزم صراحةً بالاشتراك أو بالاجتماع النهائي"],
+  lost:    ["غير مكتسبة", "#B42318", "#FEF3F2", "رفض نهائيًا أو انسحب"],
+  stalled: ["متوقفة",     "#B54708", "#FFFAEB", "توقف التفاعل بعد اهتمام — صمت يتجاوز يومين"],
+  active:  ["نشطة",       "#2F5F94", "#EFF4FB", "الحوار مستمر طبيعيًا"],
+};
 // ---------------------------------------------------------------------------
 // «ما يستحق المتابعة الآن» — the ONE morning list in the product.
 //
@@ -2738,31 +2748,31 @@ function vWinLoss() {
   const judged = (t.won || 0) + (t.lost || 0) + (t.stalled || 0);
   let h = '<div class="card" style="margin-bottom:18px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">' +
-    '<h3 style="margin:0;">لماذا نكسب — ولماذا نخسر</h3>' +
+    '<h3 style="margin:0;">كيف صُنّفت المحادثات؟</h3>' +
     '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
-    ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + fmtN(t[k] || 0) + "</span>").join("") + "</div></div>" +
-    '<div style="font-size:11px;color:#999999;margin-top:6px;">حكم المساعد على كل محادثة من نصها الحرفي — مع الدليل</div>';
+    ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" title="' + DEAL_META[k][3] + '" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + fmtN(t[k] || 0) + "</span>").join("") + "</div></div>" +
+    '<div style="font-size:12px;color:#7C7C7C;margin-top:6px;line-height:1.8;">يحلّل المساعد كل محادثة بناءً على محتواها الفعلي، ويوضّح سبب التصنيف والأدلة الداعمة.</div>';
   if (!judged && !(t.active || 0)) {
-    h += '<div style="font-size:12.5px;color:#7C7C7C;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثات محكومة — كل صفقة مكتسبة أو غير مكتسبة ستظهر هنا بسببها.</div></div>';
+    h += '<div style="font-size:12.5px;color:#7C7C7C;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثة مصنَّفة — وكل محادثة محققة أو غير مكتسبة ستظهر هنا بسبب تصنيفها.</div></div>';
     return h;
   }
   const nWin = (winloss.win_drivers || []).length, nLoss = (winloss.loss_causes || []).length;
   const cnt = (k) => (k > 1 ? '<span class="chip">×' + fmtN(k) + "</span>" : "");
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
   if (nWin) {
-    h += '<div><div style="font-size:11.5px;font-weight:500;color:#027A48;margin-bottom:9px;">ما يكسب لنا الصفقات</div>' +
+    h += '<div><div style="font-size:11.5px;font-weight:500;color:#027A48;margin-bottom:9px;">عوامل ساعدت على التقدّم</div>' +
       winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid #EDEDED;"><span style="flex:1;font-size:12.5px;color:#171717;line-height:1.8;">' + esc(w.driver) + "</span>" + cnt(w.count) + "</div>").join("") + "</div>";
   }
   if (nLoss) {
-    h += '<div><div style="font-size:11.5px;font-weight:500;color:#B42318;margin-bottom:9px;">ما يخسّرنا الصفقات</div>' +
+    h += '<div><div style="font-size:11.5px;font-weight:500;color:#B42318;margin-bottom:9px;">أسباب التوقّف أو عدم الاكتساب</div>' +
       winloss.loss_causes.map((c) => '<div style="padding:9px 0;border-top:1px solid #EDEDED;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:500;color:#171717;">' + esc(c.cause) + "</span>" + (c.products || []).map((pd) => '<span class="chip">' + esc(clip(pd, 22)) + "</span>").join("") + cnt(c.count) + "</div>" +
         (c.example ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("") + "</div>";
   }
   h += "</div>";
   if (!nWin || !nLoss) {
     h += '<div style="font-size:12px;color:#999999;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #EDEDED;" : "10px;") + '">' +
-      (!nWin && !nLoss ? "لا محرّكات محكومة بعد على أي من الجانبين."
-        : !nLoss ? "لا خسائر محكومة بعد — وهذا خبر جيد." : "لا مكاسب محكومة بعد.") + "</div>";
+      (!nWin && !nLoss ? "لا عوامل مصنَّفة بعد على أي من الجانبين."
+        : !nLoss ? "لا أسباب توقّف مصنَّفة بعد — وهذا خبر جيد." : "لا عوامل تقدّم مصنَّفة بعد.") + "</div>";
   }
   // a bordered block that renders nothing is still a border: decide from the filtered rows, not the raw list
   const judgedProducts = (winloss.by_product || []).filter((pr) => (pr.won || 0) + (pr.lost || 0) > 0).slice(0, 4);
@@ -2770,7 +2780,7 @@ function vWinLoss() {
     h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDEDED;">' +
       judgedProducts.map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
         '<span style="flex:1;min-width:0;color:#383838;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
-        '<span style="color:#027A48;">' + fmtN(pr.won) + ' مكتسبة</span><span style="color:#C7C7C7;">·</span>'  +
+        '<span style="color:#027A48;">' + fmtN(pr.won) + ' محققة</span><span style="color:#C7C7C7;">·</span>'  +
         '<span style="color:#B42318;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
   }
   h += "</div>";
