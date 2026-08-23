@@ -2068,10 +2068,15 @@ function vKb() {
   });
   let h = "";
   if (skill) {
-    h += '<div class="crmbar rise"><span style="flex:1;min-width:220px;font-size:12.5px;color:#525252;line-height:1.8;">' +
-      '<b style="color:#171717;font-weight:500;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
+    // The AI banner. The treatment is the BRAND's AI accent — the same teal gradient as the logo
+    // tile (see .brand), never a borrowed purple-sparkle cliché: a gradient icon tile, a faint
+    // teal wash fading into the bar, and the teal primary on the one action.
+    h += '<div class="crmbar rise" style="background:linear-gradient(120deg,#F0FAF9,#fff 55%);border-color:#CFE9E6;">' +
+      '<span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#3FB6B0,#1F7A73);display:flex;align-items:center;justify-content:center;color:#fff;flex:none;">' + ic("spark", 18) + "</span>" +
+      '<span style="flex:1;min-width:220px;font-size:12.5px;color:#525252;line-height:1.8;">' +
+      '<b style="color:#171717;font-weight:700;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
       ' <span style="direction:ltr;color:#999999;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
-      '<a class="btn btn-ghost" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
+      '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
   }
   h += '<div class="tblwrap crmflat kbflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
     '<div class="kbrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;cursor:default;">' +
