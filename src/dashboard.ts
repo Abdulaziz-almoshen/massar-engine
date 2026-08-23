@@ -2069,7 +2069,7 @@ function vKb() {
   let h = "";
   if (skill) {
     h += '<div class="crmbar rise"><span style="flex:1;min-width:220px;font-size:12.5px;color:#525252;line-height:1.8;">' +
-      '<b style="color:#171717;font-weight:500;">مهارة إنشاء العروض</b> — أنتج بها عروض الخدمات (PDF) ثم ارفعها في صفحة كل خدمة.' +
+      '<b style="color:#171717;font-weight:500;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
       ' <span style="direction:ltr;color:#999999;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
       '<a class="btn btn-ghost" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
   }
