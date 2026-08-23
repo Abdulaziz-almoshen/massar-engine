@@ -1,5 +1,6 @@
 import type { InboundMessage, StatusEvent } from "./gupshup.js";
 import * as db from "./db.js";
+import { cfg } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // In-memory tracking ledger — the MVP spine of §5/§8 of the architecture doc.
@@ -300,6 +301,27 @@ export function recordSystem(phone: string, text: string) {
  * level did not change keeps its original `ts`: curation fixes what we recorded, it must not
  * restate WHEN the customer showed it.
  */
+/**
+ * A HIGH-intent reading opens an opportunity on «فرص البيع» — once per (account, service), and
+ * never again for that pair even if a human deletes the line.
+ *
+ * WHY IT IS A SEPARATE FUNCTION and not four lines inside addTag: addTag owns no persistence of its
+ * own (BR-1 — the tag set is written by writeProp, inside its transaction, and by nothing else),
+ * and check-props asserts exactly that by reading addTag's body. This is not a tag write; it is a
+ * different table, downstream, after the tag has already been accepted. Keeping it out of addTag
+ * keeps that gate honest and keeps addTag about tags.
+ *
+ * Fire-and-forget with its own catch, deliberately: the board is downstream of the conversation and
+ * nothing about it may delay or fail an agent turn. Every refusal lives in db.autoOppFromHot — this
+ * function holds none — so the rule has ONE definition and any future caller inherits it unchanged.
+ */
+function openOppFromHot(phone: string, product: string, level: Tag["level"], waName?: string): void {
+  if (!cfg.autoOppFromHot || level !== "hot") return;
+  void db.autoOppFromHot(phone, product, waName).then((o) => {
+    if (o) logEvent("opp_auto", phone, `${product} · #${o.id}`);
+  }).catch((e) => console.error(JSON.stringify({ at: "opp_auto", phone, err: String(e).slice(0, 200) })));
+}
+
 export async function addTag(
   phone: string, product: string, level: Tag["level"], by = "agent:tag_interest",
 ): Promise<{ applied: boolean; persisted: boolean; reason?: PropReject; prop?: Prop }> {
@@ -313,9 +335,11 @@ export async function addTag(
   if (r.applied) {
     bump("tag");
     logEvent("tag", phone, `${product}:${level}`);
+    openOppFromHot(phone, product, level, c.waName);
   }
   return r;
 }
+
 
 /** Curation fixes what we recorded — it must not restate WHEN the customer showed interest, so a
  *  tag whose product is unchanged keeps its original ts. */

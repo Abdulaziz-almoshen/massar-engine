@@ -286,6 +286,19 @@ CREATE TABLE IF NOT EXISTS opportunities (
   stage_at     BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_opps_phone ON opportunities(phone);
+-- THE ONCE-ONLY LEDGER for automatic creation. A hot reading opens an opportunity by itself, and
+-- the hard part is not creating it — it is never creating it TWICE, and never RESURRECTING one a
+-- human deleted on purpose. Both are the same guarantee, and it cannot live in the opportunities
+-- table itself: a deleted row is exactly the state that must still block a second attempt.
+-- INSERT … ON CONFLICT DO NOTHING RETURNING makes the claim atomic, so two webhook turns arriving
+-- together cannot both win it. The primary key IS the rule.
+CREATE TABLE IF NOT EXISTS opp_auto (
+  phone   TEXT NOT NULL,
+  product TEXT NOT NULL,
+  ts      BIGINT NOT NULL,
+  opp_id  BIGINT,
+  PRIMARY KEY (phone, product)
+);
 `;
 
 export async function init(): Promise<void> {
@@ -1024,6 +1037,68 @@ export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<Opp
   vals.push(id);
   const q = await pool.query(`UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
   return q.rows[0] ? rowToOpp(q.rows[0]) : null;
+}
+
+/**
+ * A HOT READING BECOMES AN OPPORTUNITY, ONCE. The founder's question — «are they added auto once
+ * user interest is high?» — answered at the only place that can answer it honestly: the moment the
+ * assistant records a HIGH-intent reading, which is the single qualification event this system can
+ * actually witness. Warm is NOT enough; it stays a one-click suggestion on the board's band.
+ *
+ * FOUR REFUSALS, each of which would otherwise put a lie on the money board:
+ *   · a product outside the tag registry (the agent files an unknown service as «خدمة أخرى») —
+ *     an opportunity nobody can filter for is worse than none, and the claim is NOT taken, so a
+ *     later real product for the same account still gets its chance.
+ *   · a test contact — the board has no test flag, so a rehearsal would sit beside real money.
+ *   · a contact who opted out or was read as not-interested — a hot tag from an earlier turn does
+ *     not survive «إيقاف».
+ *   · a claim already taken — including one whose opportunity a human has since DELETED. Deleting
+ *     an auto-created line is a decision, and a system that undoes it is worse than one that never
+ *     created it.
+ *
+ * It is created UNPRICED (sale_price 0). The conversation contains no number and inventing one
+ * would be a forecast dressed as a reading; the board renders it «لم تُسعَّر» and the pipeline total
+ * is untouched until a human prices it.
+ */
+export async function autoOppFromHot(phone: string, product: string, waName?: string): Promise<OppRow | null> {
+  if (!pool || !connected) return null;
+  const name = String(product || "").trim();
+  if (!name) return null;
+  // Registry check BEFORE the claim, so a refused product does not burn the account's one chance.
+  const known = await pool.query(`SELECT 1 FROM tags WHERE name = $1 LIMIT 1`, [name]);
+  if (!known.rows.length) return null;
+  const c = await pool.query(`SELECT test, opted_out, outcome FROM contacts WHERE phone = $1`, [phone]);
+  const row = c.rows[0];
+  if (row && (row.test || row.opted_out || row.outcome === "stopped" || row.outcome === "not_interested")) return null;
+  const claim = await pool.query(
+    `INSERT INTO opp_auto (phone, product, ts) VALUES ($1,$2,$3)
+     ON CONFLICT (phone, product) DO NOTHING RETURNING phone`, [phone, name, Date.now()]);
+  if (!claim.rows.length) return null;
+  // The account's own name if the book has it — the board groups by phone, but the card is read by
+  // a human, and «966543464327» is not a client. Falls back to the WhatsApp profile name, then the
+  // number, which is the last honest thing left to show.
+  const ent = await pool.query(`SELECT name FROM entities WHERE phone = $1`, [phone]);
+  const account = (ent.rows[0] && ent.rows[0].name) || waName || phone;
+  const camp = await pool.query(
+    `SELECT campaign_id FROM campaign_targets WHERE phone = $1 ORDER BY campaign_id DESC LIMIT 1`, [phone]);
+  const rows = await createOppLines(
+    { account_name: account, phone, source: "whatsapp",
+      source_ref: camp.rows[0] ? String(camp.rows[0].campaign_id) : null, created_by: "المساعد" },
+    [{ product: name, stage: "contact", sale_price: 0, years: 1, qty: 1, discount: 0 }]);
+  const made = rows[0] ?? null;
+  if (made) await pool.query(`UPDATE opp_auto SET opp_id = $1 WHERE phone = $2 AND product = $3`, [made.id, phone, name]);
+  return made;
+}
+
+/** Every (phone, product) the assistant has read as HOT, for the boot backfill. Contacts already
+ *  hot when this shipped must get the same treatment as the next one, or the board's behaviour
+ *  depends on the deploy date — which is the kind of inconsistency nobody can explain later. */
+export async function hotReadings(): Promise<{ phone: string; product: string; wa_name: string | null }[]> {
+  if (!pool || !connected) return [];
+  return (await pool.query(
+    `SELECT DISTINCT t.phone, t.product, c.wa_name
+       FROM interest_tags t LEFT JOIN contacts c ON c.phone = t.phone
+      WHERE t.level = 'hot'`)).rows;
 }
 
 export async function deleteOpp(id: number): Promise<boolean> {

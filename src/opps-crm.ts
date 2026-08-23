@@ -74,6 +74,8 @@ export const OPPS_CRM_CSS = `
   .opline .pn { flex:1; min-width:0; font-size:12.5px; font-weight:450; color:#171717;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .opline .sg { font-size:11px; color:#7C7C7C; white-space:nowrap; }
+  .opauto { font-size:9.5px; font-weight:500; color:#2E7D77; background:#E9F7F6; border-radius:999px;
+    padding:2px 7px; margin-inline-start:7px; vertical-align:middle; }
   .opline .lv { font-size:12px; font-weight:500; color:#1F7A73; min-width:84px; text-align:end;
     font-variant-numeric:tabular-nums; }
   /* the inline expander — the detail screen the prototype spends a page on, as six controls */
@@ -91,6 +93,53 @@ export const OPPS_CRM_CSS = `
   .opedit .acts .btn { height:30px; padding:0 11px; font-size:12px; }
   .opedit .dngr:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
   .opedit .dngr.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; }
+
+  /* ===== the LIST — seven tracks, seven cells; the arity rule that wrapped three earlier tables ===== */
+  .opflat .crow { grid-template-columns: 40px 1.7fr 1.5fr 1.15fr .85fr .7fr 1.5fr; padding-inline:20px 12px; }
+  .opflat .crow .o-ac { display:flex; align-items:center; gap:10px; min-width:0; }
+  .opflat .crow .o-ac .av { width:26px; height:26px; flex:none; border-radius:7px; background:#F3F3F3;
+    color:#525252; display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:500; }
+  .opflat .crow .o-ac .lb { font-size:13.5px; color:#171717; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-pr { font-size:12.5px; color:#525252; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-st { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#525252; min-width:0; }
+  .opflat .crow .o-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
+  .opflat .crow .o-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-vl { font-size:13px; font-weight:500; color:#1F7A73; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .opflat .crow .o-nx { font-size:12px; color:#7C7C7C; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opexp { padding:0 20px 4px; background:#FBFBFB; border-bottom:1px solid #EDEDED; }
+  @media (max-width: 1100px) {
+    .opflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
+    .opflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
+    .opflat .crow .o-ac { grid-row:1; grid-column:2; }
+    .opflat .crow .o-vl { grid-row:1; grid-column:3; text-align:end; }
+    .opflat .crow .o-pr { grid-row:2; grid-column:2 / 4; }
+    .opflat .crow .o-st { grid-row:3; grid-column:2 / 4; }
+    .opflat .crow .o-sr { grid-row:4; grid-column:2; }
+    .opflat .crow .o-nx { grid-row:5; grid-column:2 / 4; }
+  }
+
+  /* ===== the stage strip — the pipeline in one line, and the stage filter ===== */
+  .opstrip { display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
+  .opstrip .opsc { font-family:inherit; flex:1; min-width:118px; text-align:start; cursor:pointer;
+    background:#fff; border:1px solid #EDEDED; border-radius:12px; padding:10px 13px;
+    display:flex; flex-direction:column; gap:3px; }
+  .opstrip .opsc:hover { border-color:#C7C7C7; }
+  .opstrip .opsc.on { border-color:#3FB6B0; background:#F4FCFB; }
+  .opstrip .opsc .t { font-size:11.5px; color:#7C7C7C; display:flex; align-items:center; gap:6px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opstrip .opsc .t .d { width:6px; height:6px; border-radius:999px; flex:none; }
+  .opstrip .opsc .n { font-size:19px; font-weight:600; color:#171717; font-variant-numeric:tabular-nums; line-height:1.2; }
+  .opstrip .opsc .v { font-size:11.5px; color:#1F7A73; font-variant-numeric:tabular-nums;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opstrip .opsc .u { color:#B54708; margin-inline-start:6px; }
+  .opstrip .opsc .u2 { color:#999999; margin-inline-start:6px; }
+
+  /* bulk-bar controls, on the dark bar the campaigns list already established */
+  .bulkbar .opbulk { font-family:inherit; font-size:11.5px; height:30px; border-radius:999px;
+    padding:0 11px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff;
+    max-width:150px; }
+  .bulkbar .opbulk option { color:#171717; }
+  .bulkbar .opbulk::placeholder { color:rgba(255,255,255,.6); }
 
   /* ===== the un-recorded band: replies that are already opportunities and are not on the board ===== */
   .optriage { background:#fff; border:1px solid #EDEDED; border-radius:13px; margin-bottom:14px; }
@@ -135,8 +184,18 @@ export const OPPS_CRM_JS = `
 /* Own state, own names. oppTab/oppQ belong to «فرز الردود» (vMorningList) and are NOT reused: two
    screens sharing one search box is how a filter typed on one silently narrows the other. */
 var oppRows = null, oppLoading = false, oppBusy = false;
+/* THE TAB, and inside it THE VIEW. «فرص» is the board; «فرز الردود» is the WhatsApp triage this
+   board feeds off. The board itself has the product's three-view control — قائمة · كانبان · بطاقات
+   — the same one #kmon carries, because a card grid answers «show me these six deals» and nothing
+   else: at two hundred lines it is a scroll, not a screen. The LIST is the default and the thing
+   that scales; the KANBAN is where a pipeline is actually worked; the CARDS are the account view
+   the prototype drew. */
 var opView = "board";        /* board | triage — the tab, not a filter */
-var opQ = "", opStat = "all", opSrc = "all";
+var opMode = "list";         /* list | kanban | cards */
+var opSort = "value";        /* value | recent | stage | account */
+var opSel = {};              /* selected LINE ids for the bulk bar, keyed by id */
+var opQ = "", opStat = "all", opSrc = "all", opStg = "all";
+var opDragId = null;
 var opOpen = 0;              /* id of the expanded line; 0 = none. One at a time, by construction. */
 var opArm = 0;               /* id of the line whose delete is armed */
 var opSheet = null;          /* the create form's whole draft, or null when closed */
@@ -192,6 +251,13 @@ function opValue(o) {
   return Math.round(Number(o.sale_price || 0) * Number(o.years || 1) * Number(o.qty || 1) *
     (1 - Number(o.discount || 0) / 100));
 }
+/* AN AUTO-CREATED LINE HAS NO PRICE, and «٠ ر.س» is not the same statement as «we have not priced
+   this yet» — the first reads as a worthless deal on a board whose whole left column is money. The
+   conversation contains no number and inventing one would be a forecast dressed as a reading, so
+   the absence is rendered as an absence. It also keeps the totals honest: an unpriced line adds
+   nothing to a sum, and now says why. */
+function opPriced(l) { return Number(l.sale_price || 0) > 0; }
+var OPP_UNPRICED = "لم تُسعَّر";
 /* «٥٫٣ م ر.س» / «٤٥٠ ألف ر.س» — the prototype's short money, in Arabic-Indic digits. */
 function opMoney(v) {
   v = Number(v || 0);
@@ -236,10 +302,20 @@ function opGroups() {
     return by[k];
   });
 }
-function opGroupValue(g) {
-  return g.lines.filter(function (l) { return !opIsLost(l); })
+/* ONE MONEY RULE, and it is the prototype's: A LOST LINE IS WORTH NOTHING, so it never counts
+   toward any total that MIXES stages. It shipped broken for one build — the card head excluded
+   lost while the stage strip and the list footer added it back, so two numbers on one screen
+   disagreed by the exact value of every deal we had already failed to win. Single-stage figures
+   (the خسارة column, the خسارة strip cell) still state their own sum: that is a fact about one
+   stage, not a total across them. Every mixed total says «دون الخسارة» when the set it is drawn
+   from contains one — a silent exclusion is the same defect wearing better manners. */
+function opSumLive(ls) {
+  return ls.filter(function (l) { return !opIsLost(l); })
     .reduce(function (a, l) { return a + opValue(l); }, 0);
 }
+function opHasLost(ls) { return ls.some(opIsLost); }
+
+function opGroupValue(g) { return opSumLive(g.lines); }
 /* قائمة while anything is still live; ربح/خسارة only once every line has landed; مكتملة جزئياً for
    the mixed close. The prototype's exact rollup — the head must never claim a deal is won while a
    line under it is still open. */
@@ -261,18 +337,88 @@ function opGroupOwners(g) {
   g.lines.forEach(function (l) { if (l.owner && seen.indexOf(l.owner) === -1) seen.push(l.owner); });
   return seen;
 }
-function opMatches() {
+/* ONE filter, applied to LINES, and every view reads it — the list, the kanban, the cards and the
+   totals. Two definitions of «what is on screen» is how a header ends up disagreeing with the rows
+   beneath it, which is the defect this file's own card head was designed to make impossible. */
+function opLines() {
   var q = opQ.trim();
-  return opGroups().filter(function (g) {
-    if (opStat !== "all" && opGroupStatus(g).key !== opStat) return false;
-    if (opSrc !== "all" && !g.lines.some(function (l) { return l.source === opSrc; })) return false;
+  return (oppRows || []).filter(function (l) {
+    if (opSrc !== "all" && l.source !== opSrc) return false;
+    if (opStg !== "all") {
+      if (opStg === "open" ? !opIsOpen(l) : opStg === "live" ? !(opIsOpen(l) || opIsWon(l)) : l.stage !== opStg) return false;
+    }
     if (!q) return true;
-    return String(g.name).includes(q) || g.phone.includes(q) ||
-      g.lines.some(function (l) { return String(l.product).includes(q); });
+    return String(l.account_name).includes(q) || String(l.product).includes(q) ||
+      String(l.phone || "").includes(q) || String(l.owner || "").includes(q);
+  });
+}
+/* Sorted lines for the list. «القيمة» leads by default because the question a pipeline answers
+   first is «what is the biggest thing at risk», and an unpriced line sorts last rather than as
+   zero-among-equals — it is not a small deal, it is an unanswered one. */
+function opSorted() {
+  var rows = opLines().slice();
+  var pos = {}; OPP_ST.forEach(function (st, i) { pos[st.key] = i; });
+  return rows.sort(function (a, b) {
+    if (opSort === "recent") return (b.updated_at || 0) - (a.updated_at || 0);
+    if (opSort === "stage") return (pos[a.stage] - pos[b.stage]) || (opValue(b) - opValue(a));
+    if (opSort === "account") return String(a.account_name).localeCompare(String(b.account_name), "ar");
+    return (opPriced(b) - opPriced(a)) || (opValue(b) - opValue(a));
+  });
+}
+/* Selection INTERSECTED with what is visible on read — the rule the reviewer forced on the
+   campaigns list after a selection survived navigation and staged one campaign's phones under
+   another campaign's name. A filter that hides a row also drops it from the bulk write. */
+function opSelIds() {
+  var live = {};
+  opLines().forEach(function (l) { live[l.id] = true; });
+  return Object.keys(opSel).map(Number).filter(function (id) { return live[id]; });
+}
+
+/* The CARDS view groups the SAME filtered lines — it does not re-filter. A card that showed lines
+   the list had excluded would be a second answer to «what is on screen». */
+function opMatches() {
+  var keep = {};
+  opLines().forEach(function (l) { keep[l.id] = true; });
+  return opGroups().map(function (g) {
+    return { key: g.key, name: g.name, phone: g.phone, lines: g.lines.filter(function (l) { return keep[l.id]; }) };
+  }).filter(function (g) {
+    if (!g.lines.length) return false;
+    return opStat === "all" || opGroupStatus(g).key === opStat;
   }).sort(function (a, b) {
     var ord = { open: 0, partial: 1, won: 2, lost: 3 };
     return (ord[opGroupStatus(a).key] - ord[opGroupStatus(b).key]) || (opGroupValue(b) - opGroupValue(a));
   });
+}
+
+/* ---- the stage strip: the pipeline in one line ----
+   Six cells, count and money per stage, over EVERY match rather than the visible page — a total
+   that changes when you turn a page is not a total. It doubles as the stage filter, so the fastest
+   way to ask «what is sitting in التفاوض» is to click the number that says how much is. */
+function opStageStrip() {
+  var rows = (oppRows || []).filter(function (l) {
+    var q = opQ.trim();
+    if (opSrc !== "all" && l.source !== opSrc) return false;
+    if (!q) return true;
+    return String(l.account_name).includes(q) || String(l.product).includes(q) ||
+      String(l.phone || "").includes(q) || String(l.owner || "").includes(q);
+  });
+  var cell = function (key, label, dot, ls, mixed) {
+    /* mixed = this cell spans more than one stage, so the money rule applies */
+    var val = mixed ? opSumLive(ls) : ls.reduce(function (a, l) { return a + opValue(l); }, 0);
+    var unpriced = ls.filter(function (l) { return !opPriced(l); }).length;
+    return '<button class="opsc' + (opStg === key ? " on" : "") + '" onclick="opSetStg(&quot;' + key + '&quot;)">' +
+      '<span class="t">' + (dot ? '<span class="d" style="background:' + dot + ';"></span>' : "") + label + "</span>" +
+      '<span class="n">' + fmtN(ls.length) + "</span>" +
+      '<span class="v">' + (val ? opMoney(val) : "—") +
+      (mixed && opHasLost(ls) ? '<span class="u2">دون الخسارة</span>' : "") +
+      (unpriced ? '<span class="u" title="بند بلا سعر — لا يدخل في أي مجموع">' + fmtN(unpriced) + " بلا تسعير</span>" : "") +
+      "</span></button>";
+  };
+  var h = '<div class="opstrip rise">' + cell("all", "الكل", "", rows, true);
+  OPP_ST.forEach(function (st) {
+    h += cell(st.key, st.label, st.dot, rows.filter(function (l) { return l.stage === st.key; }), false);
+  });
+  return h + "</div>";
 }
 
 /* ---- the un-recorded band ----
@@ -331,16 +477,21 @@ function opCard(g) {
       return '<span class="opsrc" title="مصدر الفرصة">' + esc(s) + "</span>";
     }).join("") +
     '<span class="brk">قائمة ' + fmtN(open) + " · ربح " + fmtN(won) + " · خسارة " + fmtN(lost) + "</span></div>" +
-    '<span class="val">' + opMoney(opGroupValue(g)) + "</span></div>";
+    (g.lines.some(opPriced)
+      ? '<span class="val">' + opMoney(opGroupValue(g)) + "</span>"
+      : '<span class="val" style="color:#999999;font-size:13px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
   h += "</div>";
   h += '<div class="oplines">' + g.lines.map(function (l) {
     var st = opStage(l.stage);
     var row = '<div class="opline" onclick="opToggleLine(' + l.id + ')">' +
       '<span class="d" style="background:' + st.dot + ';"></span>' +
-      '<span class="pn">' + esc(l.product) + "</span>" +
+      '<span class="pn">' + esc(l.product) +
+      (l.created_by === "المساعد" ? '<span class="opauto" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
+      "</span>" +
       (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") +
       '<span class="sg">' + st.label + "</span>" +
-      '<span class="lv">' + opMoney(opValue(l)) + "</span></div>";
+      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#999999;font-weight:450;"') + ">" +
+      (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span></div>";
     return row + (opOpen === l.id ? opLineEditor(l) : "");
   }).join("") + "</div>";
   return h + "</div>";
@@ -384,6 +535,124 @@ function opCampName(id) {
   return cp ? cp.name : "حملة محذوفة";
 }
 
+/* ---- the LIST: the view that scales ----
+   The product's own flat-table idiom (.tblwrap/.crow/.krow/.thead-wide), so this reads as the same
+   application as #kmon, #customers and #targets rather than a screen with private furniture. Seven
+   real columns, every one of them a stored field; a row expands in place rather than navigating,
+   because the work here is «move this along», not «go read about it». */
+function opListView() {
+  var rows = opSorted();
+  var sel = opSelIds();
+  var page = pageSlice("opps", rows);
+  var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
+  var h = '<div class="tblwrap opflat rise">';
+  h += '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
+    (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
+    "<div>الجهة</div><div>الخدمة</div><div>المرحلة</div><div>القيمة</div><div>المصدر</div>" +
+    "<div>المسؤول والخطوة التالية</div></div>" +
+    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
+    (allOn ? " checked" : "") + ' onclick="opTogglePage()"></span><span>الفرصة</span><span style="flex:1"></span><span>المرحلة</span></div>';
+  if (!page.length) {
+    h += '<div style="padding:26px 20px;text-align:center;font-size:12.5px;color:#999999;">' +
+      (oppRows.length ? "لا بند يطابق ما اخترته." : "لا فرص مسجّلة بعد.") + "</div>";
+  }
+  page.forEach(function (l) {
+    var st = opStage(l.stage);
+    h += '<div class="trow km krow crow' + (opSel[l.id] ? " sel" : "") + '" onclick="opToggleLine(' + l.id + ')">' +
+      '<div class="selcell" onclick="event.stopPropagation()"><input type="checkbox"' +
+        (opSel[l.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(l.product) + '" onclick="opToggleSel(' + l.id + ')"></div>' +
+      '<div class="o-ac"><span class="av">' + esc(String(l.account_name).trim().charAt(0)) + "</span>" +
+        '<span class="lb">' + esc(l.account_name) + "</span></div>" +
+      '<div class="o-pr">' + esc(l.product) +
+        (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
+      '<div class="o-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span>" +
+        (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") + "</div>" +
+      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#C7C7C7;font-weight:450;"') + ">" +
+        (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>" +
+      '<div class="o-sr"><span class="opsrc">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span></div>" +
+      '<div class="o-nx">' + (l.owner ? '<b style="font-weight:500;color:#525252;">' + esc(clip(l.owner, 18)) + "</b> · " : "") +
+        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#C7C7C7;">لم تُحدَّد خطوة</span>') + "</div>" +
+      "</div>";
+    if (opOpen === l.id) h += '<div class="opexp">' + opLineEditor(l) + "</div>";
+  });
+  /* «٠ ر.س» is the one thing this footer must never say when nothing under it is priced — it is the
+     same false claim the line cells were fixed to stop making, one row lower. */
+  var live = opSumLive(rows);
+  h += '<div class="tfoot">' + pageBar("opps", rows.length, "بند") +
+    "<span>" + (live ? opMoney(live) + " قيمة المعروض" + (opHasLost(rows) ? " · دون الخسارة" : "")
+                     : "لا قيمة مسعَّرة بعد") + "</span></div></div>";
+  if (sel.length) h += opBulkBar(sel);
+  return h;
+}
+
+/* ---- the KANBAN: where a pipeline is worked ----
+   The prototype's own «لوحة متابعة الفرص — أدر فرص البيع واسحبها بين المراحل», on the board chrome
+   #kmon already uses. Each column states its count AND its money, because a stage with four deals
+   worth 40k and a stage with four worth 4m are not the same stage. Dragging writes the stage
+   through the same PATCH the rungs use — there is no second write path. */
+function opKanbanView() {
+  var rows = opLines();
+  var h = '<div class="kboard ms-scroll rise">';
+  OPP_ST.forEach(function (st) {
+    var cards = rows.filter(function (l) { return l.stage === st.key; })
+      .sort(function (a, b) { return (opPriced(b) - opPriced(a)) || (opValue(b) - opValue(a)); });
+    var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
+    h += '<div class="kcol" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ' +
+      'ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">' +
+      '<div class="kcolh"><span style="width:8px;height:8px;border-radius:999px;flex:none;background:' + st.dot + ';"></span>' +
+      '<div class="lb">' + st.label + "</div><span style=\'flex:1\'></span>" +
+      '<span class="cntpill">' + fmtN(cards.length) + "</span></div>" +
+      '<div style="font-size:11.5px;color:#7C7C7C;padding:0 4px 9px;font-variant-numeric:tabular-nums;">' +
+      (val ? opMoney(val) : "بلا تسعير") + "</div>";
+    var shown = cards.slice(0, LIST_CAP);
+    shown.forEach(function (l) {
+      h += '<div class="kcard" draggable="true" ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()" ' +
+        'onclick="opToggleLine(' + l.id + ')">' +
+        '<div class="ktitle"><span class="nm">' + esc(l.account_name) + "</span></div>" +
+        '<div class="kline">' + esc(l.product) +
+          (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
+        '<div class="kfoot"><span class="kl">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span>" +
+        '<span class="ksep">·</span><span class="kv">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span>" +
+        (opStalled(l) ? '<span class="ksep">·</span><span class="kl" style="color:#B54708;">متوقّف ' + opNDay(opDays(l)) + "</span>" : "") +
+        "</div></div>";
+    });
+    if (!shown.length) h += '<div class="kdrop">اسحب بندًا هنا لنقله إلى «' + st.label + "»</div>";
+    /* A board that silently shows the first 200 of 900 is a board that lies about the stage. */
+    if (cards.length > shown.length) {
+      h += '<div style="font-size:10.5px;color:#B54708;font-weight:500;padding:4px;">تُعرض ' +
+        fmtN(shown.length) + " من " + fmtN(cards.length) + " — استخدم «قائمة» لرؤيتها كلها</div>";
+    }
+    h += "</div>";
+  });
+  return h + "</div>" + (opOpen ? opOpenCardSheet() : "");
+}
+/* The kanban has no room for an expander inside a 290px column, so a clicked card opens the SAME
+   editor in a sheet — one editor, two placements, never two implementations. */
+function opOpenCardSheet() {
+  var l = (oppRows || []).find(function (x) { return x.id === opOpen; });
+  if (!l) return "";
+  return '<div class="opsheet" onclick="opToggleLine(0)"><div class="sheet" style="max-width:560px;" onclick="event.stopPropagation()">' +
+    '<div class="sh"><span class="t">' + esc(l.account_name) + " · " + esc(l.product) + "</span>" +
+    '<button class="btn btn-ghost" onclick="opToggleLine(0)">إغلاق</button></div>' +
+    opLineEditor(l) + "</div></div>";
+}
+
+/* ---- the bulk bar ----
+   The scale affordance the list exists for: at two hundred lines the work is «move these eleven to
+   التفاوض», not eleven visits to eleven rows. Same floating-bar idiom as the campaigns list, and
+   the same intersect-on-read rule — a hidden row is never in the write. */
+function opBulkBar(sel) {
+  return '<div class="bulkbar"><div>' +
+    '<span class="cnt">' + opPl(sel.length, "بند واحد", "بندان", "بنود", "بندًا") + " محدّد</span>" +
+    '<select class="opbulk" onchange="opBulkStage(this)" ' + (oppBusy ? "disabled" : "") + ">" +
+    '<option value="">انقل إلى مرحلة…</option>' +
+    OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + st.label + "</option>"; }).join("") +
+    "</select>" +
+    '<input class="opbulk" id="opbulkowner" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)">' +
+    '<button class="x" title="إلغاء التحديد" onclick="opClearSel()">×</button></div></div>';
+}
+
 /* ---- the view ---- */
 function vOppsCrm() {
   opLoad(false);
@@ -391,37 +660,47 @@ function vOppsCrm() {
   h += '<span class="vtog">' +
     '<button class="' + (opView === "board" ? "on" : "") + '" onclick="opSetView(&quot;board&quot;)">الفرص</button>' +
     '<button class="' + (opView === "triage" ? "on" : "") + '" onclick="opSetView(&quot;triage&quot;)">فرز الردود</button></span>';
-  if (opView === "board") {
-    h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:190px;max-width:300px;">' +
-      '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + "</span>" +
-      '<input id="opq" class="inp" value="' + esc(opQ) + '" oninput="opSearch(this)" placeholder="ابحث بالعميل أو المنتج…" ' +
-      'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
+  if (opView !== "board") {
+    h += '<span style="flex:1"></span><span style="font-size:12px;color:#7C7C7C;">' +
+      "من ردّ، ومن لم يردّ، ومتى موعد المهتمين</span></div>";
+    return h + vMorningList();
+  }
+  h += '<span class="hair"></span>';
+  h += '<span class="vtog">' + [["list", "قائمة"], ["kanban", "كانبان"], ["cards", "بطاقات"]].map(function (v) {
+    return '<button class="' + (opMode === v[0] ? "on" : "") + '" onclick="opSetMode(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
+  }).join("") + "</span>";
+  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:170px;max-width:260px;">' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + "</span>" +
+    '<input id="opq" class="inp" value="' + esc(opQ) + '" oninput="opSearch(this)" placeholder="جهة، خدمة، مسؤول…" ' +
+    'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
+  h += '<select class="crmsel' + (opSrc !== "all" ? " on" : "") + '" onchange="opSetSrc(this.value)"' +
+    (opSrc !== "all" ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + ">" +
+    '<option value="all">كل المصادر</option>' +
+    Object.keys(OPP_SRC).map(function (k) {
+      return '<option value="' + k + '"' + (opSrc === k ? " selected" : "") + ">" + OPP_SRC[k] + "</option>";
+    }).join("") + "</select>";
+  /* Sorting belongs to the list; a kanban is sorted by its own columns and a card grid by account
+     status, so offering a sort control there would be a control that does nothing. */
+  if (opMode === "list") {
+    h += '<select class="crmsel" onchange="opSetSort(this.value)">' +
+      [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]]
+        .map(function (o) { return '<option value="' + o[0] + '"' + (opSort === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
+      "</select>";
+  }
+  if (opMode === "cards") {
     h += '<select class="crmsel' + (opStat !== "all" ? " on" : "") + '" onchange="opSetStat(this.value)"' +
       (opStat !== "all" ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + ">" +
       [["all", "كل الحالات"], ["open", "قائمة"], ["partial", "مكتملة جزئياً"], ["won", "ربح"], ["lost", "خسارة"]]
         .map(function (o) { return '<option value="' + o[0] + '"' + (opStat === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
       "</select>";
-    h += '<select class="crmsel' + (opSrc !== "all" ? " on" : "") + '" onchange="opSetSrc(this.value)"' +
-      (opSrc !== "all" ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + ">" +
-      '<option value="all">كل المصادر</option>' +
-      Object.keys(OPP_SRC).map(function (k) {
-        return '<option value="' + k + '"' + (opSrc === k ? " selected" : "") + ">" + OPP_SRC[k] + "</option>";
-      }).join("") + "</select>";
-    h += '<span style="flex:1"></span>';
-    if (oppRows) {
-      var gs = opGroups();
-      h += '<span style="font-size:12px;color:#7C7C7C;">' + opNOpp(gs.length) + " · " +
-        opMoney(gs.reduce(function (a, g) { return a + opGroupValue(g); }, 0)) + "</span>";
-    }
-    h += '<button class="btn btn-dark" onclick="opOpenSheet()">+ إضافة فرصة</button>';
-  } else {
-    h += '<span style="flex:1"></span><span style="font-size:12px;color:#7C7C7C;">' +
-      "من ردّ، ومن لم يردّ، ومتى موعد المهتمين</span>";
   }
+  h += '<span style="flex:1"></span>';
+  h += '<button class="btn btn-dark" onclick="opOpenSheet()">+ إضافة فرصة</button>';
   h += "</div>";
   if (opSheet) h += opSheetHtml();
-  if (opView === "triage") return h + vMorningList();
-  if (oppRows === null) return h + crmSkeleton(4);
+  if (oppRows === null) return h + crmSkeleton(5);
+
+  h += opStageStrip();
 
   var un = opUnrecorded();
   if (un.length) {
@@ -429,6 +708,7 @@ function vOppsCrm() {
     h += '<details class="optriage rise"' + (oppRows.length ? "" : " open") + ">" +
       "<summary>" + ic("reply", 16) + '<b style="font-weight:500;color:#171717;">' + opNEnt(un.length) +
       " أبدت اهتمامًا في واتساب ولا فرصة مسجّلة لها</b>" +
+      '<span style="color:#999999;font-size:11.5px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
       '<span style="flex:1"></span><span style="color:#999999;font-size:12px;">اضغط للعرض</span></summary>' +
       shown.map(function (c) {
         var pr = opReadProduct(c);
@@ -443,27 +723,30 @@ function vOppsCrm() {
       "</details>";
   }
 
-  var groups = opMatches();
-  if (!groups.length) {
+  if (!oppRows.length) {
     return h + '<div class="tblwrap rise" style="padding:34px 22px;text-align:center;">' +
-      '<div style="font-size:14px;color:#171717;margin-bottom:7px;">' +
-      (oppRows.length ? "لا فرصة تطابق ما اخترته." : "لا فرص مسجّلة بعد.") + "</div>" +
+      '<div style="font-size:14px;color:#171717;margin-bottom:7px;">لا فرص مسجّلة بعد.</div>' +
       '<div style="font-size:12.5px;color:#7C7C7C;line-height:1.9;">' +
-      (oppRows.length
-        ? "غيّر البحث أو الحالة أو المصدر."
-        : "الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. ابدأ بـ«إضافة فرصة»" +
-          /* the pointer to the band only when a band is actually above — an empty ledger with no
-             warm replies would otherwise send the reader to a place that is not on the screen */
-          (un.length ? "، أو سجّل فرصة من الجهات التي أبدت اهتمامها أعلاه." : ".")) +
-      "</div></div>";
+      "الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. " +
+      "النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا؛ وما دون ذلك يُسجَّل بضغطة" +
+      (un.length ? " من القائمة أعلاه" : "") + "، أو بـ«إضافة فرصة».</div></div>";
   }
-  var page = pageSlice("opps", groups);
-  h += '<div class="opgrid rise">' + page.map(opCard).join("") + "</div>";
-  if (groups.length > PAGE_SIZES[0]) {
-    h += '<div class="tblwrap" style="margin-top:14px;"><div class="tfoot">' +
-      pageBar("opps", groups.length, "فرصة") + "</div></div>";  /* pageBar's unit is a bare noun after «من ١٢٣» — «من ١٢٣ فرصة» is the correct تمييز */
+  if (opMode === "kanban") return h + opKanbanView();
+  if (opMode === "cards") {
+    var groups = opMatches();
+    if (!groups.length) {
+      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12.5px;color:#999999;">' +
+        "لا فرصة تطابق ما اخترته.</div>";
+    }
+    var page = pageSlice("opps", groups);
+    h += '<div class="opgrid rise">' + page.map(opCard).join("") + "</div>";
+    if (groups.length > PAGE_SIZES[0]) {
+      h += '<div class="tblwrap" style="margin-top:14px;"><div class="tfoot">' +
+        pageBar("opps", groups.length, "فرصة") + "</div></div>";
+    }
+    return h;
   }
-  return h;
+  return h + opListView();
 }
 
 /* ---- the create form ---- */
@@ -544,6 +827,69 @@ function opSheetHtml() {
 
 /* ---- handlers ---- */
 window.opSetView = function (v) { opView = v; opOpen = 0; opArm = 0; render(false); };
+/* PAGE is reset on every control that changes WHAT is listed: a filter that shrinks 34 pages to 1
+   must not strand the reader on an empty page 34. Selection is cleared with it — a checkbox the
+   reader can no longer see is a write they did not authorise. */
+window.opSetMode = function (v) { opMode = v; opOpen = 0; opArm = 0; PAGE.opps = 1; render(false); };
+window.opSetSort = function (v) { opSort = v; PAGE.opps = 1; render(false); };
+window.opSetStg = function (v) { opStg = opStg === v && v !== "all" ? "all" : v; PAGE.opps = 1; opSel = {}; render(false); };
+window.opToggleSel = function (id) { if (opSel[id]) delete opSel[id]; else opSel[id] = 1; render(false); };
+window.opTogglePage = function () {
+  var page = pageSlice("opps", opSorted());
+  var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
+  page.forEach(function (l) { if (allOn) delete opSel[l.id]; else opSel[l.id] = 1; });
+  render(false);
+};
+window.opClearSel = function () { opSel = {}; render(false); };
+/* A bulk write is N single writes through the ONE endpoint — no second server path that could
+   validate differently from the one a single row uses. It reports what actually landed, including
+   the failures, rather than assuming the whole set went. */
+async function opBulkPatch(patch, label) {
+  var ids = opSelIds();
+  if (!ids.length || oppBusy) return;
+  oppBusy = true; render(false);
+  var ok = 0, bad = 0;
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      var r = await fetch("/admin/opps/" + fmtId(ids[i]), {
+        method: "PATCH", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+        body: JSON.stringify(patch) });
+      var j = await r.json();
+      if (r.ok && j.ok) { ok++; oppRows = oppRows.map(function (o) { return o.id === j.opp.id ? j.opp : o; }); }
+      else bad++;
+    } catch (e) { bad++; }
+  }
+  oppBusy = false; opSel = {}; render(false);
+  alertBar(label + " — " + opPl(ok, "بند واحد", "بندان", "بنود", "بندًا") +
+    (bad ? " · تعذّر " + fmtN(bad) : ""), bad > 0);
+}
+window.opBulkStage = function (el) {
+  var v = el.value; el.value = "";
+  if (!v) return;
+  var st = opStage(v);
+  void opBulkPatch({ stage: v }, "نُقلت إلى «" + st.label + "»");
+};
+window.opBulkOwner = function (el) {
+  var v = String(el.value || "").trim(); el.value = "";
+  if (!v) return;
+  void opBulkPatch({ owner: v }, "أُسندت إلى " + v);
+};
+/* Drag writes through the same PATCH the stage rungs use. The column's own key is the payload —
+   never the rendered label, which is the mistake the campaigns board documented: a visible string
+   is a coincidence, a key is a contract. */
+window.opDragStart = function (e, id) { opDragId = id; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; };
+window.opDragEnd = function () { opDragId = null; };
+window.opDragOver = function (e, el) { e.preventDefault(); if (el) el.classList.add("over"); };
+window.opDragLeave = function (el) { if (el) el.classList.remove("over"); };
+window.opDrop = function (e, stage, el) {
+  e.preventDefault();
+  if (el) el.classList.remove("over");
+  var id = opDragId; opDragId = null;
+  if (id === null) return;
+  var l = (oppRows || []).find(function (x) { return x.id === id; });
+  if (!l || l.stage === stage) return;   /* a drop onto the same column is not a write */
+  void window.opSaveField(id, "stage", stage);
+};
 window.opSearch = function (el) { opQ = el.value; clearTimeout(window.__opq); window.__opq = setTimeout(function () { render(false); }, 250); };
 window.opSetStat = function (v) { opStat = v; PAGE.opps = 1; render(false); };
 window.opSetSrc = function (v) { opSrc = v; PAGE.opps = 1; render(false); };

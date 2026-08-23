@@ -1072,6 +1072,20 @@ const main = async () => {
     let added = 0;
     for (const name of seed) if (!have.has(name) && await db.createTag(name, "seed")) added++;
     if (added) log({ at: "boot", msg: `tag registry seeded with ${added} name(s)` });
+    // Contacts the assistant read as HOT before auto-creation shipped get the same treatment as the
+    // next one — otherwise the board's behaviour would depend on the deploy date, which is the kind
+    // of inconsistency nobody can explain a month later. Idempotent by construction: every call
+    // goes through the same once-only claim, so this runs on every boot and every reconnect and
+    // creates nothing the second time. It runs AFTER the tag seed on purpose — the registry check
+    // inside it would refuse a product the seed above is about to create.
+    if (cfg.autoOppFromHot) {
+      let made = 0;
+      for (const h of await db.hotReadings()) {
+        const o = await db.autoOppFromHot(h.phone, h.product, h.wa_name ?? undefined).catch(() => null);
+        if (o) made++;
+      }
+      if (made) log({ at: "boot", msg: `opp_auto backfill: ${made} opportunity line(s) from hot readings` });
+    }
     await agent.refreshKb();
     // The agent's account facts. Loaded once into a synchronous snapshot, then kept current
     // by every import and every fact write — systemPrompt is sync and must not wait on a query.

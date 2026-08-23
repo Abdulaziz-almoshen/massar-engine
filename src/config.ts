@@ -29,6 +29,11 @@ export const cfg = {
   // exact-match against tracker phones, which are always bare digits. Unset = alerts disabled.
   notifyNumber: (process.env.NOTIFY_NUMBER || "").replace(/\D/g, ""),
 
+  // A HOT reading opens an opportunity on «فرص البيع» by itself. On by default — the founder asked
+  // for it — and switchable without a deploy (`fly secrets set AUTO_OPP=off`) because an automation
+  // that writes to his money board must be stoppable by him, not only by us.
+  autoOppFromHot: (process.env.AUTO_OPP || "on").toLowerCase() !== "off",
+
   // Sales assets the agent may send (images/PDFs). JSON array:
   // [{"id":"sickleave-onepager","type":"document","url":"https://…/x.pdf","filename":"الإجازات-المرضية.pdf","caption":"…"}]
   assetsJson: process.env.ASSETS_JSON || "[]",
@@ -48,5 +53,6 @@ export function configReport() {
     sourceNumber: cfg.sourceNumber ? "set" : "MISSING — outbound disabled until GUPSHUP_SOURCE_NUMBER is set",
     webhookToken: cfg.webhookToken ? "set" : "MISSING (webhook is unauthenticated!)",
     adminToken: cfg.adminToken ? "set" : "MISSING (/admin disabled)",
+    autoOppFromHot: cfg.autoOppFromHot ? "on" : "off (AUTO_OPP=off)",
   };
 }
