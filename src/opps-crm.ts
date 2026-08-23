@@ -921,6 +921,38 @@ window.opFromContact = function (phone) {
   opErr = ""; render(false);
 };
 
+/* ---- the door from جهات الاستهداف ----
+ * The founder onboards a book of leads, phones one of them, and then has to record the deal. Until
+ * this existed the only way in was to open #opps and RETYPE the account name into a datalist that
+ * suggests the first 400 of three thousand — so the answer to «how do I move this lead to the
+ * opportunity list» was «you don't, you type it again». The action belongs on the object, not on
+ * the other screen.
+ *
+ * Prefill is only what the ledger already holds: the account's name and number, and — when the
+ * operator has tagged it «مرشّح لـ» exactly one service — that service, because a single candidate
+ * tag IS his own decision about what to sell them. Two tags prefill nothing; picking one for him
+ * would be a guess wearing his authority.
+ *
+ * The source defaults to «مكالمة» here rather than the board's neutral default: the reason you are
+ * standing on a lead row with a deal to record is almost always that you just spoke to them. It is
+ * a select, not a commitment.
+ *
+ * It NAVIGATES to #opps with the sheet open rather than rendering the sheet over the target list —
+ * the opportunity is about to live on the board, and finishing the act on the screen that will hold
+ * it is the difference between a form and a place. */
+window.opFromEntity = function (id) {
+  var e = entities.find(function (x) { return x.id === id; });
+  if (!e) return;
+  var line = opBlankLine();
+  var tags = e.productTags || [];
+  if (tags.length === 1) line.product = tags[0];
+  opSheet = { name: e.name, phone: e.phone, source: "call", source_ref: "", owner: "", lines: [line] };
+  opErr = "";
+  opView = "board";
+  if ((location.hash || "").slice(1).split("/")[0] === "opps") render(false);
+  else location.hash = "#opps";   /* hashchange renders; assigning the same hash fires nothing */
+};
+
 window.opSubmit = async function () {
   if (oppBusy) return;
   var d = opSheet;

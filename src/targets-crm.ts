@@ -22,7 +22,7 @@
 export const TARGETS_CRM_CSS = `
   /* SIX cells, six tracks. Nothing here is display:contents, so cell count and track count are
      the same number in both directions — the arity bug class that wrapped three earlier tables. */
-  .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.4fr 1.1fr 1fr 52px; padding-inline:20px 12px; }
+  .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.2fr 1.1fr 1fr 128px; padding-inline:20px 12px; }
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
   .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#F3F3F3;
     color:#525252; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
@@ -38,6 +38,22 @@ export const TARGETS_CRM_CSS = `
     border-radius:6px; height:26px; padding:0 8px; cursor:pointer; white-space:nowrap; }
   .tgtdel:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
   .tgtdel.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; opacity:1 !important; }
+  .tgtopp { font-family:inherit; font-size:12px; color:#2E7D77; background:#fff; border:1px solid #EDEDED;
+    border-radius:6px; height:26px; padding:0 9px; cursor:pointer; white-space:nowrap; }
+  .tgtopp:hover { border-color:#3FB6B0; background:#F4FCFB; }
+  /* The shared .crow rule hides the ENTIRE action cell until hover, which is right for a delete and
+     wrong for the one thing this screen is asked for: «I onboarded leads, I called one, now what».
+     An affordance you must already know about to discover is not an answer to that question. So the
+     cell is always visible and the DELETE alone keeps the hover reveal — opacity cannot be undone
+     by a child, so the rule has to move down to the button rather than be overridden on it. */
+  .tgtflat .crow .c-act { opacity:1; }
+  .tgtflat .crow .tgtdel { opacity:0; transition:opacity .14s ease-in; }
+  .tgtflat .crow:hover .tgtdel, .tgtflat .crow:focus-within .tgtdel,
+  .tgtflat .crow.sel .tgtdel { opacity:1; }
+  /* Both halves of the armed pair stay put: a confirm that fades when the pointer drifts is a
+     confirm you cannot answer. */
+  .tgtflat .crow .tgtdel.arm, .tgtflat .crow .tgtdel.armx { opacity:1; }
+  @media (pointer:coarse) { .tgtflat .crow .tgtdel { opacity:1; } }
   /* إدارة الوسوم */
   .tagsheet { position:fixed; inset:0; z-index:140; background:rgba(23,23,23,.32);
     display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
@@ -172,10 +188,15 @@ function tgtRow(e) {
     })() + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
+    /* Two row actions, and the constructive one comes first. «فتح فرصة» is the answer to «I onboarded
+       leads, I called one, now what» — the act belongs on the lead, not on a form three screens
+       away that makes you retype its name. It is hover-revealed and neutral like the delete beside
+       it; nothing here writes on one click — it opens a prefilled form the operator still submits. */
     '<div class="c-act">' + (armed
       ? '<button class="tgtdel arm" onclick="event.stopPropagation();entDel(' + e.id + ')">تأكيد الحذف</button>' +
-        '<button class="tgtdel" style="margin-inline-start:6px;" onclick="event.stopPropagation();tgtArmDel(0)">تراجع</button>'
-      : '<button class="tgtdel" title="حذف الجهة" onclick="event.stopPropagation();tgtArmDel(' + e.id + ')">حذف</button>') + "</div>" +
+        '<button class="tgtdel armx" style="margin-inline-start:6px;" onclick="event.stopPropagation();tgtArmDel(0)">تراجع</button>'
+      : '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' +
+        '<button class="tgtdel" style="margin-inline-start:6px;" title="حذف الجهة" onclick="event.stopPropagation();tgtArmDel(' + e.id + ')">حذف</button>') + "</div>" +
     "</div>";
 }
 
