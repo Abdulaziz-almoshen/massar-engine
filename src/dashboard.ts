@@ -18,6 +18,7 @@ import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
+import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -471,6 +472,7 @@ ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
 ${TARGETS_CRM_CSS}
+${OPPS_CRM_CSS}
 ${PALETTE_CSS}
 </style>
 </head>
@@ -641,7 +643,7 @@ const TITLES = {
   kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
-  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "من مهتم، ومن غير مهتم، ومتى موعد المهتمين"],
+  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
@@ -3527,6 +3529,8 @@ function dataSignature() {
     showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, tgtTagsOpen,
     tgtTagEdit, tgtTagArm, cusTagF,
     tagReg.length, oppTab, oppQ, campFilter, rQ, selProd,
+    oppRows ? oppRows.length : -1, oppRows ? oppRows.reduce((a, o) => a + o.updated_at, 0) : 0,
+    opView, opQ, opStat, opSrc, opOpen, opArm, oppBusy, opErr, opSheet ? JSON.stringify(opSheet) : "",
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
     JSON.stringify(entFilters), JSON.stringify(tgtFilters), JSON.stringify(prodFilter),
@@ -3574,7 +3578,7 @@ function render(fetchNew) {
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? vTargetsCrm()
-      : cur === "opps" ? vMorningList()
+      : cur === "opps" ? vOppsCrm()
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()
@@ -3920,6 +3924,7 @@ ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
 ${TARGETS_CRM_JS}
+${OPPS_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an

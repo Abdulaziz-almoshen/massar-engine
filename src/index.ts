@@ -866,6 +866,102 @@ app.delete("/admin/notes/:id", async (req, reply) => {
   return { ok: await db.deleteNote(id) };
 });
 
+// ------------------------------ opportunities (فرص البيع) ------------------------------
+//
+// The board's whole contract. A line is a human's claim about a deal, so every write records WHO
+// made it (created_by) and the product is clamped to the SAME registry that validates a tag — the
+// emitted-value-must-be-readable rule: the board offers a closed list of names and stores exactly
+// the string it offered, so a card can never show a product no filter can find.
+
+app.get("/admin/opps", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  return { opps: await db.listOpps() };
+});
+
+app.post("/admin/opps", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const name = String(b.account_name ?? "").trim().slice(0, 120);
+  if (!name) return reply.code(400).send({ ok: false, error: "invalid_field", field: "account_name" });
+  const rawPhone = String(b.phone ?? "").trim();
+  // Normalised through the SAME function the importer uses, so a line typed as 05… lands on the
+  // very row an imported book already holds instead of opening a second card for one client.
+  const phone = rawPhone ? audience.normalizePhone(rawPhone) : "";
+  if (rawPhone && phone.length < 8) return reply.code(400).send({ ok: false, error: "invalid_field", field: "phone" });
+  const source = String(b.source ?? "other");
+  if (!(db.OPP_SOURCES as readonly string[]).includes(source)) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "source" });
+  }
+  // A whatsapp line must name the campaign it came from — that link is the only reason the founder's
+  // «sometimes it comes from the campaign» is answerable later, and a dangling id answers nothing.
+  const sourceRef = String(b.source_ref ?? "").trim() || null;
+  if (source === "whatsapp" && sourceRef && !(await db.refExists("campaign", sourceRef))) {
+    return reply.code(400).send({ ok: false, error: "unknown_ref", kind: "campaign", id: sourceRef });
+  }
+  const lines = Array.isArray(b.lines) ? (b.lines as Record<string, unknown>[]) : [];
+  if (!lines.length) return reply.code(400).send({ ok: false, error: "invalid_field", field: "lines" });
+  if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
+  const known = new Set((await db.listTags()).map((t) => t.name));
+  for (const l of lines) {
+    const bad = db.validateOppLine(l);
+    if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
+    if (!known.has(String(l.product).trim())) {
+      return reply.code(400).send({ ok: false, error: "unknown_product", product: l.product, known: [...known] });
+    }
+  }
+  const rows = await db.createOppLines(
+    { account_name: name, phone: phone || null, source, source_ref: sourceRef, created_by: adminName(req) },
+    lines.map((l) => ({
+      product: String(l.product).trim(),
+      stage: (l.stage ?? undefined) as never,
+      sale_price: Math.round(Number(l.sale_price ?? 0)),
+      years: Math.round(Number(l.years ?? 1)), qty: Math.round(Number(l.qty ?? 1)),
+      discount: Math.round(Number(l.discount ?? 0)),
+      owner: String(l.owner ?? "").trim().slice(0, 60) || null,
+      close_on: l.close_on == null || l.close_on === "" ? null : Number(l.close_on),
+      next_step: String(l.next_step ?? "").trim().slice(0, 300) || null,
+    })));
+  if (!rows.length) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });
+  return { ok: true, opps: rows };
+});
+
+app.patch("/admin/opps/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  // A PATCH carries a subset, so only what is present is validated — merged onto a product because
+  // validateOppLine's first obligation is that one exists.
+  const bad = db.validateOppLine({ product: b.product ?? "x", ...b });
+  if (bad && !(bad === "product" && b.product === undefined)) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
+  }
+  if (b.product !== undefined) {
+    const known = new Set((await db.listTags()).map((t) => t.name));
+    if (!known.has(String(b.product).trim())) {
+      return reply.code(400).send({ ok: false, error: "unknown_product", product: b.product });
+    }
+  }
+  const patch: Record<string, unknown> = {};
+  for (const k of ["product", "stage", "owner", "next_step", "lost_reason"]) {
+    if (b[k] !== undefined) patch[k] = String(b[k] ?? "").trim().slice(0, 300) || null;
+  }
+  for (const k of ["sale_price", "years", "qty", "discount"]) {
+    if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
+  }
+  if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
+  const row = await db.updateOpp(id, patch as never);
+  if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
+  return { ok: true, opp: row };
+});
+
+app.delete("/admin/opps/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  return { ok: await db.deleteOpp(id) };
+});
+
 app.post("/admin/campaign/test", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { id, test } = (req.body ?? {}) as { id?: number; test?: boolean };

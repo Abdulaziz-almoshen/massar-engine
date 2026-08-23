@@ -25,8 +25,12 @@ ROUTES = [
     # is why both routes are asserted now — the old landmark would still pass on the wrong screen.
     ("#customers", "العملاء"),
     ("#targets", "جهات الاستهداف"),
-    # فرص البيع stopped being a «ضمن المرحلة القادمة» placeholder this cycle; it is the outcome board.
-    ("#opps", "جهة في السجل"),
+    # فرص البيع is the opportunity board (cycle opps-board): account cards over stored product
+    # lines. Repointed from «جهة في السجل», which now renders only under its SECOND tab («فرز
+    # الردود») — a landmark on a tab the route does not open would go red on a page that works.
+    # «إضافة فرصة» is the board tab's own control bar and renders before any fetch resolves, so it
+    # is green on a slow ledger and red on a broken view, which is the distinction that matters.
+    ("#opps", "إضافة فرصة"),
     ("#pipeline", "لوحة المتابعة"),
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),

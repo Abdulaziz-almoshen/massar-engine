@@ -242,6 +242,50 @@ CREATE TABLE IF NOT EXISTS product_kb (
   source_filename TEXT,
   updated_at      BIGINT NOT NULL
 );
+-- ---------------------------------------------------------------------------
+-- فرص البيع — the opportunity ledger (cycle opps-board). The prototype's own model, taken whole:
+-- «فرصة = عميل + عدة منتجات», so ONE ROW IS ONE PRODUCT LINE and the board groups lines by account.
+-- A group is not a table: it is COALESCE(phone, name), computed on read, which is why moving one
+-- line to a different stage can never desynchronise a stored rollup from its lines.
+--
+-- WHY THIS IS STORED WHILE contacts' CRM STAGE IS DERIVED. The pipeline stage of a CONVERSATION is
+-- readable from the ledger — a reply exists or it does not — so storing it could only let it drift.
+-- A deal's stage cannot be read from anything we hold: «التقييم الفني والمالي» is a fact about a
+-- meeting nobody in this system witnessed. It is a human's claim, so it is stored WITH its author
+-- (created_by) and the moment it was last moved (stage_at), and «متوقّف» is derived from stage_at
+-- rather than typed by anyone.
+--
+-- source is the founder's own distinction and the reason this table is not merely a view over
+-- contacts: «sometimes the opportunity comes from whatsapp campaign and sometimes we call them or
+-- visit them and record the client in our massar». A whatsapp line carries the campaign it came
+-- from in source_ref; a visit carries nothing, which is honest — nobody logged the visit here.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS opportunities (
+  id           BIGSERIAL PRIMARY KEY,
+  account_name TEXT NOT NULL,
+  -- nullable ON PURPOSE: an account recorded after a visit may have no WhatsApp number at all, and
+  -- a defaulted empty string would silently group every such account into one card.
+  phone        TEXT,
+  product      TEXT NOT NULL,
+  stage        TEXT NOT NULL DEFAULT 'contact'
+               CHECK (stage IN ('contact','present','tech','negotiate','won','lost')),
+  source       TEXT NOT NULL DEFAULT 'other'
+               CHECK (source IN ('whatsapp','call','visit','referral','inbound','other')),
+  source_ref   TEXT,
+  sale_price   BIGINT NOT NULL DEFAULT 0,
+  years        INT NOT NULL DEFAULT 1,
+  qty          INT NOT NULL DEFAULT 1,
+  discount     INT NOT NULL DEFAULT 0,
+  owner        TEXT,
+  close_on     BIGINT,
+  next_step    TEXT,
+  lost_reason  TEXT,
+  created_by   TEXT,
+  created_at   BIGINT NOT NULL,
+  updated_at   BIGINT NOT NULL,
+  stage_at     BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_opps_phone ON opportunities(phone);
 `;
 
 export async function init(): Promise<void> {
@@ -870,6 +914,121 @@ export async function updateNote(id: number, patch: Partial<NoteRow>): Promise<N
 export async function deleteNote(id: number): Promise<boolean> {
   if (!pool || !connected) return false;
   const q = await pool.query(`DELETE FROM notes WHERE id = $1`, [id]);
+  return (q.rowCount ?? 0) > 0;
+}
+
+// ------------------------------ opportunities (فرص البيع) ------------------------------
+
+export type OppRow = {
+  id: number; account_name: string; phone: string | null; product: string;
+  stage: "contact" | "present" | "tech" | "negotiate" | "won" | "lost";
+  source: "whatsapp" | "call" | "visit" | "referral" | "inbound" | "other";
+  source_ref: string | null;
+  sale_price: number; years: number; qty: number; discount: number;
+  owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null;
+  created_by: string | null; created_at: number; updated_at: number; stage_at: number;
+};
+
+export const OPP_STAGES = ["contact", "present", "tech", "negotiate", "won", "lost"] as const;
+export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", "other"] as const;
+
+/** Rejects what the CHECK constraints and the arithmetic would reject, before the query runs, so a
+ *  bad value is a 400 naming its field rather than a 500 — the same contract validateTask holds.
+ *  The numbers are bounded rather than merely typed: a discount of 400 would render a NEGATIVE
+ *  pipeline value, and «قيمة الفرصة» is a number the founder reads as money. */
+export function validateOppLine(l: Record<string, unknown>): string | null {
+  if (typeof l.product !== "string" || !l.product.trim()) return "product";
+  if (l.stage != null && !(OPP_STAGES as readonly string[]).includes(String(l.stage))) return "stage";
+  // ABSENT IS THE DEFAULT, NOT ZERO. Reading a missing years as 0 rejected every line that simply
+  // did not carry the field — and because years is checked before product, it rejected them with
+  // the wrong field name, which hid an unknown product behind a complaint about a number nobody
+  // sent. The defaults here are the SAME ones the INSERT and the route apply; a validator that
+  // disagrees with the write it guards is worse than no validator.
+  const num = (v: unknown, dflt: number) => (v == null || v === "" ? dflt : Number(v));
+  const price = num(l.sale_price, 0), years = num(l.years, 1), qty = num(l.qty, 1), disc = num(l.discount, 0);
+  if (!Number.isFinite(price) || price < 0 || price > 1e12) return "sale_price";
+  if (!Number.isFinite(years) || years < 1 || years > 20 || years % 1 !== 0) return "years";
+  if (!Number.isFinite(qty) || qty < 1 || qty > 10000 || qty % 1 !== 0) return "qty";
+  if (!Number.isFinite(disc) || disc < 0 || disc > 100) return "discount";
+  if (l.close_on != null && l.close_on !== "" && !Number.isFinite(Number(l.close_on))) return "close_on";
+  return null;
+}
+
+function rowToOpp(r: Record<string, unknown>): OppRow {
+  return {
+    id: Number(r.id), account_name: String(r.account_name), phone: (r.phone as string) ?? null,
+    product: String(r.product), stage: r.stage as OppRow["stage"], source: r.source as OppRow["source"],
+    source_ref: (r.source_ref as string) ?? null,
+    sale_price: Number(r.sale_price), years: Number(r.years), qty: Number(r.qty), discount: Number(r.discount),
+    owner: (r.owner as string) ?? null,
+    close_on: r.close_on == null ? null : Number(r.close_on),
+    next_step: (r.next_step as string) ?? null, lost_reason: (r.lost_reason as string) ?? null,
+    created_by: (r.created_by as string) ?? null,
+    created_at: Number(r.created_at), updated_at: Number(r.updated_at), stage_at: Number(r.stage_at),
+  };
+}
+
+export async function listOpps(): Promise<OppRow[]> {
+  if (!pool || !connected) return [];
+  return (await pool.query(`SELECT * FROM opportunities ORDER BY id DESC`)).rows.map(rowToOpp);
+}
+
+/** One account, N product lines, ONE write. The lines of a deal are created together on the board
+ *  and must arrive together: a partial insert would paint a card whose «٣ منتجات» is a lie. */
+export async function createOppLines(head: {
+  account_name: string; phone: string | null; source: string; source_ref: string | null; created_by: string | null;
+}, lines: Partial<OppRow>[]): Promise<OppRow[]> {
+  if (!pool || !connected) return [];
+  const now = Date.now();
+  const out: OppRow[] = [];
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const l of lines) {
+      const q = await client.query(
+        `INSERT INTO opportunities (account_name, phone, product, stage, source, source_ref,
+           sale_price, years, qty, discount, owner, close_on, next_step, created_by,
+           created_at, updated_at, stage_at)
+         VALUES ($1,$2,$3,COALESCE($4,'contact'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$15) RETURNING *`,
+        [head.account_name, head.phone, l.product, l.stage ?? null, head.source, head.source_ref,
+         l.sale_price ?? 0, l.years ?? 1, l.qty ?? 1, l.discount ?? 0, l.owner ?? null,
+         l.close_on ?? null, l.next_step ?? null, head.created_by, now]);
+      out.push(rowToOpp(q.rows[0]));
+    }
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => { /* the original error is the one that matters */ });
+    throw e;
+  } finally {
+    client.release();
+  }
+  return out;
+}
+
+/** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ ١٨ يومًا» counts days in the
+ *  stage and not days since anyone last touched the row — editing a next step must not reset a
+ *  stall the board exists to show. */
+export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<OppRow | null> {
+  if (!pool || !connected) return null;
+  const sets: string[] = [], vals: unknown[] = []; let i = 1;
+  for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
+    "close_on", "next_step", "lost_reason", "source", "source_ref", "account_name"] as const) {
+    if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
+  }
+  if (!sets.length) return null;
+  sets.push(`updated_at = $${i++}`); vals.push(Date.now());
+  if (patch.stage !== undefined) {
+    sets.push(`stage_at = CASE WHEN stage = $${i} THEN stage_at ELSE $${i + 1} END`);
+    vals.push(patch.stage, Date.now()); i += 2;
+  }
+  vals.push(id);
+  const q = await pool.query(`UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+  return q.rows[0] ? rowToOpp(q.rows[0]) : null;
+}
+
+export async function deleteOpp(id: number): Promise<boolean> {
+  if (!pool || !connected) return false;
+  const q = await pool.query(`DELETE FROM opportunities WHERE id = $1`, [id]);
   return (q.rowCount ?? 0) > 0;
 }
 

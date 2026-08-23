@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 
 // Server-side Arabic reaches the UI verbatim, so segments.ts is subject to the same rule.
-const FILES = ["src/dashboard.ts", "src/segments.ts", "src/campaigns-crm.ts"];
+const FILES = ["src/dashboard.ts", "src/segments.ts", "src/campaigns-crm.ts", "src/opps-crm.ts"];
 const FILE = FILES[0];
 const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 
@@ -22,7 +22,7 @@ const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 // catches it only when the truncation happens to be invalid TypeScript — twice it did not.
 // campaigns-crm.ts carries the SAME hazard for the same reason — its two exported template literals
 // are the client CSS and JS — so it is guarded here too rather than left to be discovered later.
-for (const [file, allowed] of [["src/dashboard.ts", 2], ["src/campaigns-crm.ts", 4]]) {
+for (const [file, allowed] of [["src/dashboard.ts", 2], ["src/campaigns-crm.ts", 4], ["src/opps-crm.ts", 4]]) {
   const text = readFileSync(file, "utf8");
   const n = (text.match(/`/g) || []).length;
   if (n !== allowed) {
