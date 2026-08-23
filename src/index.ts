@@ -957,11 +957,17 @@ const main = async () => {
   templates.assertButtonsHandled(agent.EMITTED_BUTTONS);
   tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
-  if (db.isConnected()) await tracker.hydrate();
-  // Seed the tag vocabulary from Lean's own catalogue, once and idempotently, so the registry
-  // starts where the hard-coded list left off and nothing an operator already tagged stops
-  // validating. Everything added after this is theirs.
-  if (db.isConnected()) {
+  // Everything the process reads from Postgres into memory, in one place, because it must run at
+  // TWO moments: boot, and the reconnect a latched-off pool makes 30s after Postgres returns.
+  // Every step is idempotent — hydrate() self-guards against a second run (a reconnect after a
+  // healthy boot must not clobber memory that is ahead of the dropped writes), the tag seed
+  // checks what exists, and the two refreshes are plain re-reads.
+  const hydrateFromDb = async () => {
+    if (!db.isConnected()) return;
+    await tracker.hydrate();
+    // Seed the tag vocabulary from Lean's own catalogue, once and idempotently, so the registry
+    // starts where the hard-coded list left off and nothing an operator already tagged stops
+    // validating. Everything added after this is theirs.
     const have = new Set((await db.listTags()).map((t) => t.name));
     const seed = [
       ...(insights.SERVICE_CATALOGUE as readonly string[]),
@@ -970,11 +976,20 @@ const main = async () => {
     let added = 0;
     for (const name of seed) if (!have.has(name) && await db.createTag(name, "seed")) added++;
     if (added) log({ at: "boot", msg: `tag registry seeded with ${added} name(s)` });
-  }
-  if (db.isConnected()) await agent.refreshKb();
-  // The agent's account facts. Loaded once at boot into a synchronous snapshot, then kept current
-  // by every import and every fact write — systemPrompt is sync and must not wait on a query.
-  if (db.isConnected()) await accounts.refresh();
+    await agent.refreshKb();
+    // The agent's account facts. Loaded once into a synchronous snapshot, then kept current
+    // by every import and every fact write — systemPrompt is sync and must not wait on a query.
+    await accounts.refresh();
+  };
+  await hydrateFromDb();
+  // Registered AFTER the boot run on purpose: a clean boot fires no callback; this is the rescue
+  // path for the Aug 19–23 failure, where init() raced a Postgres restart and the engine served
+  // an empty ledger for 3.7 days with /health green.
+  db.onReconnect(() => {
+    hydrateFromDb()
+      .then(() => log({ at: "db", msg: "reconnected — memory rehydrated from postgres" }))
+      .catch((e) => log({ at: "db", msg: `reconnect rehydrate failed: ${String(e).slice(0, 200)}` }));
+  });
   agent.initModel().catch(() => { /* retried lazily on first turn */ });
   await app.listen({ port: cfg.port, host: "0.0.0.0" });
   log({ at: "boot", msg: `listening on :${cfg.port}` });

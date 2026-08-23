@@ -533,9 +533,16 @@ export function snapshot() {
 }
 
 /** Rebuild the in-memory tracker from Postgres at boot (deploys no longer wipe state). */
+let hydratedOnce = false;
 export async function hydrate(): Promise<number> {
+  // Runs at most once per process. On a mid-life RECONNECT the memory is AHEAD of Postgres —
+  // every write during the outage was dropped by fire() — so re-reading the rows here would
+  // overwrite the newest conversations with the pre-outage snapshot. Only a process that never
+  // hydrated (boot raced a Postgres restart) may fill itself from the table.
+  if (hydratedOnce) return contacts.size;
   const data = await db.loadAll();
   if (!data) return 0;
+  hydratedOnce = true;
   for (const r of data.contacts) {
     const c: Contact = {
       phone: r.phone,

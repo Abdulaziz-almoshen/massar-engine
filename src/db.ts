@@ -12,9 +12,25 @@ import * as facts from "./facts.js";
 
 let pool: pg.Pool | null = null;
 let connected = false;
+let migrated = false;
 
 export function enabled(): boolean { return Boolean(process.env.DATABASE_URL); }
 export function isConnected(): boolean { return connected; }
+
+/**
+ * Callbacks for the moment `connected` flips back true AFTER boot. Boot's own hydration sequence
+ * runs before anything is registered here, so a clean boot fires nothing; these exist for the two
+ * ways the pool comes back mid-life — a reprobe after a drop, or the retry loop below rescuing a
+ * boot that raced a Postgres restart (Aug 19–23, 2026: the engine served an empty ledger for 3.7
+ * days while Postgres sat healthy, because nothing on the read path ever probed again).
+ */
+const reconnectCbs: Array<() => void> = [];
+export function onReconnect(cb: () => void): void { reconnectCbs.push(cb); }
+function markConnected(): void {
+  if (connected) return;
+  connected = true;
+  for (const cb of reconnectCbs) { try { cb(); } catch { /* the callback logs its own failures */ } }
+}
 
 /**
  * Re-test a pool that the error handler latched OFF.
@@ -31,13 +47,26 @@ async function reprobe(): Promise<boolean> {
   if (!pool || !enabled()) return false;
   try {
     await pool.query("SELECT 1");
-    connected = true;
+    // A boot whose init() died mid-migration reaches here with tables possibly missing — finish
+    // the job before declaring the pool usable, or every read after "recovery" would still throw.
+    if (!migrated) { await pool.query(MIGRATION); migrated = true; }
+    markConnected();
     console.log(JSON.stringify({ at: "db", msg: "reconnected after a pool error" }));
   } catch {
     connected = false;                                  // still down; the caller reports it honestly
   }
   return connected;
 }
+
+// reprobe() used to run only on the outbox write path (line ~330), so an idle engine with a
+// latched-off pool never recovered and every dashboard read returned [] until a human restarted
+// the machine. One cheap probe every 30s bounds the outage instead; if boot's init() never even
+// built a pool, retry init() whole.
+setInterval(() => {
+  if (!enabled() || connected) return;
+  if (pool) void reprobe();
+  else void init();
+}, 30_000).unref();
 
 const MIGRATION = `
 CREATE TABLE IF NOT EXISTS contacts (
@@ -229,7 +258,8 @@ export async function init(): Promise<void> {
       console.error(JSON.stringify({ at: "db", msg: "pool error — memory-only until recovery", err: String(e).slice(0, 200) }));
     });
     await pool.query(MIGRATION);
-    connected = true;
+    migrated = true;
+    markConnected();
     console.log(JSON.stringify({ at: "db", msg: "connected + migrated" }));
   } catch (e) {
     connected = false;

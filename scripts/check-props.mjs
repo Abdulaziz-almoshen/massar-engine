@@ -205,7 +205,8 @@ check("upsertProps THROWS when the ledger is unreachable — it does not return 
 check("…and it RE-PROBES a latched-off pool before refusing a human's fact",
   /await reprobe\(\)/.test(upsPropsBody), true);
 check("reprobe actually re-tests the connection rather than just reading the flag",
-  /async function reprobe[\s\S]{0,400}SELECT 1[\s\S]{0,200}connected = true/.test(src.db), true);
+  /async function reprobe[\s\S]{0,700}SELECT 1[\s\S]{0,400}markConnected\(\)/.test(src.db) &&
+  /function markConnected\(\)[\s\S]{0,200}connected = true/.test(src.db), true);
 
 // writeProp must delegate to the guard, or the behaviour half above tests dead code.
 const wpBody = src.tracker.slice(src.tracker.indexOf("export async function writeProp("),

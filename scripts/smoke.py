@@ -31,7 +31,11 @@ ROUTES = [
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
-    ("#kb", "خدمات المساعد"),
+    # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
+    # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
+    # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
+    # topbar renders even when the view body is broken.
+    ("#kb", "منها بمعرفة معتمدة"),
     # The most-edited surface, and the one the blank-page class would hit hardest.
     # The landmark below is the enrichment panel's sub-line, «ما تكتبه هنا لا يستطيع المساعد
     # تغييره». Repointed in the crm-record cycle from vSalesPath's heading «مسار البيع مع هذا
