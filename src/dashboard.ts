@@ -3527,7 +3527,7 @@ function dataSignature() {
     Object.keys(insCache).length,
     winloss ? JSON.stringify(winloss.totals) : "",
     showTest, campTab, campSortKey, campQ, entQ, tgtQ, tgtArm, tgtProd, tgtTagBusy, tgtTagsOpen,
-    tgtTagEdit, tgtTagArm, cusTagF,
+    tgtTagEdit, tgtTagArm, cusTagF, tgtOppBusy,
     tagReg.length, oppTab, oppQ, campFilter, rQ, selProd,
     oppRows ? oppRows.length : -1, oppRows ? oppRows.reduce((a, o) => a + o.updated_at, 0) : 0,
     opView, opMode, opSort, opQ, opStat, opSrc, opStg, opOpen, opArm, oppBusy, opErr,

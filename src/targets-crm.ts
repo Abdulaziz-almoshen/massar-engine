@@ -100,6 +100,7 @@ var tgtProd = "";
    and staged one campaign's phones under another campaign's name. */
 var tgtSel = {};
 var tgtTagBusy = false;
+var tgtOppBusy = false;
 var tgtTagsOpen = false;
 var tgtTagEdit = "";   /* the tag whose name is being edited, inline */
 var tgtTagArm = "";    /* the tag armed for deletion — arm, then confirm, like the row delete */
@@ -277,6 +278,20 @@ function tgtBulkBar() {
       (tgtTagBusy ? "جارٍ…" : "وسم") + "</button>" +
     '<button' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(false)">إزالة الوسم</button>' +
     '<button onclick="tgtOpenTags()">إدارة الوسوم</button>' +
+    '<span style="width:1px;height:20px;background:rgba(255,255,255,.28);flex:none;"></span>' +
+    /* The bulk half of «فرصة +», and it reads the SAME service select the tagging uses. A second
+       dropdown sat beside the first looking identical, and no reader could tell which act it
+       governed — but the deeper point is that it was never a second question: «مرشّح لـ فحص
+       الموظفين» is the decision to approach them about that service, and opening a deal on it is
+       the next step in the same sentence. One service chosen, two acts on it.
+       The row action opens a FORM because one deal has a price and a next step worth typing; N
+       deals do not — what you know after working a list is «these eleven are live on فحص
+       الموظفين», and the money comes later, one card at a time. So each line opens UNPRICED at
+       «تواصل أولي», the same shape the assistant's own auto-created lines take, which is why the
+       board needs no new vocabulary to show them. */
+    '<button' + (tgtOppBusy ? " disabled" : "") + ' onclick="tgtBulkOpp()" ' +
+      'title="افتح فرصة بيع بالخدمة المختارة لكل جهة محدَّدة">' +
+      (tgtOppBusy ? "جارٍ…" : "افتح فرصة") + "</button>" +
     '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
 }
 
@@ -433,6 +448,65 @@ window.tgtTag = function (add) {
     })
     .catch(function () { alertBar("تعذّر الوسم — تحقّق من الاتصال.", true); })
     .finally(function () { tgtTagBusy = false; render(false); });
+};
+/* افتح فرصة للمحدَّد — N accounts, one service, one line each.
+ *
+ * N calls through the SAME endpoint a single create uses, never a bulk server path that could
+ * validate differently from the one a lone row goes through. It is slower and it is correct: one
+ * definition of what an opportunity may be.
+ *
+ * IT SKIPS WHAT ALREADY EXISTS. Opening a second line on the same (account, service) while the
+ * first is still live is the fastest way to make a pipeline total lie — the same deal counted
+ * twice. The skip is reported, not silent, because a bar that says «فُتحت ١١» when it opened 7 is
+ * the invented-number defect this product keeps paying for.
+ *
+ * oppRows may be null here: #targets never loads the board. It is fetched first rather than
+ * assumed empty, because assuming empty is exactly how the duplicate check would pass by doing
+ * nothing.
+ */
+window.tgtBulkOpp = async function () {
+  var ids = tgtSelIds();
+  var el = document.getElementById("tgtagsel");   /* ONE select governs both acts — see tgtBulkBar */
+  var product = el ? el.value : "";
+  if (!ids.length || !product || tgtOppBusy) return;
+  tgtOppBusy = true; render(false);
+  try {
+    if (oppRows === null) {
+      var lr = await fetch("/admin/opps", { headers: { "x-admin-token": TOKEN } });
+      oppRows = lr.ok ? (await lr.json()).opps || [] : [];
+    }
+    var livePairs = {};
+    oppRows.forEach(function (o) {
+      if (o.phone && !opIsLost(o) && !opIsWon(o)) livePairs[o.phone + "|" + o.product] = 1;
+    });
+    var made = 0, skipped = 0, failed = 0, fresh = [];
+    for (var i = 0; i < ids.length; i++) {
+      var e = entities.find(function (x) { return x.id === ids[i]; });
+      if (!e) { failed++; continue; }
+      if (livePairs[e.phone + "|" + product]) { skipped++; continue; }
+      try {
+        var r = await fetch("/admin/opps", { method: "POST",
+          headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+          body: JSON.stringify({ account_name: e.name, phone: e.phone, source: "call",
+            lines: [{ product: product, sale_price: 0, years: 1, qty: 1 }] }) });
+        var j = await r.json();
+        if (r.ok && j.ok) { made++; fresh = fresh.concat(j.opps || []); }
+        else failed++;
+      } catch (err) { failed++; }
+    }
+    oppRows = fresh.concat(oppRows);
+    tgtSel = {};
+    /* Every outcome is named. A silent skip and a silent failure are indistinguishable from
+       success to the person reading the bar. */
+    var msg = "فُتحت " + opPl(made, "فرصة واحدة", "فرصتان", "فرص", "فرصة") + " · " + product;
+    if (skipped) msg += " · تُخطّيت " + fmtN(skipped) + " لوجود فرصة قائمة بالخدمة نفسها";
+    if (failed) msg += " · تعذّرت " + fmtN(failed);
+    alertBar(msg, failed > 0);
+  } catch (e2) {
+    alertBar("تعذّر فتح الفرص — تحقّق من الاتصال.", true);
+  } finally {
+    tgtOppBusy = false; render(false);
+  }
 };
 window.tgtSearch = function (el) { tgtQ = el.value; clearTimeout(window.__tq); window.__tq = setTimeout(function () { render(false); }, 250); };
 /* Indexes only in the attribute string — Arabic keys stay out of onchange, and both sides re-derive
