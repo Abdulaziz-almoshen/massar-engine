@@ -201,35 +201,26 @@ var opArm = 0;               /* id of the line whose delete is armed */
 var opSheet = null;          /* the create form's whole draft, or null when closed */
 var opErr = "";
 
-var OPP_ST = [
-  { key: "contact",   label: "تواصل أولي",            dot: "#999999" },
-  { key: "present",   label: "عرض المنتج",            dot: "#2F5F94" },
-  { key: "tech",      label: "التقييم الفني والمالي", dot: "#7A5CC4" },
-  { key: "negotiate", label: "التفاوض والاعتماد",     dot: "#1F7A73" },
-  { key: "won",       label: "إغلاق الصفقة",          dot: "#027A48" },
-  { key: "lost",      label: "خسارة",                 dot: "#B42318" }
-];
+/* THE LADDER, THE SOURCES AND THE STALL RULE NOW COME FROM THE BUSINESS TIER.
+   They used to be declared here, in the presentation module, which is what let the card head and
+   the stage strip disagree about whether a lost deal counts. src/opps-domain.ts owns them, a unit
+   test asserts them, and OPPS_DOMAIN_JS ships that exact compiled source into this scope — so
+   OPP_STAGES, OPP_SOURCES, OPP_STALL_STAGES, OPP_STALL_DAYS and every rule function below are
+   already defined by the time this file runs. Technical Standards §1 (UI holds no business logic)
+   and §4 (those rules are tested) are both satisfied by that seam rather than by intent. */
+var OPP_ST = OPP_STAGES;
 /* The founder's own list of where a deal comes from. «حملة واتساب» is the only one this system can
    witness by itself; the rest are a human telling it what happened offline, which is exactly why
    they are recorded rather than guessed. */
-var OPP_SRC = {
-  whatsapp: "حملة واتساب", call: "مكالمة", visit: "زيارة",
-  referral: "إحالة", inbound: "طلب وارد", other: "غير محدد"
-};
-var OPP_STALL = { tech: 1, negotiate: 1 };   /* the two rungs that actually stall */
-var OPP_STALL_DAYS = 14;
+var OPP_SRC = OPP_SOURCES;
 
 /* ARABIC COUNTS ARE NOT «n + noun». The board first shipped «١ منتجات» and «٥ جهة» — both wrong
    in the product's own language, on the two lines a reader's eye lands on first. The rule is
-   four-way: مفرد · مثنى · جمع القلة (٣–١٠) · تمييز مفرد منصوب (١١+), and zero takes the plural.
+   four-way: مفرد · مثنى · جمع القلة (٣–١٠) · تمييز مفرد (١١+ AND zero — CLDR puts ar's zero in the
+   singular form, «٠ فرصة», not «٠ فرص»; a unit test caught this comment claiming the opposite).
    Scoped to this file deliberately: retrofitting every count in the dashboard is its own change,
    and the counts here are the ones this screen emits. */
-function opPl(n, one, two, few, many) {
-  n = Number(n || 0);
-  if (n === 1) return one;
-  if (n === 2) return two;
-  return fmtN(n) + " " + (n >= 3 && n <= 10 ? few : many);
-}
+function opPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function opNProd(n) { return opPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function opNOpp(n) { return opPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
 function opNEnt(n) { return opPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
@@ -239,24 +230,28 @@ function opStage(k) {
   for (var i = 0; i < OPP_ST.length; i++) if (OPP_ST[i].key === k) return OPP_ST[i];
   return OPP_ST[0];
 }
-function opIsWon(o) { return o.stage === "won"; }
-function opIsLost(o) { return o.stage === "lost"; }
-function opIsOpen(o) { return !opIsWon(o) && !opIsLost(o); }
-function opDays(o) { return Math.floor((Date.now() - Number(o.stage_at || o.created_at || Date.now())) / 864e5); }
-function opStalled(o) { return opIsOpen(o) && Boolean(OPP_STALL[o.stage]) && opDays(o) >= OPP_STALL_DAYS; }
+/* Thin adapters: they translate a ledger ROW (snake_case columns, as Postgres returns them) into
+   the shape the business tier speaks, and delegate. No rule is restated here. */
+function opFacts(o) {
+  return { stage: o.stage, salePrice: Number(o.sale_price || 0), years: Number(o.years || 1),
+    quantity: Number(o.qty || 1), discountPercent: Number(o.discount || 0),
+    stageEnteredAt: Number(o.stage_at || o.created_at || 0) };
+}
+function opIsWon(o) { return isWonStage(o.stage); }
+function opIsLost(o) { return isLostStage(o.stage); }
+function opIsOpen(o) { return isOpenStage(o.stage); }
+function opDays(o) { return daysInStage(opFacts(o), Date.now()); }
+function opStalled(o) { return isLineStalled(opFacts(o), Date.now()); }
 /* سعر البيع × السنوات × الكمية × (١ − الخصم). The prototype's arithmetic, unchanged — and the ONE
    definition of what a line is worth: the card total, the board total and the form preview all
    call this, so no two numbers on the screen can be computed differently. */
-function opValue(o) {
-  return Math.round(Number(o.sale_price || 0) * Number(o.years || 1) * Number(o.qty || 1) *
-    (1 - Number(o.discount || 0) / 100));
-}
+function opValue(o) { return calculateLineValue(opFacts(o)); }
 /* AN AUTO-CREATED LINE HAS NO PRICE, and «٠ ر.س» is not the same statement as «we have not priced
    this yet» — the first reads as a worthless deal on a board whose whole left column is money. The
    conversation contains no number and inventing one would be a forecast dressed as a reading, so
    the absence is rendered as an absence. It also keeps the totals honest: an unpriced line adds
    nothing to a sum, and now says why. */
-function opPriced(l) { return Number(l.sale_price || 0) > 0; }
+function opPriced(l) { return isLinePriced(opFacts(l)); }
 var OPP_UNPRICED = "لم تُسعَّر";
 /* «٥٫٣ م ر.س» / «٤٥٠ ألف ر.س» — the prototype's short money, in Arabic-Indic digits. */
 function opMoney(v) {
@@ -268,7 +263,7 @@ function opMoney(v) {
 /* The group key. A phone is the account's identity everywhere else in this product (entities and
    contacts are both phone-keyed), so a line that has one groups by it and a line recorded after a
    visit with no number groups by its name. Never by both, or one client would open two cards. */
-function opKey(o) { return o.phone ? "p:" + o.phone : "n:" + String(o.account_name || "").trim(); }
+function opKey(o) { return accountKey(o.account_name, o.phone); }
 
 function opLoad(force) {
   if (oppLoading || (oppRows && !force)) return;
@@ -309,23 +304,24 @@ function opGroups() {
    (the خسارة column, the خسارة strip cell) still state their own sum: that is a fact about one
    stage, not a total across them. Every mixed total says «دون الخسارة» when the set it is drawn
    from contains one — a silent exclusion is the same defect wearing better manners. */
-function opSumLive(ls) {
-  return ls.filter(function (l) { return !opIsLost(l); })
-    .reduce(function (a, l) { return a + opValue(l); }, 0);
-}
-function opHasLost(ls) { return ls.some(opIsLost); }
+function opSumLive(ls) { return sumLiveValue(ls.map(opFacts)); }
+function opHasLost(ls) { return hasLostLine(ls.map(opFacts)); }
 
 function opGroupValue(g) { return opSumLive(g.lines); }
 /* قائمة while anything is still live; ربح/خسارة only once every line has landed; مكتملة جزئياً for
    the mixed close. The prototype's exact rollup — the head must never claim a deal is won while a
    line under it is still open. */
 function opGroupStatus(g) {
-  var open = 0, won = 0, lost = 0;
-  g.lines.forEach(function (l) { if (opIsOpen(l)) open++; else if (opIsWon(l)) won++; else lost++; });
-  if (open > 0) return { key: "open", label: "قائمة", bg: "#EEF4FB", color: "#2F5F94" };
-  if (won > 0 && lost > 0) return { key: "partial", label: "مكتملة جزئياً", bg: "#FEF6E7", color: "#B54708" };
-  if (won > 0) return { key: "won", label: "ربح", bg: "#E7F6EE", color: "#027A48" };
-  return { key: "lost", label: "خسارة", bg: "#FEF3F2", color: "#B42318" };
+  /* The COLOURS are presentation and stay here; the RULE — which word an account's lines add up to
+     — is the business tier's, and is unit-tested there. */
+  var key = groupStatusKey(g.lines.map(opFacts));
+  var style = {
+    open:    { label: "قائمة",         bg: "#EEF4FB", color: "#2F5F94" },
+    partial: { label: "مكتملة جزئياً", bg: "#FEF6E7", color: "#B54708" },
+    won:     { label: "ربح",           bg: "#E7F6EE", color: "#027A48" },
+    lost:    { label: "خسارة",         bg: "#FEF3F2", color: "#B42318" }
+  }[key];
+  return { key: key, label: style.label, bg: style.bg, color: style.color };
 }
 function opGroupSources(g) {
   var seen = [];

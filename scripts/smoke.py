@@ -71,6 +71,29 @@ def main() -> int:
 
     tok = token()
     failures: list[str] = []
+    # WAIT FOR THE MACHINE TO BE AWAKE BEFORE JUDGING A PAGE.
+    # `npm run deploy` runs this immediately after `fly deploy`, so the first request lands on a
+    # cold machine still booting and hydrating from Postgres. On 2026-08-24 that produced a 160-char
+    # #customer render and a red gate on a page that was, on the very next run, 18,882 chars and
+    # perfect. A gate that fails for a reason it is not testing is a gate people learn to re-run
+    # instead of read — which is exactly how the blank-page class it guards would get back in.
+    # Poll /health until the DB is actually connected, then start.
+    import urllib.request, json as _json, time as _time
+    for attempt in range(30):
+        try:
+            with urllib.request.urlopen(f"{BASE}/health", timeout=5) as r:
+                h = _json.loads(r.read())
+            if h.get("ok") and h.get("db", {}).get("connected"):
+                if attempt:
+                    print(f"  (waited {attempt}s for the machine to finish booting)")
+                break
+        except Exception:
+            pass
+        _time.sleep(1)
+    else:
+        print("smoke: /health never reported a connected database — refusing to judge the pages",
+              file=sys.stderr)
+        return 1
     detail_route = None
 
     with sync_playwright() as p:
