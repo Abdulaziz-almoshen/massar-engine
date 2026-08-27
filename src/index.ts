@@ -15,6 +15,7 @@ import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
 import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
+import { activityByDay, readSeriousness } from "./signal-domain.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -551,6 +552,25 @@ app.get("/admin/customer/:phone", async (req, reply) => {
         : undefined,
     ),
     timeline: insights.buildTimeline(contact),
+    // THE INDICATORS the record now leads with. Computed here, on the server, and delivered ready
+    // to draw: these rules are the business tier (`signal-domain.ts`, unit-tested), and the record
+    // page is presentation. Shipping them to the browser would widen ADR-0001's closure contract
+    // for no second reader.
+    //
+    // Lifetime, deliberately NOT campaign-scoped like `interaction` above. «How serious is this
+    // client» is a question about the person, and a prospect who priced the deal last month is
+    // serious today even when today's campaign window holds one message.
+    signal: readSeriousness({
+      transcript: contact.transcript || [],
+      tags: contact.tags || [],
+      outcome: contact.outcome,
+      optedOut: contact.optedOut,
+      isButtonEcho: (t: string) => Boolean(templates.buttonIntent(t)),
+      now: Date.now(),
+    }),
+    // 21 days: three weeks is long enough to show a conversation going quiet and short enough that
+    // each bar is still a readable day on a 300px chart.
+    activity: activityByDay(contact.transcript || [], Date.now(), 21),
     // Newest FIRST, and carrying the launch time. Without a date and an order these rendered as a
     // row of identical blue chips, so the founder could not tell which campaign started the
     // conversation he was looking at — his words: «not sure which one is related to the last one».

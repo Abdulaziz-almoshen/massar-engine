@@ -34,6 +34,7 @@ export default defineConfig({
       reporter: ["text-summary", "json-summary"],
       include: [
         "src/opps-domain.ts", // business tier — the opportunity rules
+        "src/signal-domain.ts", // business tier — the client seriousness / momentum indicators
         "src/facts.ts",       // the fact refusal ladder
         "src/audience.ts",    // the importer: header matching, phone normalisation, skip reasons
       ],

@@ -2806,6 +2806,152 @@ function vWinLoss() {
 // toneBadge is DELETED with its last caller (the ins.learning branch of فهم المساعد). A renderer
 // with no reader is an invented vocabulary waiting to be re-called, which is how the badge row
 // survived §5's deletion in one state after being removed from the other.
+// ---------------------------------------------------------------------------
+// مؤشرات المحادثة — the record's answer to «كيف تسير هذه المحادثة؟», as SIGNALS.
+//
+// The founder's instruction, and the reason this card exists: «we need indicators of what the
+// client is interested in, how serious they are, and what the AI recommends as the next action —
+// nobody wants to read text as an output of an AI.» The record answered that question with seven
+// prose blocks inside a tab the reader had to open. This is four figures, one chart and one line,
+// always visible, above the fold.
+//
+// EVERY FIGURE HERE IS EARNED. The score, the momentum, the speed and the silence are computed by
+// signal-domain.ts from what the ledger witnessed — messages, tags, recorded outcomes, the clock —
+// and «لماذا هذه القراءة» itemises them. No model produces any number on this card. The one model
+// output is the suggested next action, and it is marked as a suggestion.
+//
+// INTEREST IS NOT REPEATED HERE. It renders in the status strip directly above with its own
+// provenance mark, and a fourth rendering of a customer's interest is the exact duplication this
+// record has already had to delete twice.
+function vSignalBoard(d) {
+  const s = d.signal;
+  if (!s) return "";
+  const ins = d.insights || {};
+  // ink, wash — the band's own two colours, so the meter, the number and the word agree.
+  const BAND = { ready: ["#027A48", "#ECFDF3"], serious: ["#1F7A73", "#EAF6F5"], watch: ["#B54708", "#FFFAEB"], cold: ["#7C7C7C", "#F3F3F3"] };
+  const bd = BAND[s.band] || BAND.cold;
+  // A mark first and a colour second — «يتصاعد» must survive a greyscale print and a colour-blind
+  // reader, which a bare green dot does not.
+  const MOVE = { rising: ["▲", "#027A48"], steady: ["■", "#7C7C7C"], cooling: ["▼", "#B54708"], silent: ["○", "#B42318"], none: ["·", "#C7C7C7"] };
+  const mv = MOVE[s.momentum] || MOVE.none;
+
+  // THE METER — ten blocks, not a percentage bar. A continuous bar invites reading 62 against 58
+  // as a difference; the blocks say what the score actually is: a coarse band with a number on it.
+  let meter = "";
+  for (let i = 0; i < 10; i++) {
+    meter += '<span style="flex:1;height:8px;border-radius:2px;background:' +
+      (i * 10 < s.score ? bd[0] : "#EDEDED") + ';"></span>';
+  }
+
+  const stat = (label, value, ink) =>
+    '<div style="min-width:96px;"><div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">' + label + "</div>" +
+    '<div style="font-size:14px;font-weight:700;margin-top:3px;color:' + (ink || "#171717") + ';">' + value + "</div></div>";
+
+  // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
+  // answer, and arAgo already owns that agreement for the whole portal.
+  const speed = s.replyMinutes === null || s.replyMinutes === undefined
+    ? '<span style="color:#999999;font-weight:500;">لم يردّ بعد</span>'
+    : (s.replyMinutes < 1 ? "أقل من دقيقة"
+      : s.replyMinutes < 60 ? fmtN(s.replyMinutes) + (s.replyMinutes === 1 ? " دقيقة" : s.replyMinutes === 2 ? " دقيقتين" : s.replyMinutes <= 10 ? " دقائق" : " دقيقة")
+      : arAgo(Math.round(s.replyMinutes / 60)));
+  const silent = s.daysSilent === null || s.daysSilent === undefined
+    ? '<span style="color:#999999;font-weight:500;">—</span>'
+    : (s.daysSilent === 0 ? "اليوم" : s.daysSilent === 1 ? "أمس" : fmtN(s.daysSilent) + (s.daysSilent === 2 ? " يومين" : s.daysSilent <= 10 ? " أيام" : " يومًا"));
+
+  // THE CHART — 21 days of who spoke. Bars are stacked so one column is one day's total: two
+  // adjacent thin bars at this width read as noise, and the question the chart answers is «هل
+  // المحادثة حيّة؟», which is a shape over time rather than a pair of counts.
+  const act = d.activity || [];
+  // The ceiling has a FLOOR of three. Scaling purely to the observed peak drew one lone message as
+  // a full-height column — a dead thread rendering as its own busiest day, which is the opposite of
+  // what the chart is asked. Three is the smallest ceiling that keeps a single message reading as
+  // a single message.
+  let peak = 3, total = 0;
+  act.forEach((a) => { const t = (a.inbound || 0) + (a.outbound || 0); total += t; if (t > peak) peak = t; });
+  const H = 44;
+  let bars = "";
+  act.forEach((a) => {
+    const inb = a.inbound || 0, outb = a.outbound || 0;
+    const hi = Math.round((inb / peak) * H), ho = Math.round((outb / peak) * H);
+    const title = fmtD(a.day) + " · منه " + fmtN(inb) + " · منّا " + fmtN(outb);
+    bars += '<span title="' + esc(title) + '" style="flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;height:' + fmtN2(H) + 'px;">' +
+      (inb ? '<span style="display:block;height:' + fmtN2(Math.max(hi, 3)) + 'px;background:#1F7A73;border-radius:2px 2px 0 0;"></span>' : "") +
+      (outb ? '<span style="display:block;height:' + fmtN2(Math.max(ho, 2)) + 'px;background:#DCDCDC;border-radius:' + (inb ? "0" : "2px 2px 0 0") + ';"></span>' : "") +
+      (!inb && !outb ? '<span style="display:block;height:2px;background:#F3F3F3;border-radius:2px;"></span>' : "") + "</span>";
+  });
+
+  // «لماذا هذه القراءة» — native disclosure, closed by default. The itemisation is what makes the
+  // number arguable, and a number nobody can argue with is decoration.
+  const why = (s.factors || []).length
+    ? '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:11.5px;color:#2E7D77;font-weight:700;list-style:none;">لماذا هذه القراءة؟</summary>' +
+      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
+      s.factors.map((f) =>
+        '<div style="display:flex;gap:9px;align-items:baseline;font-size:12px;line-height:1.8;">' +
+        '<span style="font-weight:700;min-width:34px;color:' + (f.points < 0 ? "#B42318" : f.points > 0 ? "#027A48" : "#7C7C7C") + ';">' +
+        (f.points === 0 ? "·" : (f.points < 0 ? "−" : "+") + fmtN(Math.abs(f.points))) + "</span>" +
+        '<span style="color:#171717;font-weight:600;min-width:96px;">' + esc(f.label) + "</span>" +
+        '<span style="color:#525252;flex:1;min-width:140px;">' + esc(f.evidence) + "</span></div>").join("") +
+      "</div></details>"
+    : "";
+
+  // THE ONE MODEL OUTPUT ON THIS CARD, named as a suggestion and carrying the same heading as the
+  // full block inside فهم المساعد — the same claim in its summary position, never a second claim.
+  const next = hasWords(ins.next_action)
+    ? '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:11px 14px;">' +
+      '<div style="font-size:10.5px;font-weight:700;color:#2E7D77;margin-bottom:4px;">اقتراح المساعد للخطوة التالية</div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:#171717;line-height:1.85;">' + esc(ins.next_action) + "</div></div>"
+    : "";
+
+  return '<div class="card" style="margin:2px 0 14px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;">' +
+    '<h3 style="margin:0;font-size:15px;font-weight:600;color:#171717;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "مؤشرات المحادثة</h3>" +
+    '<span style="font-size:11px;color:#999999;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
+    '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;">' +
+    // 1 — the meter
+    '<div style="min-width:200px;flex:1;">' +
+    '<div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">الجدية</div>' +
+    '<div style="display:flex;align-items:baseline;gap:9px;margin-top:2px;">' +
+    '<span style="font-size:30px;font-weight:700;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
+    '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
+    '<div style="display:flex;gap:3px;margin-top:10px;max-width:230px;">' + meter + "</div>" +
+    '<div style="font-size:10.5px;color:#C7C7C7;margin-top:5px;">من ١٠٠</div></div>' +
+    // 2 — the three measured stats
+    '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">' +
+    stat("الزخم", '<span style="color:' + mv[1] + ';">' + mv[0] + "</span> " + esc(s.momentumLabel), null) +
+    stat("سرعة ردّه", speed, null) +
+    stat("آخر كلام منه", silent, null) +
+    stat("كتب بكلماته", fmtN(s.typedTurns) + (s.typedTurns === 1 ? " رسالة" : s.typedTurns === 2 ? " رسالتين" : s.typedTurns <= 10 ? " رسائل" : " رسالة"), null) +
+    "</div></div>" +
+    // 3 — the chart
+    '<div style="margin-top:18px;">' +
+    '<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">' +
+    '<span style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
+    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#1F7A73;margin-inline-end:5px;"></span>رسائله</span>' +
+    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#DCDCDC;margin-inline-end:5px;"></span>رسائلنا</span></div>' +
+    // No direction override: the portal's other time chart runs oldest at the START edge and today
+    // at the END, which in this RTL page means right to left. Two time axes pointing opposite ways
+    // on one product is a reading error waiting to happen.
+    (total
+      ? '<div style="display:flex;align-items:flex-end;gap:3px;margin-top:10px;">' + bars + "</div>" +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:#C7C7C7;">' +
+        '<span>' + esc(act.length ? fmtD(act[0].day) : "") + "</span><span>" +
+        esc(act.length ? fmtD(act[act.length - 1].day) : "") + "</span></div>"
+      : '<div style="font-size:12px;color:#999999;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
+    "</div>" +
+    next + why + "</div>";
+}
+/** Pixel counts are CSS, not Arabic prose — they must stay Latin or the style attribute is invalid.
+ *  Named so check-numerals sees a formatter rather than a raw concatenation, and so the next
+ *  reader cannot mistake it for fmtN and print «٣٨px» into a stylesheet. */
+function fmtN2(n) { return String(Number(n) || 0); }
+/** Counted days in agreeing Arabic, so the chart's own window length is never a hardcoded word
+ *  that a change to the window would quietly falsify. */
+function arDaysUi(n) {
+  const d = Number(n) || 0;
+  if (d === 1) return "يوم";
+  if (d === 2) return "يومين";
+  return fmtN(d) + (d <= 10 ? " أيام" : " يومًا");
+}
 function tlDot(kind) {
   return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#999999", sys: "#E2E2E2" }[kind] || "#E2E2E2";
 }
@@ -3318,9 +3464,9 @@ function vCustomer(ph) {
     (function () {
       const it = d.interaction || {};
       const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
-      const idle = it.hoursSinceCustomer !== null && it.hoursSinceCustomer !== undefined
-        ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "";
-      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + idle + "</div>" : "";
+      // «آخر كلام منه» is DELETED from this line: مؤشرات المحادثة states it below under its own
+      // label, and one figure printed twice on a screen reads as two measurements that agree.
+      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + "</div>" : "";
     })() +
     "</div></div>";
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
@@ -3441,6 +3587,11 @@ function vCustomer(ph) {
   // §1 region map. DOM order is panel THEN main, so the 372px track lands on the RIGHT — the
   // start side in RTL — and collapses at 900 with ملف العميل above فهم المساعد, deliberately:
   // what the team recorded outranks what the model inferred.
+  // مؤشرات المحادثة, ABOVE the grid and therefore outside the tab shell. Anything placed inside
+  // .crecmain is re-parented into a tab panel by record-tabs, and the default tab is المحادثة —
+  // so a signal card put there would be exactly as buried as the prose it replaces. The whole
+  // point is that these read without a click.
+  h += vSignalBoard(d);
   h += '<div class="crec">' + factsPanel + vAccountPanel(d) + '<div class="crecmain">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;">' +
