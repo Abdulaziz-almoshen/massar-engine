@@ -55,6 +55,21 @@ export const OPP_SOURCES: Readonly<Record<string, string>> = {
 export const OPP_STALL_STAGES: readonly string[] = ["tech", "negotiate"];
 export const OPP_STALL_DAYS = 14;
 
+/** The rungs that mean a real, CONFIRMED buyer — not merely someone who has heard the pitch.
+ *  «التقييم الفني والمالي» is the first stage a prospect reaches only by putting their own people
+ *  on it, and «التفاوض والاعتماد» is the one before signature. Below these two, interest is a
+ *  conversation; at or above them it is a commitment of the client's time and budget.
+ *
+ *  Deliberately NOT a `position >= 3` range test. «إغلاق الصفقة» sits at position 5 and is a
+ *  CUSTOMER, not a potential one, so a range would silently fold won deals into a number the
+ *  product side reads as pipeline. Naming the two rungs makes that exclusion visible and makes a
+ *  future stage insert a decision instead of an accident. */
+export const CONFIRMED_INTEREST_STAGES: readonly string[] = ["tech", "negotiate"];
+
+export function isConfirmedInterestStage(stage: string): boolean {
+  return stage === "tech" || stage === "negotiate";
+}
+
 /** The shape the rules operate on — the stored columns they read, and nothing else. Deliberately
  *  structural rather than the full `OppRow`: the browser holds plain JSON, and a rule that needed a
  *  class could not run in both tiers. */

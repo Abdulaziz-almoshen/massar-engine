@@ -13,6 +13,8 @@ import * as accounts from "./accounts.js";
 import * as segments from "./segments.js";
 import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
+import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
+import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
 import { randomBytes } from "node:crypto";
 import multipart from "@fastify/multipart";
 
@@ -87,6 +89,54 @@ app.get("/health", async () => ({
   accounts: { known: accounts.count(), withFacts: accounts.withFacts(), refreshedAt: accounts.lastRefreshAt() },
   config: configReport(),
 }));
+
+// --------------------- integration (read-only, aggregate-only) ---------------------
+//
+// The ONE surface another Lean system may read. Three properties hold it in place, and each one is
+// a decision rather than an omission:
+//
+//   · READ-ONLY — GET only. Nothing here can move a deal, and a compromised consumer cannot write.
+//   · AGGREGATE-ONLY — integers and catalogue names. No account name, no phone, no transcript, no
+//     money. There is no field to redact because none is ever assembled.
+//   · CLOSED BY DEFAULT — with INTEGRATION_TOKEN unset the surface answers 404, the same as a route
+//     that does not exist. A misconfigured deploy therefore fails shut, and it does not advertise
+//     that an integration exists here for someone to go looking at.
+//
+// 404-not-401 for the unset case is deliberate: «not configured» and «wrong token» are different
+// facts, and only the second one should confirm to a caller that they found the right door.
+
+function integrationOk(req: any): boolean {
+  return Boolean(cfg.integrationToken) && req.headers["x-integration-token"] === cfg.integrationToken;
+}
+
+app.get("/integration/product-interest", async (req, reply) => {
+  if (!cfg.integrationToken) return reply.code(404).send({ status: "not_found" });
+  if (!integrationOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const opps = await db.listOpps();
+  const feed = countPotentialClientsByProduct(opps);
+  // Optional `?products=a|b` — the DISTINCT client count across a caller's chosen subset. Pipe
+  // separated because a catalogue name contains a comma («تكامل الأنظمة (HIS/ERP)» does not, but
+  // nothing stops the next one from doing so) and a separator that can appear inside a value is a
+  // parsing bug waiting for the entry that trips it.
+  const raw = String((req.query as Record<string, unknown> | undefined)?.products ?? "").trim();
+  const selectedNames = raw ? raw.split("|").map((p) => p.trim()).filter(Boolean).slice(0, 50) : [];
+  const selected = selectedNames.length
+    ? { products: selectedNames, ...countPotentialClientsAcross(opps, selectedNames) }
+    : null;
+  return {
+    ok: true,
+    generatedAt: Date.now(),
+    selected,
+    // The consumer displays what «محتمل» meant, rather than hardcoding its own copy of the rule.
+    // When the definition changes here, every dashboard reading it re-labels itself in the same
+    // deploy instead of quietly describing the old rule over the new number.
+    stages: CONFIRMED_INTEREST_STAGES.map((key) => {
+      const stage = OPP_STAGES.find((s) => s.key === key);
+      return { key, label: stage ? stage.label : key };
+    }),
+    ...feed,
+  };
+});
 
 // ------------------------------ admin (token-gated) ------------------------------
 

@@ -21,6 +21,15 @@ export const cfg = {
   // Header token (x-admin-token) for /admin/* endpoints.
   adminToken: process.env.ADMIN_TOKEN || "",
 
+  // Header token (x-integration-token) for /integration/* — the READ-ONLY, aggregate-only feed
+  // other Lean systems consume (today: Makeen's product dashboard, «العملاء المحتملون»).
+  //
+  // A SEPARATE secret from ADMIN_TOKEN by design. The admin token can move money-bearing rows and
+  // read every customer's phone and transcript; a sibling product that only needs six integers must
+  // never be handed it, because handing it over is what turns one system's leak into both systems'
+  // leak. Unset = the whole /integration surface is off (404), so the default posture is closed.
+  integrationToken: process.env.INTEGRATION_TOKEN || "",
+
   // Public base URL for serving media to Gupshup.
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "https://massar-engine.fly.dev",
 
