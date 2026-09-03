@@ -40,7 +40,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   body { font-family: 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
-  .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
+  .ms-scroll::-webkit-scrollbar-thumb { background: #C7C7C7; border-radius: 999px; }
   .app { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 
   /* ===== sidebar (Massar identity) ===== */
@@ -250,7 +250,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .ptab { font-family:inherit; font-size:12px; font-weight:450; border:1px solid #EDEDED;
     background:#fff; color:#525252; border-radius:6px; padding:6px 12px; cursor:pointer; }
   .ptab.on { background:#EDEDED; color:#171717; border-color:#EDEDED; }
-  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
+  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E2E2E2; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
   .inp:focus { border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.15); }
   .fun { margin-bottom: 13px; }
   .fun .r1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
@@ -271,7 +271,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* Sparse-state rule (portal-wide): a screen with few rows must read as DELIBERATE, not
      half-loaded. One line, directly under the controls, that says what is here and where the
      rest is. Real data is still thin on most screens, so this recurs — it lives once. */
-  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
+  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E2E2E2; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
   .sparse b { color: #171717; font-weight: 700; }
   .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
   .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 12px; color: #7C7C7C; }
@@ -364,7 +364,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .t2 { font-size: 11.5px; color: #999999; margin-top: 4px; }
   .kbrow .ct { font-size: 11.5px; color: #999999; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
-  .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E4E7EC; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
+  .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E2E2E2; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
   .ptitle h1 { margin:0; font-size:18px; font-weight:600; color:#171717; letter-spacing:0;
     line-height:1.4; }
@@ -986,7 +986,7 @@ function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #d5dae2;') +
+    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #C7C7C7;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -3617,7 +3617,7 @@ function vCustomer(ph) {
     h += '<div style="font-size:13px;color:#525252;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
       '<div style="font-size:11.5px;color:#7C7C7C;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
-    h += '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
+    h += '<div style="background:#fff;border:1px solid #EDEDED;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
       '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
       '<div style="font-size:14px;font-weight:700;color:#171717;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
     // DELETED (design plan §5): the 2×2 mcards grid and the product_interest badge row.
