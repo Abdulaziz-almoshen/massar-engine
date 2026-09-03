@@ -69,7 +69,7 @@ are migrated under D-1.
 **State.** Commits go directly to `master`; there is no second developer to review.
 **Why.** One operator, one repo. Git Flow with a mandatory second reviewer cannot be satisfied.
 **Compensating control.** Every change passes the gate chain above before deploy, and each cycle is
-reviewed by the Orbit reviewer/QA/safety roles with the evidence recorded in `.orbit/STATE.md`.
+reviewed (diff review, QA evidence, safety checks) with the evidence recorded in `docs/STATE.md`.
 **Exit.** Adopt feature branches + PRs the moment a second engineer joins.
 
 ### D-4 · §4 Coverage scope — declared, not silent.

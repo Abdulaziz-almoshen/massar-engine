@@ -7,9 +7,9 @@
 set -u
 STAMP="${1:-v1}"
 ROOT="/Users/abdulaziz/Projects/Massar"
-T="$ROOT/.orbit/artifacts/agent-eval/$STAMP/transcripts.json"
-OUT="$ROOT/.orbit/artifacts/agent-eval/$STAMP/verdict.json"
-SCHEMA="$ROOT/.orbit/qa/agent-eval-result.schema.json"
+T="$ROOT/docs/artifacts/agent-eval/$STAMP/transcripts.json"
+OUT="$ROOT/docs/artifacts/agent-eval/$STAMP/verdict.json"
+SCHEMA="$ROOT/docs/qa/agent-eval-result.schema.json"
 
 {
 cat <<'SPEC'
