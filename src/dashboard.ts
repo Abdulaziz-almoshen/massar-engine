@@ -466,7 +466,14 @@ export const DASHBOARD_HTML = `<!doctype html>
     .pen { opacity: 1; width: 40px; height: 40px; top: 6px; }
     .cbar .mini { flex: 1 1 44%; min-height: 40px; }
   }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+  /* THE SIDEBAR BECOMES A STRIP, IT DOES NOT DISAPPEAR. It used to be display:none here, which
+     left a phone with no site name, no navigation and no search — the trunk test failed on every
+     route and the only way back was the browser's own back button. Same markup, same links, turned
+     on its side: the group labels and the collapse control go (they orient a column, not a strip),
+     the switcher keeps its mark, and every remaining target is 44px because a finger is not a
+     cursor. NO BACKTICKS IN THIS FILE'S COMMENTS — the CSS is inside a template literal and one
+     backtick ends it (ADR-0001, caught by this very cycle's build). */
+  @media (max-width: 900px) { .app { flex-direction: column; } aside { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 6px; padding-inline: 8px; overflow-x: auto; border-inline-end: none; border-block-end: 1px solid #EDEDED; } aside .switcher { width: auto; flex: none; height: 44px; padding: 6px; } aside .switcher > div, aside .switcher .chev { display: none; } aside .navsearch { width: auto; flex: none; min-width: 44px; height: 44px; justify-content: center; padding-inline: 10px; } aside .navsearch .lbl, aside .navsearch kbd { display: none; } aside #nav { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; } aside #nav .grp { display: none; } aside #nav .nv { width: auto; flex: none; height: 44px; white-space: nowrap; margin-bottom: 0; } aside .collapse { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
