@@ -447,6 +447,15 @@ export const DASHBOARD_HTML = `<!doctype html>
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
   .pen[disabled] { cursor: not-allowed; color: #E2E2E2; }
   @media (hover: none) { .pen { opacity: 1; } }
+  /* A FINGER IS NOT A CURSOR. The control primitives are sized for a mouse — .kebab is 32px, the
+     filter pills 27px, the tabs content-sized — which measured 16 sub-44px targets on the customers
+     screen at 390px alone. Raising the minimum on coarse pointers only leaves every desktop
+     measurement exactly as it was. Height only: widths stay content-sized so a pill still reads as
+     a pill. */
+  @media (pointer: coarse) {
+    .btn, .qpill, .ptab, .crmsel, .inp, .vtog button, .rtabs button, .ctabs button { min-height: 44px; }
+    .kebab { width: 44px; height: 44px; }
+  }
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
   .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
   .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
