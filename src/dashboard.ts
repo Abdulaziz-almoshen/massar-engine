@@ -455,6 +455,12 @@ export const DASHBOARD_HTML = `<!doctype html>
   @media (pointer: coarse) {
     .btn, .qpill, .ptab, .crmsel, .inp, .vtog button, .rtabs button, .ctabs button { min-height: 44px; }
     .kebab { width: 44px; height: 44px; }
+    .switcher { min-width: 44px; }
+    /* The row checkbox stops at 20px, not 44. A list row is 36px by DESIGN.md rule 8, so a 44px
+       control cannot sit in one without contradicting the token authority; 20px is the largest
+       honest improvement inside that rule. The tension is recorded in TODOS.md rather than settled
+       here, because it is a row-height decision, not a styling one. */
+    input[type="checkbox"] { width: 20px; height: 20px; }
   }
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
   .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
