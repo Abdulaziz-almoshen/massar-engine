@@ -251,7 +251,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     background:#fff; color:#525252; border-radius:6px; padding:6px 12px; cursor:pointer; }
   .ptab.on { background:#EDEDED; color:#171717; border-color:#EDEDED; }
   .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E2E2E2; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
-  .inp:focus { border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.15); }
+  .inp:focus { border-color: #1F7A73; box-shadow: 0 0 0 3px rgba(31,122,115,.15); }
   .fun { margin-bottom: 13px; }
   .fun .r1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
   .fun .l { font-size: 12.5px; font-weight: 600; color: #171717; }
@@ -452,7 +452,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
   .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #999999; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F3F3F3; }
   .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
-  .crec :focus-visible { outline: 2px solid #2E7D77; outline-offset: 2px; }
+  .crec :focus-visible { outline: 2px solid #1F7A73; outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
     .fsaved { animation: fsaved .14s ease-out; }
     @keyframes fsaved { from { background: #ECFDF3; } to { background: transparent; } }
