@@ -89,7 +89,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     flex:none; }
   .collapse:hover { background:#F3F3F3; }
   .collapse .cicon { color:#999999; font-size:14px; }
-  .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #1c3a5e; display: flex; align-items: center; justify-content: center; color: #cdd6e6; font-weight: 700; font-size: 14px; }
+  .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #E2E2E2; display: flex; align-items: center; justify-content: center; color: #525252; font-weight: 700; font-size: 14px; }
   .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
   .userbox .r { font-size: 11px; color: #8ea3c0; }
 
