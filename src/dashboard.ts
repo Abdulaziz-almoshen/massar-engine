@@ -101,7 +101,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
   header.crumb .sep { font-size:13px; color:#C7C7C7; }
   header.crumb .s { font-size:13px; font-weight:450; color:#525252; }
-  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: -.2px; }
+  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: 0; }
   header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
   .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#7C7C7C;
     background:transparent; padding:0; border-radius:0; }
@@ -115,7 +115,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      loudest colour on the page. Frappe's number cards have no icon; neither do these now. */
   .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 10px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px; }
   .kpi .k { font-size: 12px; color: #7C7C7C; font-weight: 450; }
-  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
+  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .kpi .dl { font-size: 11.5px; font-weight: 450; color: #7C7C7C; }
   .kpi .v small { font-size: 12px; font-weight: 450; color: #999999; }
 
@@ -130,7 +130,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hlab { font-size: 12.5px; color: #7C7C7C; }
   .hero .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
   .hero .hfig { font-size: 44px; line-height: 1; font-weight: 600; color: #171717;
-    font-variant-numeric: tabular-nums; letter-spacing: -1.4px; }
+    font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .hero .hd { font-size: 13px; font-weight: 500; color: #027A48; background: #ECFDF3;
     border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
   .hero .hd.flat { color: #7C7C7C; background: #F3F3F3; }
@@ -235,7 +235,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   @media (max-width: 860px) { .aqa { display: none; } }
   .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
     margin-bottom:16px; }
-  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: .1px; }
+  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: 0; }
   .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:450;
     border-radius:6px; padding:3px 8px; white-space:nowrap; background:#F8F8F8;
     border:1px solid #EDEDED; color:#525252; }
@@ -2128,7 +2128,7 @@ function vKbProduct(name) {
   h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
     '<div style="width:44px;height:44px;flex:none;border-radius:10px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;font-weight:500;font-size:18px;">' + esc(name.trim().charAt(0)) + "</div>" +
     '<div style="flex:1;min-width:220px;">' +
-    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:-.2px;">' + esc(name) + "</h1>" +
+    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:0;">' + esc(name) + "</h1>" +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
@@ -2851,7 +2851,7 @@ function vSignalBoard(d) {
   }
 
   const stat = (label, value, ink) =>
-    '<div style="min-width:96px;"><div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">' + label + "</div>" +
+    '<div style="min-width:96px;"><div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">' + label + "</div>" +
     '<div style="font-size:14px;font-weight:700;margin-top:3px;color:' + (ink || "#171717") + ';">' + value + "</div></div>";
 
   // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
@@ -2916,7 +2916,7 @@ function vSignalBoard(d) {
     '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;">' +
     // 1 — the meter
     '<div style="min-width:200px;flex:1;">' +
-    '<div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">الجدية</div>' +
+    '<div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">الجدية</div>' +
     '<div style="display:flex;align-items:baseline;gap:9px;margin-top:2px;">' +
     '<span style="font-size:30px;font-weight:700;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
     '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
@@ -2932,7 +2932,7 @@ function vSignalBoard(d) {
     // 3 — the chart
     '<div style="margin-top:18px;">' +
     '<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">' +
-    '<span style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:.03em;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
+    '<span style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
     '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#1F7A73;margin-inline-end:5px;"></span>رسائله</span>' +
     '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#DCDCDC;margin-inline-end:5px;"></span>رسائلنا</span></div>' +
     // No direction override: the portal's other time chart runs oldest at the START edge and today
@@ -3514,7 +3514,7 @@ function vCustomer(ph) {
     const ink = o ? o[1] : "#7C7C7C", bg = o ? o[2] : "#F8F8F8";
     const row = (label, body) =>
       '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:9px;">' +
-      '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
+      '<span style="font-size:11px;font-weight:700;letter-spacing:0;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
       '<span style="flex:1;min-width:180px;">' + body + "</span></div>";
 
     // 1 — OUTCOME
