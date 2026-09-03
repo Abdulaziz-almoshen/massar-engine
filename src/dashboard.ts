@@ -4095,7 +4095,11 @@ ${PALETTE_JS}
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */
 palInstall();   // one keydown listener and one overlay node, installed before the first paint
-if (!location.hash) location.hash = "kmon";
+// The first screen answers "what should I do today", not "here is a table". #home is
+// «مركز القيادة»: one figure at the size that says so, then the rows that owe work. #kmon opens on
+// the campaigns list, which is a fine second screen and a poor first one — a list has no point of
+// view, and DESIGN.md's list rule 13 asks every page to have one.
+if (!location.hash) location.hash = "home";
 refresh();
 tplLoad();
 setInterval(async () => {
