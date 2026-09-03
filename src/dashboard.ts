@@ -2960,7 +2960,11 @@ function arDaysUi(n) {
   return fmtN(d) + (d <= 10 ? " أيام" : " يومًا");
 }
 function tlDot(kind) {
-  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#999999", sys: "#E2E2E2" }[kind] || "#E2E2E2";
+  // ONE ACCENT, AND IT MARKS THE CUSTOMER. Seven kinds used to carry seven hues — navy, two teals,
+  // ochre and the retired gold — which taught the reader that colour meant something. It did not:
+  // the kind is already written next to the dot. Teal now marks the only turn that is the
+  // customer's own words; everything we did sits on the neutral ramp, ordered by weight.
+  return { in: "#1F7A73", out: "#7C7C7C", camp: "#999999", file: "#999999", tag: "#999999", st: "#C7C7C7", sys: "#E2E2E2" }[kind] || "#E2E2E2";
 }
 // ---------------------------------------------------------------------------
 // ملف العميل — the enrichable client record (cycle crm-record; design plan §3/§4).
