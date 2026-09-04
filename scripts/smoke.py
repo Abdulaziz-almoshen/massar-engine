@@ -42,6 +42,11 @@ ROUTES = [
     # whenever the catalogue is empty, which is a legitimate state, not a failure.
     ("#perf", "المتوقع من الفرص المفتوحة"),
     ("#pipeline", "لوحة المتابعة"),
+    # «المنتجات» and «التقارير» stopped being «قريبًا» placeholders. Both landmarks render from the
+    # data, so they go red if the endpoint behind the screen breaks — which is the whole reason
+    # these two screens exist.
+    ("#products", "الكتالوج"),
+    ("#reports", "الخسائر بسبب التكامل"),
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),

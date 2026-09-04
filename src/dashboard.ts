@@ -17,6 +17,8 @@ import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
+import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS } from "./products-crm.js";
+import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
 import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
@@ -517,6 +519,8 @@ ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
+${PRODUCTS_CRM_CSS}
+${REPORTS_CRM_CSS}
 ${TARGETS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
@@ -720,7 +724,8 @@ const DOOR_OF = (function () {
   return m;
 })();
 
-const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
+// products and reports are REAL screens now; partners and org are still placeholders.
+const PAL_SOON = { partners: 1, org: 1 };
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
@@ -731,8 +736,8 @@ const TITLES = {
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
-  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
-  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "الكتالوج وقطاعاته وباقاته — والإنجاز الربعي"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
@@ -3900,7 +3905,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "products" || cur === "reports") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -3914,6 +3919,8 @@ function render(fetchNew) {
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()
+      : cur === "products" ? vProductsCrm()
+      : cur === "reports" ? vReportsCrm()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4255,6 +4262,8 @@ ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
+${PRODUCTS_CRM_JS}
+${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${SALES_DOMAIN_JS}

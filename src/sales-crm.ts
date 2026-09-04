@@ -171,7 +171,7 @@ window.perfSetTarget = async function (product) {
   for (var i = 0; i < rows.length; i++) if (rows[i].product === product) cur = rows[i].target;
   // Digits are typed in Latin because this is an input, not a reading: an Arabic-Indic numeral
   // pasted back into a number field is a parse failure nobody can see.
-  var raw = window.prompt("المستهدف لـ «" + product + "» — الربع " + fmtN(perfState.quarter) + " من " + fmtN(perfState.year) + "\\n(بالريال، أرقام لاتينية)", String(cur || ""));
+  var raw = window.prompt("المستهدف لـ «" + product + "» — الربع " + fmtN(perfState.quarter) + " من " + arYear(perfState.year) + "\\n(بالريال، أرقام لاتينية)", String(cur || ""));
   if (raw === null) return;
   var amount = Number(String(raw).replace(/[^0-9.]/g, ""));
   if (!isFinite(amount) || amount < 0) { alertBar("قيمة غير صالحة", true); return; }
