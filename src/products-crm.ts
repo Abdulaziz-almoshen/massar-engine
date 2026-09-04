@@ -12,19 +12,19 @@
 
 export const PRODUCTS_CRM_CSS = `
 .pc-sec{margin-block-end:26px}
-.pc-h{font-size:13px;font-weight:600;color:var(--ink,#171717);margin-block-end:3px}
-.pc-sub{font-size:11.5px;color:var(--muted,#7C7C7C);margin-block-end:12px;max-width:70ch;line-height:1.7}
-.pc-note{font-size:11.5px;color:var(--muted,#7C7C7C);margin-block-start:8px;line-height:1.7;
-  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#E2E2E2);max-width:66ch}
-.pc-assumed{font-size:10.5px;font-weight:600;color:#B54708;margin-inline-start:5px}
-.pc-price{font-size:12px;color:var(--ink2,#525252);font-variant-numeric:tabular-nums}
-.pc-pkg{font-size:11.5px;color:var(--muted,#7C7C7C)}
+.pc-h{font-size:13px;font-weight:600;color:var(--ink,#212529);margin-block-end:3px}
+.pc-sub{font-size:11.5px;color:var(--muted,#536170);margin-block-end:12px;max-width:70ch;line-height:1.7}
+.pc-note{font-size:11.5px;color:var(--muted,#536170);margin-block-start:8px;line-height:1.7;
+  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#CBD7E4);max-width:66ch}
+.pc-assumed{font-size:10.5px;font-weight:600;color:#7A5600;margin-inline-start:5px}
+.pc-price{font-size:12px;color:var(--ink2,#3A3A3A);font-variant-numeric:tabular-nums}
+.pc-pkg{font-size:11.5px;color:var(--muted,#536170)}
 .pc-q{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.pc-qc{background:var(--strip,#F8F8F8);border-radius:10px;padding:12px 14px}
-.pc-qc .k{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:600}
+.pc-qc{background:var(--strip,#F4F6F9);border-radius:10px;padding:12px 14px}
+.pc-qc .k{font-size:11.5px;color:var(--muted,#536170);font-weight:600}
 .pc-qc .v{font-size:17px;font-weight:700;margin-block:4px 2px;font-variant-numeric:tabular-nums}
-.pc-qc .t{font-size:11px;color:var(--muted,#7C7C7C);font-variant-numeric:tabular-nums}
-.pc-qc.now{background:#F1F7F6}
+.pc-qc .t{font-size:11px;color:var(--muted,#536170);font-variant-numeric:tabular-nums}
+.pc-qc.now{background:#EAF1F8}
 `;
 
 export const PRODUCTS_CRM_JS = `
@@ -132,7 +132,7 @@ function vProductsCrm() {
     h += '<div class="crm-row">' +
       '<span class="crm-nm">' + esc(p.product) + '</span>' +
       '<span class="crm-sub">' +
-        (p.sector ? esc(p.sector) : '<span style="color:#B54708">بلا قطاع</span>') +
+        (p.sector ? esc(p.sector) : '<span style="color:#7A5600">بلا قطاع</span>') +
         (p.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج من bestFor في قاعدة معرفة المساعد، ولم يؤكَّد">مُستنتَج</span>' : '') +
       '</span>' +
       '<span class="crm-end"><span class="pc-price">' + price + '</span></span>' +

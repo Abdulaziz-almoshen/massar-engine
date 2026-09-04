@@ -27,7 +27,7 @@ export const ACTIVITY_CRM_CSS = `
   }
   .evt { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
   .evt .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .evt .lbl { font-size:13px; color:#525252; }
+  .evt .lbl { font-size:13px; color:#3A3A3A; }
 `;
 
 export const ACTIVITY_CRM_JS = `
@@ -39,13 +39,13 @@ var actWin = 7;          /* days */
 /* Every event kind Massar can OBSERVE, with the field that produces it. There is no kind here that
    is not written by the engine — an event type with no writer would be a fabricated row. */
 var ACT_KIND = {
-  agent:     { label: "رسالة من المساعد", dot: "#1F7A73", group: "out" },
-  customer:  { label: "ردّ العميل",        dot: "#027A48", group: "in"  },
-  system:    { label: "حدث نظامي",         dot: "#999999", group: "out" },
-  sent:      { label: "أُرسلت",            dot: "#2F5F94", group: "delivery" },
-  delivered: { label: "وصلت",              dot: "#3FB6B0", group: "delivery" },
-  read:      { label: "قُرئت",             dot: "#2E8F89", group: "delivery" },
-  failed:    { label: "فشل الإرسال",       dot: "#B42318", group: "failed" }
+  agent:     { label: "رسالة من المساعد", dot: "#306DB5", group: "out" },
+  customer:  { label: "ردّ العميل",        dot: "#12633F", group: "in"  },
+  system:    { label: "حدث نظامي",         dot: "#A9B4C0", group: "out" },
+  sent:      { label: "أُرسلت",            dot: "#416CAD", group: "delivery" },
+  delivered: { label: "وصلت",              dot: "#629CCD", group: "delivery" },
+  read:      { label: "قُرئت",             dot: "#416CAD", group: "delivery" },
+  failed:    { label: "فشل الإرسال",       dot: "#8E2A27", group: "failed" }
 };
 
 function actEvents() {
@@ -83,19 +83,19 @@ function actRow(e) {
     '<div class="selcell"></div>' +
     '<div class="c-name"><span class="evt"><span class="d" style="background:' + meta.dot + ';"></span>' +
       '<span class="lbl">' + meta.label + '</span></span></div>' +
-    '<div class="c-meta"><div class="c-prod" style="font-size:13px;color:#525252;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-      (e.text ? esc(clip(e.text, 90)) : '<span style="color:#C7C7C7;">—</span>') + '</div></div>' +
+    '<div class="c-meta"><div class="c-prod" style="font-size:13px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+      (e.text ? esc(clip(e.text, 90)) : '<span style="color:#A9B4C0;">—</span>') + '</div></div>' +
     '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;">' + esc(nm) +
-      '<span style="font-size:12px;color:#999999;direction:ltr;"> ' + esc(e.phone) + '</span></div></div>' +
-    '<div class="c-prog" style="font-size:12px;color:#7C7C7C;">' + fmtD(e.ts) + ' · ' + fmtT(e.ts) + '</div>' +
+      '<span style="font-size:12px;color:#A9B4C0;direction:ltr;"> ' + esc(e.phone) + '</span></div></div>' +
+    '<div class="c-prog" style="font-size:12px;color:#536170;">' + fmtD(e.ts) + ' · ' + fmtT(e.ts) + '</div>' +
   '</div>';
 }
 
 function actHeader() {
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
     '<div class="selcell"></div><div>الحدث</div>' +
     '<div class="c-meta"><div>التفاصيل</div></div>' +
-    '<div class="c-fig fig"><div class="c-num" style="text-align:start;color:#7C7C7C;font-size:12px;">الجهة</div></div>' +
+    '<div class="c-fig fig"><div class="c-num" style="text-align:start;color:#536170;font-size:12px;">الجهة</div></div>' +
     '<div>الوقت</div></div>' +
     '<div class="thead-narrow"><span>الحدث</span><span style="flex:1"></span><span>الوقت</span></div>';
 }
@@ -108,7 +108,7 @@ function actControlBar(n) {
               ["failed", "إخفاقات", count("failed")]];
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="actq" class="inp" value="' + esc(actQ) + '" oninput="actSearch(this)" placeholder="ابحث في الأحداث…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += tabs.map(function (t) {
     return '<button class="qpill' + (actTab === t[0] ? " on" : "") + '" onclick="actSetTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>";
@@ -143,7 +143,7 @@ function vActivityCrm() {
   h += '<div class="tblwrap crmflat actflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + actHeader();
   shown.forEach(function (e) { h += actRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;">' +
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;">' +
       (actQ.trim() ? 'لا حدث يطابق «' + esc(actQ.trim()) + '».' : 'لا أحداث في هذه الفترة.') + '</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("act", rows.length, "حدث") +

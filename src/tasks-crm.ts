@@ -14,16 +14,16 @@
 export const TASKS_CRM_CSS = `
   .tskflat .crow { grid-template-columns: 40px 2.4fr 1fr .9fr 1.1fr 1fr; }
   @media (max-width: 939px) { .tskflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; } }
-  .tsk-done .tt { color:#999999; text-decoration:line-through; }
+  .tsk-done .tt { color:#A9B4C0; text-decoration:line-through; }
   /* Frappe's Notes are a card grid (h-48 = 192px), the one place it leaves its list chrome */
   .ngrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
-  .ncard { border:1px solid #EDEDED; border-radius:10px; padding:14px 16px; background:#fff;
+  .ncard { border:1px solid #E3E9F1; border-radius:10px; padding:14px 16px; background:#fff;
     height:192px; display:flex; flex-direction:column; overflow:hidden; cursor:default; }
-  .ncard:hover { border-color:#C7C7C7; }
-  .ncard .t { font-size:14px; font-weight:500; color:#171717; }
-  .ncard .c { font-size:13px; color:#525252; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
+  .ncard:hover { border-color:#A9B4C0; }
+  .ncard .t { font-size:14px; font-weight:500; color:#212529; }
+  .ncard .c { font-size:13px; color:#3A3A3A; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
     white-space:pre-wrap; }
-  .ncard .m { font-size:12px; color:#999999; margin-top:8px; display:flex; gap:10px; align-items:center; }
+  .ncard .m { font-size:12px; color:#A9B4C0; margin-top:8px; display:flex; gap:10px; align-items:center; }
 `;
 
 export const TASKS_CRM_JS = `
@@ -31,8 +31,8 @@ export const TASKS_CRM_JS = `
 var tskRows = null, tskLoading = false, tskTab = "open", tskQ = "", tskGroup = "none";
 var nteRows = null, nteLoading = false, nteQ = "";
 
-var TSK_ST = { backlog:{l:"مؤجلة",d:"#999999"}, todo:{l:"للتنفيذ",d:"#2F5F94"},
-  in_progress:{l:"قيد التنفيذ",d:"#B54708"}, done:{l:"منجزة",d:"#027A48"}, canceled:{l:"ملغاة",d:"#999999"} };
+var TSK_ST = { backlog:{l:"مؤجلة",d:"#A9B4C0"}, todo:{l:"للتنفيذ",d:"#416CAD"},
+  in_progress:{l:"قيد التنفيذ",d:"#7A5600"}, done:{l:"منجزة",d:"#12633F"}, canceled:{l:"ملغاة",d:"#A9B4C0"} };
 var TSK_PRI = { high:"عالية", medium:"متوسطة", low:"منخفضة" };
 
 function tskLoad(force) {
@@ -66,29 +66,29 @@ function tskFiltered() {
 /* The ref is rendered by resolving it; an unresolvable ref reads «سجل محذوف» rather than showing a
    bare id or silently hiding the row — the third obligation of a link with no foreign key. */
 function tskRefLabel(t) {
-  if (!t.ref_kind) return '<span style="color:#C7C7C7;">—</span>';
+  if (!t.ref_kind) return '<span style="color:#A9B4C0;">—</span>';
   if (t.ref_kind === "contact") {
     var c = contactByPhone(t.ref_id);
-    if (c) return '<a href="#customer/' + esc(t.ref_id) + '" style="color:#1F7A73;text-decoration:none;">' + esc(c.waName || t.ref_id) + '</a>';
-    return '<span style="color:#B42318;">سجل محذوف</span>';
+    if (c) return '<a href="#customer/' + esc(t.ref_id) + '" style="color:#306DB5;text-decoration:none;">' + esc(c.waName || t.ref_id) + '</a>';
+    return '<span style="color:#8E2A27;">سجل محذوف</span>';
   }
   var cp = campaigns.find(function (x) { return String(x.id) === String(t.ref_id); });
-  if (cp) return '<a href="#kmon/' + esc(t.ref_id) + '" style="color:#1F7A73;text-decoration:none;">' + esc(cp.name) + '</a>';
-  return '<span style="color:#B42318;">سجل محذوف</span>';
+  if (cp) return '<a href="#kmon/' + esc(t.ref_id) + '" style="color:#306DB5;text-decoration:none;">' + esc(cp.name) + '</a>';
+  return '<span style="color:#8E2A27;">سجل محذوف</span>';
 }
 
 function tskRow(t) {
-  var st = TSK_ST[t.status] || { l: t.status, d: "#999999" };
+  var st = TSK_ST[t.status] || { l: t.status, d: "#A9B4C0" };
   var done = t.status === "done";
   var overdue = t.due_at && t.due_at < Date.now() && !done && t.status !== "canceled";
   return '<div class="trow km krow crow' + (done ? " tsk-done" : "") + '">' +
     '<div class="selcell"><input type="checkbox" aria-label="إنجاز ' + esc(t.title) + '"' + (done ? " checked" : "") + ' onclick="tskToggle(' + t.id + ',this.checked)"></div>' +
-    '<div class="c-name"><span class="tt" style="font-size:14px;font-weight:450;color:#171717;">' + esc(t.title) + '</span></div>' +
-    '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:13px;color:#525252;">' + st.l + '</span></div></div>' +
-    '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:13px;color:#525252;">' +
-      (t.priority ? TSK_PRI[t.priority] : '<span style="color:#C7C7C7;">—</span>') + '</div></div>' +
+    '<div class="c-name"><span class="tt" style="font-size:14px;font-weight:450;color:#212529;">' + esc(t.title) + '</span></div>' +
+    '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + st.l + '</span></div></div>' +
+    '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:13px;color:#3A3A3A;">' +
+      (t.priority ? TSK_PRI[t.priority] : '<span style="color:#A9B4C0;">—</span>') + '</div></div>' +
     '<div style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tskRefLabel(t) + '</div>' +
-    '<div style="font-size:12px;color:' + (overdue ? "#B42318" : "#7C7C7C") + ';white-space:nowrap;">' +
+    '<div style="font-size:12px;color:' + (overdue ? "#8E2A27" : "#536170") + ';white-space:nowrap;">' +
       (t.due_at ? fmtD(t.due_at) : "—") + '</div>' +
   '</div>';
 }
@@ -107,22 +107,22 @@ function vTasksCrm() {
 
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tskq" class="inp" value="' + esc(tskQ) + '" oninput="tskSearch(this)" placeholder="ابحث في المهام…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += [["open", "المفتوحة", open], ["overdue", "متأخرة", over], ["done", "منجزة", doneN], ["all", "الكل", all.length]]
     .map(function (t) { return '<button class="qpill' + (tskTab === t[0] ? " on" : "") + '" onclick="tskSetTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>"; }).join("");
   h += '<span style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " مهمة</span></div>";
 
   h += '<div class="tblwrap crmflat tskflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
-    '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+    '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
       '<div class="selcell"></div><div>المهمة</div>' +
       '<div class="c-meta"><div>الحالة</div></div>' +
-      '<div class="c-fig fig"><div class="c-num" style="text-align:start;color:#7C7C7C;font-size:12px;">الأولوية</div></div>' +
+      '<div class="c-fig fig"><div class="c-num" style="text-align:start;color:#536170;font-size:12px;">الأولوية</div></div>' +
       '<div>مرتبطة بـ</div><div>تستحق</div></div>' +
     '<div class="thead-narrow"><span>المهمة</span><span style="flex:1"></span><span>الحالة</span></div>';
   rows.forEach(function (t) { h += tskRow(t); });
   if (!rows.length) {
-    h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;line-height:1.9;">' +
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">' +
       (all.length ? "لا مهام في هذا التبويب." : "لا مهام بعد — أضف مهمة من ملف أي عميل.") + '</div>';
   }
   h += '</div></div><div class="tfoot"><span>' + ic("clock", 14) + ' المهام سجلات داخلية. لا تُرسل شيئًا للعميل.</span></div></div>';
@@ -140,7 +140,7 @@ function vNotesCrm() {
   });
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="nteq" class="inp" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<span style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " ملاحظة</span></div>";
   if (!rows.length) {

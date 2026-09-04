@@ -8,19 +8,26 @@
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included.
 
 export const REPORTS_CRM_CSS = `
-.rp-tabs{display:flex;gap:2px;flex-wrap:wrap;margin-block-end:18px;border-block-end:1px solid var(--line,#EDEDED)}
+.rp-tabs{position:relative;display:flex;gap:2px;flex-wrap:wrap;margin-block-end:18px;
+  border-block-end:1px solid var(--line-soft)}
 .rp-tab{appearance:none;background:transparent;border:0;border-radius:0;cursor:pointer;font-family:inherit;
-  font-size:13px;font-weight:450;color:var(--muted,#7C7C7C);letter-spacing:0;padding:8px 11px;
+  font-size:13px;font-weight:450;color:var(--muted,#536170);letter-spacing:0;padding:8px 11px;
   border-block-end:2px solid transparent;margin-block-end:-1px;display:inline-flex;align-items:center;gap:7px}
-.rp-tab:hover{color:var(--ink,#171717)}
-.rp-tab.on{color:var(--ink,#171717);font-weight:600;border-block-end-color:var(--teal,#1F7A73)}
-.rp-tab .n{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted,#7C7C7C)}
-.rp-tab.on .n{color:var(--teal,#1F7A73)}
-.rp-q{font-size:12.5px;color:var(--ink2,#525252);margin-block-end:4px}
-.rp-tot{font-size:11.5px;color:var(--muted,#7C7C7C);margin-block-end:14px;font-variant-numeric:tabular-nums}
+.rp-tab:hover{color:var(--ink,#212529)}
+.rp-tab.on{color:var(--ink);font-weight:600}
+/* Same sliding indicator as the door tabs, from the same moveInd helper — one pattern, one
+   implementation. Two strips that slide differently is how a product starts feeling assembled. */
+.rp-tabs .ind{position:absolute;inset-block-end:0;inset-inline-start:0;height:2px;background:var(--blue);
+  border-radius:var(--r-pill) var(--r-pill) 0 0;width:0;transform:translateX(0);
+  transition:transform var(--base) var(--ease),width var(--base) var(--ease);pointer-events:none}
+.rp-tabs .ind.noanim{transition:none}
+.rp-tab .n{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted,#536170)}
+.rp-tab.on .n{color:var(--teal,#306DB5)}
+.rp-q{font-size:12.5px;color:var(--ink2,#3A3A3A);margin-block-end:4px}
+.rp-tot{font-size:11.5px;color:var(--muted,#536170);margin-block-end:14px;font-variant-numeric:tabular-nums}
 .rp-days{font-variant-numeric:tabular-nums;font-weight:600}
-.rp-basis{font-size:11.5px;color:var(--muted,#7C7C7C);margin-block-start:18px;line-height:1.7;
-  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#E2E2E2);max-width:66ch}
+.rp-basis{font-size:11.5px;color:var(--muted,#536170);margin-block-start:18px;line-height:1.7;
+  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#CBD7E4);max-width:66ch}
 `;
 
 export const REPORTS_CRM_JS = `
@@ -78,7 +85,11 @@ function vReportsCrm() {
     h += '<button class="rp-tab' + (r.id === rpPick ? " on" : "") + '" onclick="rpOpen(\\'' + r.id + '\\')">' +
       esc(r.title) + (d ? '<span class="n">' + fmtN(d.count) + '</span>' : '') + '</button>';
   });
-  h += '</div>';
+  h += '<i class="ind"></i></div>';
+
+  /* Placed after the strip is in the DOM; render() writes innerHTML, so the measure has to wait a
+     frame or getBoundingClientRect reads zeros. */
+  setTimeout(function () { moveInd(document.querySelector(".rp-tabs")); }, 0);
 
   var cur = rpData[rpPick];
   if (!cur) return h + '<div class="crm-empty"><b>جارٍ الحساب…</b></div>';

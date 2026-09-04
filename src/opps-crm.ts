@@ -44,69 +44,69 @@ export const OPPS_CRM_CSS = `
   /* ===== opps board ===== */
   .opgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(390px,1fr)); gap:14px; }
   @media (max-width: 860px) { .opgrid { grid-template-columns:1fr; } }
-  .opcard { background:#fff; border:1px solid #EDEDED; border-radius:14px; overflow:hidden;
+  .opcard { background:#fff; border:1px solid #E3E9F1; border-radius:14px; overflow:hidden;
     display:flex; flex-direction:column; }
-  .opcard:hover { border-color:#C7C7C7; }
+  .opcard:hover { border-color:#A9B4C0; }
   .opcard .oph { padding:15px 18px; }
   .opcard .opt { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-  .opcard .av { width:38px; height:38px; flex:none; border-radius:9px; background:#F3F3F3; color:#525252;
+  .opcard .av { width:38px; height:38px; flex:none; border-radius:9px; background:#EDF1F7; color:#3A3A3A;
     display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:500; }
-  .opcard .nm { font-size:14.5px; font-weight:500; color:#171717; overflow:hidden;
+  .opcard .nm { font-size:14.5px; font-weight:500; color:#212529; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
-  .opcard .sub { font-size:11.5px; color:#999999; margin-top:3px; overflow:hidden;
+  .opcard .sub { font-size:11.5px; color:#A9B4C0; margin-top:3px; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .opcard .opm { display:flex; align-items:center; justify-content:space-between; gap:8px;
     margin-top:13px; flex-wrap:wrap; }
-  .opcard .val { font-size:16px; font-weight:600; color:#1F7A73; font-variant-numeric:tabular-nums;
+  .opcard .val { font-size:16px; font-weight:600; color:#306DB5; font-variant-numeric:tabular-nums;
     white-space:nowrap; }
-  .opcard .brk { font-size:11px; color:#999999; font-variant-numeric:tabular-nums; }
+  .opcard .brk { font-size:11px; color:#A9B4C0; font-variant-numeric:tabular-nums; }
   .opst { flex:none; font-size:11px; font-weight:500; padding:4px 11px; border-radius:999px; white-space:nowrap; }
-  .opsrc { font-size:10.5px; font-weight:500; color:#525252; background:#F3F3F3; border-radius:999px;
+  .opsrc { font-size:10.5px; font-weight:500; color:#3A3A3A; background:#EDF1F7; border-radius:999px;
     padding:3px 9px; white-space:nowrap; }
-  .opwarn { font-size:10.5px; font-weight:500; color:#B54708; background:#FEF6E7; border-radius:999px;
+  .opwarn { font-size:10.5px; font-weight:500; color:#7A5600; background:#FFF5D6; border-radius:999px;
     padding:3px 9px; white-space:nowrap; }
-  .opcard .oplines { border-top:1px solid #F3F3F3; background:#FBFBFB; padding:2px 18px 8px; flex:1; }
-  .opline { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F3F3F3;
+  .opcard .oplines { border-top:1px solid #EDF1F7; background:#F4F6F9; padding:2px 18px 8px; flex:1; }
+  .opline { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #EDF1F7;
     cursor:pointer; }
   .opline:last-child { border-bottom:none; }
   .opline:hover { opacity:.75; }
   .opline .d { width:7px; height:7px; border-radius:999px; flex:none; }
-  .opline .pn { flex:1; min-width:0; font-size:12.5px; font-weight:450; color:#171717;
+  .opline .pn { flex:1; min-width:0; font-size:12.5px; font-weight:450; color:#212529;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opline .sg { font-size:11px; color:#7C7C7C; white-space:nowrap; }
-  .opauto { font-size:9.5px; font-weight:500; color:#2E7D77; background:#E9F7F6; border-radius:999px;
+  .opline .sg { font-size:11px; color:#536170; white-space:nowrap; }
+  .opauto { font-size:9.5px; font-weight:500; color:#306DB5; background:#EAF1F8; border-radius:999px;
     padding:2px 7px; margin-inline-start:7px; vertical-align:middle; }
-  .opline .lv { font-size:12px; font-weight:500; color:#1F7A73; min-width:84px; text-align:end;
+  .opline .lv { font-size:12px; font-weight:500; color:#306DB5; min-width:84px; text-align:end;
     font-variant-numeric:tabular-nums; }
   /* the inline expander — the detail screen the prototype spends a page on, as six controls */
-  .opedit { border-bottom:1px solid #F3F3F3; padding:4px 0 13px; }
-  .opedit .lb { font-size:11px; color:#999999; margin:9px 0 6px; }
+  .opedit { border-bottom:1px solid #EDF1F7; padding:4px 0 13px; }
+  .opedit .lb { font-size:11px; color:#A9B4C0; margin:9px 0 6px; }
   .opedit .rail { display:flex; flex-wrap:wrap; gap:6px; }
   .opedit .rung { font-family:inherit; font-size:11.5px; font-weight:500; border-radius:999px;
-    padding:6px 11px; cursor:pointer; color:#525252; background:#fff; border:1px solid #EDEDED;
+    padding:6px 11px; cursor:pointer; color:#3A3A3A; background:#fff; border:1px solid #E3E9F1;
     display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
   .opedit .rung .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .opedit .rung.on { color:#171717; background:#F3F3F3; border-color:#C7C7C7; }
+  .opedit .rung.on { color:#212529; background:#EDF1F7; border-color:#A9B4C0; }
   .opedit .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px; }
   .opedit .inp { padding:8px 11px; font-size:12px; border-radius:8px; width:100%; }
   .opedit .acts { display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap; }
   .opedit .acts .btn { height:30px; padding:0 11px; font-size:12px; }
-  .opedit .dngr:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
-  .opedit .dngr.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; }
+  .opedit .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
+  .opedit .dngr.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; }
 
   /* ===== the LIST — seven tracks, seven cells; the arity rule that wrapped three earlier tables ===== */
   .opflat .crow { grid-template-columns: 40px 1.7fr 1.5fr 1.15fr .85fr .7fr 1.5fr; padding-inline:20px 12px; }
   .opflat .crow .o-ac { display:flex; align-items:center; gap:10px; min-width:0; }
-  .opflat .crow .o-ac .av { width:26px; height:26px; flex:none; border-radius:7px; background:#F3F3F3;
-    color:#525252; display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:500; }
-  .opflat .crow .o-ac .lb { font-size:13.5px; color:#171717; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-pr { font-size:12.5px; color:#525252; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-st { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#525252; min-width:0; }
+  .opflat .crow .o-ac .av { width:26px; height:26px; flex:none; border-radius:7px; background:#EDF1F7;
+    color:#3A3A3A; display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:500; }
+  .opflat .crow .o-ac .lb { font-size:13.5px; color:#212529; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-pr { font-size:12.5px; color:#3A3A3A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-st { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#3A3A3A; min-width:0; }
   .opflat .crow .o-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
   .opflat .crow .o-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-vl { font-size:13px; font-weight:500; color:#1F7A73; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .opflat .crow .o-nx { font-size:12px; color:#7C7C7C; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opexp { padding:0 20px 4px; background:#FBFBFB; border-bottom:1px solid #EDEDED; }
+  .opflat .crow .o-vl { font-size:13px; font-weight:500; color:#306DB5; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .opflat .crow .o-nx { font-size:12px; color:#536170; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opexp { padding:0 20px 4px; background:#F4F6F9; border-bottom:1px solid #E3E9F1; }
   @media (max-width: 1100px) {
     .opflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
     .opflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
@@ -121,61 +121,61 @@ export const OPPS_CRM_CSS = `
   /* ===== the stage strip — the pipeline in one line, and the stage filter ===== */
   .opstrip { display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
   .opstrip .opsc { font-family:inherit; flex:1; min-width:118px; text-align:start; cursor:pointer;
-    background:#fff; border:1px solid #EDEDED; border-radius:12px; padding:10px 13px;
+    background:#fff; border:1px solid #E3E9F1; border-radius:12px; padding:10px 13px;
     display:flex; flex-direction:column; gap:3px; }
-  .opstrip .opsc:hover { border-color:#C7C7C7; }
-  .opstrip .opsc.on { border-color:#3FB6B0; background:#F4FCFB; }
-  .opstrip .opsc .t { font-size:11.5px; color:#7C7C7C; display:flex; align-items:center; gap:6px;
+  .opstrip .opsc:hover { border-color:#A9B4C0; }
+  .opstrip .opsc.on { border-color:#629CCD; background:#EAF1F8; }
+  .opstrip .opsc .t { font-size:11.5px; color:#536170; display:flex; align-items:center; gap:6px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .opstrip .opsc .t .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .opstrip .opsc .n { font-size:19px; font-weight:600; color:#171717; font-variant-numeric:tabular-nums; line-height:1.2; }
-  .opstrip .opsc .v { font-size:11.5px; color:#1F7A73; font-variant-numeric:tabular-nums;
+  .opstrip .opsc .n { font-size:19px; font-weight:600; color:#212529; font-variant-numeric:tabular-nums; line-height:1.2; }
+  .opstrip .opsc .v { font-size:11.5px; color:#306DB5; font-variant-numeric:tabular-nums;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opstrip .opsc .u { color:#B54708; margin-inline-start:6px; }
-  .opstrip .opsc .u2 { color:#999999; margin-inline-start:6px; }
+  .opstrip .opsc .u { color:#7A5600; margin-inline-start:6px; }
+  .opstrip .opsc .u2 { color:#A9B4C0; margin-inline-start:6px; }
 
   /* bulk-bar controls, on the dark bar the campaigns list already established */
   .bulkbar .opbulk { font-family:inherit; font-size:11.5px; height:30px; border-radius:999px;
     padding:0 11px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff;
     max-width:150px; }
-  .bulkbar .opbulk option { color:#171717; }
+  .bulkbar .opbulk option { color:#212529; }
   .bulkbar .opbulk::placeholder { color:rgba(255,255,255,.6); }
 
   /* ===== the un-recorded band: replies that are already opportunities and are not on the board ===== */
-  .optriage { background:#fff; border:1px solid #EDEDED; border-radius:13px; margin-bottom:14px; }
+  .optriage { background:#fff; border:1px solid #E3E9F1; border-radius:13px; margin-bottom:14px; }
   .optriage > summary { list-style:none; cursor:pointer; padding:13px 18px; display:flex;
-    align-items:center; gap:10px; font-size:12.5px; color:#525252; }
+    align-items:center; gap:10px; font-size:12.5px; color:#3A3A3A; }
   .optriage > summary::-webkit-details-marker { display:none; }
   .optriage .trow3 { display:flex; align-items:center; gap:10px; padding:10px 18px;
-    border-top:1px solid #F3F3F3; }
-  .optriage .trow3 .nm { flex:1; min-width:0; font-size:13px; color:#171717;
+    border-top:1px solid #EDF1F7; }
+  .optriage .trow3 .nm { flex:1; min-width:0; font-size:13px; color:#212529;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .optriage .trow3 .pr { font-size:11.5px; color:#7C7C7C; white-space:nowrap; }
+  .optriage .trow3 .pr { font-size:11.5px; color:#536170; white-space:nowrap; }
   .optriage .trow3 .btn { height:28px; padding:0 10px; font-size:12px; }
 
   /* ===== إضافة فرصة ===== */
   .opsheet { position:fixed; inset:0; z-index:140; background:rgba(23,23,23,.32);
     display:flex; align-items:flex-start; justify-content:center; padding:48px 20px; overflow-y:auto; }
-  .opsheet .sheet { background:#fff; border:1px solid #EDEDED; border-radius:14px; width:100%;
+  .opsheet .sheet { background:#fff; border:1px solid #E3E9F1; border-radius:14px; width:100%;
     max-width:660px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
   .opsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .opsheet .sh .t { font-size:16px; font-weight:600; color:#171717; }
-  .opsheet .hint { font-size:12px; color:#7C7C7C; line-height:1.9; margin-top:6px; }
+  .opsheet .sh .t { font-size:16px; font-weight:600; color:#212529; }
+  .opsheet .hint { font-size:12px; color:#536170; line-height:1.9; margin-top:6px; }
   .opsheet .fld { margin-top:13px; }
-  .opsheet .fld > label { display:block; font-size:11.5px; color:#999999; margin-bottom:6px; }
+  .opsheet .fld > label { display:block; font-size:11.5px; color:#A9B4C0; margin-bottom:6px; }
   .opsheet .inp, .opsheet select.inp { width:100%; height:38px; padding:0 12px; font-size:13px; border-radius:9px; }
   .opsheet .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   @media (max-width: 560px) { .opsheet .two { grid-template-columns:1fr; } }
-  .opsheet .lrow { border:1px solid #EDEDED; border-radius:11px; padding:11px; margin-top:9px; background:#FBFBFB; }
+  .opsheet .lrow { border:1px solid #E3E9F1; border-radius:11px; padding:11px; margin-top:9px; background:#F4F6F9; }
   .opsheet .lrow .num { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   @media (max-width: 560px) { .opsheet .lrow .num { grid-template-columns:1fr 1fr; } }
-  .opsheet .lrow .num label { display:block; font-size:10.5px; color:#999999; margin-bottom:4px; }
+  .opsheet .lrow .num label { display:block; font-size:10.5px; color:#A9B4C0; margin-bottom:4px; }
   .opsheet .lfoot { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-top:9px; }
-  .opsheet .lfoot .v { font-size:12.5px; font-weight:500; color:#1F7A73; font-variant-numeric:tabular-nums; }
+  .opsheet .lfoot .v { font-size:12.5px; font-weight:500; color:#306DB5; font-variant-numeric:tabular-nums; }
   .opsheet .tot { display:flex; align-items:center; justify-content:space-between; gap:10px;
-    margin-top:14px; padding-top:13px; border-top:1px solid #EDEDED; }
-  .opsheet .tot .v { font-size:18px; font-weight:600; color:#1F7A73; font-variant-numeric:tabular-nums; }
-  .opsheet .err { font-size:12.5px; color:#B42318; margin-top:10px; }
+    margin-top:14px; padding-top:13px; border-top:1px solid #E3E9F1; }
+  .opsheet .tot .v { font-size:18px; font-weight:600; color:#306DB5; font-variant-numeric:tabular-nums; }
+  .opsheet .err { font-size:12.5px; color:#8E2A27; margin-top:10px; }
   .opsheet .acts { display:flex; gap:9px; margin-top:16px; flex-wrap:wrap; }
 `;
 
@@ -316,10 +316,10 @@ function opGroupStatus(g) {
      — is the business tier's, and is unit-tested there. */
   var key = groupStatusKey(g.lines.map(opFacts));
   var style = {
-    open:    { label: "قائمة",         bg: "#EEF4FB", color: "#2F5F94" },
-    partial: { label: "مكتملة جزئياً", bg: "#FEF6E7", color: "#B54708" },
-    won:     { label: "ربح",           bg: "#E7F6EE", color: "#027A48" },
-    lost:    { label: "خسارة",         bg: "#FEF3F2", color: "#B42318" }
+    open:    { label: "قائمة",         bg: "#EEF4FB", color: "#416CAD" },
+    partial: { label: "مكتملة جزئياً", bg: "#FFF5D6", color: "#7A5600" },
+    won:     { label: "ربح",           bg: "#E7F6EE", color: "#12633F" },
+    lost:    { label: "خسارة",         bg: "#FBE7E6", color: "#8E2A27" }
   }[key];
   return { key: key, label: style.label, bg: style.bg, color: style.color };
 }
@@ -475,7 +475,7 @@ function opCard(g) {
     '<span class="brk">قائمة ' + fmtN(open) + " · ربح " + fmtN(won) + " · خسارة " + fmtN(lost) + "</span></div>" +
     (g.lines.some(opPriced)
       ? '<span class="val">' + opMoney(opGroupValue(g)) + "</span>"
-      : '<span class="val" style="color:#999999;font-size:13px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
+      : '<span class="val" style="color:#A9B4C0;font-size:13px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
   h += "</div>";
   h += '<div class="oplines">' + g.lines.map(function (l) {
     var st = opStage(l.stage);
@@ -486,7 +486,7 @@ function opCard(g) {
       "</span>" +
       (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") +
       '<span class="sg">' + st.label + "</span>" +
-      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#999999;font-weight:450;"') + ">" +
+      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#A9B4C0;font-weight:450;"') + ">" +
       (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span></div>";
     return row + (opOpen === l.id ? opLineEditor(l) : "");
   }).join("") + "</div>";
@@ -513,7 +513,7 @@ function opLineEditor(l) {
     '<input class="inp" type="number" min="1" max="20" value="' + esc(l.years) + '" onchange="opSaveField(' + l.id + ',&quot;years&quot;,this.value)">' +
     '<input class="inp" type="number" min="1" value="' + esc(l.qty) + '" onchange="opSaveField(' + l.id + ',&quot;qty&quot;,this.value)">' +
     '<input class="inp" type="number" min="0" max="100" value="' + esc(l.discount) + '" onchange="opSaveField(' + l.id + ',&quot;discount&quot;,this.value)"></div>';
-  h += '<div class="acts"><span style="font-size:11.5px;color:#999999;">' +
+  h += '<div class="acts"><span style="font-size:11.5px;color:#A9B4C0;">' +
     "مصدرها " + esc(OPP_SRC[l.source] || OPP_SRC.other) +
     (l.source === "whatsapp" && l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
     (l.created_by ? " · سجّلها " + esc(l.created_by) : "") +
@@ -542,7 +542,7 @@ function opListView() {
   var page = pageSlice("opps", rows);
   var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
   var h = '<div class="tblwrap opflat rise">';
-  h += '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+  h += '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
     (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
     "<div>الجهة</div><div>الخدمة</div><div>المرحلة</div><div>القيمة</div><div>المصدر</div>" +
@@ -550,7 +550,7 @@ function opListView() {
     '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
     (allOn ? " checked" : "") + ' onclick="opTogglePage()"></span><span>الفرصة</span><span style="flex:1"></span><span>المرحلة</span></div>';
   if (!page.length) {
-    h += '<div style="padding:26px 20px;text-align:center;font-size:12.5px;color:#999999;">' +
+    h += '<div style="padding:26px 20px;text-align:center;font-size:12.5px;color:#A9B4C0;">' +
       (oppRows.length ? "لا بند يطابق ما اخترته." : "لا فرص مسجّلة بعد.") + "</div>";
   }
   page.forEach(function (l) {
@@ -564,11 +564,11 @@ function opListView() {
         (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
       '<div class="o-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span>" +
         (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") + "</div>" +
-      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#C7C7C7;font-weight:450;"') + ">" +
+      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#A9B4C0;font-weight:450;"') + ">" +
         (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>" +
       '<div class="o-sr"><span class="opsrc">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span></div>" +
-      '<div class="o-nx">' + (l.owner ? '<b style="font-weight:500;color:#525252;">' + esc(clip(l.owner, 18)) + "</b> · " : "") +
-        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#C7C7C7;">لم تُحدَّد خطوة</span>') + "</div>" +
+      '<div class="o-nx">' + (l.owner ? '<b style="font-weight:500;color:#3A3A3A;">' + esc(clip(l.owner, 18)) + "</b> · " : "") +
+        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#A9B4C0;">لم تُحدَّد خطوة</span>') + "</div>" +
       "</div>";
     if (opOpen === l.id) h += '<div class="opexp">' + opLineEditor(l) + "</div>";
   });
@@ -599,7 +599,7 @@ function opKanbanView() {
       '<div class="kcolh"><span style="width:8px;height:8px;border-radius:999px;flex:none;background:' + st.dot + ';"></span>' +
       '<div class="lb">' + st.label + "</div><span style=\'flex:1\'></span>" +
       '<span class="cntpill">' + fmtN(cards.length) + "</span></div>" +
-      '<div style="font-size:11.5px;color:#7C7C7C;padding:0 4px 9px;font-variant-numeric:tabular-nums;">' +
+      '<div style="font-size:11.5px;color:#536170;padding:0 4px 9px;font-variant-numeric:tabular-nums;">' +
       (val ? opMoney(val) : "بلا تسعير") + "</div>";
     var shown = cards.slice(0, LIST_CAP);
     shown.forEach(function (l) {
@@ -610,13 +610,13 @@ function opKanbanView() {
           (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
         '<div class="kfoot"><span class="kl">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span>" +
         '<span class="ksep">·</span><span class="kv">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span>" +
-        (opStalled(l) ? '<span class="ksep">·</span><span class="kl" style="color:#B54708;">متوقّف ' + opNDay(opDays(l)) + "</span>" : "") +
+        (opStalled(l) ? '<span class="ksep">·</span><span class="kl" style="color:#7A5600;">متوقّف ' + opNDay(opDays(l)) + "</span>" : "") +
         "</div></div>";
     });
     if (!shown.length) h += '<div class="kdrop">اسحب بندًا هنا لنقله إلى «' + st.label + "»</div>";
     /* A board that silently shows the first 200 of 900 is a board that lies about the stage. */
     if (cards.length > shown.length) {
-      h += '<div style="font-size:10.5px;color:#B54708;font-weight:500;padding:4px;">تُعرض ' +
+      h += '<div style="font-size:10.5px;color:#7A5600;font-weight:500;padding:4px;">تُعرض ' +
         fmtN(shown.length) + " من " + fmtN(cards.length) + " — استخدم «قائمة» لرؤيتها كلها</div>";
     }
     h += "</div>";
@@ -657,7 +657,7 @@ function vOppsCrm() {
     '<button class="' + (opView === "board" ? "on" : "") + '" onclick="opSetView(&quot;board&quot;)">الفرص</button>' +
     '<button class="' + (opView === "triage" ? "on" : "") + '" onclick="opSetView(&quot;triage&quot;)">فرز الردود</button></span>';
   if (opView !== "board") {
-    h += '<span style="flex:1"></span><span style="font-size:12px;color:#7C7C7C;">' +
+    h += '<span style="flex:1"></span><span style="font-size:12px;color:#536170;">' +
       "من ردّ، ومن لم يردّ، ومتى موعد المهتمين</span></div>";
     return h + vMorningList();
   }
@@ -666,11 +666,11 @@ function vOppsCrm() {
     return '<button class="' + (opMode === v[0] ? "on" : "") + '" onclick="opSetMode(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
   }).join("") + "</span>";
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:170px;max-width:260px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + "</span>" +
     '<input id="opq" class="inp" value="' + esc(opQ) + '" oninput="opSearch(this)" placeholder="جهة، خدمة، مسؤول…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<select class="crmsel' + (opSrc !== "all" ? " on" : "") + '" onchange="opSetSrc(this.value)"' +
-    (opSrc !== "all" ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + ">" +
+    (opSrc !== "all" ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + ">" +
     '<option value="all">كل المصادر</option>' +
     Object.keys(OPP_SRC).map(function (k) {
       return '<option value="' + k + '"' + (opSrc === k ? " selected" : "") + ">" + OPP_SRC[k] + "</option>";
@@ -685,7 +685,7 @@ function vOppsCrm() {
   }
   if (opMode === "cards") {
     h += '<select class="crmsel' + (opStat !== "all" ? " on" : "") + '" onchange="opSetStat(this.value)"' +
-      (opStat !== "all" ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + ">" +
+      (opStat !== "all" ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + ">" +
       [["all", "كل الحالات"], ["open", "قائمة"], ["partial", "مكتملة جزئياً"], ["won", "ربح"], ["lost", "خسارة"]]
         .map(function (o) { return '<option value="' + o[0] + '"' + (opStat === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
       "</select>";
@@ -702,10 +702,10 @@ function vOppsCrm() {
   if (un.length) {
     var shown = un.slice(0, 8);
     h += '<details class="optriage rise"' + (oppRows.length ? "" : " open") + ">" +
-      "<summary>" + ic("reply", 16) + '<b style="font-weight:500;color:#171717;">' + opNEnt(un.length) +
+      "<summary>" + ic("reply", 16) + '<b style="font-weight:500;color:#212529;">' + opNEnt(un.length) +
       " أبدت اهتمامًا في واتساب ولا فرصة مسجّلة لها</b>" +
-      '<span style="color:#999999;font-size:11.5px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
-      '<span style="flex:1"></span><span style="color:#999999;font-size:12px;">اضغط للعرض</span></summary>' +
+      '<span style="color:#A9B4C0;font-size:11.5px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
+      '<span style="flex:1"></span><span style="color:#A9B4C0;font-size:12px;">اضغط للعرض</span></summary>' +
       shown.map(function (c) {
         var pr = opReadProduct(c);
         return '<div class="trow3"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
@@ -713,7 +713,7 @@ function vOppsCrm() {
           '<button class="btn btn-ghost" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;)">سجّل فرصة</button></div>';
       }).join("") +
       (un.length > shown.length
-        ? '<div class="trow3"><span class="nm" style="color:#999999;">' +
+        ? '<div class="trow3"><span class="nm" style="color:#A9B4C0;">' +
           "وبقيّتها في «فرز الردود» — " + opNEnt(un.length - shown.length) + " أخرى</span></div>"
         : "") +
       "</details>";
@@ -721,8 +721,8 @@ function vOppsCrm() {
 
   if (!oppRows.length) {
     return h + '<div class="tblwrap rise" style="padding:34px 22px;text-align:center;">' +
-      '<div style="font-size:14px;color:#171717;margin-bottom:7px;">لا فرص مسجّلة بعد.</div>' +
-      '<div style="font-size:12.5px;color:#7C7C7C;line-height:1.9;">' +
+      '<div style="font-size:14px;color:#212529;margin-bottom:7px;">لا فرص مسجّلة بعد.</div>' +
+      '<div style="font-size:12.5px;color:#536170;line-height:1.9;">' +
       "الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. " +
       "النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا؛ وما دون ذلك يُسجَّل بضغطة" +
       (un.length ? " من القائمة أعلاه" : "") + "، أو بـ«إضافة فرصة».</div></div>";
@@ -731,7 +731,7 @@ function vOppsCrm() {
   if (opMode === "cards") {
     var groups = opMatches();
     if (!groups.length) {
-      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12.5px;color:#999999;">' +
+      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12.5px;color:#A9B4C0;">' +
         "لا فرصة تطابق ما اخترته.</div>";
     }
     var page = pageSlice("opps", groups);
@@ -776,7 +776,7 @@ function opSheetHtml() {
     return '<option value="' + esc(e.name) + '"></option>';
   }).join("") + "</datalist>";
   if (entities.length > accts.length) {
-    h += '<div style="font-size:11px;color:#999999;margin-top:5px;">الاقتراحات تعرض أول ' +
+    h += '<div style="font-size:11px;color:#A9B4C0;margin-top:5px;">الاقتراحات تعرض أول ' +
       fmtN(accts.length) + " جهة من " + fmtN(entities.length) + " — اكتب اسم أي جهة أخرى كاملًا.</div>";
   }
   h += '<div class="fld two"><div><label>مصدر الفرصة</label><select class="inp" onchange="opDraft(&quot;source&quot;,this.value)">' +
@@ -812,7 +812,7 @@ function opSheetHtml() {
       "</div></div>";
   });
   h += '<button class="btn btn-ghost" style="margin-top:9px;" onclick="opLineAdd()">+ إضافة منتج</button></div>';
-  h += '<div class="tot"><span style="font-size:12.5px;color:#7C7C7C;">قيمة الفرصة</span>' +
+  h += '<div class="tot"><span style="font-size:12.5px;color:#536170;">قيمة الفرصة</span>' +
     '<span class="v">' + opMoney(total) + "</span></div>";
   if (opErr) h += '<div class="err">' + esc(opErr) + "</div>";
   h += '<div class="acts"><button class="btn btn-dark" onclick="opSubmit()"' + (oppBusy ? " disabled" : "") + ">" +

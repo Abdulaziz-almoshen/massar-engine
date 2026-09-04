@@ -21,8 +21,8 @@ export const REP_PAGE_HTML: string = `<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@450;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --ink:#171717; --ink2:#525252; --muted:#7C7C7C; --line:#E2E2E2; --line2:#EDEDED;
-         --strip:#F8F8F8; --card:#fff; --teal:#1F7A73; }
+  :root{ --ink:#212529; --ink2:#3A3A3A; --muted:#536170; --line:#CBD7E4; --line2:#E3E9F1;
+         --strip:#F4F6F9; --card:#fff; --teal:#306DB5; }
   *{box-sizing:border-box}
   body{margin:0;background:var(--strip);color:var(--ink);
        font-family:Cairo,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:450;font-size:15px;
