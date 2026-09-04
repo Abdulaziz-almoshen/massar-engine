@@ -1,5 +1,6 @@
 import pg from "pg";
 import * as facts from "./facts.js";
+import { SALES_STAGES } from "./sales-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -49,7 +50,7 @@ async function reprobe(): Promise<boolean> {
     await pool.query("SELECT 1");
     // A boot whose init() died mid-migration reaches here with tables possibly missing — finish
     // the job before declaring the pool usable, or every read after "recovery" would still throw.
-    if (!migrated) { await pool.query(MIGRATION); migrated = true; }
+    if (!migrated) { await pool.query(MIGRATION); await runMigrations(pool); migrated = true; }
     markConnected();
     console.log(JSON.stringify({ at: "db", msg: "reconnected after a pool error" }));
   } catch {
@@ -301,6 +302,184 @@ CREATE TABLE IF NOT EXISTS opp_auto (
 );
 `;
 
+// ---------------------------------------------------------------------------
+// Versioned migrations.
+//
+// WHY THIS EXISTS. Everything above is one idempotent string of CREATE TABLE IF NOT EXISTS, which
+// is fine for adding a table and useless for CHANGING one: `IF NOT EXISTS` alters no existing
+// CHECK, and re-running an ALTER fails. The commercial engine has to widen
+// `opportunities_stage_check` from six stages to eight on live rows, so the engine needs to know
+// what it has already applied.
+//
+// It also closes a race the review found: the 30-second reprobe timer can call the migration while
+// init() is still inside it, because `pool` exists while `migrated` is still false. The advisory
+// lock serialises that — one connection runs migrations, the other waits and then finds them
+// applied. Two machines during a deploy are covered by the same lock.
+//
+// Each step runs in ONE transaction with its version stamp, so a step either lands completely or
+// not at all. A half-applied schema is the failure this replaces.
+
+/** Arbitrary but fixed: the lock key for schema work on this database. */
+const MIGRATION_LOCK_KEY = 0x6d61_7361; // "masa"
+
+/** Ordered, append-only. NEVER edit or renumber a shipped step — add a new one. */
+const MIGRATIONS: readonly { version: string; sql: string }[] = [
+  {
+    version: "002-commercial-engine",
+    sql: `
+-- The eight-stage ladder, as data rather than a hardcoded enum.
+CREATE TABLE IF NOT EXISTS pipelines (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  product    TEXT,                       -- NULL = the default ladder every product inherits
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pipeline_stages (
+  id          BIGSERIAL PRIMARY KEY,
+  pipeline_id BIGINT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+  key         TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  weight_pct  INT  NOT NULL CHECK (weight_pct BETWEEN 0 AND 100),
+  position    INT  NOT NULL,
+  exit_criterion TEXT,
+  UNIQUE (pipeline_id, key)
+);
+
+-- THE LEDGER. Append-only. Without it the engine cannot answer "which deals were won in Q1":
+-- opportunities.stage_at is the moment the stage LAST MOVED and is overwritten by any later edit,
+-- and close_on is a PLANNED date. Every target, forecast and commission figure reads from here.
+CREATE TABLE IF NOT EXISTS track_stage_events (
+  id           BIGSERIAL PRIMARY KEY,
+  opp_id       BIGINT NOT NULL,
+  from_stage   TEXT,                     -- NULL on the opening event
+  to_stage     TEXT NOT NULL,
+  outcome_key  TEXT,                     -- dependent on from_stage; see sales-domain
+  outcome_reason TEXT,
+  effective_at TIMESTAMPTZ NOT NULL,     -- when it HAPPENED, in a type that carries its zone
+  recorded_at  BIGINT NOT NULL,          -- when we heard about it
+  actor        TEXT,
+  engagement_ref TEXT,                   -- supporting evidence, when there is any
+  corrects_id  BIGINT REFERENCES track_stage_events(id),
+  note         TEXT
+);
+CREATE INDEX IF NOT EXISTS tse_opp_idx ON track_stage_events (opp_id, effective_at DESC);
+CREATE INDEX IF NOT EXISTS tse_period_idx ON track_stage_events (effective_at, to_stage);
+
+-- CURRENT responsibility, which is a different fact from history. الإدارة المسؤولة lives here and
+-- not on an append-only engagement: an engagement records who handled a PAST interaction, so
+-- «أين تتعثّر الصفقات» built on it would list every department that ever touched the deal.
+CREATE TABLE IF NOT EXISTS actions (
+  id           BIGSERIAL PRIMARY KEY,
+  opp_id       BIGINT NOT NULL,
+  stage_event_id BIGINT REFERENCES track_stage_events(id),
+  dept         TEXT NOT NULL,
+  person       TEXT,
+  title        TEXT NOT NULL,
+  due_at       BIGINT,
+  state        TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','done','cancelled')),
+  done_at      BIGINT,
+  created_at   BIGINT NOT NULL,
+  created_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS actions_open_idx ON actions (state, dept, due_at);
+CREATE INDEX IF NOT EXISTS actions_opp_idx ON actions (opp_id, state);
+
+-- The management layer. Products are TEXT names everywhere in this codebase (tags, product_kb,
+-- opportunities.product), so these key on the name too rather than introducing an id that nothing
+-- else uses yet and half-migrating the whole schema.
+CREATE TABLE IF NOT EXISTS sectors (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS product_meta (
+  product    TEXT PRIMARY KEY,
+  sector_id  BIGINT REFERENCES sectors(id),
+  owner      TEXT,
+  updated_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS targets (
+  product  TEXT   NOT NULL,
+  year     INT    NOT NULL,
+  quarter  INT    NOT NULL CHECK (quarter BETWEEN 1 AND 4),
+  amount   BIGINT NOT NULL CHECK (amount >= 0),
+  updated_at BIGINT NOT NULL,
+  updated_by TEXT,
+  PRIMARY KEY (product, year, quarter)
+);
+
+-- Widen the stage ladder from six to eight. The mapping is an identity: every live stage keeps its
+-- key, and discover and quote are new, so no row is reclassified and no rep's board changes.
+-- DROP then ADD, because CREATE TABLE IF NOT EXISTS alters no existing constraint.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_stage_check;
+ALTER TABLE opportunities ADD  CONSTRAINT opportunities_stage_check
+  CHECK (stage IN ('contact','discover','present','tech','quote','negotiate','won','lost'));
+
+-- Seed the opening event for every opportunity that predates the ledger, so a deal that already
+-- exists is not invisible to the targets model. effective_at is its best known moment: when the
+-- stage last moved. Marked so it can never be mistaken for a witnessed transition.
+INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor, note)
+SELECT o.id, NULL, o.stage, to_timestamp(o.stage_at / 1000.0), $NOW$, 'migration',
+       'backfilled from opportunities.stage_at — the stage was already here, the moment is approximate'
+FROM opportunities o
+WHERE NOT EXISTS (SELECT 1 FROM track_stage_events e WHERE e.opp_id = o.id);
+`,
+  },
+];
+
+/** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
+async function runMigrations(p: pg.Pool): Promise<void> {
+  await p.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY, applied_at BIGINT NOT NULL)`);
+  const client = await p.connect();
+  try {
+    await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    const done = new Set<string>(
+      (await client.query("SELECT version FROM schema_migrations")).rows.map((r: any) => String(r.version)));
+    for (const m of MIGRATIONS) {
+      if (done.has(m.version)) continue;
+      try {
+        await client.query("BEGIN");
+        await client.query(m.sql.replaceAll("$NOW$", String(Date.now())));
+        await client.query("INSERT INTO schema_migrations (version, applied_at) VALUES ($1,$2)",
+          [m.version, Date.now()]);
+        await client.query("COMMIT");
+        console.log(JSON.stringify({ at: "db", msg: "migration applied", version: m.version }));
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw new Error(`migration ${m.version} failed: ${String(e).slice(0, 300)}`);
+      }
+    }
+    await seedDefaultPipeline(client);
+  } finally {
+    await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
+    client.release();
+  }
+}
+
+/** The ladder is DATA, and sales-domain is its single source of truth. Re-seeded every boot by key
+ *  so a weight corrected in code reaches the database without anyone writing a migration for it. */
+async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
+  const r = await client.query("SELECT id FROM pipelines WHERE product IS NULL LIMIT 1");
+  let id: number;
+  if (r.rowCount) id = Number(r.rows[0].id);
+  else {
+    const ins = await client.query(
+      "INSERT INTO pipelines (name, product, created_at) VALUES ($1,NULL,$2) RETURNING id",
+      ["المسار الافتراضي", Date.now()]);
+    id = Number(ins.rows[0].id);
+  }
+  for (const st of SALES_STAGES) {
+    await client.query(
+      `INSERT INTO pipeline_stages (pipeline_id, key, label, weight_pct, position, exit_criterion)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (pipeline_id, key) DO UPDATE
+         SET label = EXCLUDED.label, weight_pct = EXCLUDED.weight_pct,
+             position = EXCLUDED.position, exit_criterion = EXCLUDED.exit_criterion`,
+      [id, st.key, st.label, st.weightPct, st.position, st.exitCriterion]);
+  }
+}
+
 export async function init(): Promise<void> {
   if (!enabled()) {
     console.log(JSON.stringify({ at: "db", msg: "DATABASE_URL not set — memory-only mode" }));
@@ -315,6 +494,7 @@ export async function init(): Promise<void> {
       console.error(JSON.stringify({ at: "db", msg: "pool error — memory-only until recovery", err: String(e).slice(0, 200) }));
     });
     await pool.query(MIGRATION);
+    await runMigrations(pool);
     migrated = true;
     markConnected();
     console.log(JSON.stringify({ at: "db", msg: "connected + migrated" }));
