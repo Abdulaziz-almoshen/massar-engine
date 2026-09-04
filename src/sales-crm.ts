@@ -40,7 +40,8 @@ export const SALES_CRM_CSS = `
 .perf-sec{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:400}
 .perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#EDEDED);
   min-width:90px;overflow:hidden}
-.perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block}
+.perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block;
+  background:#1F7A73}
 .perf-bar .pace{position:absolute;inset-block:-2px;width:2px;background:var(--ink,#1A1A1A);opacity:.45}
 .perf-rag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
 .perf-rag .dot{width:7px;height:7px;border-radius:999px;flex:none}
@@ -84,13 +85,21 @@ function perfRag(attain, elapsed) {
 
 function perfBar(attain, elapsed) {
   if (attain === null) return '<div class="perf-bar"></div>';
-  var key = ragKey(attain, elapsed);
-  var col = key === "good" ? "#2E6B4F" : key === "warn" ? "#7A5C00" : "#A32B21";
   var w = Math.max(0, Math.min(100, attain));
   var pace = Math.max(0, Math.min(100, (Number(elapsed) || 0) * 100));
-  // The tick is where the quarter is. A bar short of it is behind pace even if the colour is green.
-  return '<div class="perf-bar"><i style="width:' + w.toFixed(1) + '%;background:' + col + '"></i>' +
-         '<span class="pace" style="inset-inline-start:' + pace.toFixed(1) + '%"></span></div>';
+  // TEAL, always. DESIGN.md invariant 3 lists "progress fill" as a teal-only use, and the charts
+  // rule is blunter: teal is the only saturated hue in a chart, because "four bars in four colours
+  // taught that teal, green and navy meant something. They did not."
+  //
+  // The status is not lost, it moves to where the design system puts it — the dot and label beside
+  // the bar (invariant 8: row state is a dot + label). That reads for a colour-blind director too,
+  // which a green-versus-red bar never did.
+  //
+  // The tick is the honest signal here: it marks how far through the quarter we are. A fill short
+  // of the tick is behind pace, and that is POSITIONAL, not chromatic.
+  return '<div class="perf-bar"><i style="width:' + w.toFixed(1) + '%"></i>' +
+         '<span class="pace" style="inset-inline-start:' + pace.toFixed(1) + '%" ' +
+         'title="موضعنا من الربع"></span></div>';
 }
 
 async function perfLoad(year, quarter) {
