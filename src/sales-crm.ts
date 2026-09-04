@@ -126,6 +126,16 @@ window.perfPick = function (q) {
   perfLoad(perfState.year || 0, q);
 };
 
+/* The product name is attacker-supplied: tags are minted from an uploaded spreadsheet cell
+   (audience.ts tagsFromCell caps the length and validates no characters). It therefore never goes
+   into an inline handler — an HTML attribute is decoded before the JS parser sees it, so any
+   escaping done here is undone by the parser. It travels as a data attribute and is read back as
+   a string, which no amount of quoting in the name can break out of. */
+document.addEventListener("click", function (e) {
+  var b = e.target && e.target.closest ? e.target.closest("[data-perf-product]") : null;
+  if (b) window.perfSetTarget(b.getAttribute("data-perf-product"));
+});
+
 window.perfSetTarget = async function (product) {
   var cur = 0;
   var rows = (perfState.data && perfState.data.rows) || [];
@@ -232,7 +242,7 @@ function vSalesPerf() {
       '<td class="money">' + (at === null ? "—" : fmtN(Math.round(at)) + "٪") + "</td>" +
       '<td class="money perf-sechide">' + (cv === null ? "—" : fmtN(Math.round(cv)) + "٪") + "</td>" +
       "<td>" + perfRag(at, elapsed) + "</td>" +
-      '<td><button class="perf-set" onclick="perfSetTarget(' + JSON.stringify(r.product).replace(/"/g, "&quot;") + ')">' +
+      '<td><button class="perf-set" data-perf-product="' + esc(r.product) + '">' +
         (r.target ? "تعديل" : "تحديد المستهدف") + "</button></td>" +
       "</tr>";
   }

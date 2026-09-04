@@ -50,7 +50,7 @@ async function reprobe(): Promise<boolean> {
     await pool.query("SELECT 1");
     // A boot whose init() died mid-migration reaches here with tables possibly missing — finish
     // the job before declaring the pool usable, or every read after "recovery" would still throw.
-    if (!migrated) { await pool.query(MIGRATION); await runMigrations(pool); migrated = true; }
+    if (!migrated) { await runMigrations(pool); migrated = true; }
     markConnected();
     console.log(JSON.stringify({ at: "db", msg: "reconnected after a pool error" }));
   } catch {
@@ -429,11 +429,19 @@ WHERE NOT EXISTS (SELECT 1 FROM track_stage_events e WHERE e.opp_id = o.id);
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
 async function runMigrations(p: pg.Pool): Promise<void> {
-  await p.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
-    version TEXT PRIMARY KEY, applied_at BIGINT NOT NULL)`);
   const client = await p.connect();
   try {
+    // The lock comes FIRST, and the bookkeeping table is created on the locked client. Taking it
+    // after the CREATE left the one window the lock exists to close: CREATE TABLE IF NOT EXISTS is
+    // not concurrency-safe in Postgres, so two sessions racing it (a deploy overlap, or reprobe()
+    // landing on a boot) raise 23505/42P07 on pg_type_typname_nsp_index. That throw escapes init(),
+    // and the process falls back to memory-only — every write silently dropped until a restart.
     await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    // MIGRATION (the base schema) runs here too, for the same reason: it is a wall of
+    // CREATE TABLE IF NOT EXISTS, and it used to run on the bare pool before the lock was taken.
+    await client.query(MIGRATION);
+    await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      version TEXT PRIMARY KEY, applied_at BIGINT NOT NULL)`);
     const done = new Set<string>(
       (await client.query("SELECT version FROM schema_migrations")).rows.map((r: any) => String(r.version)));
     for (const m of MIGRATIONS) {
@@ -540,7 +548,6 @@ export async function init(): Promise<void> {
       connected = false;
       console.error(JSON.stringify({ at: "db", msg: "pool error — memory-only until recovery", err: String(e).slice(0, 200) }));
     });
-    await pool.query(MIGRATION);
     await runMigrations(pool);
     migrated = true;
     markConnected();
@@ -715,7 +722,9 @@ export async function loadAll(): Promise<{
  *
  *  Returns raw money and raw counts. Attainment, coverage and the RAG band are computed by
  *  sales-domain in the browser, so the arithmetic has exactly one home. */
-export async function salesPerformance(startMs: number, endMs: number, year: number, quarter: number): Promise<{
+export async function salesPerformance(
+  startMs: number, endMs: number, year: number, quarter: number, isCurrentPeriod: boolean,
+): Promise<{
   product: string; sector: string | null; target: number; achieved: number;
   weightedOpen: number; openCount: number; wonCount: number;
 }[]> {
@@ -732,13 +741,30 @@ export async function salesPerformance(startMs: number, endMs: number, year: num
           AND e.effective_at <  to_timestamp($2 / 1000.0)
         GROUP BY o.product
      ),
+     -- Two bugs lived in this block and both were silent.
+     --
+     -- 1. The join had no pipeline_id, so it was 1:1 only while exactly one ladder existed. The
+     --    schema deliberately allows a per-product ladder (pipelines.product), and pipeline_stages
+     --    is unique on (pipeline_id, key) — NOT on key. The first second pipeline anyone inserted
+     --    would have doubled every product's weightedOpen and openCount with nothing on screen
+     --    saying so. Pinned to the default ladder until per-product ladders are actually resolved.
+     --
+     -- 2. It ignored $1/$2 entirely, so picking Q1 2024 returned TODAY's open pipeline and the
+     --    coverage tile added current deals to a closed quarter's achieved figure. Open value is
+     --    now what is expected to close IN the selected period. A deal with no close_on has no
+     --    period to belong to, so it counts only when the period is the one we are inside —
+     --    $5 is that flag, decided by the caller rather than guessed in SQL.
      openv AS (
        SELECT o.product,
               SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0) * ps.weight_pct / 100.0) AS weighted,
               COUNT(*) AS open_count
          FROM opportunities o
-         JOIN pipeline_stages ps ON ps.key = o.stage
+         JOIN pipeline_stages ps
+           ON ps.key = o.stage
+          AND ps.pipeline_id = (SELECT id FROM pipelines WHERE product IS NULL ORDER BY id LIMIT 1)
         WHERE o.stage NOT IN ('won','lost')
+          AND ( (o.close_on IS NOT NULL AND o.close_on >= $1 AND o.close_on < $2)
+             OR (o.close_on IS NULL AND $5) )
         GROUP BY o.product
      ),
      tgt AS (
@@ -758,7 +784,7 @@ export async function salesPerformance(startMs: number, endMs: number, year: num
        LEFT JOIN openv ON openv.product = t.name
        LEFT JOIN tgt   ON tgt.product   = t.name
       ORDER BY COALESCE(tgt.amount,0) DESC, t.name`,
-    [startMs, endMs, year, quarter]);
+    [startMs, endMs, year, quarter, isCurrentPeriod]);
   return r.rows.map((x: any) => ({
     product: String(x.product), sector: x.sector ? String(x.sector) : null,
     target: Number(x.target) || 0, achieved: Math.round(Number(x.achieved) || 0),

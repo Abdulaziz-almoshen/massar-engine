@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { cfg, configReport } from "./config.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
 import * as db from "./db.js";
@@ -17,11 +18,59 @@ import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
 import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
 import { activityByDay, readSeriousness } from "./signal-domain.js";
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
 await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+
+// One shared token, no users, no sessions, no rotation — and until now no lockout, so an online
+// guessing attack had unlimited attempts against the credential that can message real clinics.
+// Scoped to /admin ONLY. NOT the webhook: Gupshup bursts delivery statuses far past any sane
+// per-minute cap during a campaign, and a throttled webhook drops inbound — which can be an
+// «إيقاف». Opt-out is sacred (CLAUDE.md §7), so the webhook keeps its token and no limiter.
+// /dashboard and /health stay open too: a limit that locks an operator out of the screen is a
+// limit someone removes.
+//
+// Registered global with an allowList that skips everything outside /admin, rather than
+// global:false plus per-route config — the per-route form needs the config on each route's own
+// definition, and setting it from an onRoute hook does NOT take: it was verified silently doing
+// nothing (40 wrong-token attempts, 40 x 401, zero 429).
+//
+// ONLY FAILED ATTEMPTS COUNT. The threat here is an online guessing attack on the one shared
+// token, not authorised traffic, so a request carrying a VALID token is allow-listed and consumes
+// no quota. Counting every admin call instead was measured breaking the product: a clean smoke run
+// of the dashboard's own screens blew past 120/min and #kmon and the client record came back 429
+// with a blank render. Limiting the credential check rather than the user costs the operator
+// nothing and still caps guessing at 20/min per IP.
+await app.register(rateLimit, {
+  global: true,
+  max: 20,
+  timeWindow: "1 minute",
+  // Fly puts the real client in fly-client-ip; req.ip is the proxy, and limiting the proxy would
+  // throttle every operator together the first time one of them typed a wrong token.
+  keyGenerator: (req: any) => String(req.headers["fly-client-ip"] || req.ip),
+  allowList: (req: any) => !String(req.url || "").startsWith("/admin") || adminOk(req),
+  // statusCode belongs ON the returned object: Fastify reads it off the error, and without it the
+  // correct body went out under a 500. Verified — 120 x 401 then 30 x 429.
+  errorResponseBuilder: () => ({ statusCode: 429, status: "too_many_requests", error: "محاولات كثيرة. انتظر دقيقة." }),
+});
+
+// No error handler existed, so Fastify's default returned err.message verbatim — which for a
+// database failure is the raw pg text, relation and column names included. Detail is logged
+// server-side; the caller gets the status and nothing that describes the schema.
+app.setErrorHandler((err: any, req, reply) => {
+  const status = Number(err?.statusCode) || 500;
+  if (status >= 500) {
+    console.error(JSON.stringify({
+      at: "http", level: "error", msg: "unhandled route error",
+      url: String(req.url || "").split("?")[0], err: String(err?.message ?? err).slice(0, 300),
+    }));
+    return reply.code(status).send({ status: "error", error: "تعذّر تنفيذ الطلب." });
+  }
+  // 4xx is the app's own deliberate answer (auth, validation, the rate limiter) — pass it through.
+  return reply.code(status).send(err?.status || err?.error ? err : { status: "error", error: String(err?.message ?? "") });
+});
 const startedAt = Date.now();
 
 function log(obj: Record<string, unknown>) {
@@ -39,7 +88,7 @@ app.post("/webhooks/gupshup", async (req, reply) => {
   // guard evaluate false and accepted every POST — while configReport() printed "webhook is
   // unauthenticated!" and the app booted anyway. A forged webhook can flip opt-out state and
   // write the transcript the agent reads back, so an absent secret must refuse, not wave through.
-  if (!cfg.webhookToken || token !== cfg.webhookToken) {
+  if (!cfg.webhookToken || !secretEq(String(token), cfg.webhookToken)) {
     return reply.code(401).send({ status: "unauthorized" });
   }
 
@@ -154,8 +203,18 @@ app.get("/admin/sales/performance", async (req, reply) => {
   if (quarter < 1 || quarter > 4) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
   }
+  // Year was unchecked while quarter was, and the asymmetry was reachable: Date.UTC overflows past
+  // year 275760, riyadhPeriodBounds then returns NaN, pg serialises that as the string "NaN", and
+  // to_timestamp raises — surfacing the raw driver error, relation names included, as a 500.
+  // Same range POST /admin/sales/targets already enforces.
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
+  }
   const b = sales.riyadhPeriodBounds(year, quarter, fsm);
-  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter);
+  // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned close
+  // date belongs to the current period or to none, and the decision is made here rather than in SQL.
+  const isCurrentPeriod = year === now.year && quarter === now.quarter;
+  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter, isCurrentPeriod);
   return {
     ok: true, year, quarter, fiscalStartMonth: fsm,
     periodStart: b.startMs, periodEnd: b.endMs, now: Date.now(),
@@ -170,7 +229,8 @@ app.post("/admin/sales/targets", async (req, reply) => {
   if (!product) return reply.code(400).send({ ok: false, error: "invalid_field", field: "product" });
   const known = new Set((await db.listTags()).map((t) => t.name));
   if (!known.has(product)) {
-    return reply.code(400).send({ ok: false, error: "unknown_product", product, known: [...known] });
+    // The count, not the catalogue: an error body is not a place to enumerate the product line.
+    return reply.code(400).send({ ok: false, error: "unknown_product", product, knownCount: known.size });
   }
   const year = Number(b.year), quarter = Number(b.quarter), amount = Number(b.amount);
   if (!Number.isFinite(year) || year < 2020 || year > 2100) {
@@ -238,8 +298,22 @@ app.get("/integration/product-interest", async (req, reply) => {
 
 // ------------------------------ admin (token-gated) ------------------------------
 
+/** Constant-time string compare for secrets. Lengths are compared first and separately, because
+ *  timingSafeEqual THROWS on a length mismatch and a secret's length is not what needs protecting. */
+function secretEq(got: string, want: string): boolean {
+  const a = Buffer.from(got, "utf8"), b = Buffer.from(want, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Constant-time, because `===` on a secret leaks its prefix through timing and this one token is
+ *  the entire authorization model: it can launch campaigns to real clinics and read every
+ *  transcript. Lengths are compared first and separately — timingSafeEqual THROWS on a length
+ *  mismatch, and the length of a token is not the secret worth protecting. */
 function adminOk(req: any): boolean {
-  return Boolean(cfg.adminToken) && req.headers["x-admin-token"] === cfg.adminToken;
+  if (!cfg.adminToken) return false;
+  const got = req.headers["x-admin-token"];
+  if (typeof got !== "string") return false;
+  return secretEq(got, cfg.adminToken);
 }
 /** WHO typed a fact. One operator today (assumption A-3), so the token is the authorization and
  *  this is only a label on the record.

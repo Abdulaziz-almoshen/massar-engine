@@ -271,6 +271,44 @@ describe("the browser seam", () => {
     expect(SALES_DOMAIN_JS).toContain("function ragKey");
   });
 
+  it("actually evaluates standalone, with every shipped function CALLED", () => {
+    // The strongest check available, and the reason the two above are not enough on their own:
+    // checkSalesDomainClosure() pattern-matches identifiers and only inspects capitalised ones, so
+    // a lowercase free reference slips past it. This evaluates the real payload in an isolated
+    // Function scope — which sees globals and NOTHING from this module — and then CALLS every
+    // function, because a ReferenceError in a body only fires on invocation. Defining them proves
+    // nothing.
+    //
+    // Residual gap, stated rather than papered over: a Function scope in Node still sees Node
+    // globals the browser lacks (`process`, `Buffer`). Those stay the pattern checker's job.
+    const run = new Function(
+      SALES_DOMAIN_JS +
+        `;
+        return [
+          stageWeight("present", SALES_STAGES),
+          isTerminalStage("won"),
+          isStalled("present", 40, STALL_STAGES, STALL_DAYS),
+          weightedValue(1000, 2, 3, 10, "present", SALES_STAGES),
+          riyadhFiscalPeriod(Date.now(), 1),
+          riyadhPeriodBounds(2026, 3, 1),
+          attainmentPct(50, 100),
+          coveragePct(50, 20, 100),
+          periodElapsedFraction(Date.now(), Date.now() - 1000, Date.now() + 1000),
+          ragKey(50, 0.5),
+          contactState(3, true),
+        ];`,
+    );
+    const out = run() as unknown[];
+    expect(out).toHaveLength(11);
+    // And the values agree with the Node-side implementations, so the seam carries behaviour and
+    // not just syntax.
+    expect(out[0]).toBe(stageWeight("present", SALES_STAGES));
+    expect(out[3]).toBe(weightedValue(1000, 2, 3, 10, "present", SALES_STAGES));
+    expect(out[6]).toBe(attainmentPct(50, 100));
+    expect(out[9]).toBe(ragKey(50, 0.5));
+    expect(out[10]).toBe(contactState(3, true));
+  });
+
   it("declares no lowercase module-scope binding, which the closure checker depends on", () => {
     // checkSalesDomainClosure only inspects identifiers starting with an upper-case letter, so a
     // lowercase module-scope const referenced from a shipped function would pass in Node and throw

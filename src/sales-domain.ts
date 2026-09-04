@@ -18,7 +18,9 @@
 // SAME TWO-RUNTIME CONSTRAINT AS opps-domain.ts, and it is load-bearing: every function in
 // DOMAIN_FNS must be SELF-CONTAINED. It may reference only its own parameters and the constants
 // injected alongside it. A helper that resolves in Node and not in the browser is a blank page.
-// `checkSalesDomainClosure()` asserts exactly that at boot.
+// `checkSalesDomainClosure()` pattern-checks that, and the "actually evaluates standalone" test
+// in tests/sales-domain.test.ts proves it by CALLING every shipped function in an isolated
+// scope. Neither runs at boot: the npm test gate is what enforces this, not the server.
 
 /** One rung of the ladder. `weightPct` is what makes a forecast possible at all: six unweighted
  *  stages cannot produce the number a sales director is measured on. */

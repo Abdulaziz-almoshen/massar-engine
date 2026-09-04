@@ -8,10 +8,16 @@
 // goes through the same validators the portal uses — an invalid line fails here exactly as it
 // would in production.
 //
-// SAFETY. This script never calls a send route. The four that reach WhatsApp
-// (/admin/send-test, /admin/send-template, /admin/campaign/launch, /admin/campaign/test) are
-// listed in FORBIDDEN below and asserted against every request before it is made, so a careless
-// edit fails loudly instead of messaging a real clinic. Point it only at localhost.
+// SAFETY. A route denylist is NOT enough and this script used to rely on one. The four admin
+// send routes are in FORBIDDEN below, but the webhook is a FIFTH path to the wire: a forged
+// inbound message drives agent.handleInbound, which replies through safeSend — and one of the
+// seeded turns is «إيقاف», whose handler sends a confirmation. The seeded destinations are
+// well-formed Saudi mobiles.
+//
+// So the precondition is asserted, not assumed: assertCannotSend() reads GET /health and refuses
+// to run unless the engine reports outbound.ok === false. A blank GUPSHUP_API_KEY was always the
+// real reason this was safe; now it is checked instead of described in a comment. Point it only
+// at localhost.
 //
 // Usage:  node scripts/seed-local.mjs [baseUrl] [adminToken]
 //         node scripts/seed-local.mjs http://127.0.0.1:8080 local
@@ -26,6 +32,27 @@ if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(BASE)) {
 }
 
 const FORBIDDEN = ["/admin/send-test", "/admin/send-template", "/admin/campaign/launch", "/admin/campaign/test"];
+
+/** Refuse to run against an engine that CAN reach WhatsApp. config.ts does `import "dotenv/config"`,
+ *  so an engine started from the repo directory picks up the real .env and its live keys — which is
+ *  exactly the setup a developer running this script is most likely to have. */
+async function assertCannotSend() {
+  let h;
+  try {
+    h = await (await fetch(BASE + "/health")).json();
+  } catch (e) {
+    console.error(`refusing to seed: cannot read ${BASE}/health (${String(e).slice(0, 80)})`);
+    process.exit(1);
+  }
+  if (h?.outbound?.ok !== false) {
+    console.error("REFUSING TO SEED: this engine can send WhatsApp messages.");
+    console.error(`  /health outbound: ${JSON.stringify(h?.outbound)}`);
+    console.error("  The seeder forges inbound webhooks, and the agent replies to them.");
+    console.error("  Start the engine with GUPSHUP_API_KEY unset (e.g. GUPSHUP_API_KEY= npm start).");
+    process.exit(1);
+  }
+  console.log(`outbound disabled (${h.outbound.reason}) — safe to seed\n`);
+}
 
 let ok = 0, failed = 0;
 
@@ -82,7 +109,8 @@ const OPPS = [
 ];
 
 // Inbound WhatsApp turns, in the Gupshup v2 envelope the webhook actually parses.
-// The agent cannot reply: OPENAI_API_KEY and GUPSHUP_API_KEY are both blank in a seeded run.
+// These DO drive the agent's reply path, including «إيقاف» -> safeSend. assertCannotSend() above
+// is what makes that safe, by proving outbound is dead before the first one is posted.
 const INBOUND = [
   ["966500000801", "السلام عليكم، وصلتني رسالتكم عن التكامل. عندنا Cerner في ثلاثة فروع."],
   ["966500000801", "كم تقريبًا التكلفة السنوية؟"],
@@ -121,6 +149,7 @@ const wa = (phone, text, i) => ({
 });
 
 async function main() {
+  await assertCannotSend();
   console.log(`seeding ${BASE}\n`);
 
   // Products are tags, and an opportunity line is rejected unless its product is a KNOWN tag.
