@@ -167,6 +167,31 @@ export function readMomentum(transcript: readonly SignalTurn[], now: number): { 
  * carry messages compresses a three-week silence into the gap between two adjacent bars and shows
  * a healthy rhythm that never happened. The silence is the signal.
  */
+/** The same chart, from exact per-day counts instead of from a resident transcript.
+ *
+ *  Shares activityByDay's bucket construction deliberately: every day in the window is present,
+ *  empty ones included, in the identical shape. A chart whose bars appear only on days that had
+ *  traffic reads as a different chart, and the one thing this change must not do is redraw a
+ *  shipped surface while claiming to only make it accurate. */
+export function activityFromCounts(
+  counts: readonly { day: number; inbound: number; outbound: number }[],
+  now: number,
+  days: number,
+): { day: number; inbound: number; outbound: number }[] {
+  const span = Math.max(1, Math.floor(days));
+  const startOfToday = Math.floor(now / DAY_MS) * DAY_MS;
+  const buckets = new Map<number, { day: number; inbound: number; outbound: number }>();
+  for (let i = span - 1; i >= 0; i--) {
+    const day = startOfToday - i * DAY_MS;
+    buckets.set(day, { day, inbound: 0, outbound: 0 });
+  }
+  for (const c of counts) {
+    const b = buckets.get(c.day);
+    if (b) { b.inbound += c.inbound; b.outbound += c.outbound; }
+  }
+  return [...buckets.values()];
+}
+
 export function activityByDay(
   transcript: readonly SignalTurn[],
   now: number,

@@ -17,8 +17,21 @@ import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
 import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
-import { activityByDay, readSeriousness } from "./signal-domain.js";
+import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
+
+// THE RISK IS A BLOCKED LOOP, SO MEASURE THE LOOP. The queue scores contacts in synchronous JS on
+// one shared CPU that also serves the Gupshup webhook, and the dashboard polls every five seconds.
+// Contact count says nothing about that, and RSS only notices pressure after it exists — by which
+// point the symptom is a webhook that timed out, and a timed-out webhook can be a lost «إيقاف».
+//
+// resolution:20 keeps the histogram cheap; it samples, it does not instrument every tick.
+const LOOP_RESOLUTION_MS = 20;
+const loopDelay = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
+loopDelay.enable();
+const loopLagMs = (ns: number) =>
+  Math.max(0, Math.round((ns / 1e6 - LOOP_RESOLUTION_MS) * 10) / 10);
 import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
@@ -181,6 +194,17 @@ app.get("/health", async () => ({
   gupshupAppName: gupshup.appName() || "(unknown — learned from first webhook)",
   sourceNumber: gupshup.sourceNumber() || "(unset — auto-learns from v3 webhooks)",
   outbound: gupshup.outboundReady(),
+  // Milliseconds the event loop was late. p99 is the number that matters: a mean stays flat while
+  // one 300ms scoring pass a minute quietly delays every webhook behind it.
+  // The histogram measures the whole interval, so an IDLE process reads ~20ms at resolution 20.
+  // Reporting that raw would have an operator chasing a lag that is only the sampler. Subtracting
+  // the resolution makes the number mean what its name says: milliseconds the loop was LATE.
+  loop: {
+    meanMs: loopLagMs(loopDelay.mean),
+    p99Ms: loopLagMs(loopDelay.percentile(99)),
+    maxMs: loopLagMs(loopDelay.max),
+  },
+  contacts: tracker.contactCount(),
   db: { enabled: db.enabled(), connected: db.isConnected(), counts: await db.counts() },
   // The account graph, reported honestly: `known` counts entities in the snapshot, `withFacts`
   // counts the ones that actually carry a fact the agent can state. Before this cycle the second
@@ -871,6 +895,18 @@ app.get("/admin/customer/:phone", async (req, reply) => {
     return Number.isFinite(w) ? w : 0;
   };
   const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
+
+  // THE LIFETIME READ GETS THE LIFETIME TRANSCRIPT. The resident Map holds the last 50 messages
+  // per contact, so seriousness — which index.ts below calls deliberately lifetime — was silently
+  // a recent-50 question for any account worth opening. Loaded from Postgres per-record: this is
+  // one row's page view, not a hot path, and the honesty is worth the query. Falls back to the
+  // resident copy when there is no database, so a local dev still renders.
+  const lifetime = db.enabled() ? await db.fullTranscript(phone) : [];
+  const transcriptForSignal = lifetime.length ? lifetime : (contact.transcript || []);
+  // The chart is aggregated in Postgres over the WHOLE table, so 21 days means 21 days even for a
+  // contact with 400 messages. Computed from the resident copy only when there is no database.
+  const activityCounts = db.enabled() ? await db.activityCountsByDay(phone, 21) : null;
+
   return {
     contact, entity, insights: ins,
     // NFR-3 made visible: with no DATABASE_URL (or a dropped pool) a property write CANNOT persist,
@@ -908,7 +944,7 @@ app.get("/admin/customer/:phone", async (req, reply) => {
     // client» is a question about the person, and a prospect who priced the deal last month is
     // serious today even when today's campaign window holds one message.
     signal: readSeriousness({
-      transcript: contact.transcript || [],
+      transcript: transcriptForSignal as never,
       tags: contact.tags || [],
       outcome: contact.outcome,
       optedOut: contact.optedOut,
@@ -917,7 +953,11 @@ app.get("/admin/customer/:phone", async (req, reply) => {
     }),
     // 21 days: three weeks is long enough to show a conversation going quiet and short enough that
     // each bar is still a readable day on a 300px chart.
-    activity: activityByDay(contact.transcript || [], Date.now(), 21),
+    activity: activityCounts
+      ? activityFromCounts(activityCounts, Date.now(), 21)
+      : activityByDay(contact.transcript || [], Date.now(), 21),
+    // Stated on the response because it changes how the two figures above should be read.
+    transcriptSource: lifetime.length ? "lifetime" : "resident",
     // Newest FIRST, and carrying the launch time. Without a date and an order these rendered as a
     // row of identical blue chips, so the founder could not tell which campaign started the
     // conversation he was looking at — his words: «not sure which one is related to the last one».

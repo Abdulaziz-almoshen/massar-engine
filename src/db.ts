@@ -1552,6 +1552,72 @@ export async function hotReadings(): Promise<{ phone: string; product: string; w
       WHERE t.level = 'hot'`)).rows;
 }
 
+// ---------------------------------------------------------------------------
+// THE TRANSCRIPT HAS INCOMPATIBLE CONSUMERS, so it stopped being served by one policy.
+//
+// hydrate() keeps the last 50 messages per contact BY COUNT. Three things read that, and they want
+// different windows:
+//
+//   · readSeriousness is DELIBERATELY LIFETIME — index.ts states it: «a prospect who priced the
+//     deal last month is serious today». Truncating to 50 silently makes it a recent-50 question.
+//   · activityByDay draws 21 days. A chatty account blows past 50 messages inside a week, so the
+//     chart was already wrong today for exactly the accounts anyone would look at.
+//   · the agent needs recent context only, which is what the resident Map is genuinely for.
+//
+// A first attempt swapped the count for a 90-day window, which was the same mistake in a different
+// unit — it would have quietly redefined a lifetime signal. So the consumers were split instead:
+// the two exact questions are answered by SQL over the full table, and the Map stays what it always
+// should have been, the agent's working set.
+// ---------------------------------------------------------------------------
+
+/** Every message for one contact, oldest first. Loaded per-record, on demand, because the lifetime
+ *  read is a question about a person and a resident cache cannot bound it honestly. */
+export async function fullTranscript(phone: string): Promise<{ role: string; text: string; ts: number }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT role, text, ts FROM messages WHERE phone = $1 ORDER BY ts ASC`, [phone]);
+  // messages.ts is BIGINT epoch-ms, not a timestamp. node-pg returns bigint as a STRING, so
+  // new Date(x.ts) yields Invalid Date and every signal silently reads NaN.
+  return r.rows.map((x: any) => ({
+    role: String(x.role), text: String(x.text ?? ""), ts: Number(x.ts),
+  }));
+}
+
+/** Per-day message counts, aggregated in Postgres over the WHOLE table rather than over whatever
+ *  50 messages happen to be resident.
+ *
+ *  Buckets on the UTC day, matching activityByDay's existing boundary EXACTLY. Riyadh days would
+ *  arguably be more correct for a Saudi product, but moving the boundary would silently redraw a
+ *  shipped chart, and that is a design decision, not a side effect of making the data exact. The
+ *  only change here is correctness for talkative accounts. */
+export async function activityCountsByDay(phone: string, days: number): Promise<{ day: number; inbound: number; outbound: number }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    // ts is BIGINT epoch-ms. Bucketing is integer division, not date arithmetic, and the window is
+    // a plain lower bound — `extract(epoch FROM ts)` and `now() - interval` both fail on a bigint,
+    // which is how this surfaced: a 500 on the client record the first time it ran.
+    `SELECT (ts / 86400000) * 86400000 AS day,
+            COUNT(*) FILTER (WHERE role = 'customer') AS inbound,
+            COUNT(*) FILTER (WHERE role = 'agent')    AS outbound
+       FROM messages
+      WHERE phone = $1 AND ts >= $2
+      GROUP BY 1 ORDER BY 1`,
+    [phone, Date.now() - Math.max(1, Math.min(365, days)) * 86_400_000]);
+  return r.rows.map((x: any) => ({
+    day: Number(x.day), inbound: Number(x.inbound) || 0, outbound: Number(x.outbound) || 0,
+  }));
+}
+
+/** How many messages this contact has ever exchanged. Used for sorting «العملاء»; the resident
+ *  transcript length was a truncated proxy that ranked a 400-message account level with a 50. */
+export async function transcriptCounts(): Promise<Record<string, number>> {
+  if (!(await reprobe()) || !pool) return {};
+  const r = await pool.query(`SELECT phone, COUNT(*) n FROM messages GROUP BY phone`);
+  const out: Record<string, number> = {};
+  for (const x of r.rows) out[String(x.phone)] = Number(x.n) || 0;
+  return out;
+}
+
 /** The raw rows Gate A is computed from. Deliberately raw: the arithmetic lives in sales-domain
  *  where it is pure and unit-tested, so the gate's verdict cannot be one thing in SQL and another
  *  on screen. */

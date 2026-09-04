@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  activityByDay, bandOf, readMomentum, readSeriousness, replyLatencies,
+  activityByDay, activityFromCounts, bandOf, readMomentum, readSeriousness, replyLatencies,
   type SignalTurn,
 } from "../src/signal-domain.js";
 
@@ -207,5 +207,31 @@ describe("readSeriousness", () => {
     expect(read.daysSilent).toBeNull();
     expect(read.replyMinutes).toBeNull();
     expect(read.momentum).toBe("none");
+  });
+});
+
+describe("activityFromCounts — the exact chart, in the shape the old one drew", () => {
+  it("emits every day in the window, empties included, like activityByDay", () => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const today = Math.floor(now / DAY) * DAY;
+    const fromCounts = activityFromCounts([{ day: today, inbound: 3, outbound: 1 }], now, 21);
+    const fromTranscript = activityByDay(
+      [{ role: "customer", text: "a", ts: now }, { role: "customer", text: "b", ts: now },
+       { role: "customer", text: "c", ts: now }, { role: "agent", text: "d", ts: now }],
+      now, 21);
+    // Same length, same keys, same day boundaries — the point is that making the data exact must
+    // not redraw a shipped chart.
+    expect(fromCounts.length).toBe(fromTranscript.length);
+    expect(fromCounts.map((b) => b.day)).toEqual(fromTranscript.map((b) => b.day));
+    expect(fromCounts[fromCounts.length - 1]).toEqual(fromTranscript[fromTranscript.length - 1]);
+  });
+
+  it("drops counts that fall outside the window instead of folding them into an edge bucket", () => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const old = Math.floor((now - 400 * DAY) / DAY) * DAY;
+    const out = activityFromCounts([{ day: old, inbound: 99, outbound: 99 }], now, 21);
+    expect(out.every((b) => b.inbound === 0 && b.outbound === 0)).toBe(true);
   });
 });
