@@ -43,7 +43,7 @@ c("located the migration regions to exclude", migrationRanges.length >= 2,
 
 // Tables the shipped screens read. A read with no writer is a screen that shows migration-day
 // values forever. Add a table here when a screen starts reading it.
-const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pipeline_stages", "pipelines"];
+const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pipeline_stages", "pipelines", "engagements", "actions"];
 
 for (const table of MUST_HAVE_WRITERS) {
   const writers = [];
@@ -56,6 +56,13 @@ for (const table of MUST_HAVE_WRITERS) {
   c(`${table} has a runtime writer`, writers.length > 0,
     writers.length ? `db.ts:${writers.join(", ")}` : "ONLY the migration writes it — every screen reading it is frozen");
 }
+
+// DELIBERATELY NOT EXTENDED TO READERS. The obvious next step was to assert that every table with
+// a writer also has a reader, closing the mirror defect. It was not taken: text presence cannot
+// prove a route is reachable, that its filter matches what the writer wrote, or that a round trip
+// works. That guarantee belongs to tests/db.integration.test.ts, which exercises the writer and the
+// reader against a real Postgres. A regex that appeared to check reachability would be worse than
+// no check, because it would be believed.
 
 // The specific regression that cost a 1.44M deal: the stage writer must live in updateOpp, in the
 // same transaction as the UPDATE. A writer somewhere else in the file is not the same guarantee.

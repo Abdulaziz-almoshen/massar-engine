@@ -25,6 +25,12 @@ d("db integration", () => {
     // Never point this at anything that could be production. A test suite that truncates tables
     // needs a louder guard than a comment.
     if (!/localhost|127\.0\.0\.1/.test(URL_!)) throw new Error("TEST_DATABASE_URL must be local");
+    // And never at the DEVELOPMENT database either. beforeEach truncates four tables, and pointing
+    // this at `massar` destroyed the local seed data the first time it ran — the dev instance the
+    // screens are checked against. The database name must say it is for tests.
+    if (!/\/[a-z_]*test/i.test(new URL(URL_!).pathname)) {
+      throw new Error("TEST_DATABASE_URL must name a test database (…/massar_test), not " + new URL(URL_!).pathname);
+    }
     process.env.DATABASE_URL = URL_;
     db = await import("../src/db.js");
     await db.init();
@@ -33,6 +39,12 @@ d("db integration", () => {
   afterAll(async () => { await pool?.end(); });
 
   beforeEach(async () => {
+    // salesPerformance reads FROM tags — the catalogue is the row source, so a product with no tag
+    // simply does not appear on the board. On a fresh test database that made the won-CTE
+    // assertions read `undefined` rather than a number.
+    await pool.query(
+      `INSERT INTO tags (name, created_at, created_by) VALUES ('تكامل الأنظمة', $1, 'test')
+       ON CONFLICT (name) DO NOTHING`, [Date.now()]);
     await pool.query("DELETE FROM engagements");
     await pool.query("DELETE FROM actions");
     await pool.query("DELETE FROM track_stage_events");
@@ -132,6 +144,43 @@ d("db integration", () => {
       // Two win events could exist on a re-win; the row's CURRENT stage decides, the ledger dates it.
       expect(line?.achieved).toBe(0);
       expect(line?.openCount).toBe(1);
+    });
+  });
+
+  describe("«أين تتعثّر الصفقات» — the reader that shipped with the writer", () => {
+    it("groups open work by the department that owes it, oldest blockage first", async () => {
+      const a = await mkOpp("tech");
+      const b = await mkOpp("negotiate");
+      await db.recordEngagement({ idemKey: "g1", contactPhone: "966500000999", oppId: a, rep: "سارة",
+        kind: "call", outcomeKey: "awaiting_tech", occurredAt: Date.now(), note: null });
+      await db.recordEngagement({ idemKey: "g2", contactPhone: "966500000999", oppId: b, rep: "سارة",
+        kind: "call", outcomeKey: "awaiting_procurement", occurredAt: Date.now(), note: null });
+      const groups = await db.stalledByDept();
+      const depts = groups.map((g) => g.dept).sort();
+      expect(depts).toEqual(["المشتريات", "التقنية"].sort());
+      expect(groups.every((g) => g.openCount === 1)).toBe(true);
+      expect(groups.every((g) => g.items[0].rep === "سارة")).toBe(true);
+    });
+
+    it("dedups: chasing the same blocker twice owes the department one task, not two", async () => {
+      const id = await mkOpp("tech");
+      await db.recordEngagement({ idemKey: "d1", contactPhone: "966500000999", oppId: id, rep: "سارة",
+        kind: "call", outcomeKey: "awaiting_tech", occurredAt: Date.now(), note: null });
+      await db.recordEngagement({ idemKey: "d2", contactPhone: "966500000999", oppId: id, rep: "سارة",
+        kind: "call", outcomeKey: "awaiting_tech", occurredAt: Date.now(), note: null });
+      expect(Number((await pool.query("SELECT COUNT(*) c FROM engagements")).rows[0].c)).toBe(2);
+      expect(Number((await pool.query("SELECT COUNT(*) c FROM actions WHERE state='open'")).rows[0].c)).toBe(1);
+    });
+
+    it("closes an action once and refuses the second close", async () => {
+      const id = await mkOpp("tech");
+      await db.recordEngagement({ idemKey: "c1", contactPhone: "966500000999", oppId: id, rep: "سارة",
+        kind: "call", outcomeKey: "awaiting_tech", occurredAt: Date.now(), note: null });
+      const actionId = Number((await pool.query("SELECT id FROM actions WHERE state='open'")).rows[0].id);
+      expect(await db.closeAction(actionId, "done", "اللوحة")).toBe(true);
+      // Without this the screen fills with rows nobody can clear and stops being read.
+      expect(await db.closeAction(actionId, "done", "اللوحة")).toBe(false);
+      expect((await db.stalledByDept()).length).toBe(0);
     });
   });
 

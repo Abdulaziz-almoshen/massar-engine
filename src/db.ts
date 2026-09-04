@@ -1552,6 +1552,60 @@ export async function hotReadings(): Promise<{ phone: string; product: string; w
       WHERE t.level = 'hot'`)).rows;
 }
 
+/** «أين تتعثّر الصفقات» — open work grouped by the department that owes it.
+ *
+ *  The founder's vision doc calls this "the screen Zoho's defaults do not give you and the reason
+ *  this product exists". It reads the actions table over actions_open_idx (state, dept, due_at),
+ *  which was built for exactly this and had never been read by anything. */
+export async function stalledByDept(): Promise<{
+  dept: string; openCount: number; oldestDays: number;
+  items: { id: number; oppId: number; account: string; product: string; stage: string;
+           title: string; ageDays: number; rep: string | null }[];
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT a.id, a.opp_id, a.dept, a.title, a.created_at, a.created_by,
+            o.account_name, o.product, o.stage
+       FROM actions a
+       JOIN opportunities o ON o.id = a.opp_id
+      WHERE a.state = 'open'
+      ORDER BY a.dept, a.created_at ASC`);
+  const now = Date.now();
+  const byDept = new Map<string, any[]>();
+  for (const x of r.rows) {
+    const dept = String(x.dept);
+    const ageDays = Math.floor((now - Number(x.created_at)) / 86_400_000);
+    if (!byDept.has(dept)) byDept.set(dept, []);
+    byDept.get(dept)!.push({
+      id: Number(x.id), oppId: Number(x.opp_id), account: String(x.account_name ?? ""),
+      product: String(x.product ?? ""), stage: String(x.stage ?? ""), title: String(x.title ?? ""),
+      ageDays, rep: x.created_by ? String(x.created_by) : null,
+    });
+  }
+  return [...byDept.entries()]
+    .map(([dept, items]) => ({
+      dept, openCount: items.length,
+      oldestDays: items.reduce((m, i) => Math.max(m, i.ageDays), 0),
+      items,
+    }))
+    .sort((a, b) => b.oldestDays - a.oldestDays || b.openCount - a.openCount);
+}
+
+/** Close or cancel one action. Without this the screen above fills with rows nobody can clear and
+ *  stops being read, which is how a dashboard dies — the mirror of the table-with-no-writer defect
+ *  and the reason the writer and this shipped in one diff. */
+export async function closeAction(id: number, state: "done" | "cancelled", by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const q = await pool.query(
+    `UPDATE actions SET state = $1, done_at = $2 WHERE id = $3 AND state = 'open'`,
+    [state, Date.now(), id]);
+  if ((q.rowCount ?? 0) > 0) {
+    console.log(JSON.stringify({ at: "actions", msg: "closed", id, state, by }));
+    return true;
+  }
+  return false;
+}
+
 /** THE REP'S DAY, filtered in SQL and grouped by the human being called.
  *
  *  Two shapes were wrong before this and both mattered:

@@ -304,6 +304,30 @@ app.get("/integration/product-interest", async (req, reply) => {
   };
 });
 
+app.get("/admin/actions/stalled", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const groups = await db.stalledByDept();
+  return {
+    ok: true,
+    departments: sales.DEPARTMENTS,
+    groups,
+    totalOpen: groups.reduce((n, g) => n + g.openCount, 0),
+  };
+});
+
+app.post("/admin/actions/:id/close", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const state = String((req.body as any)?.state ?? "done");
+  if (state !== "done" && state !== "cancelled") {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "state" });
+  }
+  const done = await db.closeAction(id, state, adminName(req));
+  if (!done) return reply.code(404).send({ ok: false, error: "not_found_or_already_closed" });
+  return { ok: true, id, state };
+});
+
 // ------------------------------ /rep — the sales rep's surface ------------------------------
 //
 // Closed by default: with REP_TOKENS unset every route here answers 404, the same posture
