@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { cfg, configReport } from "./config.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
+import { REP_PAGE_HTML } from "./rep-page.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
 import * as sales from "./sales-domain.js";
@@ -409,6 +410,13 @@ function repSurfaceOff(reply: any): boolean {
   if (cfg.repTokens.length === 0) { reply.code(404).send({ status: "not_found" }); return true; }
   return false;
 }
+
+// The page itself is public, exactly as /dashboard is: it contains no data, and the token that
+// bootstraps it arrives in the URL the rep is sent. Every byte of content behind it is gated.
+app.get("/rep", async (_req, reply) => {
+  if (cfg.repTokens.length === 0) return reply.code(404).send({ status: "not_found" });
+  return reply.type("text/html; charset=utf-8").send(REP_PAGE_HTML);
+});
 
 app.get("/rep/queue", async (req, reply) => {
   if (repSurfaceOff(reply)) return;

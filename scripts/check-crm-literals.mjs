@@ -11,6 +11,11 @@
 //
 // It also verifies the emitted modules PARSE, which is the property that actually matters: a
 // broken presentation module is a blank page, and that is the failure class ADR-0001 exists for.
+//
+// The declaration pattern allows an optional `: string` annotation. Without that, rep-page.ts —
+// declared `export const REP_PAGE_HTML: string = ` — was COUNTED as a scanned file but its literal
+// was never matched, so a planted backtick sailed past while tsc caught it. A guard that reports
+// a file as covered without checking it is worse than one that admits it does not.
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -27,7 +32,7 @@ const c = (label, ok, detail = "") => {
 // Every module that exports a browser payload as a template literal.
 const files = readdirSync(join(root, "src"))
   .filter((f) => f.endsWith(".ts"))
-  .filter((f) => /export const [A-Z_]+_(CSS|JS)\s*=\s*`/.test(readFileSync(join(root, "src", f), "utf8")));
+  .filter((f) => /export const [A-Z_]+_(CSS|JS|HTML)\s*(?::\s*string\s*)?=\s*`/.test(readFileSync(join(root, "src", f), "utf8")));
 
 c("found presentation modules exporting template literals", files.length > 0, `${files.length} files`);
 
@@ -36,7 +41,7 @@ for (const file of files) {
   // Walk each exported template literal and confirm the block that STARTS it also ENDS it, with
   // nothing between that could have closed it early. A stray backtick shows up as a block that
   // terminates at the wrong place, so the simplest reliable test is: the emitted JS must parse.
-  const blocks = [...src.matchAll(/export const ([A-Z_]+_(?:CSS|JS))\s*=\s*`/g)];
+  const blocks = [...src.matchAll(/export const ([A-Z_]+_(?:CSS|JS|HTML))\s*(?::\s*string\s*)?=\s*`/g)];
   for (const m of blocks) {
     const start = m.index + m[0].length;
     const end = src.indexOf("`;", start);
