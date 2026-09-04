@@ -31,9 +31,14 @@ export const SALES_CRM_CSS = `
 .perf-kpi .v{font-size:21px;font-weight:700;margin-top:3px;letter-spacing:0}
 .perf-kpi .s{font-size:11.5px;color:var(--muted,#7C7C7C);margin-top:2px}
 .perf-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+/* Logical properties only, per DESIGN.md: "no left/right, no physical offsets". The physical
+   the physical shorthand landed on the correct side ONLY because this document is RTL — it would
+   flip the moment anything renders LTR. And rows take border-TOP, which is what invariant 8
+   specifies for a flush list. (No backticks in this comment: it lives INSIDE a template literal,
+   and one terminates the string. Third time this session.) */
 .perf-tbl th{text-align:start;font-size:11.5px;font-weight:600;color:var(--muted,#7C7C7C);
-  padding:0 10px 8px 0;border-bottom:1px solid var(--line,#E2E2E2);white-space:nowrap}
-.perf-tbl td{padding:0 10px 0 0;border-bottom:1px solid var(--line2,#EDEDED);height:36px;vertical-align:middle}
+  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#E2E2E2);white-space:nowrap}
+.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#EDEDED);height:36px;vertical-align:middle}
 .perf-tbl tr:hover td{background:var(--strip,#F8F8F8)}
 .perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
 .perf-prod{font-weight:600}

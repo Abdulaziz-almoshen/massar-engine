@@ -15,7 +15,7 @@
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
     "check:buttons": "npm run build && node scripts/check-buttons.mjs",
-    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts",
+    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts && npm run check:crmlit",
     "check:crm": "npm run build && node scripts/check-crm.mjs",
     "check:optout": "npm run build && node scripts/check-optout.mjs",
     "check:campaigns": "npm run build && node scripts/check-campaign-scope.mjs",
@@ -30,7 +30,8 @@
     "check:facts": "npm run build && node scripts/check-facts.mjs",
     "qa:scale": "./.venv/bin/python scripts/qa-scale.py",
     "test": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:crmlit": "npm run build && node scripts/check-crm-literals.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",
