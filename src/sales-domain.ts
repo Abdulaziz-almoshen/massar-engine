@@ -294,6 +294,14 @@ export function checkSalesDomainClosure(): string[] {
     ...DOMAIN_FNS.map((fn) => fn.name),
     "Number", "String", "Math", "Date", "Object", "Array", "JSON", "Boolean", "Set",
   ]);
+  // KNOWN LIMIT, stated rather than implied: this scans identifiers whose first letter is
+  // upper-case, which is every module-scope constant in this file by convention. A LOWERCASE
+  // module-scope binding referenced from a shipped function would be invisible here — it would
+  // pass in Node and throw ReferenceError in the browser, which is a blank page.
+  //
+  // The heuristic is kept because the alternative is parsing JavaScript at runtime. Its
+  // PRECONDITION — that this module declares no lowercase module-scope binding — is asserted by
+  // a test instead, so the guard cannot quietly stop guarding when someone adds one.
   const bad: string[] = [];
   for (const fn of DOMAIN_FNS) {
     const src = fn.toString();

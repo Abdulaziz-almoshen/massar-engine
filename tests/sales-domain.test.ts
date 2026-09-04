@@ -6,6 +6,7 @@
 // or the real clock.
 
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   SALES_STAGES, STAGE_OUTCOMES, LEGACY_STAGE_MAP, STALL_STAGES, STALL_DAYS, DEPARTMENTS,
   stageWeight, isTerminalStage, isStalled, weightedValue, riyadhFiscalPeriod,
@@ -268,6 +269,19 @@ describe("the browser seam", () => {
     expect(SALES_DOMAIN_JS).toContain("var STAGE_OUTCOMES =");
     expect(SALES_DOMAIN_JS).toContain("function riyadhFiscalPeriod");
     expect(SALES_DOMAIN_JS).toContain("function ragKey");
+  });
+
+  it("declares no lowercase module-scope binding, which the closure checker depends on", () => {
+    // checkSalesDomainClosure only inspects identifiers starting with an upper-case letter, so a
+    // lowercase module-scope const referenced from a shipped function would pass in Node and throw
+    // ReferenceError in the browser. Rather than pretend the checker catches that, assert its
+    // precondition: every module-scope value here is UPPER_CASE or a function declaration.
+    const src = readFileSync(new URL("../src/sales-domain.ts", import.meta.url), "utf8");
+    const offenders = src
+      .split("\n")
+      .filter((l) => /^(?:export\s+)?(?:const|let|var)\s+[a-z]/.test(l))
+      .map((l) => l.trim().slice(0, 70));
+    expect(offenders, "add it to DOMAIN_FNS' allowlist or rename it UPPER_CASE").toEqual([]);
   });
 
   it("is executable as emitted, not merely present as text", () => {
