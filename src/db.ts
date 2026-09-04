@@ -450,10 +450,57 @@ async function runMigrations(p: pg.Pool): Promise<void> {
         throw new Error(`migration ${m.version} failed: ${String(e).slice(0, 300)}`);
       }
     }
+    await assertSchemaShape(client);
     await seedDefaultPipeline(client);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
     client.release();
+  }
+}
+
+/** The columns the code will actually read and write. Asserted AFTER migrations run.
+ *
+ * WHY. `CREATE TABLE IF NOT EXISTS` is idempotent but NOT verifying: if a table already exists with
+ * the wrong shape — from a partial run, a hand-created table, or a future migration that collides —
+ * the step is skipped, the version is stamped applied, and the engine boots believing a schema it
+ * does not have. Measured, not assumed: planting `CREATE TABLE targets (wrong_column int)` and
+ * booting produced "migration applied" with `targets` still holding one wrong column.
+ *
+ * That defeats the whole reason the migration system was added. So the shape is checked, and a
+ * mismatch fails the boot loudly instead of surfacing later as a confusing runtime error on a write.
+ * `/health` reports ok:false in that state, so the failure is visible rather than silent. */
+const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
+  pipelines: ["id", "name", "product", "created_at"],
+  pipeline_stages: ["id", "pipeline_id", "key", "label", "weight_pct", "position"],
+  track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
+  actions: ["id", "opp_id", "dept", "title", "state", "created_at"],
+  sectors: ["id", "name"],
+  product_meta: ["product", "sector_id"],
+  targets: ["product", "year", "quarter", "amount"],
+};
+
+async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
+  const want = Object.entries(REQUIRED_SHAPE);
+  const r = await client.query(
+    `SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = ANY($1)`,
+    [want.map(([t]) => t)]);
+  const have = new Map<string, Set<string>>();
+  for (const row of r.rows) {
+    const t = String(row.table_name);
+    if (!have.has(t)) have.set(t, new Set());
+    have.get(t)!.add(String(row.column_name));
+  }
+  const missing: string[] = [];
+  for (const [table, cols] of want) {
+    const got = have.get(table);
+    if (!got) { missing.push(`${table} (table absent)`); continue; }
+    for (const c of cols) if (!got.has(c)) missing.push(`${table}.${c}`);
+  }
+  if (missing.length) {
+    throw new Error(
+      `schema shape mismatch after migration — the engine would run against a schema it does not ` +
+      `have. Missing: ${missing.join(", ")}`);
   }
 }
 
