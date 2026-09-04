@@ -1779,7 +1779,33 @@ window.confirmLaunch = async () => {
     const d = await r.json().catch(() => ({}));
     closeLaunch();
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
-    alertBar("أُرسلت " + fmtN(d.sent) + " من " + fmtN(d.requested) + ". فتحنا لك لوحة الحملة.", false);
+    // The launch endpoint has always returned a per-recipient "failed" array carrying WHY each one
+    // did not go out (opted out, outside the 24h window, never wrote to us, invalid number). This
+    // screen read only d.sent and d.requested, so the operator saw "أُرسلت ٤٧ من ٥٠" and was never
+    // told what happened to the other three. A refusal the system computed and then hid is the
+    // project recurring defect: an emitted value nobody can read back.
+    var failedRows = Array.isArray(d.failed) ? d.failed : [];
+    var launchNote = "أُرسلت " + fmtN(d.sent) + " من " + fmtN(d.requested);
+    if (failedRows.length) {
+      // Object.create(null), not {}: reason strings become keys here, and a reason of "__proto__"
+      // or "constructor" silently corrupts a count on a normal object.
+      var byReason = Object.create(null);
+      failedRows.forEach(function (f) {
+        var why = (f && (f.reason || f.error)) || "سبب غير معروف";
+        byReason[why] = (byReason[why] || 0) + 1;
+      });
+      // No counted noun after the number: Arabic plurals are four-way and this file has no
+      // pluralize helper, so the count stands alone and the reason carries the meaning.
+      launchNote += " · لم تُرسل " + fmtN(failedRows.length) + ": " +
+        Object.keys(byReason).map(function (k) { return k + " (" + fmtN(byReason[k]) + ")"; }).join("، ");
+      // Counts alone still leave the operator asking WHICH clinic. Name the first few numbers so
+      // the answer is on screen instead of one query away.
+      var someNumbers = failedRows.slice(0, 3).map(function (f) { return f && f.phone; }).filter(Boolean);
+      if (someNumbers.length) {
+        launchNote += " (" + someNumbers.join("، ") + (failedRows.length > someNumbers.length ? "، …" : "") + ")";
+      }
+    }
+    alertBar(launchNote + ". فتحنا لك لوحة الحملة.", failedRows.length > 0);
     entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) {

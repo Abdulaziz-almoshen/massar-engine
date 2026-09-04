@@ -34,25 +34,62 @@ app.get("/webhooks/gupshup", async () => "OK");
 
 app.post("/webhooks/gupshup", async (req, reply) => {
   const token = (req.query as any)?.token ?? "";
-  if (cfg.webhookToken && token !== cfg.webhookToken) {
+  // FAIL CLOSED. This used to read `if (cfg.webhookToken && ...)`, so an UNSET token made the
+  // guard evaluate false and accepted every POST — while configReport() printed "webhook is
+  // unauthenticated!" and the app booted anyway. A forged webhook can flip opt-out state and
+  // write the transcript the agent reads back, so an absent secret must refuse, not wave through.
+  if (!cfg.webhookToken || token !== cfg.webhookToken) {
     return reply.code(401).send({ status: "unauthorized" });
   }
 
-  // Ack immediately; process async so Gupshup never times out on us.
+  // Parse BEFORE acking, so anything we cannot turn into events is RECORDED rather than swallowed.
+  //
+  // Scope, stated rather than implied: Fastify parses the JSON body before this handler runs, so
+  // malformed JSON is already refused upstream and never reaches the catch below. The silent drop
+  // that actually happens here is the quieter one — normalizeWebhook returns [] for a shape it does
+  // not recognise (a new provider format, a v4 envelope), and a real «إيقاف» inside it would vanish
+  // with no trace at all. Both paths log the raw body, which is the only thing that lets an
+  // operator recover the event by hand.
+  //
+  // It still acks 200 either way: the failure is deterministic, so a retry re-sends the same
+  // unreadable body, and an endpoint that answers 4xx in a loop is one a provider can disable —
+  // which would lose ALL inbound, including the opt-outs this fix exists to protect.
+  let events;
+  try {
+    events = gupshup.normalizeWebhook(req.body);
+  } catch (e) {
+    console.error(JSON.stringify({ at: "webhook", level: "error", msg: "normalize threw — event NOT processed, raw body logged for manual recovery", err: String(e).slice(0, 300), raw: JSON.stringify(req.body ?? null).slice(0, 2000) }));
+    return reply.send({ status: "ok" });
+  }
+  if (!events.length && req.body && typeof req.body === "object" && Object.keys(req.body as object).length) {
+    console.error(JSON.stringify({ at: "webhook", level: "error", msg: "unrecognised payload shape — 0 events from a non-empty body, raw logged", raw: JSON.stringify(req.body).slice(0, 2000) }));
+  }
+
+  // Ack now; process async so Gupshup never times out on us.
   reply.send({ status: "ok" });
 
-  const events = gupshup.normalizeWebhook(req.body);
+  // Per-event try/catch. One malformed event must not abort the loop and take the events after it
+  // down with it — that is a silent partial loss, and this handler runs after the ack, so a throw
+  // here surfaces nowhere at all.
+  //
+  // KNOWN LIMIT, stated rather than implied: this makes the handler crash-resistant, not durable.
+  // A process death between the ack and the write still loses the event. The fix for that is the
+  // inbound_events table in phase 0 of docs/designs/massar-platform-implementation.md.
   for (const ev of events) {
-    if (ev.kind === "message") {
-      if (!ev.from) continue;
-      const contact = tracker.recordInbound(ev);
-      // Pass the tap-vs-typed provenance, not just the text. Without it the agent cannot tell a
-      // customer who TAPPED «لا» from one who wrote it as an answer to a question.
-      enqueue(ev.from, () => agent.handleInbound(contact, ev.text, gupshup.isButtonTap(ev)));
-    } else if (ev.kind === "status") {
-      tracker.recordStatus(ev);
-    } else {
-      log({ at: "webhook", msg: "unhandled event type", type: ev.type });
+    try {
+      if (ev.kind === "message") {
+        if (!ev.from) continue;
+        const contact = tracker.recordInbound(ev);
+        // Pass the tap-vs-typed provenance, not just the text. Without it the agent cannot tell a
+        // customer who TAPPED «لا» from one who wrote it as an answer to a question.
+        enqueue(ev.from, () => agent.handleInbound(contact, ev.text, gupshup.isButtonTap(ev)));
+      } else if (ev.kind === "status") {
+        tracker.recordStatus(ev);
+      } else {
+        log({ at: "webhook", msg: "unhandled event type", type: ev.type });
+      }
+    } catch (e) {
+      console.error(JSON.stringify({ at: "webhook", level: "error", msg: "event dropped", kind: ev.kind, from: "from" in ev ? ev.from : "", err: String(e).slice(0, 300) }));
     }
   }
 });
@@ -76,7 +113,11 @@ app.get("/", async (req, reply) => {
 // ------------------------------ health ------------------------------
 
 app.get("/health", async () => ({
-  ok: true,
+  // Honest, not decorative. This returned `true` unconditionally, so a machine whose migration
+  // failed and fell back to memory-only mode (db.ts init catch) reported healthy while every write
+  // was being dropped. Still HTTP 200 on purpose: Fly restarts on a failing check, and a restart
+  // loop during a database outage is worse than a truthful body an operator can read.
+  ok: !db.enabled() || db.isConnected(),
   service: "massar-engine",
   uptimeSec: Math.round((Date.now() - startedAt) / 1000),
   model: agent.currentModel(),
@@ -388,7 +429,10 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
       // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
       // guaranteed single bubble — that is the primary shape for asset launches now.
-      const rejectedShape = (e: unknown) => /gupshup 4\d\d:/.test(String(e));
+      // Was a local 4xx-only regex — the same defect the agent path carried: a Gupshup HTTP 200
+      // with {"status":"error"} is a definite refusal and was being rethrown instead of falling
+      // back to text, so that recipient got nothing. One predicate now, in gupshup.ts.
+      const rejectedShape = gupshup.isProviderRejection;
       const asset = introAsset;
       // The trade-off, made explicit instead of hardcoded. On the sandbox number the two cannot be
       // combined: document+caption is ONE bubble but carries no buttons; quick_reply with a

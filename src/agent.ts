@@ -1249,10 +1249,24 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       await gupshup.sendQuickReply(contact.phone, body, btns);
       tracker.recordAgentReply(contact.phone, `${body} [أزرار: ${btns.map((b) => b.title).join(" | ")}]${RUNG_ONE_MARK}`);
     } catch (e) {
-      await safeSend(contact.phone, body);
-      // The marker records that rung one was DELIVERED, so the fallback must carry it too —
-      // otherwise a text-only fallback leaves the contact eligible to receive rung one again.
-      tracker.recordSystem(contact.phone, RUNG_ONE_MARK);
+      // Same rule as the choices fallback above: re-send only when the provider REJECTED the
+      // shape. On an unknown outcome (timeout, socket) the quick reply may already have arrived,
+      // and sending the same body as text is how one clinic gets rung one twice.
+      if (gupshup.isProviderRejection(e)) {
+        // Definitively refused, nothing was sent: fall back to text and mark, because the text DID go.
+        await safeSend(contact.phone, body);
+        tracker.recordSystem(contact.phone, RUNG_ONE_MARK);
+      } else if (gupshup.isUnknownOutcome(e)) {
+        // Timeout or provider 5xx: it may already be on the customer's phone. Do not resend, and DO
+        // mark — if it landed, letting the contact become eligible again is a second duplicate.
+        console.error(JSON.stringify({ at: "agent", level: "error", msg: "rung-one outcome unknown — NOT resent, marked to prevent a repeat", phone: contact.phone, err: String(e).slice(0, 200) }));
+        tracker.recordSystem(contact.phone, RUNG_ONE_MARK);
+      } else {
+        // Never reached the wire at all — a local preflight throw such as "outbound not ready"
+        // (missing API key or source number). Marking here would permanently suppress a rung one
+        // that was never sent, so the contact stays eligible and the failure stays loud.
+        console.error(JSON.stringify({ at: "agent", level: "error", msg: "rung-one never sent (local failure) — left eligible for retry", phone: contact.phone, err: String(e).slice(0, 200) }));
+      }
     }
     return;
   }
@@ -1504,8 +1518,17 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
           tracker.recordAgentReply(contact.phone, `${body} [أزرار: ${titles.join(" | ")}]`);
           console.log(JSON.stringify({ at: "agent", msg: "converted offered choices to buttons", phone: contact.phone, titles }));
         } catch (e) {
-          console.error(JSON.stringify({ at: "agent", msg: "quick-reply rejected — sent as text", phone: contact.phone, err: String(e).slice(0, 200) }));
-          await safeSend(contact.phone, finalText);
+          // Fall back to plain text ONLY when the provider actually looked at the request and
+          // rejected the SHAPE (a 4xx). This used to re-send unconditionally, so a timeout on a
+          // quick-reply that Gupshup had in fact accepted delivered the same message twice to a
+          // real clinic. An unknown outcome is not a failure and must not be retried blind.
+          if (gupshup.isProviderRejection(e)) {
+            console.error(JSON.stringify({ at: "agent", msg: "quick-reply rejected — sent as text", phone: contact.phone, err: String(e).slice(0, 200) }));
+            await safeSend(contact.phone, finalText);
+          } else {
+            console.error(JSON.stringify({ at: "agent", level: "error", msg: "quick-reply outcome unknown — NOT resent", phone: contact.phone, err: String(e).slice(0, 200) }));
+            tracker.recordSystem(contact.phone, "[تعذّر تأكيد إرسال الأزرار — لم تُعد المحاولة تفاديًا لرسالة مكرّرة]");
+          }
         }
       } else {
         await safeSend(contact.phone, finalText);
