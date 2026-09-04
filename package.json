@@ -15,7 +15,7 @@
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
     "check:buttons": "npm run build && node scripts/check-buttons.mjs",
-    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts && npm run check:crmlit && npm run check:writers && npm run check:authz",
+    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts && npm run check:crmlit && npm run check:writers && npm run check:authz && npm run check:nav",
     "check:crm": "npm run build && node scripts/check-crm.mjs",
     "check:optout": "npm run build && node scripts/check-optout.mjs",
     "check:campaigns": "npm run build && node scripts/check-campaign-scope.mjs",
@@ -35,7 +35,8 @@
     "test:watch": "vitest",
     "check:authz": "npm run build && node scripts/check-authz.mjs",
     "check:writers": "node scripts/check-ledger-writers.mjs",
-    "check:crmlit": "npm run build && node scripts/check-crm-literals.mjs"
+    "check:crmlit": "npm run build && node scripts/check-crm-literals.mjs",
+    "check:nav": "node scripts/check-nav-destinations.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",

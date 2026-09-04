@@ -104,6 +104,25 @@ export const DASHBOARD_HTML = `<!doctype html>
   header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
   header.crumb .sep { font-size:13px; color:#C7C7C7; }
   header.crumb .s { font-size:13px; font-weight:450; color:#525252; }
+  /* The tab strip under the crumb. DESIGN.md: teal is the only accent, radii are 6/10/999/0, and a
+     selected state is NOT a filled chip — so the active tab is ink-weight text over a 2px teal
+     underline, and every other tab is muted with no fill at all. 13px sits on the type ladder. */
+  .subnav { height:36px; flex:none; display:flex; align-items:stretch; gap:2px; padding-inline:20px;
+    background:#fff; border-bottom:1px solid #EDEDED; overflow-x:auto; scrollbar-width:none; }
+  .subnav::-webkit-scrollbar { display:none; }
+  .subnav .sub { appearance:none; background:transparent; border:0; border-radius:0; cursor:pointer;
+    font-family:inherit; font-size:13px; font-weight:450; color:#7C7C7C; letter-spacing:0;
+    padding-inline:10px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;
+    border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .subnav .sub:hover { color:#171717; }
+  .subnav .sub.on { color:#171717; font-weight:600; border-bottom-color:#1F7A73; }
+  /* «قريبًا» screens stay visible and reachable, and say so by weight rather than by hiding. */
+  .subnav .sub.soon { color:#C7C7C7; }
+  .subnav .sub.soon:hover { color:#999999; }
+  .subnav .sub .sbdg { font-size:11px; font-weight:600; color:#B54708; font-variant-numeric:tabular-nums; }
+  .subnav .sub:focus { outline:none; }
+  .subnav .sub:focus-visible { outline:2px solid #1F7A73; outline-offset:-2px; }
+  @media (pointer:coarse) { .subnav { height:44px; } }
   header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: 0; }
   header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
   .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#7C7C7C;
@@ -556,6 +575,9 @@ ${PALETTE_CSS}
       <span class="livechip" id="live" style="display:none"><span class="d"></span> مباشر · <span id="upd">—</span></span>
       <span id="crumbact"></span>
     </header>
+    <!-- Tab strip for the destinations that left the rail when it went from fifteen doors to six.
+         Written by nav() every route change; hidden on doors with a single destination. -->
+    <div class="subnav" id="subnav" style="display:none"></div>
     <div class="body ms-scroll" id="body"></div>
   </main>
 </div>
@@ -656,13 +678,48 @@ let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — s
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
 let campMsg = "في أغلب المنشآت الصحية، إصدار {product} يمر بخطوات ورقية متكررة بين النظام الداخلي والجهات الرسمية.\\n\\nما نقدمه في لِين هو ربط مباشر مع نظام HIS لديكم: الإجراء يُنفَّذ من داخل نظامكم بتوثيق رسمي معتمد، فيقل زمن الإصدار بنسبة تصل إلى ٧٠٪ ويختفي الإدخال المزدوج.\\n\\nأرفقنا ملفًا موجزًا يوضح آلية الربط والخطوات.\\n\\nسؤال واحد لنعرف ما يناسبكم: كم فرعًا لديكم تقريبًا؟";
 
+// SIX DOORS, NOT FIFTEEN. The rule from the design record: what is not an independent noun in the
+// user's work is not a door in the rail. Fifteen items was accumulation, not information
+// architecture — four of them were «قريبًا» placeholders sitting at the same weight as العملاء.
+//
+// NOTHING IS ORPHANED. Every one of the fifteen keeps a destination as a tab under its door, and
+// every old #hash still resolves because not one route handler is touched by this change. That
+// matters more than the tidier rail: a screen you can no longer reach is indistinguishable from a
+// screen that was deleted, and this project has shipped that mistake before.
 const NAV = [
-  { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", i: "home" },
-  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", i: "users" }, { id: "opps", l: "فرص البيع", i: "target" }, { id: "pipeline", l: "لوحة المتابعة", i: "reply" }, { id: "tasks", l: "المهام", i: "check" }, { id: "notes", l: "الملاحظات", i: "doc" },
-  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", i: "send" }, { id: "kmon", l: "متابعة الحملات", i: "eye" }, { id: "kb", l: "معرفة الخدمة", i: "book" }, { id: "partners", l: "شركاء المبيعات", i: "spark" },
-  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "perf", l: "المستهدفات والأداء", i: "chart" }, { id: "reports", l: "التقارير", i: "chart" },
-  { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
+  { id: "home",      l: "الرئيسية",  i: "home" },
+  { id: "opps",      l: "فرص البيع", i: "target" },
+  { id: "customers", l: "العملاء",   i: "users" },
+  { id: "products",  l: "المنتجات",  i: "flame" },
+  { id: "kmon",      l: "الحملات",   i: "send" },
+  { id: "reports",   l: "التقارير",  i: "chart" },
 ];
+
+// Sub-destinations per door, in tab order. The FIRST entry is the door's own landing route, so a
+// door with one entry renders no tab strip at all.
+//
+// «المهام» and «الملاحظات» sit under العملاء rather than vanishing into the client record: a task
+// with no client and no opportunity attached has nowhere else to live, and dropping the list would
+// hide exactly those rows. «جهات الاستهداف» and «معرفة الخدمة» are campaign INPUTS, so they sit
+// under الحملات. «الهيكل التنظيمي» sits under المنتجات because dept and manager are the same
+// rollup layer as the sector.
+const SUBS = {
+  opps:      [["opps", "الفرص"], ["pipeline", "لوحة المتابعة"]],
+  customers: [["customers", "العملاء"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
+  products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
+  kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
+              ["kb", "معرفة الخدمة"], ["partners", "شركاء المبيعات"]],
+};
+
+// route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
+// a route ends up highlighting no door at all, or two.
+const DOOR_OF = (function () {
+  const m = { customer: "customers" };   // #customer/<phone> is a detail view of العملاء
+  for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
+  for (var j = 0; j < NAV.length; j++) if (!m[NAV[j].id]) m[NAV[j].id] = NAV[j].id;
+  return m;
+})();
+
 const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
@@ -718,22 +775,49 @@ function PAL_BADGES() {
   return out;
 }
 function nav() {
-  // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
+  // Which DOOR is lit. #customer/<phone> is a detail view of العملاء, #tasks now lives under it
+  // too, and DOOR_OF carries both because it is derived from SUBS rather than written twice.
   const raw = (location.hash || "#kmon").slice(1).split("/")[0];
-  const cur = raw === "customer" ? "customers" : raw;
+  const cur = DOOR_OF[raw] || raw;
   // Two badges, both counts of work OWED and both derived from data already in memory — no extra
   // request, and nothing that can be stale in a way the screen behind it is not.
   //   فرص البيع  — appointments confirmed for today: the calls you owe before the day ends.
   //   المهام     — tasks past due, only once the tasks route has actually loaded them; a badge
   //                that guesses «٠» before the fetch is a lie for the whole session.
   const badges = PAL_BADGES();
+  // A door carries the badge of ANY route beneath it, because the count is of work owed and the
+  // work did not move when the rail shrank. Summed, not replaced: المهام sits under العملاء now,
+  // so a door showing only its own landing route's badge would silently drop the overdue count.
+  const doorBadge = (id) => {
+    const subs = SUBS[id] || [[id]];
+    let n = 0, cls = "", tip = [];
+    for (let i = 0; i < subs.length; i++) {
+      const b = badges[subs[i][0]];
+      if (!b) continue;
+      n += Number(String(b[0]).replace(/[^0-9]/g, "")) || 0;
+      cls = cls || b[1];
+      tip.push(b[2]);
+    }
+    return n ? [fmtN(n), cls, tip.join(" · ")] : null;
+  };
   document.getElementById("nav").innerHTML = NAV.map((x) => {
-    if (x.grp) return '<div class="grp">' + x.grp + "</div>";
-    const b = badges[x.id];
-    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
+    const b = doorBadge(x.id);
+    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'" title="' + (b ? b[2] : x.l) + '">' +
       '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#1F7A73" : "#999999") + '</span><span class="lbl">' + x.l + "</span>" +
       (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
   }).join("");
+
+  // The tab strip. Rendered only where a door actually has more than one destination, so a single
+  // -destination door does not grow a strip of one tab that looks interactive and does nothing.
+  const subs = SUBS[cur] || [];
+  document.getElementById("subnav").innerHTML = subs.length > 1
+    ? subs.map((sx) => {
+        const sb = badges[sx[0]];
+        return '<button class="sub' + (sx[0] === raw ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
+          (sb ? '<span class="sbdg">' + sb[0] + "</span>" : "") + "</button>";
+      }).join("")
+    : "";
+  document.getElementById("subnav").style.display = subs.length > 1 ? "" : "none";
   // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
   // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
   // الاستهداف وأدرها للحملات» — the import list's title — above every CLIENT RECORD, and made
@@ -741,7 +825,10 @@ function nav() {
   const t = TITLES[raw] || TITLES[cur] || TITLES.kmon;
   document.getElementById("pt").textContent = t[0];
   document.getElementById("ps").textContent = t[1];
-  document.getElementById("live").style.display = (cur === "kmon" || cur === "home") ? "" : "none";
+  // ONLY الحملات. «مباشر» is a claim that the numbers on screen are being re-fetched, and after
+  // R14 took #home off the 5s tick that claim became false there — a live badge over a snapshot is
+  // worse than no badge, because it stops the reader from refreshing when they should.
+  document.getElementById("live").style.display = (raw === "kmon") ? "" : "none";
 }
 
 // win scopes the delivery chip to a campaign. On a campaign screen the row chip read «ردّ» from
@@ -3719,6 +3806,39 @@ function gate(msg) {
     '<input id="tok" placeholder="admin token" dir="ltr"><button class="btn btn-teal" onclick="saveTok()">دخول</button>' +
     (msg ? '<div style="color:#c43d3d;font-size:12px;margin-top:10px;">' + esc(msg) + "</div>" : "") + "</div>";
 }
+/**
+ * R19 — this dashboard is the ADMIN surface, and it now says so correctly.
+ *
+ * Every /admin route refuses a rep token, so a rep opening this URL got «رمز غير صحيح» — invalid
+ * token. Their token is not invalid. It is valid, it works, and it is for a different door. That
+ * message sends a rep hunting for a typo that does not exist, which is the same failure as any
+ * other screen that reports the wrong cause.
+ *
+ * So: on a 401, ask whether this credential is a working REP credential before naming the problem.
+ * /rep accepts a rep or the admin, which makes it the cheapest possible probe, and it is a read.
+ * Done here rather than by changing 401 to 403 across forty route handlers — same answer for the
+ * reader, one place to get wrong instead of forty.
+ */
+async function gateUnauthorized() {
+  let isRep = false;
+  try {
+    if (TOKEN) {
+      const rr = await fetch("/rep/queue", { headers: { "x-rep-token": TOKEN } });
+      isRep = rr.ok;
+    }
+  } catch (e) { /* offline or blocked: fall back to the generic message, never to a wrong one */ }
+  if (isRep) {
+    document.getElementById("body").innerHTML =
+      '<div class="gate"><div style="font-size:16px;font-weight:700;">هذه الشاشة للمشرف</div>' +
+      '<div style="color:#525252;font-size:13px;line-height:1.9;margin-top:8px;max-width:44ch;">' +
+      'رمزك صحيح، لكنه رمز مندوب. لوحة المندوب فيها عملاؤك وفرصك وتسجيل نشاطك.</div>' +
+      '<a class="btn btn-teal" href="/rep?token=' + encodeURIComponent(TOKEN) + '" ' +
+      'style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;margin-top:14px;">' +
+      'افتح لوحة المندوب</a></div>';
+    return;
+  }
+  gate("رمز غير صحيح");
+}
 window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN); refresh(); };
 window.reloadProfile = () => { profileData = null; render(false); refresh(); };
 
@@ -3825,7 +3945,7 @@ async function refresh(force) {
       // fall through here: the inner condition was false, nothing returned, every later fetch
       // 401'd, profileData stayed null, and the page sat on «جارٍ تجميع ملف العميل» forever with
       // no login prompt. Measured 2026-08-16 on #customer/966535106365.
-      if (r.status === 401) return gate("رمز غير صحيح");
+      if (r.status === 401) return gateUnauthorized();
       else { cache = await r.json(); }
       if (!showTestDecided && cache && (cache.contacts || []).length) {
         showTestDecided = true;
@@ -4154,7 +4274,12 @@ refresh();
 tplLoad();
 setInterval(async () => {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
-  if (cur === "kmon" || cur === "home") { refresh(); }
+  // R14: #home is OFF the tick. refresh() is a full re-render, and doing it every 5s on the
+  // executive home moved figures under the reader mid-sentence and reset scroll on a screen whose
+  // whole job is to be read. الحملات keeps it because a live campaign genuinely changes while
+  // watched. Home still gets fresh data on the cheap /admin/state path below, it just does not
+  // repaint itself; the «مباشر» chip is hidden there to match.
+  if (cur === "kmon") { refresh(); }
   else if (TOKEN) { try { const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } }); if (r.ok) cache = await r.json(); } catch (e) {} }
 }, 5000);
 </script>
