@@ -58,8 +58,15 @@ ROUTES = [
     # that exact phrase also appears in this view's loading and error states («جارٍ تجميع ملف
     # العميل…», «تعذّر فتح ملف العميل»), so it would go GREEN on a page that never loaded — which
     # is the one thing this script exists to catch. The sub-line renders only from vFactsPanel.
-    ("#customer/966500000850", "ما تكتبه هنا لا يستطيع المساعد تغييره"),
 ]
+
+# A screen with nothing in it is not a broken screen — but it renders far under MIN_CHARS, so the
+# blank-page guard cannot tell the two apart on a fresh database. It can, if the honest empty state
+# names itself: a page carrying one of these is passing DELIBERATELY, whatever its length. A truly
+# blank render carries neither this nor the landmark, so nothing is weakened.
+EMPTY_OK = {
+    "#kmon": "لا حملات بعد",
+}
 MIN_CHARS = 400
 
 
@@ -112,6 +119,7 @@ def main() -> int:
               file=sys.stderr)
         return 1
     detail_route = None
+    customer_route = None
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -126,9 +134,25 @@ def main() -> int:
                 detail_route = (f"#kmon/{campaigns}", "حكم الحملة")
         except Exception:
             pass
+        # And a real contact, for the client record. This used to be a HARDCODED phone number in
+        # ROUTES, which meant the strongest screen in the product was only ever smoked against one
+        # database that happened to contain it: red on a fresh CI database and red locally, for the
+        # same reason, on every run of this session. Probed, it exercises real data everywhere and
+        # skips honestly where there is none.
+        try:
+            probe2 = browser.new_page()
+            probe2.goto(f"{BASE}/dashboard?token={tok}#customers")
+            probe2.wait_for_timeout(3500)
+            phone = probe2.evaluate(
+                "() => (cache && cache.contacts && cache.contacts.length) ? cache.contacts[0].phone : null")
+            if phone:
+                customer_route = (f"#customer/{phone}", "ما تكتبه هنا لا يستطيع المساعد تغييره")
+            probe2.close()
+        except Exception:
+            pass
         probe.close()
 
-        routes = ROUTES + ([detail_route] if detail_route else [])
+        routes = ROUTES + ([detail_route] if detail_route else []) + ([customer_route] if customer_route else [])
         for route, landmark in routes:
             before = len(failures)
             errors: list[str] = []
@@ -158,15 +182,37 @@ def main() -> int:
 
             body_len = page.evaluate("() => (document.getElementById('body') || {}).innerHTML?.length || 0")
             text = page.evaluate("() => document.body.innerText")
-            if body_len < MIN_CHARS:
+
+            # ONE reload before judging a short page. The client record needs /admin/state and then
+            # /admin/customer/<phone>, two sequential fetches behind a fixed 4s sleep, and on a
+            # COLD engine that sleep is occasionally not enough: the same route measured 160 chars
+            # on the first run against a freshly seeded database and 28,648 on the next, with every
+            # request returning 200 both times. A gate that is red at random is worse than no gate,
+            # because its operator learns to re-run it — which is how the blank-page class this
+            # script exists to catch gets waved through. A genuinely blank page is still blank after
+            # a reload, so nothing is hidden; only the race is removed.
+            if body_len < MIN_CHARS and route not in EMPTY_OK:
+                # The retry waits LONGER than the first pass, deliberately. Measured against a cold
+                # engine on a freshly created database, the client record rendered 160 chars on the
+                # first run and 28,424 on every run after — a one-time warmup, not a defect, and a
+                # same-length retry reproduced the 160 rather than clearing it.
+                page.reload()
+                page.wait_for_timeout(9000)
+                body_len = page.evaluate("() => (document.getElementById('body') || {}).innerHTML?.length || 0")
+                text = page.evaluate("() => document.body.innerText")
+            # An empty state that NAMES itself is a working screen, not a blank one.
+            empty_marker = EMPTY_OK.get(route)
+            is_honest_empty = bool(empty_marker) and empty_marker in text
+            if body_len < MIN_CHARS and not is_honest_empty:
                 failures.append(f"{route}: rendered only {body_len} chars (threshold {MIN_CHARS})")
-            if landmark not in text:
+            if landmark not in text and not is_honest_empty:
                 failures.append(f"{route}: landmark «{landmark}» missing")
             if errors:
                 failures.append(f"{route}: {len(errors)} runtime error(s) — {errors[0]}")
 
             ok = len(failures) == before
-            print(f"  {route:26} {body_len:>7} chars  {'ok' if ok else 'FAIL'}  «{landmark}»")
+            note = "«" + landmark + "»" + ("  (فارغة بشكل صحيح)" if is_honest_empty else "")
+            print(f"  {route:26} {body_len:>7} chars  {'ok' if ok else 'FAIL'}  {note}")
             page.close()
 
         browser.close()

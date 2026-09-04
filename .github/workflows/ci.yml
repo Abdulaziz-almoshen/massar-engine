@@ -1,0 +1,110 @@
+# CI for massar-engine.
+#
+# WHY THIS EXISTS (R16). The gate was twenty steps that only ever ran when someone remembered to
+# type `npm run check`, and two of the strongest signals never ran at all outside a laptop:
+#   - the DB-backed suite skips itself with no TEST_DATABASE_URL, and a skipped suite that nobody
+#     runs is the APPEARANCE of coverage, which is worse than none
+#   - smoke needs a booted engine and a browser, so it only ran at deploy time — after the mistake
+#
+# SAFETY, FIRST AND NON-NEGOTIABLE. This workflow BOOTS THE ENGINE and then runs a seeder that
+# forges inbound WhatsApp webhooks, which the agent replies to. The standing project rule is «NO
+# WHATSAPP SEND, TO ANY NUMBER, FOR ANY REASON». So:
+#   - no repository secrets are read here, by design: `secrets` appears nowhere in this file
+#   - GUPSHUP_API_KEY is set EMPTY (not just absent), which is what makes outbound impossible
+#   - and that is ASSERTED against /health before the seeder is allowed to run, not assumed
+# A future edit that adds a Gupshup credential to this workflow turns CI into a sender. The assert
+# step is what stops that silently succeeding.
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: local
+          POSTGRES_DB: massar_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # Throwaway, and local-only. Not a secret: it authenticates against an engine that exists for
+      # ninety seconds inside this runner and holds nothing but seeded fixtures.
+      CI_TOKEN: ci-local-not-a-secret
+      TEST_DATABASE_URL: postgres://postgres:local@127.0.0.1:5432/massar_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm }
+      - run: npm ci
+
+      # 1. The twenty-step gate. Unit tests, the Arabic/numeral checks, the writer, authz and nav
+      #    guards. No database and no browser needed.
+      - name: gate (npm run check)
+        run: npm run check
+
+      # 2. The DB-backed suite. This is the half that used to skip itself into a green tick.
+      - name: DB-backed suite
+        run: npm run test:db
+
+      - name: fail if the DB suite silently skipped
+        run: |
+          out=$(npm run test:db 2>&1)
+          echo "$out" | grep -qE "Tests +[0-9]+ passed" || { echo "$out"; echo "::error::DB suite reported no passing tests — TEST_DATABASE_URL is probably unset"; exit 1; }
+          echo "$out" | grep -qE "skipped \(" && { echo "$out"; echo "::error::DB suite SKIPPED — a skipped suite is not coverage"; exit 1; }
+          echo "DB suite really ran"
+
+      # 3. Boot the engine, prove it cannot send, seed it, then smoke it in a real browser.
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: install playwright
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+
+      - name: boot the engine
+        env:
+          DATABASE_URL: postgres://postgres:local@127.0.0.1:5432/massar_test
+          ADMIN_TOKEN: ${{ env.CI_TOKEN }}
+          WEBHOOK_TOKEN: ${{ env.CI_TOKEN }}   # the seeder posts forged webhooks with the same value
+          PORT: "8080"
+          # EXPLICITLY EMPTY, not merely absent. config.ts does `import "dotenv/config"`, which
+          # loads a .env from the working directory — and dotenv does NOT override a variable that
+          # is already set. Relying on «CI has no .env» would be one committed or generated file
+          # away from a CI engine with live Gupshup keys. Setting it empty here wins regardless.
+          # Verified locally against a checkout that DOES have a real .env: outbound.ok went true
+          # with the variable merely unset, and false with it set empty.
+          GUPSHUP_API_KEY: ""
+        run: |
+          npm run build
+          node dist/index.js > /tmp/engine.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/health >/dev/null || { cat /tmp/engine.log; exit 1; }
+
+      # THE SAFETY GATE. Everything after this line talks to a running engine; this is the step
+      # that proves that engine has no way to reach a real phone.
+      - name: assert the engine CANNOT send WhatsApp
+        run: |
+          ok=$(curl -s http://127.0.0.1:8080/health | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{process.stdout.write(String(JSON.parse(d)?.outbound?.ok))}catch(e){process.stdout.write("parse-error")}})')
+          echo "health.outbound.ok = $ok"
+          [ "$ok" = "false" ] || { echo "::error::CI engine CAN send WhatsApp (outbound.ok=$ok). Refusing to run the seeder."; cat /tmp/engine.log; exit 1; }
+
+      - name: seed fixtures
+        run: node scripts/seed-local.mjs http://127.0.0.1:8080 "$CI_TOKEN"
+
+      - name: smoke (13 routes, real browser)
+        env:
+          SMOKE_BASE: http://127.0.0.1:8080
+          SMOKE_ADMIN_TOKEN: ${{ env.CI_TOKEN }}
+        run: python scripts/smoke.py
+
+      - name: engine log on failure
+        if: failure()
+        run: tail -100 /tmp/engine.log || true

@@ -915,11 +915,21 @@ export async function loadAll(): Promise<{
  * account drilldown — which is three chances for a fourth screen to disagree with the first three
  * about what a deal is worth. The sector rollup below would have been the fourth copy.
  *
- * The TypeScript twin lives in validateLine's `num` defaults (0 price, 1 year, 1 qty, 0 discount)
- * and MUST keep matching: the columns are NOT NULL with those same defaults, so the two agree today
- * by construction. Full unification of the TS and SQL paths is open item R18.
+ * IT ROUNDS PER ROW, and that is the whole point. calculateLineValue (opps-domain.ts) rounds each
+ * line, because a deal is worth a whole number of riyals and that rounded figure is what «فرص
+ * البيع» prints on the card. SUMming the UNROUNDED expression therefore produced a different total
+ * from adding up the cards the reader can see. Measured on three deals at a 50% discount on an odd
+ * price: the cards read 4 + 2 + 51 = 57 and «المستهدفات والأداء» read 56. One riyal, on twelve
+ * rows — but it scales with the row count, it always favours neither side predictably, and a
+ * founder who adds up the board and gets a different number stops trusting both screens.
+ *
+ * So the rounding boundary is the LINE, in both languages, and tests/value-parity.test.ts drives
+ * the same inputs through this string and through calculateLineValue and asserts they agree —
+ * including the .5 ties, where JS Math.round and Postgres ROUND(numeric) both go away from zero.
+ * That test is the unification: the two implementations cannot literally share code, so what is
+ * shared is a proof that they answer identically.
  */
-const OPP_VALUE_SQL = "o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)";
+export const OPP_VALUE_SQL = "ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))";
 
 export async function salesPerformance(
   startMs: number, endMs: number, year: number, quarter: number, isCurrentPeriod: boolean,
@@ -1923,7 +1933,7 @@ export async function repQueue(rep: string, limit = 50): Promise<{
             MIN(o.owner)                              AS owner,
             json_agg(json_build_object(
               'id', o.id, 'product', o.product, 'stage', o.stage,
-              'value', ROUND(${OPP_VALUE_SQL})
+              'value', ${OPP_VALUE_SQL}
             ) ORDER BY o.stage_at DESC)               AS lines,
             (SELECT MAX(e.occurred_at) FROM engagements e WHERE e.contact_phone = o.phone) AS last_eng
        FROM opportunities o
