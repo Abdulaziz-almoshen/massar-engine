@@ -42,13 +42,18 @@ d("db integration", () => {
     // salesPerformance reads FROM tags — the catalogue is the row source, so a product with no tag
     // simply does not appear on the board. On a fresh test database that made the won-CTE
     // assertions read `undefined` rather than a number.
-    await pool.query(
-      `INSERT INTO tags (name, created_at, created_by) VALUES ('تكامل الأنظمة', $1, 'test')
-       ON CONFLICT (name) DO NOTHING`, [Date.now()]);
+    // Two products, because the composite-FK test needs a package on a DIFFERENT product from
+    // the one mkOpp writes its deals against.
+    for (const t of ["تكامل الأنظمة", "الإجازات المرضية"]) {
+      await pool.query(
+        `INSERT INTO tags (name, created_at, created_by) VALUES ($1, $2, 'test')
+         ON CONFLICT (name) DO NOTHING`, [t, Date.now()]);
+    }
     await pool.query("DELETE FROM engagements");
     await pool.query("DELETE FROM actions");
     await pool.query("DELETE FROM track_stage_events");
     await pool.query("DELETE FROM opportunities");
+    await pool.query("DELETE FROM packages WHERE name NOT IN ('الباقة القياسية','باقة المؤسسات')");
   });
 
   const mkOpp = async (stage: string, price = 100000) => {
@@ -181,6 +186,64 @@ d("db integration", () => {
       // Without this the screen fills with rows nobody can clear and stops being read.
       expect(await db.closeAction(actionId, "done", "اللوحة")).toBe(false);
       expect((await db.stalledByDept()).length).toBe(0);
+    });
+  });
+
+  describe("packages — price on the package, enforced by the database", () => {
+    const mkPkg = async (product: string, name: string, price: number) =>
+      db.upsertPackage({ product, name, listPrice: price, years: 1, scope: null });
+
+    it("refuses a package for a product that is not in the catalogue", async () => {
+      expect(await mkPkg("منتج غير موجود", "باقة", 1000)).toBeNull();
+    });
+
+    it("REFUSES a deal referencing a package of a DIFFERENT product", async () => {
+      // The composite foreign key, not application code. A plain package_id FK would allow this.
+      // mkOpp creates the deal on «تكامل الأنظمة», so the package must belong to a DIFFERENT
+      // product for this to be the case under test. A first draft put both on the same product
+      // and the FK correctly allowed it — the test was wrong, not the constraint.
+      const pkg = await mkPkg("الإجازات المرضية", "باقة الاختبار", 50000);
+      const other = await mkOpp("tech");   // على «تكامل الأنظمة»
+      await expect(
+        pool.query("UPDATE opportunities SET package_id = $1 WHERE id = $2", [pkg!.id, other]),
+      ).rejects.toThrow(/opp_package_product_fk/);
+    });
+
+    it("REFUSES deleting a package a deal still references — retirement is the only exit", async () => {
+      const pkg = await mkPkg("تكامل الأنظمة", "باقة مرجعية", 50000);
+      const id = await mkOpp("tech");
+      await pool.query("UPDATE opportunities SET product='تكامل الأنظمة', package_id=$1 WHERE id=$2", [pkg!.id, id]);
+      await expect(pool.query("DELETE FROM packages WHERE id = $1", [pkg!.id]))
+        .rejects.toThrow(/opp_package_product_fk/);
+      // Retiring it works, and the deal keeps pointing at it.
+      expect(await db.retirePackage(pkg!.id, true)).toBe(true);
+      const still = await pool.query("SELECT package_id FROM opportunities WHERE id=$1", [id]);
+      expect(Number(still.rows[0].package_id)).toBe(pkg!.id);
+    });
+
+    it("hides retired packages from the offerable list but keeps them readable", async () => {
+      const pkg = await mkPkg("تكامل الأنظمة", "باقة منتهية", 40000);
+      await db.retirePackage(pkg!.id, true);
+      const live = await db.listPackages("تكامل الأنظمة");
+      const all = await db.listPackages("تكامل الأنظمة", true);
+      expect(live.map((p) => p.name)).not.toContain("باقة منتهية");
+      expect(all.map((p) => p.name)).toContain("باقة منتهية");
+    });
+
+    it("upserts on (product, name) rather than duplicating", async () => {
+      await mkPkg("تكامل الأنظمة", "باقة واحدة", 10000);
+      await mkPkg("تكامل الأنظمة", "باقة واحدة", 12000);
+      const rows = (await db.listPackages("تكامل الأنظمة")).filter((p) => p.name === "باقة واحدة");
+      expect(rows.length).toBe(1);
+      expect(rows[0].listPrice).toBe(12000);
+    });
+
+    it("seeded the two REAL published packages, and only those", async () => {
+      // Verbatim from agent.ts:80. The only prices this company publishes.
+      const sick = await db.listPackages("الإجازات المرضية");
+      const byName = Object.fromEntries(sick.map((p) => [p.name, p.listPrice]));
+      expect(byName["الباقة القياسية"]).toBe(18000);
+      expect(byName["باقة المؤسسات"]).toBe(95000);
     });
   });
 

@@ -304,6 +304,40 @@ export const SALES_DOMAIN_JS: string = [
 ].join("\n");
 
 // ---------------------------------------------------------------------------
+// WHICH PRICE IS AUTHORITATIVE. Three numbers now describe one deal and they are NOT
+// interchangeable:
+//
+//   packages.list_price          the PUBLISHED reference, per year. What we ask.
+//   opportunities.sale_price     the NEGOTIATED price, per year. What this customer agreed.
+//   opportunities.discount       a further reduction the rep applied on top of sale_price.
+//
+// «قيمة الفرصة» is UNCHANGED by any of this: sale_price x qty x years x (1 - discount/100). It was
+// correct before packages existed and 37 live deals are computed from it, so it keeps its exact
+// meaning and its exact arithmetic. Adding a reference price adds a NEW question, it does not
+// redefine the old answer.
+//
+// The new question is «كم تحت السعر المعلن بيعت», and it is answerable only against the price that
+// was quoted AT THE TIME — quoted_list_price on the deal, not today's packages.list_price. Reading
+// the live package would make every historical figure move the moment anyone edits a price.
+// ---------------------------------------------------------------------------
+
+/** How far under the published price a deal landed, as a percentage. Positive means below list.
+ *
+ *  Returns NULL when there is no quoted reference, and that is the common case rather than an edge
+ *  one: five of the six products publish no price at all («يحدده المختص» — quoted case by case).
+ *  A screen must render «لم يُحدَّد» for those, never ٠٪, because zero percent off list is a claim
+ *  and no-published-price is the absence of one. */
+export function offListPct(
+  value: number, quotedListPrice: number | null, quantity: number, quotedYears: number | null,
+): number | null {
+  if (quotedListPrice == null || quotedYears == null) return null;
+  const qty = Number(quantity) || 1;
+  const reference = quotedListPrice * qty * quotedYears;
+  if (!(reference > 0)) return null;
+  return (1 - value / reference) * 100;
+}
+
+// ---------------------------------------------------------------------------
 // GATE A. The threshold the pilot is judged on, defined precisely enough to be reproducible.
 //
 // The plan stated it as "fewer than three engagements on a median working day, or fewer than half

@@ -476,6 +476,70 @@ ALTER TABLE actions ADD  CONSTRAINT actions_opp_fk
   FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
 `,
   },
+  {
+    version: "004-pricing",
+    sql: `
+-- THE REFERENCE PRICE, and it lives on the PACKAGE.
+--
+-- A first design put it on the product with packages as named durations. The company's own
+-- published price list disproves that: agent.ts carries «الباقة القياسية (فرع واحد): 18,000 ر.س
+-- سنويًا · باقة المؤسسات (حتى 10 فروع): 95,000 ر.س سنويًا» — one product, BOTH annual, and the
+-- differentiator is BRANCH COUNT, not duration. A single per-year product price cannot produce
+-- both numbers. Found by the Codex outside voice; two reviewers and the founder had all chosen
+-- the other model before anyone opened that file.
+--
+-- AND MOST PRODUCTS HAVE NO LIST PRICE AT ALL. Five of the six say «يحدده المختص» — quoted case
+-- by case. So an empty price is not a gap waiting to be filled, it is the truth, and the screens
+-- must say so rather than render a zero.
+CREATE TABLE IF NOT EXISTS packages (
+  id          BIGSERIAL PRIMARY KEY,
+  product     TEXT   NOT NULL,
+  name        TEXT   NOT NULL,
+  -- Per YEAR. The published reference, never what was negotiated.
+  list_price  BIGINT NOT NULL CHECK (list_price >= 0),
+  years       INT    NOT NULL DEFAULT 1 CHECK (years > 0),
+  -- What actually differentiates this package from its siblings: «فرع واحد», «حتى ١٠ فروع».
+  -- Text on purpose — the axis differs per product and inventing a numeric one would be a guess.
+  scope       TEXT,
+  -- Lifecycle is RETIRE, never delete. A won deal must keep pointing at the package it was sold
+  -- under, so nothing that a deal references may ever be removed.
+  retired_at  BIGINT,
+  created_at  BIGINT NOT NULL,
+  UNIQUE (product, name),
+  -- Not redundant with the primary key: it is what lets the opportunity carry a COMPOSITE foreign
+  -- key below, so a deal on product X cannot reference a package belonging to product Y.
+  UNIQUE (id, product)
+);
+CREATE INDEX IF NOT EXISTS packages_product_idx ON packages (product) WHERE retired_at IS NULL;
+
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS package_id BIGINT;
+-- THE SNAPSHOT. Without it, editing a package's price silently reprices every deal ever quoted
+-- from it, including WON ones, and «المحقق» moves with nobody touching a deal. That is the same
+-- class of defect as the ledger that had no writer. The quote is a fact about a moment.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS quoted_list_price BIGINT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS quoted_years INT;
+
+-- Composite FK: (package_id, product) must exist together in packages. MATCH SIMPLE means a NULL
+-- package_id satisfies it, so every pre-existing deal passes untouched. RESTRICT rather than
+-- CASCADE or SET NULL, because retirement is the lifecycle and a referenced package must not go.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opp_package_product_fk;
+ALTER TABLE opportunities ADD  CONSTRAINT opp_package_product_fk
+  FOREIGN KEY (package_id, product) REFERENCES packages (id, product) ON DELETE RESTRICT;
+
+-- The two REAL packages, verbatim from agent.ts. The only published prices this company has.
+INSERT INTO packages (product, name, list_price, years, scope, created_at)
+SELECT 'الإجازات المرضية', 'الباقة القياسية', 18000, 1, 'فرع واحد', $NOW$
+WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'الباقة القياسية');
+INSERT INTO packages (product, name, list_price, years, scope, created_at)
+SELECT 'الإجازات المرضية', 'باقة المؤسسات', 95000, 1, 'حتى ١٠ فروع', $NOW$
+WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'باقة المؤسسات');
+
+-- For the five products that are quoted case by case, the verbatim wording, so a screen can say
+-- «يحدده المختص» instead of rendering an empty cell that reads as missing data.
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS pricing_note TEXT;
+`,
+  },
+
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -537,6 +601,7 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   product_meta: ["product", "sector_id"],
   targets: ["product", "year", "quarter", "amount"],
   engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
+  packages: ["id", "product", "name", "list_price", "years", "scope", "retired_at", "created_at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1690,6 +1755,63 @@ export async function closeAction(id: number, state: "done" | "cancelled", by: s
     return true;
   }
   return false;
+}
+
+export type PackageRow = {
+  id: number; product: string; name: string; listPrice: number; years: number;
+  scope: string | null; retiredAt: number | null;
+};
+
+/** Live packages for a product, or all of them. Retired ones are excluded by default: a retired
+ *  package must stay readable for the deals that reference it, but must not be offerable on a new
+ *  quote. */
+export async function listPackages(product?: string, includeRetired = false): Promise<PackageRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const where: string[] = [], vals: unknown[] = [];
+  if (product) { vals.push(product); where.push(`product = $${vals.length}`); }
+  if (!includeRetired) where.push("retired_at IS NULL");
+  const r = await pool.query(
+    `SELECT id, product, name, list_price, years, scope, retired_at FROM packages
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      ORDER BY product, list_price`, vals);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), product: String(x.product), name: String(x.name),
+    listPrice: Number(x.list_price), years: Number(x.years),
+    scope: x.scope ? String(x.scope) : null,
+    retiredAt: x.retired_at == null ? null : Number(x.retired_at),
+  }));
+}
+
+/** Create or update one package. Keyed on (product, name), which is the pair a human actually
+ *  names it by. */
+export async function upsertPackage(p: {
+  product: string; name: string; listPrice: number; years: number; scope: string | null;
+}): Promise<PackageRow | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const known = new Set((await listTags()).map((t) => t.name));
+  if (!known.has(p.product)) return null;
+  const r = await pool.query(
+    `INSERT INTO packages (product, name, list_price, years, scope, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (product, name) DO UPDATE
+       SET list_price = EXCLUDED.list_price, years = EXCLUDED.years, scope = EXCLUDED.scope
+     RETURNING id, product, name, list_price, years, scope, retired_at`,
+    [p.product, p.name, Math.round(p.listPrice), Math.round(p.years), p.scope, Date.now()]);
+  const x = r.rows[0];
+  return { id: Number(x.id), product: String(x.product), name: String(x.name),
+           listPrice: Number(x.list_price), years: Number(x.years),
+           scope: x.scope ? String(x.scope) : null,
+           retiredAt: x.retired_at == null ? null : Number(x.retired_at) };
+}
+
+/** RETIRE, never delete. A won deal must keep pointing at the package it was sold under, and the
+ *  database enforces that: the composite foreign key is ON DELETE RESTRICT, so a DELETE of a
+ *  referenced package is refused outright. Retirement is the only exit. */
+export async function retirePackage(id: number, retire: boolean): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const q = await pool.query(
+    `UPDATE packages SET retired_at = $1 WHERE id = $2`, [retire ? Date.now() : null, id]);
+  return (q.rowCount ?? 0) > 0;
 }
 
 /** THE REP'S DAY, filtered in SQL and grouped by the human being called.

@@ -373,6 +373,59 @@ app.get("/admin/gate-a", async (req, reply) => {
   };
 });
 
+// ------------------------------ packages (الباقات) ------------------------------
+//
+// THE PRODUCT KEY TRAVELS IN THE QUERY OR THE BODY, NEVER IN THE PATH. One shipped product is
+// «تكامل الأنظمة (HIS/ERP)» and that slash would split a path parameter — /admin/packages/تكامل
+// الأنظمة (HIS/ERP) is two segments, not one. Product names are also mutable display text, so a
+// rename would change every URL. Found by the Codex outside voice and verified against the live
+// tags table.
+
+app.get("/admin/packages", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const product = q.product ? String(q.product) : undefined;
+  const includeRetired = String(q.retired ?? "") === "1";
+  return { ok: true, packages: await db.listPackages(product, includeRetired) };
+});
+
+app.post("/admin/packages", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  const name = String(b.name ?? "").trim().slice(0, 120);
+  if (!product) return reply.code(400).send({ ok: false, error: "invalid_field", field: "product" });
+  if (!name) return reply.code(400).send({ ok: false, error: "invalid_field", field: "name" });
+  const listPrice = Number(b.listPrice);
+  // Bounded, like every other money field on this surface: a price of 1e15 renders as a number
+  // nobody can read and a negative one inverts every discount figure downstream.
+  if (!Number.isFinite(listPrice) || listPrice < 0 || listPrice > 1e12) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "listPrice" });
+  }
+  const years = Number(b.years ?? 1);
+  if (!Number.isInteger(years) || years < 1 || years > 10) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "years" });
+  }
+  const row = await db.upsertPackage({
+    product, name, listPrice, years,
+    scope: b.scope == null ? null : String(b.scope).trim().slice(0, 120) || null,
+  });
+  // Null means the product is not in the catalogue. Same guard the targets endpoint uses: a
+  // package for a product that does not exist would be invisible on every screen.
+  if (!row) return reply.code(400).send({ ok: false, error: "unknown_product", product });
+  return { ok: true, package: row };
+});
+
+app.post("/admin/packages/:id/retire", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const retire = (req.body as any)?.retire !== false;
+  const done = await db.retirePackage(id, retire);
+  if (!done) return reply.code(404).send({ ok: false, error: "not_found" });
+  return { ok: true, id, retired: retire };
+});
+
 app.get("/admin/actions/stalled", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const groups = await db.stalledByDept();
