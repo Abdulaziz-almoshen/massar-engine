@@ -9,7 +9,7 @@ import { describe, it, expect } from "vitest";
 import {
   SALES_STAGES, STAGE_OUTCOMES, LEGACY_STAGE_MAP, STALL_STAGES, STALL_DAYS, DEPARTMENTS,
   stageWeight, isTerminalStage, isStalled, weightedValue, riyadhFiscalPeriod,
-  attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
+  riyadhPeriodBounds, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
   checkSalesDomainClosure, SALES_DOMAIN_JS,
 } from "../src/sales-domain.js";
 
@@ -155,6 +155,34 @@ describe("fiscal periods in Riyadh local time", () => {
   });
 });
 
+describe("period bounds round-trip with period bucketing", () => {
+  it("bounds a calendar quarter at Riyadh midnight, half-open", () => {
+    const b = riyadhPeriodBounds(2026, 1, 1);
+    expect(b.startMs).toBe(riyadh(2026, 1, 1, 0, 0));
+    expect(b.endMs).toBe(riyadh(2026, 4, 1, 0, 0));
+  });
+
+  it("every quarter's last instant buckets back to that quarter, and its end to the next", () => {
+    // The property that stops a deal being counted twice or dropped on a boundary.
+    for (let q = 1; q <= 4; q++) {
+      const b = riyadhPeriodBounds(2026, q, 1);
+      expect(riyadhFiscalPeriod(b.startMs, 1)).toEqual({ year: 2026, quarter: q });
+      expect(riyadhFiscalPeriod(b.endMs - 1, 1)).toEqual({ year: 2026, quarter: q });
+      const next = riyadhFiscalPeriod(b.endMs, 1);
+      expect(next).not.toEqual({ year: 2026, quarter: q });
+    }
+  });
+
+  it("round-trips a non-January fiscal year too", () => {
+    const b = riyadhPeriodBounds(2026, 1, 4);           // FY starts April
+    expect(riyadhFiscalPeriod(b.startMs, 4)).toEqual({ year: 2026, quarter: 1 });
+    expect(riyadhFiscalPeriod(b.endMs - 1, 4)).toEqual({ year: 2026, quarter: 1 });
+    // Q4 of an April-start FY2026 spills into calendar 2027.
+    const q4 = riyadhPeriodBounds(2026, 4, 4);
+    expect(new Date(q4.startMs + 3 * 3600 * 1000).getUTCFullYear()).toBe(2027);
+  });
+});
+
 describe("attainment and coverage are different questions", () => {
   it("attainment asks what has been won", () => {
     expect(attainmentPct(350000, 1000000)).toBeCloseTo(35);
@@ -227,6 +255,12 @@ describe("the browser seam", () => {
     // A function referencing anything outside its parameters and the injected constants passes in
     // Node and throws in the browser, which renders a blank page.
     expect(checkSalesDomainClosure()).toEqual([]);
+  });
+
+  it("does not mistake a property of an allowed global for a free reference", () => {
+    // Regression: the checker matched `UTC` in `Date.UTC(...)` and reported correct code as
+    // broken. A guard that cries wolf gets widened until it guards nothing.
+    expect(checkSalesDomainClosure()).not.toContain("UTC");
   });
 
   it("carries the constants and the functions into the bundle", () => {

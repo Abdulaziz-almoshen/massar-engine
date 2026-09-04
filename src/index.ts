@@ -3,6 +3,7 @@ import { cfg, configReport } from "./config.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
+import * as sales from "./sales-domain.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
@@ -130,6 +131,62 @@ app.get("/health", async () => ({
   accounts: { known: accounts.count(), withFacts: accounts.withFacts(), refreshedAt: accounts.lastRefreshAt() },
   config: configReport(),
 }));
+
+// --------------------- the commercial engine: performance and targets ---------------------
+//
+// ONE endpoint feeds the whole performance screen, from ONE grouped query, so no two tiles can
+// disagree and the executive view costs one connection rather than one per card.
+
+/** The fiscal calendar. January default because Lean's fiscal year start is still an open question
+ *  in the design doc — env-switchable so the answer is a config change, not a deploy of new code. */
+function fiscalStartMonth(): number {
+  const m = Number(process.env.FISCAL_START_MONTH || 1);
+  return Number.isFinite(m) && m >= 1 && m <= 12 ? Math.round(m) : 1;
+}
+
+app.get("/admin/sales/performance", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const fsm = fiscalStartMonth();
+  const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
+  const year = Number(q.year) || now.year;
+  const quarter = Number(q.quarter) || now.quarter;
+  if (quarter < 1 || quarter > 4) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
+  }
+  const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter);
+  return {
+    ok: true, year, quarter, fiscalStartMonth: fsm,
+    periodStart: b.startMs, periodEnd: b.endMs, now: Date.now(),
+    rows,
+  };
+});
+
+app.post("/admin/sales/targets", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  if (!product) return reply.code(400).send({ ok: false, error: "invalid_field", field: "product" });
+  const known = new Set((await db.listTags()).map((t) => t.name));
+  if (!known.has(product)) {
+    return reply.code(400).send({ ok: false, error: "unknown_product", product, known: [...known] });
+  }
+  const year = Number(b.year), quarter = Number(b.quarter), amount = Number(b.amount);
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
+  }
+  if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
+  }
+  // A negative target is not a stretch goal, it is a typo that would flip every colour on the board.
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1e12) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "amount" });
+  }
+  const ok = await db.setTarget(product, year, quarter, amount, adminName(req));
+  if (!ok) return reply.code(503).send({ ok: false, error: "not_persisted" });
+  return { ok: true, product, year, quarter, amount: Math.round(amount) };
+});
 
 // --------------------- integration (read-only, aggregate-only) ---------------------
 //

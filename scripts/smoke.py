@@ -12,10 +12,15 @@ Exit 0 = safe, exit 1 = do not leave this deploy live.
 """
 import json
 import re
+import os
 import sys
 from pathlib import Path
 
-BASE = "https://massar-engine.fly.dev"
+# Production by default, because `npm run deploy` is what usually runs this. Overridable so a
+# LOCAL build can be smoked before it ships: without this the variable was hardcoded, an operator
+# who set BASE in the environment silently tested production instead, and a new screen that works
+# locally reads as a broken deploy. That happened while adding #perf.
+BASE = os.environ.get("SMOKE_BASE") or os.environ.get("BASE") or "https://massar-engine.fly.dev"
 
 # route → a landmark that must exist if the view actually rendered
 ROUTES = [
@@ -31,6 +36,11 @@ ROUTES = [
     # «إضافة فرصة» is the board tab's own control bar and renders before any fetch resolves, so it
     # is green on a slow ledger and red on a broken view, which is the distinction that matters.
     ("#opps", "إضافة فرصة"),
+    # المستهدفات والأداء renders its period chips and KPI shells BEFORE the fetch resolves, so
+    # «المتوقع من الفرص المفتوحة» is green on a slow ledger and red on a broken view — the same
+    # distinction the #opps landmark was chosen for. A landmark inside the table would go red
+    # whenever the catalogue is empty, which is a legitimate state, not a failure.
+    ("#perf", "المتوقع من الفرص المفتوحة"),
     ("#pipeline", "لوحة المتابعة"),
     ("#tasks", "المهام"),
     ("#notes", "الملاحظات"),
@@ -54,6 +64,13 @@ MIN_CHARS = 400
 
 
 def token() -> str:
+    # The environment wins, so a LOCAL instance can be smoked with a throwaway token instead of
+    # the production one. Reading only from .env meant an operator pointing SMOKE_BASE at
+    # localhost sent the real admin token to it and got 401 on every route — the same class of
+    # gap as the hardcoded BASE above.
+    from_env = os.environ.get("SMOKE_ADMIN_TOKEN") or os.environ.get("ADMIN_TOKEN")
+    if from_env:
+        return from_env.strip()
     env = Path(__file__).resolve().parent.parent / ".env"
     m = re.search(r"^ADMIN_TOKEN=(.+)$", env.read_text(encoding="utf-8"), re.M)
     if not m:

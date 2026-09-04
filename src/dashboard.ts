@@ -19,6 +19,8 @@ import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
+import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
+import { SALES_DOMAIN_JS } from "./sales-domain.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
@@ -495,6 +497,7 @@ ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
 ${TARGETS_CRM_CSS}
+${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${PALETTE_CSS}
 </style>
@@ -655,7 +658,7 @@ const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", i: "home" },
   { grp: "دورة البيع" }, { id: "customers", l: "العملاء", i: "users" }, { id: "opps", l: "فرص البيع", i: "target" }, { id: "pipeline", l: "لوحة المتابعة", i: "reply" }, { id: "tasks", l: "المهام", i: "check" }, { id: "notes", l: "الملاحظات", i: "doc" },
   { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", i: "send" }, { id: "kmon", l: "متابعة الحملات", i: "eye" }, { id: "kb", l: "معرفة الخدمة", i: "book" }, { id: "partners", l: "شركاء المبيعات", i: "spark" },
-  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "reports", l: "التقارير", i: "chart" },
+  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "perf", l: "المستهدفات والأداء", i: "chart" }, { id: "reports", l: "التقارير", i: "chart" },
   { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
 ];
 const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
@@ -667,6 +670,7 @@ const TITLES = {
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
+  perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
@@ -3774,7 +3778,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -3783,6 +3787,7 @@ function render(fetchNew) {
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? vTargetsCrm()
+      : cur === "perf" ? vSalesPerf()
       : cur === "opps" ? vOppsCrm()
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
@@ -4130,7 +4135,9 @@ ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}
+${SALES_DOMAIN_JS}
 ${OPPS_CRM_JS}
+${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an

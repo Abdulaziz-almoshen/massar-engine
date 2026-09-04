@@ -189,6 +189,26 @@ export function riyadhFiscalPeriod(atMs: number, fiscalStartMonth: number): { ye
   return { year: year, quarter: Math.floor(offset / 3) + 1 };
 }
 
+/** The inverse of riyadhFiscalPeriod: the half-open bounds of one fiscal quarter, as epoch ms.
+ *  [start, end) — a moment exactly at `end` belongs to the NEXT quarter, which is the property that
+ *  stops a deal being counted twice or not at all on a boundary.
+ *
+ *  Lives here rather than in a query so that the bucketing and the bounds cannot disagree: the same
+ *  fixed +03:00 offset defines both, and a test asserts they round-trip. */
+export function riyadhPeriodBounds(year: number, quarter: number, fiscalStartMonth: number): { startMs: number; endMs: number } {
+  const start = Number(fiscalStartMonth) || 1;
+  const q = Number(quarter) || 1;
+  const monthIndex = (start - 1) + (q - 1) * 3;
+  const sy = Number(year) + Math.floor(monthIndex / 12);
+  const sm = monthIndex % 12;
+  const ey = Number(year) + Math.floor((monthIndex + 3) / 12);
+  const em = (monthIndex + 3) % 12;
+  return {
+    startMs: Date.UTC(sy, sm, 1, 0, 0, 0, 0) - 3 * 60 * 60 * 1000,
+    endMs: Date.UTC(ey, em, 1, 0, 0, 0, 0) - 3 * 60 * 60 * 1000,
+  };
+}
+
 /** attainment — the plain question: how much of the target has actually been won.
  *  Returns null rather than 0 when there is no target, because "no target set" and "zero percent of
  *  target" are different facts and a screen that renders them the same is lying. */
@@ -249,7 +269,7 @@ export function contactState(engagementCount: number, hasOwner: boolean): "untou
 
 const DOMAIN_FNS = [
   stageWeight, isTerminalStage, isStalled, weightedValue,
-  riyadhFiscalPeriod, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
+  riyadhFiscalPeriod, riyadhPeriodBounds, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
 ] as const;
 
 export const SALES_DOMAIN_JS: string = [
@@ -277,7 +297,10 @@ export function checkSalesDomainClosure(): string[] {
   const bad: string[] = [];
   for (const fn of DOMAIN_FNS) {
     const src = fn.toString();
-    const body = src.slice(src.indexOf("{"));
+    // Strip PROPERTY accesses before scanning. `Date.UTC` is a member of an allowed global, not a
+    // free reference to a module-scope `UTC`, and treating it as one made the check fail on
+    // correct code — a guard that cries wolf gets widened until it guards nothing.
+    const body = src.slice(src.indexOf("{")).replace(/\.\s*[A-Za-z_$][A-Za-z0-9_$]*/g, "");
     const idents = body.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) || [];
     for (const id of idents) {
       // Only module-scope constants are a risk; locals and params resolve fine. Upper-case-initial

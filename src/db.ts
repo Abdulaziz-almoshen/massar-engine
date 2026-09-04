@@ -656,6 +656,84 @@ export async function loadAll(): Promise<{
   }
 }
 
+/** ONE grouped query for the whole performance screen, deliberately.
+ *
+ *  The review's finding: "computed" must not mean recomputing every tile from the ledger on each
+ *  request. This machine is 512 MB with a pool of five and a health check already holding a
+ *  connection every 30 seconds, so the executive view takes ONE connection and returns every figure
+ *  from ONE snapshot — which also stops two tiles disagreeing mid-request.
+ *
+ *  `achieved` reads the stage-event ledger, not opportunities: a deal's stage_at is overwritten by
+ *  any later edit, so it cannot say WHEN a deal was won. That is the whole reason the ledger exists.
+ *
+ *  Returns raw money and raw counts. Attainment, coverage and the RAG band are computed by
+ *  sales-domain in the browser, so the arithmetic has exactly one home. */
+export async function salesPerformance(startMs: number, endMs: number, year: number, quarter: number): Promise<{
+  product: string; sector: string | null; target: number; achieved: number;
+  weightedOpen: number; openCount: number; wonCount: number;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `WITH won AS (
+       SELECT o.product,
+              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)) AS achieved,
+              COUNT(*) AS won_count
+         FROM track_stage_events e
+         JOIN opportunities o ON o.id = e.opp_id
+        WHERE e.to_stage = 'won'
+          AND e.effective_at >= to_timestamp($1 / 1000.0)
+          AND e.effective_at <  to_timestamp($2 / 1000.0)
+        GROUP BY o.product
+     ),
+     openv AS (
+       SELECT o.product,
+              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0) * ps.weight_pct / 100.0) AS weighted,
+              COUNT(*) AS open_count
+         FROM opportunities o
+         JOIN pipeline_stages ps ON ps.key = o.stage
+        WHERE o.stage NOT IN ('won','lost')
+        GROUP BY o.product
+     ),
+     tgt AS (
+       SELECT product, SUM(amount) AS amount FROM targets
+        WHERE year = $3 AND quarter = $4 GROUP BY product
+     )
+     SELECT t.name AS product, s.name AS sector,
+            COALESCE(tgt.amount, 0)      AS target,
+            COALESCE(won.achieved, 0)    AS achieved,
+            COALESCE(openv.weighted, 0)  AS weighted_open,
+            COALESCE(openv.open_count,0) AS open_count,
+            COALESCE(won.won_count, 0)   AS won_count
+       FROM tags t
+       LEFT JOIN product_meta pm ON pm.product = t.name
+       LEFT JOIN sectors s       ON s.id = pm.sector_id
+       LEFT JOIN won   ON won.product   = t.name
+       LEFT JOIN openv ON openv.product = t.name
+       LEFT JOIN tgt   ON tgt.product   = t.name
+      ORDER BY COALESCE(tgt.amount,0) DESC, t.name`,
+    [startMs, endMs, year, quarter]);
+  return r.rows.map((x: any) => ({
+    product: String(x.product), sector: x.sector ? String(x.sector) : null,
+    target: Number(x.target) || 0, achieved: Math.round(Number(x.achieved) || 0),
+    weightedOpen: Math.round(Number(x.weighted_open) || 0),
+    openCount: Number(x.open_count) || 0, wonCount: Number(x.won_count) || 0,
+  }));
+}
+
+/** Set one quarter's target for one product. Entered, never computed — it is the only figure on the
+ *  performance screen a human types, and that is deliberate: everything else is earned. */
+export async function setTarget(product: string, year: number, quarter: number, amount: number, by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  await pool.query(
+    `INSERT INTO targets (product, year, quarter, amount, updated_at, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (product, year, quarter)
+       DO UPDATE SET amount = EXCLUDED.amount, updated_at = EXCLUDED.updated_at,
+                     updated_by = EXCLUDED.updated_by`,
+    [product, year, quarter, Math.round(amount), Date.now(), by]);
+  return true;
+}
+
 export async function counts(): Promise<{ contacts: number; messages: number; events: number } | null> {
   if (!pool || !connected) return null;
   try {
