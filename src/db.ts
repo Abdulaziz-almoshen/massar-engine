@@ -1,6 +1,7 @@
 import pg from "pg";
 import * as facts from "./facts.js";
 import { SALES_STAGES } from "./sales-domain.js";
+import * as sales from "./sales-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -425,6 +426,56 @@ FROM opportunities o
 WHERE NOT EXISTS (SELECT 1 FROM track_stage_events e WHERE e.opp_id = o.id);
 `,
   },
+  {
+    version: "003-engagements",
+    sql: `
+-- WHAT THE REP DID, as distinct from what the DEAL did.
+--
+-- track_stage_events answers "when did this deal move", and updateOpp only writes a row when the
+-- stage actually CHANGES. That is correct for the money query and wrong for Gate A: a rep calls, the
+-- clinic says call me next week, the stage does not move, and nothing is recorded. That is most
+-- calls. Gate A counts engagements, so engagements need their own record.
+--
+-- The row is keyed on the CONTACT, not the opportunity. createOppLines deliberately creates several
+-- product lines per account, and a rep makes ONE call to ONE human: keying on opp_id would record
+-- two engagements for one conversation and inflate the very number the pilot is judged on.
+CREATE TABLE IF NOT EXISTS engagements (
+  id            BIGSERIAL PRIMARY KEY,
+  contact_phone TEXT   NOT NULL,
+  -- The line this call moved, when it moved one. ON DELETE SET NULL, not CASCADE: deleting one
+  -- product line must not erase the fact that a rep spoke to the person.
+  opp_id        BIGINT REFERENCES opportunities(id) ON DELETE SET NULL,
+  rep           TEXT   NOT NULL,
+  kind          TEXT   NOT NULL CHECK (kind IN ('call','visit','whatsapp','email','note')),
+  outcome_key   TEXT,
+  -- WHEN IT HAPPENED, as the rep reports it, bounded in code so backdating cannot manufacture
+  -- Gate A compliance. Separate from when we heard, because the gap between them IS the metric.
+  occurred_at   TIMESTAMPTZ NOT NULL,
+  recorded_at   BIGINT NOT NULL,
+  note          TEXT,
+  -- One command, one row. A retried tap from a phone on a bad connection must not count twice.
+  idem_key      TEXT   NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS eng_rep_day_idx  ON engagements (rep, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS eng_contact_idx  ON engagements (contact_phone, occurred_at DESC);
+
+-- Provenance for an action raised by a call that changed no stage. stage_event_id cannot carry it,
+-- because in that case there IS no stage event — which is the whole reason engagements exist.
+ALTER TABLE actions ADD COLUMN IF NOT EXISTS engagement_id BIGINT REFERENCES engagements(id) ON DELETE SET NULL;
+
+-- Close the orphan class. Both tables carried opp_id BIGINT NOT NULL with NO foreign key, so
+-- deleting an opportunity left its history pointing at nothing, forever and invisibly. These two
+-- ARE about the deal, so they go with it.
+DELETE FROM track_stage_events e WHERE NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.id = e.opp_id);
+DELETE FROM actions a           WHERE NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.id = a.opp_id);
+ALTER TABLE track_stage_events DROP CONSTRAINT IF EXISTS tse_opp_fk;
+ALTER TABLE track_stage_events ADD  CONSTRAINT tse_opp_fk
+  FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
+ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_opp_fk;
+ALTER TABLE actions ADD  CONSTRAINT actions_opp_fk
+  FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -485,6 +536,7 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   sectors: ["id", "name"],
   product_meta: ["product", "sector_id"],
   targets: ["product", "year", "quarter", "amount"],
+  engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1498,6 +1550,188 @@ export async function hotReadings(): Promise<{ phone: string; product: string; w
     `SELECT DISTINCT t.phone, t.product, c.wa_name
        FROM interest_tags t LEFT JOIN contacts c ON c.phone = t.phone
       WHERE t.level = 'hot'`)).rows;
+}
+
+/** THE REP'S DAY, filtered in SQL and grouped by the human being called.
+ *
+ *  Two shapes were wrong before this and both mattered:
+ *
+ *  · Scoring every contact in memory and filtering afterwards is O(all contacts) forever, on one
+ *    shared CPU that also serves the Gupshup webhook. Eligibility is a WHERE clause, so the JS only
+ *    ever scores rows a rep could actually call.
+ *
+ *  · One row per OPPORTUNITY tells a rep to phone the same clinic twice, because createOppLines
+ *    deliberately creates a line per product against one account. It also double-counts the
+ *    engagements Gate A is judged on. The row is the human; their open lines ride along.
+ *
+ *  Unowned deals are INCLUDED. Requiring owner to be set first would have made the pilot's queue
+ *  empty on day one, and the fix for that is not a backfill script, it is admitting that an
+ *  unclaimed deal is exactly what a rep should be shown. */
+export async function repQueue(rep: string, limit = 50): Promise<{
+  phone: string; account: string; owner: string | null;
+  lines: { id: number; product: string; stage: string; value: number }[];
+  lastEngagementAt: number | null;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT o.phone,
+            MIN(o.account_name)                       AS account,
+            MIN(o.owner)                              AS owner,
+            json_agg(json_build_object(
+              'id', o.id, 'product', o.product, 'stage', o.stage,
+              'value', ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))
+            ) ORDER BY o.stage_at DESC)               AS lines,
+            (SELECT MAX(e.occurred_at) FROM engagements e WHERE e.contact_phone = o.phone) AS last_eng
+       FROM opportunities o
+       LEFT JOIN contacts c ON c.phone = o.phone
+      WHERE o.stage NOT IN ('won','lost')
+        AND o.phone IS NOT NULL
+        AND (o.owner IS NULL OR o.owner = $1)
+        AND COALESCE(c.opted_out, false) = false
+      GROUP BY o.phone
+      ORDER BY last_eng ASC NULLS FIRST
+      LIMIT $2`,
+    [rep, limit]);
+  return r.rows.map((x: any) => ({
+    phone: String(x.phone),
+    account: String(x.account ?? ""),
+    owner: x.owner ? String(x.owner) : null,
+    lines: (x.lines || []).map((l: any) => ({
+      id: Number(l.id), product: String(l.product), stage: String(l.stage), value: Number(l.value) || 0,
+    })),
+    lastEngagementAt: x.last_eng ? new Date(x.last_eng).getTime() : null,
+  }));
+}
+
+/** How far back a rep may say a call happened. Gate A is judged on the gap between when a call
+ *  happened and when it was logged, so an unbounded occurred_at lets backdating manufacture
+ *  compliance. Two days covers a Thursday call logged on Sunday; anything older is a correction and
+ *  should be visibly one. */
+export const ENGAGEMENT_BACKDATE_LIMIT_MS = 2 * 24 * 60 * 60 * 1000;
+
+export type EngagementInput = {
+  idemKey: string;
+  contactPhone: string;
+  oppId: number | null;
+  rep: string;
+  kind: "call" | "visit" | "whatsapp" | "email" | "note";
+  outcomeKey: string | null;
+  occurredAt: number;
+  note: string | null;
+};
+export type EngagementResult =
+  | { ok: true; engagementId: number; replayed: boolean; fromStage: string | null; toStage: string | null; actionsCreated: number }
+  | { ok: false; error: string; field?: string };
+
+/**
+ * ONE COMMAND, ONE KEY, ONE TRANSACTION.
+ *
+ * A rep tapping an outcome on a phone produces up to four writes: the opportunity moves, the stage
+ * ledger gains a row, an engagement is recorded, and a department is put on the hook. Scoping
+ * idempotency per-table is not enough — an idempotent engagement insert followed by a retried
+ * action writer still duplicates the action. So the whole command lives or dies together, keyed on
+ * one idem_key the client generates and reuses across retries.
+ *
+ *     BEGIN
+ *       idem_key seen?  ── yes ──▶ return the original result, write nothing   (replay)
+ *            │ no
+ *            ▼
+ *       SELECT stage FOR UPDATE          ← the stage the outcome is judged against
+ *            ▼
+ *       resolveOutcome(fromStage, key)   ← target stage DERIVED, never taken from the request
+ *            ▼
+ *       stage moved?  ── yes ──▶ UPDATE opportunities + INSERT track_stage_events
+ *            ▼
+ *       INSERT engagements (idem_key UNIQUE)
+ *            ▼
+ *       dept owed?    ── yes ──▶ INSERT actions
+ *     COMMIT
+ *
+ * A call that moves no stage still lands an engagement, which is the entire reason this exists:
+ * updateOpp writes a ledger row ONLY on a real transition, and most calls do not move the stage.
+ */
+export async function recordEngagement(input: EngagementInput): Promise<EngagementResult> {
+  if (!(await reprobe()) || !pool) return { ok: false, error: "db_unavailable" };
+  const now = Date.now();
+  if (!input.idemKey || input.idemKey.length > 200) return { ok: false, error: "invalid_field", field: "idemKey" };
+  if (!input.contactPhone) return { ok: false, error: "invalid_field", field: "contactPhone" };
+  if (!input.rep) return { ok: false, error: "invalid_field", field: "rep" };
+  if (!Number.isFinite(input.occurredAt)) return { ok: false, error: "invalid_field", field: "occurredAt" };
+  // Bounded in both directions: the future is not a place a call can have happened, and a backdate
+  // beyond the limit would let a quiet week be rewritten into a compliant one.
+  if (input.occurredAt > now + 60_000) return { ok: false, error: "occurred_at_in_future", field: "occurredAt" };
+  if (input.occurredAt < now - ENGAGEMENT_BACKDATE_LIMIT_MS) return { ok: false, error: "occurred_at_too_old", field: "occurredAt" };
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const prior = await client.query(
+      "SELECT id, opp_id FROM engagements WHERE idem_key = $1", [input.idemKey]);
+    if (prior.rows[0]) {
+      await client.query("COMMIT");
+      return { ok: true, engagementId: Number(prior.rows[0].id), replayed: true,
+               fromStage: null, toStage: null, actionsCreated: 0 };
+    }
+
+    let fromStage: string | null = null, toStage: string | null = null;
+    let dept = "", nextAction = "";
+
+    if (input.oppId != null) {
+      const cur = await client.query(
+        "SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [input.oppId]);
+      if (!cur.rows[0]) { await client.query("ROLLBACK"); return { ok: false, error: "opp_not_found" }; }
+      fromStage = String(cur.rows[0].stage);
+
+      if (input.outcomeKey) {
+        const resolved = sales.resolveOutcome(fromStage, input.outcomeKey, sales.SALES_STAGES, sales.STAGE_OUTCOMES);
+        if (!resolved.ok) { await client.query("ROLLBACK"); return { ok: false, error: resolved.error, field: "outcomeKey" }; }
+        toStage = resolved.toStage; dept = resolved.dept; nextAction = resolved.nextAction;
+
+        if (toStage !== fromStage) {
+          await client.query(
+            `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2 WHERE id = $3`,
+            [toStage, now, input.oppId]);
+          await client.query(
+            `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
+             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7)`,
+            [input.oppId, fromStage, toStage, input.outcomeKey, input.occurredAt, now, input.rep]);
+        }
+      }
+    }
+
+    const ins = await client.query(
+      `INSERT INTO engagements (contact_phone, opp_id, rep, kind, outcome_key, occurred_at, recorded_at, note, idem_key)
+       VALUES ($1,$2,$3,$4,$5, to_timestamp($6 / 1000.0), $7,$8,$9) RETURNING id`,
+      [input.contactPhone, input.oppId, input.rep, input.kind, input.outcomeKey,
+       input.occurredAt, now, input.note, input.idemKey]);
+    const engagementId = Number(ins.rows[0].id);
+
+    // An action is owed only when a department other than sales is on the hook, and only for an
+    // outcome that did not close the deal. Deduped on the open action for the same deal and
+    // department: a rep chasing the same blocker three times owes التقنية one task, not three.
+    let actionsCreated = 0;
+    if (input.oppId != null && dept && toStage !== "lost" && toStage !== "won") {
+      const dup = await client.query(
+        `SELECT id FROM actions WHERE opp_id = $1 AND dept = $2 AND state = 'open' LIMIT 1`,
+        [input.oppId, dept]);
+      if (!dup.rows[0]) {
+        await client.query(
+          `INSERT INTO actions (opp_id, stage_event_id, engagement_id, dept, title, state, created_at, created_by)
+           VALUES ($1, NULL, $2, $3, $4, 'open', $5, $6)`,
+          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep]);
+        actionsCreated = 1;
+      }
+    }
+
+    await client.query("COMMIT");
+    return { ok: true, engagementId, replayed: false, fromStage, toStage, actionsCreated };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteOpp(id: number): Promise<boolean> {

@@ -303,6 +303,48 @@ export const SALES_DOMAIN_JS: string = [
   ...DOMAIN_FNS.map((fn) => fn.toString()),
 ].join("\n");
 
+/** WHAT AN OUTCOME IS ALLOWED TO DO. An outcome key on its own is not a command: «مهتم» means
+ *  something only relative to the rung the deal is standing on, and nothing stopped
+ *  `contact/interested` being submitted as a move to «إغلاق – خسارة».
+ *
+ *  So the target stage is DERIVED from the outcome's kind against the stage the caller was actually
+ *  holding, never taken from the request:
+ *    · advance      -> the next open rung by position (from «التفاوض والاعتماد» that is «إغلاق – ربح»)
+ *    · needs_action -> stays put; the deal has not moved, a department now owes something
+ *    · lost         -> «إغلاق – خسارة»
+ *
+ *  Pure, so the rule is unit-testable and has exactly one home (STANDARDS.md §2.1). Not in
+ *  DOMAIN_FNS: no browser surface needs it yet, and the closure contract is not worth widening
+ *  for a rule the server must enforce anyway. */
+export function resolveOutcome(
+  fromStage: string, outcomeKey: string,
+  stages: readonly SalesStage[], outcomes: readonly StageOutcome[],
+): { ok: true; toStage: string; dept: string; nextAction: string } | { ok: false; error: string } {
+  const outcome = outcomes.find((o) => o.stage === fromStage && o.key === outcomeKey);
+  if (!outcome) return { ok: false, error: "outcome_not_valid_for_stage" };
+  const here = stages.find((s) => s.key === fromStage);
+  if (!here) return { ok: false, error: "unknown_stage" };
+
+  let toStage = fromStage;
+  // A TERMINAL STAGE HAS NOWHERE TO ADVANCE TO. «ربح» on a won deal is kind:"advance" carrying
+  // dept:"إدارة المنتج" and «بدء التفعيل فورًا» — it hands the account to product, it does not move
+  // the deal to a further rung. Without this the outcome resolved to "no_stage_after_this_one" and
+  // recording a signature was impossible. Caught by the taxonomy sweep in tests/outcome-rules.
+  if (here.terminal !== null) {
+    return { ok: true, toStage: fromStage, dept: outcome.dept, nextAction: outcome.nextAction };
+  }
+  if (outcome.kind === "lost") {
+    toStage = "lost";
+  } else if (outcome.kind === "advance") {
+    const next = stages
+      .filter((s) => s.position > here.position && s.terminal !== "lost")
+      .sort((a, b) => a.position - b.position)[0];
+    if (!next) return { ok: false, error: "no_stage_after_this_one" };
+    toStage = next.key;
+  }
+  return { ok: true, toStage, dept: outcome.dept, nextAction: outcome.nextAction };
+}
+
 /** Same boot assertion as opps-domain: a shipped function that references anything outside its own
  *  parameters and the injected constants compiles cleanly, passes in Node, and throws in the
  *  browser — which is a blank page. Returns the offenders rather than throwing. */

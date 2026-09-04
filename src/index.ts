@@ -26,7 +26,7 @@ await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 }
 
 // One shared token, no users, no sessions, no rotation — and until now no lockout, so an online
 // guessing attack had unlimited attempts against the credential that can message real clinics.
-// Scoped to /admin ONLY. NOT the webhook: Gupshup bursts delivery statuses far past any sane
+// Scoped to /admin AND /rep. NOT the webhook: Gupshup bursts delivery statuses far past any sane
 // per-minute cap during a campaign, and a throttled webhook drops inbound — which can be an
 // «إيقاف». Opt-out is sacred (CLAUDE.md §7), so the webhook keeps its token and no limiter.
 // /dashboard and /health stay open too: a limit that locks an operator out of the screen is a
@@ -50,7 +50,15 @@ await app.register(rateLimit, {
   // Fly puts the real client in fly-client-ip; req.ip is the proxy, and limiting the proxy would
   // throttle every operator together the first time one of them typed a wrong token.
   keyGenerator: (req: any) => String(req.headers["fly-client-ip"] || req.ip),
-  allowList: (req: any) => !String(req.url || "").startsWith("/admin") || adminOk(req),
+  // Both guarded doors, and a VALID credential of either kind costs no quota. Allow-listing only
+  // adminOk would have counted every legitimate rep request as a failed admin attempt and throttled
+  // the pilot at 20 requests a minute; leaving /rep off the list entirely would have given the new
+  // door no brute-force protection at all.
+  allowList: (req: any) => {
+    const u = String(req.url || "");
+    if (!u.startsWith("/admin") && !u.startsWith("/rep")) return true;
+    return authorize(req) !== null;
+  },
   // statusCode belongs ON the returned object: Fastify reads it off the error, and without it the
   // correct body went out under a 500. Verified — 120 x 401 then 30 x 429.
   errorResponseBuilder: () => ({ statusCode: 429, status: "too_many_requests", error: "محاولات كثيرة. انتظر دقيقة." }),
@@ -296,7 +304,97 @@ app.get("/integration/product-interest", async (req, reply) => {
   };
 });
 
+// ------------------------------ /rep — the sales rep's surface ------------------------------
+//
+// Closed by default: with REP_TOKENS unset every route here answers 404, the same posture
+// /integration takes. «Not configured» and «wrong token» are different facts and only the second
+// should confirm to a caller that they found the right door.
+//
+// The whole surface is three routes. That is deliberate — a rep needs to see who to call, record
+// what happened, and read one account. Nothing here can launch a campaign or send a message.
+
+function repSurfaceOff(reply: any): boolean {
+  if (cfg.repTokens.length === 0) { reply.code(404).send({ status: "not_found" }); return true; }
+  return false;
+}
+
+app.get("/rep/queue", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  const caller = authorize(req);
+  if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const rows = await db.repQueue(caller.actor, 50);
+  return { ok: true, rep: caller.actor, count: rows.length, rows };
+});
+
+app.post("/rep/engagements", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  const caller = authorize(req);
+  if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+
+  const kinds = ["call", "visit", "whatsapp", "email", "note"] as const;
+  const kind = String(b.kind ?? "call");
+  if (!(kinds as readonly string[]).includes(kind)) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "kind" });
+  }
+  const phone = String(b.contactPhone ?? "").replace(/\D/g, "");
+  if (!phone) return reply.code(400).send({ ok: false, error: "invalid_field", field: "contactPhone" });
+  // The client generates the key and REUSES it across retries. That is what makes a tap from a
+  // phone on a bad connection safe to send again.
+  const idemKey = String(b.idemKey ?? "").trim();
+  if (!idemKey) return reply.code(400).send({ ok: false, error: "invalid_field", field: "idemKey" });
+
+  const r = await db.recordEngagement({
+    idemKey,
+    contactPhone: phone,
+    oppId: b.oppId == null ? null : Number(b.oppId),
+    // NEVER from the body. The actor is the credential.
+    rep: caller.actor,
+    kind: kind as (typeof kinds)[number],
+    outcomeKey: b.outcomeKey == null ? null : String(b.outcomeKey),
+    occurredAt: b.occurredAt == null ? Date.now() : Number(b.occurredAt),
+    note: b.note == null ? null : String(b.note).slice(0, 1000),
+  });
+  if (!r.ok) return reply.code(400).send(r);
+  return r;
+});
+
+/** The outcomes a rep may pick, for the stage the deal is actually on. Sent to the client so the
+ *  picklist cannot offer a move the server would reject. */
+app.get("/rep/outcomes", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  if (!authorize(req)) return reply.code(401).send({ status: "unauthorized" });
+  const stage = String((req.query as any)?.stage ?? "");
+  const list = sales.STAGE_OUTCOMES.filter((o) => o.stage === stage);
+  return { ok: true, stage, outcomes: list };
+});
+
 // ------------------------------ admin (token-gated) ------------------------------
+
+/** WHO IS CALLING, decided in one place and derived from the CREDENTIAL, never from the body.
+ *
+ *  `adminName` used to read `req.body.by`, so "who recorded this" was whatever the caller typed.
+ *  That was survivable while one operator held one token. It is not survivable for Gate A, which is
+ *  judged per rep on engagements the rep themselves records — a self-declared actor makes the gate's
+ *  own numbers unverifiable, and lets any caller write history as anyone.
+ *
+ *  Roles are positive grants, so a surface nobody has granted is closed. A rep token authenticates
+ *  on /rep and is simply NOT an admin anywhere else. */
+export type Caller = { role: "admin" | "rep"; actor: string } | null;
+
+function authorize(req: any): Caller {
+  const admin = req.headers["x-admin-token"];
+  if (cfg.adminToken && typeof admin === "string" && secretEq(admin, cfg.adminToken)) {
+    // The admin is one human today (assumption A-3), so a label is all the actor can be. Unlike the
+    // old body-derived name, it cannot be spoofed into someone else's.
+    return { role: "admin", actor: "اللوحة" };
+  }
+  const rep = req.headers["x-rep-token"];
+  if (typeof rep === "string" && rep) {
+    for (const r of cfg.repTokens) if (secretEq(rep, r.secret)) return { role: "rep", actor: r.name };
+  }
+  return null;
+}
 
 /** Constant-time string compare for secrets. Lengths are compared first and separately, because
  *  timingSafeEqual THROWS on a length mismatch and a secret's length is not what needs protecting. */
@@ -310,10 +408,13 @@ function secretEq(got: string, want: string): boolean {
  *  transcript. Lengths are compared first and separately — timingSafeEqual THROWS on a length
  *  mismatch, and the length of a token is not the secret worth protecting. */
 function adminOk(req: any): boolean {
-  if (!cfg.adminToken) return false;
-  const got = req.headers["x-admin-token"];
-  if (typeof got !== "string") return false;
-  return secretEq(got, cfg.adminToken);
+  return authorize(req)?.role === "admin";
+}
+
+/** /rep accepts a rep OR the admin, so the founder can walk the same screen the rep sees without a
+ *  second credential. /admin never accepts a rep. */
+function repOk(req: any): boolean {
+  return authorize(req) !== null;
 }
 /** WHO typed a fact. One operator today (assumption A-3), so the token is the authorization and
  *  this is only a label on the record.
@@ -323,7 +424,11 @@ function adminOk(req: any): boolean {
  *  measured, not assumed. A percent-encoded header would work and would also be a value the portal
  *  emits and cannot read back, which is this project's own recurring defect. */
 function adminName(req: any): string {
-  return String((req.body ?? {}).by ?? "").trim().slice(0, 60) || "اللوحة";
+  // Derived from the credential, not from the body. The old form read String(req.body.by), so any
+  // caller could sign a record as anyone — which for Gate A, judged per rep, made the numbers
+  // unverifiable. Falls back to the old label only when there is no caller, which cannot happen on
+  // a guarded route.
+  return authorize(req)?.actor ?? "اللوحة";
 }
 
 app.get("/admin/state", async (req, reply) => {
