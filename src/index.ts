@@ -1194,7 +1194,7 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
   }
   if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
-  const row = await db.updateOpp(id, patch as never);
+  const row = await db.updateOpp(id, patch as never, adminName(req));
   if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
   return { ok: true, opp: row };
 });

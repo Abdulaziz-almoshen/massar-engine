@@ -730,15 +730,27 @@ export async function salesPerformance(
 }[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query(
+    // The ledger says WHEN it happened; the row says whether it is STILL true. Joining the events
+    // alone got both wrong: a deal won and then corrected back out stayed in «المحقق» AND returned
+    // to open pipeline, so coverage counted the same money twice (measured: achieved held at
+    // 1,820,000 with openCount back to 3). And a deal won, reversed, then won again has two win
+    // events and would be summed twice. So: only opportunities currently at 'won', counted once,
+    // at the date of their LATEST transition into it.
     `WITH won AS (
        SELECT o.product,
               SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)) AS achieved,
               COUNT(*) AS won_count
-         FROM track_stage_events e
-         JOIN opportunities o ON o.id = e.opp_id
-        WHERE e.to_stage = 'won'
-          AND e.effective_at >= to_timestamp($1 / 1000.0)
-          AND e.effective_at <  to_timestamp($2 / 1000.0)
+         FROM opportunities o
+         JOIN LATERAL (
+           SELECT e.effective_at
+             FROM track_stage_events e
+            WHERE e.opp_id = o.id AND e.to_stage = 'won'
+            ORDER BY e.effective_at DESC
+            LIMIT 1
+         ) w ON TRUE
+        WHERE o.stage = 'won'
+          AND w.effective_at >= to_timestamp($1 / 1000.0)
+          AND w.effective_at <  to_timestamp($2 / 1000.0)
         GROUP BY o.product
      ),
      -- Two bugs lived in this block and both were silent.
@@ -1337,6 +1349,14 @@ export async function createOppLines(head: {
         [head.account_name, head.phone, l.product, l.stage ?? null, head.source, head.source_ref,
          l.sale_price ?? 0, l.years ?? 1, l.qty ?? 1, l.discount ?? 0, l.owner ?? null,
          l.close_on ?? null, l.next_step ?? null, head.created_by, now]);
+      // The opening event, same transaction. Without it a deal created directly at a closed stage
+      // (an import of already-won business, or a rep logging a deal after the fact) would never
+      // appear in «المحقق» — the won CTE reads the ledger, and the migration backfill runs once
+      // and never sees rows created after it.
+      await client.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor, note)
+         VALUES ($1, NULL, $2, to_timestamp($3 / 1000.0), $3, $4, 'فتح الفرصة')`,
+        [q.rows[0].id, String(q.rows[0].stage), now, head.created_by || "اللوحة"]);
       out.push(rowToOpp(q.rows[0]));
     }
     await client.query("COMMIT");
@@ -1352,7 +1372,7 @@ export async function createOppLines(head: {
 /** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ ١٨ يومًا» counts days in the
  *  stage and not days since anyone last touched the row — editing a next step must not reset a
  *  stall the board exists to show. */
-export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<OppRow | null> {
+export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: string): Promise<OppRow | null> {
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
   for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
@@ -1366,8 +1386,46 @@ export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<Opp
     vals.push(patch.stage, Date.now()); i += 2;
   }
   vals.push(id);
-  const q = await pool.query(`UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
-  return q.rows[0] ? rowToOpp(q.rows[0]) : null;
+
+  // THE LEDGER GETS ITS ROW HERE, IN THE SAME TRANSACTION AS THE UPDATE.
+  //
+  // Without this the whole targets screen is decoration, and it was: the ONLY insert into
+  // track_stage_events was the one-time migration backfill, so a rep marking a deal won moved
+  // opportunities.stage and wrote no event. The won CTE reads the ledger and never saw it; the
+  // openv CTE excludes won and lost. Measured on a real instance before the fix — a 1,440,000 SAR
+  // deal PATCHed to won: achieved stayed at 3,100,000 and openCount fell 3 to 2. The deal left the
+  // pipeline and never arrived anywhere. «المحقق» was frozen at migration-day values forever.
+  //
+  // One transaction, not two statements: a crash between the UPDATE and the INSERT would leave a
+  // won deal with no event, which is precisely the state this exists to make impossible.
+  // FOR UPDATE takes the row lock so two concurrent edits cannot both read the same from_stage
+  // and write two events for one transition.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const prev = await client.query("SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
+    if (!prev.rows[0]) { await client.query("ROLLBACK"); return null; }
+    const fromStage = String(prev.rows[0].stage);
+    const q = await client.query(
+      `UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+    if (!q.rows[0]) { await client.query("ROLLBACK"); return null; }
+    const toStage = String(q.rows[0].stage);
+    // Only a real transition is an event. Re-saving a row without touching the stage must not
+    // write one, or every edit would look like movement and «المحقق» would count a deal twice.
+    if (toStage !== fromStage) {
+      await client.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor)
+         VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), $4, $5)`,
+        [id, fromStage, toStage, Date.now(), actor || "اللوحة"]);
+    }
+    await client.query("COMMIT");
+    return rowToOpp(q.rows[0]);
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**

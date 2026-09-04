@@ -25,7 +25,11 @@ export const SALES_CRM_CSS = `
   padding:5px 13px;font-size:12.5px;cursor:pointer;color:var(--ink2,#525252);min-height:32px}
 .perf-per .q.on{background:#1F7A73;border-color:#1F7A73;color:#fff;font-weight:700}
 .perf-note{margin-inline-start:auto;font-size:12px;color:var(--muted,#7C7C7C);max-width:46ch;text-align:end}
-.perf-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+/* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
+   four equal cards made it the last of four with no more weight than the rest. */
+.perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
+.perf-kpi.lead{background:#F1F7F6}
+.perf-kpi.lead .v{font-size:30px}
 .perf-kpi{background:var(--strip,#F8F8F8);border-radius:10px;padding:13px 15px}
 .perf-kpi .k{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:600}
 .perf-kpi .v{font-size:21px;font-weight:700;margin-top:3px;letter-spacing:0}
@@ -43,24 +47,39 @@ export const SALES_CRM_CSS = `
 .perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
 .perf-prod{font-weight:600}
 .perf-sec{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:400}
+/* No overflow:hidden — it clipped the pace tick's own overhang, so the "extend past the track so
+   it reads as a marker" intent was dead code. The fill clips itself with its own border-radius. */
 .perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#EDEDED);
-  min-width:90px;overflow:hidden}
+  min-width:90px}
 .perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block;
   background:#1F7A73}
-.perf-bar .pace{position:absolute;inset-block:-2px;width:2px;background:var(--ink,#1A1A1A);opacity:.45}
+/* Full opacity and the darkest ink: at .45 over the teal fill this was invisible on exactly the
+   rows that are AHEAD of pace, which is the only comparison the tick exists to make. The overhang
+   above and below the track sits on the page ground, so it reads on both grounds. */
+.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#171717)}
 .perf-rag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
 .perf-rag .dot{width:7px;height:7px;border-radius:999px;flex:none}
-.rag-good{color:#2E6B4F} .rag-good .dot{background:#2E6B4F}
-.rag-warn{color:#7A5C00} .rag-warn .dot{background:#7A5C00}
-.rag-bad{color:#A32B21}  .rag-bad  .dot{background:#A32B21}
+/* The product's shipped status palette, not a fourth one. These three values are the same
+   ok/warn/bad used by «فشل الإرسال» and «أوقف الرسائل» two screens away (activity-crm,
+   campaigns-crm, customers-crm). A «متعثّر» that is a different red from every other bad state
+   in the product teaches the reader that the colour means nothing. */
+.rag-good{color:#027A48} .rag-good .dot{background:#027A48}
+.rag-warn{color:#B54708} .rag-warn .dot{background:#B54708}
+.rag-bad{color:#B42318}  .rag-bad  .dot{background:#B42318}
 .rag-none{color:var(--muted,#7C7C7C)} .rag-none .dot{background:var(--line,#E2E2E2)}
 .perf-set{border:1px solid var(--line,#E2E2E2);background:transparent;border-radius:6px;
   padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#525252);min-height:30px}
 .perf-set:hover{border-color:#1F7A73;color:#1F7A73}
+/* Both controls were missing from the product's focus-ring list (campaigns-crm.ts), so the quarter
+   chips had outline:none and the target button showed Chromium's default blue — a colour that
+   exists nowhere in Massar. Same treatment as every other control here. */
+.perf-per .q:focus, .perf-set:focus{outline:none}
+.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #1F7A73;outline-offset:1px}
 .perf-empty{padding:26px 0;color:var(--muted,#7C7C7C);font-size:13.5px;max-width:56ch;line-height:1.6}
-.perf-empty b{color:var(--ink,#1A1A1A);display:block;margin-bottom:5px;font-size:14.5px}
+.perf-empty b{color:var(--ink,#171717);display:block;margin-bottom:5px;font-size:14.5px}
 @media (max-width:820px){
   .perf-kpis{grid-template-columns:repeat(2,1fr)}
+  .perf-kpi.lead .v{font-size:24px}
   .perf-sechide{display:none}
 }
 @media (pointer:coarse){
@@ -72,6 +91,13 @@ export const SALES_CRM_CSS = `
 export const SALES_CRM_JS = `
 /* ===== sales-crm (generated from src/sales-crm.ts) ===== */
 var perfState = { year: 0, quarter: 0, data: null, loading: false };
+
+/* A YEAR IS NOT A QUANTITY. fmtN is Number.toLocaleString("ar-SA"), which groups, so ٢٠٢٦ came out
+   as ٢٬٠٢٦ — in the «المستهدف» tile at rest, not just in the dialog. DESIGN.md asks for Arabic-Indic
+   numerals, which is about digit SHAPE; grouping is a separate decision and it is wrong for a year. */
+function arYear(n) {
+  return new Intl.NumberFormat("ar-SA", { useGrouping: false }).format(Number(n) || 0);
+}
 
 function perfMoney(n) {
   // fmtN carries the Arabic-Indic numerals; the currency word is separate so a zero still reads
@@ -89,7 +115,10 @@ function perfRag(attain, elapsed) {
 }
 
 function perfBar(attain, elapsed) {
-  if (attain === null) return '<div class="perf-bar"></div>';
+  // «—», not an empty track. DESIGN.md chart rule 6: "Zero denominators render «—», never «٠٪».
+  // A rate over nothing is unmeasured, not zero." The numeric cells in this same row honour that;
+  // an empty grey track contradicted them, and read almost identically to a real 0%.
+  if (attain === null) return '<span class="perf-sec">—</span>';
   var w = Math.max(0, Math.min(100, attain));
   var pace = Math.max(0, Math.min(100, (Number(elapsed) || 0) * 100));
   // TEAL, always. DESIGN.md invariant 3 lists "progress fill" as a teal-only use, and the charts
@@ -165,8 +194,15 @@ function perfShell(quarter, year) {
   }
   per += "</div>";
   return '<div class="perf-head">' + per +
+    // THE BASIS IS STATED ON THE SCREEN, because it was never decided. The plan named this as its
+    // single unresolved business question — bookings, ACV, or TCV — and the code shipped one
+    // answer: sale_price x qty x years, the whole contract booked into the quarter it was won.
+    // A director reads an unlabelled riyal figure as revenue. This one is not, and until the
+    // founder rules, the screen says so rather than letting the number imply it.
     '<div class="perf-note">كل رقم هنا محسوب من السجل — عدا المستهدف، وهو الوحيد الذي يُكتب بيد إنسان. ' +
-    'العلامة على الشريط هي موضعنا من الربع.</div></div>';
+    'العلامة على الشريط هي موضعنا من الربع.<br>' +
+    '<b>المحقق يُحتسب بإجمالي قيمة العقد لكل سنواته، ويُسجَّل كاملًا في ربع الإغلاق</b> — ' +
+    'وهو أساس لم يُعتمد بعد.</div></div>';
 }
 
 /** The four figures. Nulls render as «—» rather than as zero: "not loaded yet" and "zero riyals"
@@ -174,18 +210,18 @@ function perfShell(quarter, year) {
 function perfKpis(totT, totA, totW, totCover, totAttain, totOpen, quarter, year) {
   var dash = "—";
   return '<div class="perf-kpis">' +
+    '<div class="perf-kpi lead"><div class="k">التغطية</div><div class="v">' +
+      (totCover === null || totCover === undefined ? dash : fmtN(Math.round(totCover)) + "٪") + '</div>' +
+      '<div class="s">المحقق والمتوقع معًا مقابل المستهدف</div></div>' +
     '<div class="perf-kpi"><div class="k">المستهدف</div><div class="v">' +
       (totT === null ? dash : perfMoney(totT)) + '</div>' +
-      '<div class="s">' + (quarter ? "الربع " + fmtN(quarter) + " · " + fmtN(year) : "&nbsp;") + '</div></div>' +
+      '<div class="s">' + (quarter ? "الربع " + fmtN(quarter) + " · " + arYear(year) : "&nbsp;") + '</div></div>' +
     '<div class="perf-kpi"><div class="k">المحقق</div><div class="v">' +
       (totA === null ? dash : perfMoney(totA)) + '</div>' +
       '<div class="s">' + (totA === null ? "&nbsp;" : (totAttain === null ? "بلا مستهدف" : fmtN(Math.round(totAttain)) + "٪ من المستهدف")) + '</div></div>' +
     '<div class="perf-kpi"><div class="k">المتوقع من الفرص المفتوحة</div><div class="v">' +
       (totW === null ? dash : perfMoney(totW)) + '</div>' +
-      '<div class="s">' + (totW === null ? "&nbsp;" : fmtN(totOpen) + " فرصة مرجّحة باحتمال مرحلتها") + '</div></div>' +
-    '<div class="perf-kpi"><div class="k">التغطية</div><div class="v">' +
-      (totCover === null || totCover === undefined ? dash : fmtN(Math.round(totCover)) + "٪") + '</div>' +
-      '<div class="s">المحقق والمتوقع معًا</div></div>' +
+      '<div class="s">' + (totW === null ? "&nbsp;" : opNOpp(totOpen) + " مرجّحة باحتمال مرحلتها") + '</div></div>' +
     "</div>";
 }
 
