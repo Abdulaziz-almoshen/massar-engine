@@ -45,11 +45,11 @@ app.post("/webhooks/gupshup", async (req, reply) => {
   // Parse BEFORE acking, so anything we cannot turn into events is RECORDED rather than swallowed.
   //
   // Scope, stated rather than implied: Fastify parses the JSON body before this handler runs, so
-  // malformed JSON is already refused upstream and never reaches the catch below. The silent drop
-  // that actually happens here is the quieter one — normalizeWebhook returns [] for a shape it does
-  // not recognise (a new provider format, a v4 envelope), and a real «إيقاف» inside it would vanish
-  // with no trace at all. Both paths log the raw body, which is the only thing that lets an
-  // operator recover the event by hand.
+  // malformed JSON is already refused upstream and never reaches the catch below, which therefore
+  // only fires if normalizeWebhook itself throws. An unrecognised SHAPE does not land here at all —
+  // normalizeWebhook returns a {kind:"other"} event for any object, so it surfaces in the
+  // "unhandled event type" branch below, which now carries the raw body. That is the only thing
+  // that lets an operator recover an «إيقاف» that arrived inside an envelope we cannot yet read.
   //
   // It still acks 200 either way: the failure is deterministic, so a retry re-sends the same
   // unreadable body, and an endpoint that answers 4xx in a loop is one a provider can disable —
@@ -60,9 +60,6 @@ app.post("/webhooks/gupshup", async (req, reply) => {
   } catch (e) {
     console.error(JSON.stringify({ at: "webhook", level: "error", msg: "normalize threw — event NOT processed, raw body logged for manual recovery", err: String(e).slice(0, 300), raw: JSON.stringify(req.body ?? null).slice(0, 2000) }));
     return reply.send({ status: "ok" });
-  }
-  if (!events.length && req.body && typeof req.body === "object" && Object.keys(req.body as object).length) {
-    console.error(JSON.stringify({ at: "webhook", level: "error", msg: "unrecognised payload shape — 0 events from a non-empty body, raw logged", raw: JSON.stringify(req.body).slice(0, 2000) }));
   }
 
   // Ack now; process async so Gupshup never times out on us.
@@ -86,7 +83,9 @@ app.post("/webhooks/gupshup", async (req, reply) => {
       } else if (ev.kind === "status") {
         tracker.recordStatus(ev);
       } else {
-        log({ at: "webhook", msg: "unhandled event type", type: ev.type });
+        // Raw body included on purpose: this is the real silent-drop path. A future provider
+        // envelope lands here, and if it carried an opt-out, this log is the only record of it.
+        console.error(JSON.stringify({ at: "webhook", level: "error", msg: "unhandled event type", type: ev.type, raw: JSON.stringify(req.body ?? null).slice(0, 2000) }));
       }
     } catch (e) {
       console.error(JSON.stringify({ at: "webhook", level: "error", msg: "event dropped", kind: ev.kind, from: "from" in ev ? ev.from : "", err: String(e).slice(0, 300) }));
