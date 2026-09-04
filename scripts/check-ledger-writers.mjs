@@ -43,7 +43,7 @@ c("located the migration regions to exclude", migrationRanges.length >= 2,
 
 // Tables the shipped screens read. A read with no writer is a screen that shows migration-day
 // values forever. Add a table here when a screen starts reading it.
-const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pipeline_stages", "pipelines", "engagements", "actions", "packages"];
+const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pipeline_stages", "pipelines", "engagements", "actions", "packages", "sectors", "product_meta"];
 
 for (const table of MUST_HAVE_WRITERS) {
   const writers = [];

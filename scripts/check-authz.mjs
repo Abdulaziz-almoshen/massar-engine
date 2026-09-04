@@ -60,7 +60,8 @@ try {
 
   // An admin surface must admit the admin and refuse everyone else. 401 is the refusal; anything
   // 2xx from a rep here is the failure this file exists to catch.
-  const ADMIN_ROUTES = ["/admin/state", "/admin/sales/performance", "/admin/tags"];
+  const ADMIN_ROUTES = ["/admin/state", "/admin/sales/performance", "/admin/tags",
+    "/admin/sales/sectors", "/admin/products", "/admin/sectors"];
   for (const route of ADMIN_ROUTES) {
     c(`${route} admits admin`, (await hit(route, admin)) !== 401);
     c(`${route} REFUSES a rep token`, (await hit(route, rep)) === 401);

@@ -1,6 +1,6 @@
 import pg from "pg";
 import * as facts from "./facts.js";
-import { SALES_STAGES } from "./sales-domain.js";
+import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
 
 // ---------------------------------------------------------------------------
@@ -539,7 +539,33 @@ WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات ال�
 ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS pricing_note TEXT;
 `,
   },
-
+  {
+    version: "005-sector-provenance",
+    sql: `
+-- WHICH SECTOR ASSIGNMENT IS EVIDENCED, AND WHICH IS A GUESS.
+--
+-- Four of the six products carry their own answer: agent.ts lists a bestFor audience per product,
+-- and it is the closest thing to a stated market this repo has. It also OVERTURNED the mapping I
+-- had inferred: «الإجازات المرضية», the only product with a published price and the largest line
+-- in the pipeline, lists مجمعات طبية / مراكز طبية / مستشفيات / مراكز أسنان. It is a hospital
+-- product. I had placed it under أعمال because the employer is who consumes a sick note, which
+-- confuses who USES the document with who BUYS the system.
+--
+-- Two remain guesses and are flagged, because bestFor contradicts the placement:
+--   خدمات التطعيمات → صيدليات, but bestFor leads with مراكز صحية
+--   فحص الموظفين    → أعمال,   but bestFor leads with مستشفيات and names شركات third
+--
+-- Seeding all six keeps a sector rollup complete; the flag keeps it honest, and a screen prints
+-- «مُستنتَج» beside a flagged product so nobody reads a guess as a fact. Correcting one is a single
+-- UPDATE: a deal never stores a sector, it derives one through product_meta.product.
+--
+-- «خدمة أخرى» is deliberately NOT seeded. It is the analyst's catch-all, not a product, so it gets
+-- no sector — and the sector board must therefore show an explicit unclassified total rather than
+-- let those deals fall out of the sum. A rollup that silently drops rows is the defect this
+-- project keeps shipping.
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS sector_assumed BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -575,6 +601,7 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     }
     await assertSchemaShape(client);
     await seedDefaultPipeline(client);
+    await seedSectors(client);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
     client.release();
@@ -631,6 +658,47 @@ async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
 
 /** The ladder is DATA, and sales-domain is its single source of truth. Re-seeded every boot by key
  *  so a weight corrected in code reaches the database without anyone writing a migration for it. */
+/**
+ * The three market sectors and which product sells into each.
+ *
+ * WHY THIS IS A BOOT SEED AND NOT MIGRATION SQL. Two reasons, and the second is the important one.
+ *
+ * 1. It is the ONLY writer these two tables have. Nothing in the product creates a sector: there is
+ *    no admin screen for it, and the eng review's answer was that there should not be one for three
+ *    rows that change once a year. But `scripts/check-ledger-writers.mjs` (gate step 18) exists
+ *    because four tables shipped here that a screen read and nothing ever wrote — one of them made
+ *    a 1,440,000 SAR won deal vanish. The guard deliberately ignores migration bodies, since SQL
+ *    frozen in a versioned string is not a writer: it runs once, on one database, and never again.
+ *    Putting the seed here makes the claim true rather than exempting the table from the check.
+ *    That was open item R7, and this is its resolution.
+ *
+ * 2. It is INSERT-IF-ABSENT, never an update. seedDefaultPipeline above uses DO UPDATE because
+ *    SALES_STAGES is code-owned truth and the database should be dragged back to it on every boot.
+ *    A sector mapping is the opposite: it is a business fact that two rows below are openly a
+ *    guess. If a founder corrects «فحص الموظفين» with one UPDATE, the next deploy must not silently
+ *    revert it. So a row that already exists is left exactly as found.
+ */
+async function seedSectors(client: pg.PoolClient): Promise<void> {
+  const now = Date.now();
+  for (const name of SECTORS) {
+    await client.query(
+      "INSERT INTO sectors (name, created_at) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING",
+      [name, now]);
+  }
+  const ids = new Map<string, number>();
+  for (const r of (await client.query("SELECT id, name FROM sectors")).rows) {
+    ids.set(String(r.name), Number(r.id));
+  }
+  for (const [product, sector, assumed, note] of PRODUCT_SECTOR) {
+    const sectorId = ids.get(sector);
+    if (sectorId === undefined) continue; // unreachable: SECTORS was just inserted above
+    await client.query(
+      `INSERT INTO product_meta (product, sector_id, owner, updated_at, sector_assumed, pricing_note)
+       VALUES ($1,$2,NULL,$3,$4,$5) ON CONFLICT (product) DO NOTHING`,
+      [product, sectorId, now, assumed, note]);
+  }
+}
+
 async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
   const r = await client.query("SELECT id FROM pipelines WHERE product IS NULL LIMIT 1");
   let id: number;
@@ -839,6 +907,20 @@ export async function loadAll(): Promise<{
  *
  *  Returns raw money and raw counts. Attainment, coverage and the RAG band are computed by
  *  sales-domain in the browser, so the arithmetic has exactly one home. */
+/**
+ * «قيمة الفرصة», as SQL, in ONE place.
+ *
+ * Unit price times quantity times years, then the discount taken off. This expression was written
+ * out by hand in three separate queries — the targets rollup, the weighted-pipeline rollup and the
+ * account drilldown — which is three chances for a fourth screen to disagree with the first three
+ * about what a deal is worth. The sector rollup below would have been the fourth copy.
+ *
+ * The TypeScript twin lives in validateLine's `num` defaults (0 price, 1 year, 1 qty, 0 discount)
+ * and MUST keep matching: the columns are NOT NULL with those same defaults, so the two agree today
+ * by construction. Full unification of the TS and SQL paths is open item R18.
+ */
+const OPP_VALUE_SQL = "o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)";
+
 export async function salesPerformance(
   startMs: number, endMs: number, year: number, quarter: number, isCurrentPeriod: boolean,
 ): Promise<{
@@ -855,7 +937,7 @@ export async function salesPerformance(
     // at the date of their LATEST transition into it.
     `WITH won AS (
        SELECT o.product,
-              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)) AS achieved,
+              SUM(${OPP_VALUE_SQL}) AS achieved,
               COUNT(*) AS won_count
          FROM opportunities o
          JOIN LATERAL (
@@ -885,7 +967,7 @@ export async function salesPerformance(
      --    $5 is that flag, decided by the caller rather than guessed in SQL.
      openv AS (
        SELECT o.product,
-              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0) * ps.weight_pct / 100.0) AS weighted,
+              SUM(${OPP_VALUE_SQL} * ps.weight_pct / 100.0) AS weighted,
               COUNT(*) AS open_count
          FROM opportunities o
          JOIN pipeline_stages ps
@@ -1841,7 +1923,7 @@ export async function repQueue(rep: string, limit = 50): Promise<{
             MIN(o.owner)                              AS owner,
             json_agg(json_build_object(
               'id', o.id, 'product', o.product, 'stage', o.stage,
-              'value', ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))
+              'value', ROUND(${OPP_VALUE_SQL})
             ) ORDER BY o.stage_at DESC)               AS lines,
             (SELECT MAX(e.occurred_at) FROM engagements e WHERE e.contact_phone = o.phone) AS last_eng
        FROM opportunities o
@@ -2023,4 +2105,56 @@ export async function getAssetByPublicId(publicId: string):
   if (!pool || !connected) return null;
   const r = await pool.query(`SELECT filename, content_type, bytes FROM product_assets WHERE public_id = $1`, [publicId]);
   return r.rows[0] ?? null;
+}
+
+export type CatalogueRow = {
+  product: string; sector: string | null; sectorAssumed: boolean;
+  owner: string | null; pricingNote: string | null;
+  packages: { id: number; name: string; listPrice: number; years: number; scope: string | null }[];
+};
+
+/**
+ * Every product the product actually sells, with its sector, its provenance flag and its published
+ * packages. Feeds the products screen and the package selector.
+ *
+ * Driven off `tags`, NOT off the catalogue constant in agent.ts, because tags is what a deal stores
+ * and what every board groups by. Production carries 8 tags where agent.ts knows 6, so reading the
+ * constant here would silently hide two live products. product_meta is LEFT JOINed for the same
+ * reason: a product with no sector row must still appear, carrying null, so the gap is visible
+ * instead of the row vanishing.
+ */
+export async function productCatalogue(): Promise<CatalogueRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT t.name AS product, s.name AS sector,
+            COALESCE(pm.sector_assumed, false) AS sector_assumed,
+            pm.owner, pm.pricing_note,
+            COALESCE(
+              (SELECT json_agg(json_build_object(
+                        'id', p.id, 'name', p.name, 'listPrice', p.list_price,
+                        'years', p.years, 'scope', p.scope) ORDER BY p.list_price)
+                 FROM packages p
+                WHERE p.product = t.name AND p.retired_at IS NULL), '[]'::json) AS packages
+       FROM tags t
+       LEFT JOIN product_meta pm ON pm.product = t.name
+       LEFT JOIN sectors s       ON s.id = pm.sector_id
+      ORDER BY t.name`);
+  return r.rows.map((x: any) => ({
+    product: String(x.product),
+    sector: x.sector ? String(x.sector) : null,
+    sectorAssumed: Boolean(x.sector_assumed),
+    owner: x.owner ? String(x.owner) : null,
+    pricingNote: x.pricing_note ? String(x.pricing_note) : null,
+    packages: (x.packages ?? []).map((p: any) => ({
+      id: Number(p.id), name: String(p.name), listPrice: Number(p.listPrice),
+      years: Number(p.years), scope: p.scope ? String(p.scope) : null,
+    })),
+  }));
+}
+
+/** The three sectors as stored, for a selector. Ordered as seeded. */
+export async function listSectors(): Promise<{ id: number; name: string }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query("SELECT id, name FROM sectors ORDER BY id");
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name) }));
 }

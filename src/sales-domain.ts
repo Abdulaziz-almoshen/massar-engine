@@ -491,3 +491,99 @@ export function checkSalesDomainClosure(): string[] {
   }
   return bad;
 }
+
+// ---------------------------------------------------------------- market sectors
+
+/**
+ * The three sectors Massar sells into. MARKET sectors, not customer segments and not government:
+ * the founder corrected both readings. Order is display order, biggest catalogue first.
+ */
+export const SECTORS = ["قطاع المستشفيات", "قطاع الصيدليات", "قطاع الأعمال"] as const;
+
+/**
+ * Which sector each catalogue product sells into: [product, sector, assumed, pricingNote].
+ *
+ * `assumed` is true where agent.ts's own bestFor audience CONTRADICTS the placement, so a screen can
+ * print «مُستنتَج» rather than presenting a guess at the same weight as a fact. Four are evidenced.
+ *
+ * `pricingNote` is the verbatim pricing line from agent.ts, and it is null for exactly one product
+ * — «الإجازات المرضية» is the only one with published packages, which live in `packages`. The other
+ * five say «يحدده المختص», so a price column renders those words instead of an empty cell that
+ * reads as missing data. This is why offListPct returns null rather than 0 for five of six.
+ *
+ * «خدمة أخرى» is absent on purpose: it is the analyst's catch-all bucket, not a product.
+ */
+export const PRODUCT_SECTOR: readonly (readonly [string, string, boolean, string | null])[] = [
+  ["الإجازات المرضية",        "قطاع المستشفيات", false, null],
+  ["التقارير الطبية",          "قطاع المستشفيات", false, "اشتراك سنوي يحدده المختص وفق الحجم"],
+  ["تكامل الأنظمة (HIS/ERP)",  "قطاع المستشفيات", false, "مشروع تكامل واشتراك سنوي، يحدده المختص"],
+  ["الشهادات الصحية",          "قطاع الصيدليات",  false, "اشتراك سنوي يحدده المختص"],
+  ["خدمات التطعيمات",          "قطاع الصيدليات",  true,  "اشتراك سنوي يحدده المختص"],
+  ["فحص الموظفين",             "قطاع الأعمال",    true,  "اشتراك سنوي بتسعير لكل فحص، يحدده المختص وفق الحجم"],
+];
+
+/** One sector's line on the sector board, plus the unclassified bucket. */
+export type SectorRollup = {
+  sector: string;            // the sector name, or UNCLASSIFIED_SECTOR
+  isUnclassified: boolean;
+  products: string[];
+  target: number; achieved: number; weightedOpen: number;
+  openCount: number; wonCount: number;
+  coveragePct: number | null; // achieved+weightedOpen over target; null when no target is set
+};
+
+/**
+ * The bucket for a product with no sector. NOT a fourth sector: it is the visible hole where a
+ * decision has not been made yet.
+ */
+export const UNCLASSIFIED_SECTOR = "بلا قطاع";
+
+/**
+ * Group per-product performance into sectors.
+ *
+ * WHY THIS IS A PURE FUNCTION AND NOT SQL. salesPerformance already computes every figure per
+ * product, driven off `tags` with a LEFT JOIN to product_meta. Writing a second query to group them
+ * would be a fifth hand-written copy of «قيمة الفرصة» and a second place for the two to disagree.
+ * Grouping is arithmetic, so it belongs here where it can be unit-tested without a database.
+ *
+ * WHY UNCLASSIFIED IS A ROW AND NOT A FILTER. Production carries products the catalogue in agent.ts
+ * has never heard of («سجل التطعيمات الوطني», «صحة أعمال Plus»), and the analyst files anything it
+ * cannot match under «خدمة أخرى». Dropping unmapped rows would make the sector totals sum to less
+ * than the pipeline while every individual line still looked right — the exact failure this project
+ * keeps shipping. So they get a row, with their real numbers, named as unclassified.
+ */
+export function rollupBySector(
+  rows: readonly { product: string; sector: string | null; target: number; achieved: number;
+                   weightedOpen: number; openCount: number; wonCount: number }[],
+  sectorOrder: readonly string[] = SECTORS,
+): SectorRollup[] {
+  const by = new Map<string, SectorRollup>();
+  const blank = (sector: string): SectorRollup => ({
+    sector, isUnclassified: sector === UNCLASSIFIED_SECTOR, products: [],
+    target: 0, achieved: 0, weightedOpen: 0, openCount: 0, wonCount: 0, coveragePct: null,
+  });
+  for (const r of rows) {
+    const key = r.sector ?? UNCLASSIFIED_SECTOR;
+    const acc = by.get(key) ?? blank(key);
+    acc.products.push(r.product);
+    acc.target += r.target; acc.achieved += r.achieved; acc.weightedOpen += r.weightedOpen;
+    acc.openCount += r.openCount; acc.wonCount += r.wonCount;
+    by.set(key, acc);
+  }
+  for (const acc of by.values()) {
+    // A sector with no target has no coverage, which is different from 0% coverage. Reporting 0
+    // would paint an untargeted sector red on a board whose whole job is showing where to worry.
+    acc.coveragePct = acc.target > 0
+      ? Math.round(((acc.achieved + acc.weightedOpen) / acc.target) * 100)
+      : null;
+    acc.products.sort((a, b) => a.localeCompare(b, "ar"));
+  }
+  // Declared sector order first, then any sector seeded later, then unclassified last: the hole
+  // belongs at the bottom of the board, not sorted into the middle of the real sectors.
+  const rank = (s: string) => {
+    if (s === UNCLASSIFIED_SECTOR) return 9999;
+    const i = sectorOrder.indexOf(s);
+    return i === -1 ? 999 : i;
+  };
+  return [...by.values()].sort((a, b) => rank(a.sector) - rank(b.sector) || a.sector.localeCompare(b.sector, "ar"));
+}

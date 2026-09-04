@@ -263,4 +263,53 @@ d("db integration", () => {
       expect(e.rows[0].opp_id).toBeNull();
     });
   });
+
+  describe("sector seed + catalogue reads", () => {
+    it("seeds the three sectors at boot, not in a migration", async () => {
+      const secs = await db.listSectors();
+      expect(secs.map((x) => x.name)).toEqual(
+        ["قطاع المستشفيات", "قطاع الصيدليات", "قطاع الأعمال"]);
+    });
+
+    it("does not duplicate sectors when the seed runs again", async () => {
+      await db.init();
+      expect((await db.listSectors())).toHaveLength(3);
+    });
+
+    // The seed is insert-if-absent so a hand correction survives a deploy. seedDefaultPipeline
+    // uses DO UPDATE for the opposite reason; getting these two backwards silently reverts a
+    // founder's fix on the next deploy.
+    it("leaves a corrected mapping alone on the next boot", async () => {
+      const hosp = (await db.listSectors()).find((s) => s.name === "قطاع المستشفيات")!;
+      await pool.query(
+        "UPDATE product_meta SET sector_id=$1, sector_assumed=false WHERE product='فحص الموظفين'",
+        [hosp.id]);
+      await db.init();
+      const r = await pool.query(
+        "SELECT sector_id, sector_assumed FROM product_meta WHERE product='فحص الموظفين'");
+      expect(Number(r.rows[0].sector_id)).toBe(hosp.id);
+      expect(r.rows[0].sector_assumed).toBe(false);
+    });
+
+    // Driven off tags, so a product the agent catalogue has never heard of still appears. Two such
+    // products exist in production.
+    it("returns a row for a tag with no product_meta, carrying a null sector", async () => {
+      await pool.query(
+        `INSERT INTO tags (name, created_at, created_by) VALUES ('صحة أعمال Plus', $1, 'test')
+         ON CONFLICT (name) DO NOTHING`, [Date.now()]);
+      const cat = await db.productCatalogue();
+      const row = cat.find((c) => c.product === "صحة أعمال Plus");
+      expect(row).toBeDefined();
+      expect(row!.sector).toBeNull();
+      expect(row!.packages).toEqual([]);
+    });
+
+    it("attaches live packages and hides retired ones", async () => {
+      const cat = await db.productCatalogue();
+      const sick = cat.find((c) => c.product === "الإجازات المرضية")!;
+      expect(sick.packages.map((p) => p.name)).toEqual(["الباقة القياسية", "باقة المؤسسات"]);
+      expect(sick.packages[0].listPrice).toBe(18000);
+      expect(sick.pricingNote).toBeNull();   // it has real packages, so no «يحدده المختص» note
+    });
+  });
 });

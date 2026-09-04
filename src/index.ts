@@ -226,33 +226,76 @@ function fiscalStartMonth(): number {
   return Number.isFinite(m) && m >= 1 && m <= 12 ? Math.round(m) : 1;
 }
 
-app.get("/admin/sales/performance", async (req, reply) => {
-  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
-  const q = (req.query as any) || {};
+/**
+ * Resolve ?year and ?quarter into fiscal period bounds, or name the bad field.
+ *
+ * Shared by every period-scoped sales route. It is a function rather than copied lines because both
+ * checks below were bugs: quarter was validated while year was not, and an out-of-range year
+ * overflowed Date.UTC into NaN, which pg serialises as the string "NaN" and to_timestamp rejects,
+ * surfacing the raw driver error with relation names as a 500. A second route pasting this block
+ * would have inherited that on day one.
+ */
+function resolvePeriod(q: any): { bad: string } | {
+  year: number; quarter: number; fsm: number; startMs: number; endMs: number; isCurrentPeriod: boolean;
+} {
   const fsm = fiscalStartMonth();
   const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
-  const year = Number(q.year) || now.year;
-  const quarter = Number(q.quarter) || now.quarter;
-  if (quarter < 1 || quarter > 4) {
-    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
-  }
-  // Year was unchecked while quarter was, and the asymmetry was reachable: Date.UTC overflows past
-  // year 275760, riyadhPeriodBounds then returns NaN, pg serialises that as the string "NaN", and
-  // to_timestamp raises — surfacing the raw driver error, relation names included, as a 500.
-  // Same range POST /admin/sales/targets already enforces.
-  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
-    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
-  }
+  const year = Number(q?.year) || now.year;
+  const quarter = Number(q?.quarter) || now.quarter;
+  if (quarter < 1 || quarter > 4) return { bad: "quarter" };
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) return { bad: "year" };
   const b = sales.riyadhPeriodBounds(year, quarter, fsm);
-  // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned close
-  // date belongs to the current period or to none, and the decision is made here rather than in SQL.
-  const isCurrentPeriod = year === now.year && quarter === now.quarter;
-  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter, isCurrentPeriod);
   return {
-    ok: true, year, quarter, fiscalStartMonth: fsm,
-    periodStart: b.startMs, periodEnd: b.endMs, now: Date.now(),
+    year, quarter, fsm, startMs: b.startMs, endMs: b.endMs,
+    // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned
+    // close date belongs to the current period or to none; decided here, not guessed in SQL.
+    isCurrentPeriod: year === now.year && quarter === now.quarter,
+  };
+}
+
+app.get("/admin/sales/performance", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const per = resolvePeriod(req.query);
+  if ("bad" in per) return reply.code(400).send({ ok: false, error: "invalid_field", field: per.bad });
+  const rows = await db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod);
+  return {
+    ok: true, year: per.year, quarter: per.quarter, fiscalStartMonth: per.fsm,
+    periodStart: per.startMs, periodEnd: per.endMs, now: Date.now(),
     rows,
   };
+});
+
+// ---- the sector board, the products screen and the sector selector (R10) -------------------
+//
+// READ-ONLY, and they are endpoints only: no screen mounts them yet. Saying otherwise is the
+// mistake made once already on this project, where a commit claimed a screen shipped and what
+// actually shipped was an HTTP route no nav item reached. The screens are open item R12.
+
+app.get("/admin/sales/sectors", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const per = resolvePeriod(req.query);
+  if ("bad" in per) return reply.code(400).send({ ok: false, error: "invalid_field", field: per.bad });
+  const rows = await db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod);
+  const sectors = sales.rollupBySector(rows);
+  return {
+    ok: true, year: per.year, quarter: per.quarter, fiscalStartMonth: per.fsm,
+    periodStart: per.startMs, periodEnd: per.endMs, now: Date.now(),
+    sectors,
+    // Stated, not left for a caller to derive: every product figure is inside exactly one bucket
+    // above, so a screen that renders these rows renders the whole pipeline.
+    productCount: rows.length,
+    unclassifiedCount: sectors.find((x) => x.isUnclassified)?.products.length ?? 0,
+  };
+});
+
+app.get("/admin/products", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return { ok: true, products: await db.productCatalogue() };
+});
+
+app.get("/admin/sectors", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return { ok: true, sectors: await db.listSectors() };
 });
 
 app.post("/admin/sales/targets", async (req, reply) => {
