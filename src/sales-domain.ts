@@ -587,3 +587,18 @@ export function rollupBySector(
   };
   return [...by.values()].sort((a, b) => rank(a.sector) - rank(b.sector) || a.sector.localeCompare(b.sector, "ar"));
 }
+
+// ---------------------------------------------------------------- what the money figure IS
+
+/**
+ * «المحقق» is the FULL CONTRACT VALUE: price x qty x years, discount taken off.
+ *
+ * The accounting basis — bookings, ACV, or TCV — was never decided, and it is still open. Until it
+ * is, the screen must not print a bare «المحقق» beside a target and let the reader supply their own
+ * basis: a CFO reading TCV as ACV is wrong by the number of years, which on a three-year deal is
+ * 300%. So the label says what the arithmetic actually did, and the note says the basis is undecided
+ * rather than implying one was chosen.
+ */
+export const VALUE_BASIS_LABEL = "قيمة العقد الكاملة — السعر × الكمية × السنوات، ناقص الخصم";
+export const VALUE_BASIS_NOTE =
+  "الأساس المحاسبي (حجوزات · ACV · TCV) لم يُحسم بعد. الرقم أعلاه قيمة العقد الكاملة، لا القيمة السنوية.";

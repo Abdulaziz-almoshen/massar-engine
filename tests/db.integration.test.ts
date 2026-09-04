@@ -312,4 +312,182 @@ d("db integration", () => {
       expect(sick.pricingNote).toBeNull();   // it has real packages, so no «يحدده المختص» note
     });
   });
+
+  describe("R8 — renaming a product moves every table that names it", () => {
+    const uniq = () => "ر٨-" + Math.random().toString(36).slice(2, 8);
+
+    it("moves targets, product_meta and packages, not just the tag", async () => {
+      const a = uniq(), b = uniq(), now = Date.now();
+      await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t')", [a, now]);
+      await pool.query("INSERT INTO targets (product, year, quarter, amount, updated_at) VALUES ($1,2030,1,900000,$2)", [a, now]);
+      await pool.query("INSERT INTO product_meta (product, updated_at) VALUES ($1,$2)", [a, now]);
+      await pool.query("INSERT INTO packages (product, name, list_price, years, created_at) VALUES ($1,'ب',1,1,$2)", [a, now]);
+
+      const r = await db.renameTag(a, b);
+      expect(r.ok).toBe(true);
+      // The old version returned true here having moved ONLY the tag, and the quarterly target
+      // silently left the board because salesPerformance joins targets ON tgt.product = t.name.
+      expect(r.moved).toMatchObject({ tags: 1, targets: 1, product_meta: 1, packages: 1 });
+
+      for (const t of ["targets", "product_meta", "packages"]) {
+        const left = await pool.query(`SELECT count(*)::int AS n FROM ${t} WHERE product = $1`, [a]);
+        expect(left.rows[0].n, `${t} still holds the old name`).toBe(0);
+        const moved = await pool.query(`SELECT count(*)::int AS n FROM ${t} WHERE product = $1`, [b]);
+        expect(moved.rows[0].n, `${t} did not receive the new name`).toBe(1);
+      }
+    });
+
+    // The composite FK (package_id, product) -> packages(id, product) makes the two sides
+    // impossible to move one at a time; Postgres refuses either order. Verified directly: the
+    // un-deferred UPDATE errors with «is still referenced from table "opportunities"».
+    it("moves both sides of the composite package FK together", async () => {
+      const a = uniq(), b = uniq(), now = Date.now();
+      await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t')", [a, now]);
+      const pk = await pool.query(
+        "INSERT INTO packages (product, name, list_price, years, created_at) VALUES ($1,'ب',5000,1,$2) RETURNING id", [a, now]);
+      await pool.query(
+        `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, package_id, created_at, updated_at)
+         VALUES ('ع',$1,'contact',$2,5000,1,1,0,$3,$2,$2)`, [a, now, pk.rows[0].id]);
+
+      const r = await db.renameTag(a, b);
+      expect(r.ok).toBe(true);
+      expect(r.moved).toMatchObject({ opportunities: 1, packages: 1 });
+      const joined = await pool.query(
+        "SELECT o.product AS op, p.product AS pp FROM opportunities o JOIN packages p ON p.id = o.package_id WHERE p.id = $1",
+        [pk.rows[0].id]);
+      expect(joined.rows[0].op).toBe(b);
+      expect(joined.rows[0].pp).toBe(b);   // the link survived the rename
+    });
+
+    it("returns ok:false and changes nothing for an unknown tag", async () => {
+      const before = await pool.query("SELECT count(*)::int AS n FROM tags");
+      const r = await db.renameTag("لا-يوجد-" + uniq(), "أيًّا-كان");
+      expect(r.ok).toBe(false);
+      expect(r.moved).toEqual({});
+      const after = await pool.query("SELECT count(*)::int AS n FROM tags");
+      expect(after.rows[0].n).toBe(before.rows[0].n);
+    });
+  });
+
+  describe("R11 — the four named reports return real rows, not just empty states", () => {
+    const now = () => Date.now();
+
+    const seedBlocked = async (outcomeKey: string, dept: string, product: string) => {
+      const t = now();
+      await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
+      const o = await pool.query(
+        `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
+         VALUES ('عميل التقرير',$1,'negotiate',$2,100000,1,1,0,$2,$2) RETURNING id`, [product, t]);
+      const oppId = Number(o.rows[0].id);
+      const e = await pool.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
+         VALUES ($1,'negotiate','negotiate',$2, now() - interval '9 days', $3, 'test') RETURNING id`,
+        [oppId, outcomeKey, t]);
+      await pool.query(
+        `INSERT INTO actions (opp_id, stage_event_id, dept, title, state, created_at)
+         VALUES ($1,$2,$3,'إجراء اختبار','open',$4)`,
+        [oppId, Number(e.rows[0].id), dept, t - 9 * 86400000]);
+      return oppId;
+    };
+
+    it.each([
+      ["awaiting-procurement", "awaiting_procurement", "المشتريات"],
+      ["contract-edit", "contract_edit", "القانونية"],
+      ["blocked-on-tech", "awaiting_tech", "التقنية"],
+    ])("%s finds a blocked deal and counts the days", async (id, key, dept) => {
+      const { reportById } = await import("../src/reports-domain.js");
+      const product = "منتج-تقرير-" + key;
+      const oppId = await seedBlocked(key, dept, product);
+      const rows = await db.runReport(reportById(id)!);
+      const mine = rows.find((r) => r.oppId === oppId);
+      expect(mine, `${id} returned nothing — an empty report reads as good news`).toBeDefined();
+      expect(mine!.dept).toBe(dept);
+      expect(mine!.daysWaiting).toBeGreaterThanOrEqual(8);   // seeded 9 days ago
+      expect(mine!.value).toBe(100000);
+    });
+
+    it("a CLOSED action leaves the report", async () => {
+      const { reportById } = await import("../src/reports-domain.js");
+      const oppId = await seedBlocked("contract_edit", "القانونية", "منتج-تقرير-مغلق");
+      await pool.query("UPDATE actions SET state='done', done_at=$1 WHERE opp_id=$2", [Date.now(), oppId]);
+      const rows = await db.runReport(reportById("contract-edit")!);
+      expect(rows.find((r) => r.oppId === oppId)).toBeUndefined();
+    });
+
+    // Both integration-loss keys must land in the same report; counting one undercounts.
+    it.each(["lost_integration", "integration_failed"])(
+      "lost-to-integration counts a deal lost with %s", async (key) => {
+        const { reportById } = await import("../src/reports-domain.js");
+        const t = Date.now(), product = "منتج-خسارة-" + key;
+        await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
+        const o = await pool.query(
+          `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
+           VALUES ('عميل خاسر',$1,'lost',$2,250000,2,1,0,$2,$2) RETURNING id`, [product, t]);
+        const oppId = Number(o.rows[0].id);
+        await pool.query(
+          `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
+           VALUES ($1,'negotiate','lost',$2, now() - interval '3 days', $3, 'test')`, [oppId, key, t]);
+        const rows = await db.runReport(reportById("lost-to-integration")!);
+        const mine = rows.find((r) => r.oppId === oppId);
+        expect(mine, `a deal lost with ${key} is missing from the loss report`).toBeDefined();
+        expect(mine!.value).toBe(500000);   // 250000 x 2 years
+      });
+
+    // A deal lost and then reopened must not still appear on a loss report.
+    it("drops a reopened deal out of the loss report", async () => {
+      const { reportById } = await import("../src/reports-domain.js");
+      const t = Date.now(), product = "منتج-خسارة-معاد";
+      await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
+      const o = await pool.query(
+        `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
+         VALUES ('عميل عاد',$1,'lost',$2,90000,1,1,0,$2,$2) RETURNING id`, [product, t]);
+      const oppId = Number(o.rows[0].id);
+      await pool.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
+         VALUES ($1,'negotiate','lost','lost_integration', now() - interval '2 days', $2, 'test')`, [oppId, t]);
+      expect((await db.runReport(reportById("lost-to-integration")!)).some((r) => r.oppId === oppId)).toBe(true);
+      await pool.query("UPDATE opportunities SET stage='negotiate' WHERE id=$1", [oppId]);
+      expect((await db.runReport(reportById("lost-to-integration")!)).some((r) => r.oppId === oppId)).toBe(false);
+    });
+  });
+
+  describe("R13 — four quarters in one pass", () => {
+    const bounds = (year: number) => [1, 2, 3, 4].map((quarter) => ({
+      quarter,
+      startMs: Date.UTC(year, (quarter - 1) * 3, 1) - 3 * 3600e3,
+      endMs: Date.UTC(year, quarter * 3, 1) - 3 * 3600e3,
+    }));
+
+    it("returns all four quarters, in order, even with no data", async () => {
+      const q = await db.quarterlyPerformance(2031, bounds(2031));
+      expect(q.map((x) => x.quarter)).toEqual([1, 2, 3, 4]);
+      expect(q.every((x) => x.achieved === 0)).toBe(true);
+    });
+
+    it("puts a target and its win in the SAME quarter, and leaves the others alone", async () => {
+      const year = 2032, t = Date.now(), product = "منتج-ربعي";
+      await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
+      await pool.query("INSERT INTO targets (product, year, quarter, amount, updated_at) VALUES ($1,$2,3,400000,$3)", [product, year, t]);
+      const o = await pool.query(
+        `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
+         VALUES ('ع',$1,'won',$2,300000,1,1,0,$2,$2) RETURNING id`, [product, t]);
+      // mid-Q3 of that year
+      await pool.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, to_stage_at, effective_at, recorded_at, actor)
+         VALUES ($1,'negotiate','won',NULL, $2::timestamptz, $3, 'test')`.replace(", to_stage_at", "").replace(",NULL", ""),
+        [Number(o.rows[0].id), new Date(Date.UTC(year, 7, 15)).toISOString(), t]);
+
+      const q = await db.quarterlyPerformance(year, bounds(year));
+      const q3 = q.find((x) => x.quarter === 3)!;
+      expect(q3.target).toBe(400000);
+      expect(q3.achieved).toBe(300000);
+      expect(q3.wonCount).toBe(1);
+      expect(q3.coveragePct).toBe(75);
+      for (const other of q.filter((x) => x.quarter !== 3)) {
+        expect(other.achieved, `Q${other.quarter} leaked`).toBe(0);
+        // null, not 0 — a quarter with no target has no coverage, which is not 0% coverage.
+        expect(other.coveragePct).toBeNull();
+      }
+    });
+  });
 });

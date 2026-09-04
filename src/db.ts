@@ -566,6 +566,30 @@ ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS pricing_note TEXT;
 ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS sector_assumed BOOLEAN NOT NULL DEFAULT false;
 `,
   },
+  {
+    version: "006-rename-cascade",
+    sql: `
+-- A PRODUCT RENAME HAS TO MOVE TEN TABLES AT ONCE.
+--
+-- The product name is a STRING key in ten tables, and renameTag updated exactly one of them plus
+-- entities.product_tags. Measured: renaming a tag returned true, moved the tag, and left the
+-- «targets» row on the old name — so the quarterly target silently disappeared from the board,
+-- because salesPerformance joins targets ON tgt.product = t.name. Same shape as the won deal that
+-- vanished from «المحقق»: every figure still rendered, and one of them was quietly wrong.
+--
+-- opportunities carries a COMPOSITE foreign key (package_id, product) -> packages (id, product).
+-- That makes the two sides impossible to update one at a time: whichever moves first violates the
+-- constraint against the other. Deferring it to COMMIT lets one transaction move both and still be
+-- checked before anything is durable. INITIALLY IMMEDIATE, so it keeps behaving exactly as it does
+-- today for every other writer; only renameTag asks for the deferral, and only for its own
+-- transaction.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opp_package_product_fk;
+ALTER TABLE opportunities ADD CONSTRAINT opp_package_product_fk
+  FOREIGN KEY (package_id, product) REFERENCES packages (id, product)
+  ON DELETE RESTRICT
+  DEFERRABLE INITIALLY IMMEDIATE;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1159,24 +1183,71 @@ export async function createTag(name: string, by: string): Promise<boolean> {
  * DISTINCT is load-bearing. An account already carrying the destination name would otherwise end up
  * holding it twice, and a duplicate inside the array makes every count off by one.
  */
-export async function renameTag(from: string, to: string): Promise<boolean> {
-  if (!pool || !connected) return false;
+/**
+ * Every table that keys work by PRODUCT NAME. The name is a string key in ten places, so a rename
+ * is a ten-table write or it is data loss.
+ *
+ * Derived by asking the database, not by memory:
+ *   SELECT table_name FROM information_schema.columns WHERE column_name = 'product'
+ * The old renameTag moved ONE of them. `scripts/check-rename-cascade.mjs` re-asks that question on
+ * every build, so a new table with a `product` column fails the gate until it is listed here.
+ */
+const PRODUCT_NAME_TABLES = [
+  "opportunities", "targets", "packages", "product_meta", "pipelines",
+  "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb",
+] as const;
+
+export type RenameResult = { ok: boolean; moved: Record<string, number> };
+
+/**
+ * Rename a product, everywhere it is written down.
+ *
+ * WHAT THIS FIXES. The old version updated `tags` and `entities.product_tags` and returned true.
+ * Measured against Postgres: after a rename the `targets` row still carried the OLD name, and
+ * salesPerformance joins targets ON tgt.product = t.name — so the founder's quarterly target
+ * silently left the board while every figure on it still rendered. Nine tables behaved that way.
+ *
+ * WHY THE CONSTRAINT IS DEFERRED. opportunities has a composite FK (package_id, product) into
+ * packages (id, product). Whichever side moves first violates it against the other, so neither can
+ * move alone. Deferring to COMMIT lets both move and still be checked before anything is durable —
+ * the check is not skipped, only postponed. Migration 006 made the constraint DEFERRABLE for this.
+ *
+ * Returns per-table counts rather than a boolean, because «تم» after a ten-table write says nothing
+ * about whether the write found anything, and this function's whole history is of silently missing
+ * rows.
+ */
+export async function renameTag(from: string, to: string): Promise<RenameResult> {
+  const moved: Record<string, number> = {};
+  if (!pool || !connected) return { ok: false, moved };
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Postponed, not skipped: still verified at COMMIT, so a rename that would break the package
+    // link still rolls the whole thing back.
+    await client.query("SET CONSTRAINTS opp_package_product_fk DEFERRED");
     const r = await client.query(`UPDATE tags SET name = $2 WHERE name = $1`, [from, to]);
-    if (!(r.rowCount ?? 0)) { await client.query("ROLLBACK"); return false; }
-    await client.query(
+    if (!(r.rowCount ?? 0)) { await client.query("ROLLBACK"); return { ok: false, moved }; }
+    moved.tags = r.rowCount ?? 0;
+
+    for (const t of PRODUCT_NAME_TABLES) {
+      // Identifier is from a frozen const list, never from a caller; the VALUES are parameterised.
+      const u = await client.query(`UPDATE ${t} SET product = $2 WHERE product = $1`, [from, to]);
+      if (u.rowCount) moved[t] = u.rowCount;
+    }
+
+    const e = await client.query(
       `UPDATE entities
           SET product_tags = (
             SELECT COALESCE(jsonb_agg(DISTINCT CASE WHEN v = to_jsonb($1::text) THEN to_jsonb($2::text) ELSE v END), '[]'::jsonb)
               FROM jsonb_array_elements(product_tags) AS v)
         WHERE product_tags @> jsonb_build_array($1::text)`, [from, to]);
+    if (e.rowCount) moved.entities = e.rowCount;
+
     await client.query("COMMIT");
-    return true;
-  } catch (e) {
+    return { ok: true, moved };
+  } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    throw e;
+    throw err;
   } finally { client.release(); }
 }
 
@@ -2167,4 +2238,145 @@ export async function listSectors(): Promise<{ id: number; name: string }[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query("SELECT id, name FROM sectors ORDER BY id");
   return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name) }));
+}
+
+export type ReportRow = {
+  oppId: number; account: string | null; product: string; stage: string;
+  outcomeKey: string | null; title: string | null; dept: string | null;
+  since: number;            // epoch ms of the blocking event / the loss
+  daysWaiting: number;      // whole days, computed in SQL against now()
+  value: number;            // «قيمة الفرصة», the ONE definition
+};
+
+/**
+ * Run one of the four named reports (R11).
+ *
+ * The definition comes from reports-domain.ts, not from here: this function knows how to ASK, and
+ * the report knows what it IS. That separation is what lets assertReportKeys check the filters
+ * against the shipped ladder without a database.
+ *
+ * Both shapes order OLDEST FIRST. A stalled-deal report sorted newest-first buries the deal that
+ * has been stuck longest under the ones that just arrived, which inverts the only reason to read it.
+ */
+export async function runReport(def: {
+  source: "open_actions" | "lost_deals"; outcomeKeys: readonly string[]; dept: string | null;
+}): Promise<ReportRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+
+  if (def.source === "open_actions") {
+    // Open actions only: a closed action is answered work, and leaving it here would grow the
+    // report forever and make «كم عالق؟» unanswerable.
+    const r = await pool.query(
+      `SELECT a.opp_id, o.account_name, o.product, o.stage, a.title, a.dept,
+              e.outcome_key,
+              a.created_at AS since,
+              GREATEST(0, FLOOR((EXTRACT(EPOCH FROM now()) * 1000 - a.created_at) / 86400000))::int AS days_waiting,
+              ${OPP_VALUE_SQL} AS value
+         FROM actions a
+         JOIN opportunities o ON o.id = a.opp_id
+         LEFT JOIN track_stage_events e ON e.id = a.stage_event_id
+        WHERE a.state = 'open'
+          AND ($1::text IS NULL OR a.dept = $1)
+          AND (cardinality($2::text[]) = 0 OR e.outcome_key = ANY($2))
+        ORDER BY a.created_at ASC`,
+      [def.dept, def.outcomeKeys]);
+    return r.rows.map((x: any) => ({
+      oppId: Number(x.opp_id), account: x.account_name ?? null, product: String(x.product),
+      stage: String(x.stage), outcomeKey: x.outcome_key ?? null, title: x.title ?? null,
+      dept: x.dept ?? null, since: Number(x.since), daysWaiting: Number(x.days_waiting),
+      value: Number(x.value),
+    }));
+  }
+
+  // lost_deals: the row's CURRENT stage decides it is lost, the ledger dates it. Same rule the won
+  // CTE uses — a deal lost and then reopened must not still appear on a loss report.
+  const r = await pool.query(
+    `SELECT o.id AS opp_id, o.account_name, o.product, o.stage, e.outcome_key,
+            NULL::text AS title, NULL::text AS dept,
+            (EXTRACT(EPOCH FROM e.effective_at) * 1000)::bigint AS since,
+            GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - e.effective_at)) / 86400))::int AS days_waiting,
+            ${OPP_VALUE_SQL} AS value
+       FROM opportunities o
+       JOIN LATERAL (
+         SELECT ee.effective_at, ee.outcome_key
+           FROM track_stage_events ee
+          WHERE ee.opp_id = o.id AND ee.outcome_key = ANY($1)
+          ORDER BY ee.effective_at DESC LIMIT 1
+       ) e ON TRUE
+      WHERE o.stage = 'lost'
+      ORDER BY e.effective_at ASC`,
+    [def.outcomeKeys]);
+  return r.rows.map((x: any) => ({
+    oppId: Number(x.opp_id), account: x.account_name ?? null, product: String(x.product),
+    stage: String(x.stage), outcomeKey: x.outcome_key ?? null, title: null, dept: null,
+    since: Number(x.since), daysWaiting: Number(x.days_waiting), value: Number(x.value),
+  }));
+}
+
+export type QuarterLine = {
+  quarter: number; startMs: number; endMs: number;
+  target: number; achieved: number; wonCount: number; coveragePct: number | null;
+};
+
+/**
+ * All four quarters of a fiscal year, in ONE query (R13).
+ *
+ * `targets` is keyed (product, year, quarter) and always has been, but the screen asked for one
+ * quarter at a time — so «الإنجاز الربعي: أربعة أشرطة» meant four round trips, four chances for the
+ * clock to tick between them, and no way to see the shape of a year at all.
+ *
+ * The quarter BOUNDS are computed by the caller and passed in, not derived in SQL, for the same
+ * reason isCurrentPeriod is: Riyadh is UTC+3 with no DST, and the fiscal start month is a config
+ * value. SQL would have to be told both anyway, and a second implementation of a calendar is a
+ * second calendar to get wrong.
+ */
+export async function quarterlyPerformance(
+  year: number, bounds: readonly { quarter: number; startMs: number; endMs: number }[],
+): Promise<QuarterLine[]> {
+  const empty = bounds.map((b) => ({ ...b, target: 0, achieved: 0, wonCount: 0, coveragePct: null }));
+  if (!(await reprobe()) || !pool) return empty;
+  const vals = bounds.map((b, i) => `($${i * 3 + 1}::int, $${i * 3 + 2}::bigint, $${i * 3 + 3}::bigint)`).join(",");
+  const params = bounds.flatMap((b) => [b.quarter, b.startMs, b.endMs]);
+  const r = await pool.query(
+    `WITH q(quarter, start_ms, end_ms) AS (VALUES ${vals}),
+     won AS (
+       SELECT q.quarter,
+              COALESCE(SUM(${OPP_VALUE_SQL}), 0) AS achieved,
+              COUNT(o.id) AS won_count
+         FROM q
+         LEFT JOIN opportunities o ON o.stage = 'won'
+          AND EXISTS (
+            SELECT 1 FROM LATERAL (
+              SELECT e.effective_at FROM track_stage_events e
+               WHERE e.opp_id = o.id AND e.to_stage = 'won'
+               ORDER BY e.effective_at DESC LIMIT 1
+            ) w
+             WHERE w.effective_at >= to_timestamp(q.start_ms / 1000.0)
+               AND w.effective_at <  to_timestamp(q.end_ms / 1000.0))
+        GROUP BY q.quarter
+     ),
+     tgt AS (
+       SELECT q.quarter, COALESCE(SUM(t.amount), 0) AS amount
+         FROM q LEFT JOIN targets t ON t.year = $${params.length + 1} AND t.quarter = q.quarter
+        GROUP BY q.quarter
+     )
+     SELECT q.quarter, q.start_ms, q.end_ms,
+            COALESCE(tgt.amount, 0) AS target,
+            COALESCE(won.achieved, 0) AS achieved,
+            COALESCE(won.won_count, 0) AS won_count
+       FROM q
+       LEFT JOIN won ON won.quarter = q.quarter
+       LEFT JOIN tgt ON tgt.quarter = q.quarter
+      ORDER BY q.quarter`,
+    [...params, year]);
+  return r.rows.map((x: any) => {
+    const target = Number(x.target), achieved = Number(x.achieved);
+    return {
+      quarter: Number(x.quarter), startMs: Number(x.start_ms), endMs: Number(x.end_ms),
+      target, achieved, wonCount: Number(x.won_count),
+      // null, not 0. A quarter with no target set has no coverage; printing 0% paints an
+      // untargeted quarter red on a board whose job is showing where to worry.
+      coveragePct: target > 0 ? Math.round((achieved / target) * 100) : null,
+    };
+  });
 }

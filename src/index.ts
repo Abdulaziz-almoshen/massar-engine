@@ -6,6 +6,7 @@ import { REP_PAGE_HTML } from "./rep-page.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
 import * as sales from "./sales-domain.js";
+import * as reports from "./reports-domain.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
@@ -296,6 +297,61 @@ app.get("/admin/products", async (req, reply) => {
 app.get("/admin/sectors", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   return { ok: true, sectors: await db.listSectors() };
+});
+
+// ---- the four named reports (R11) and the four-quarter view (R13) -------------------------
+// READ-ONLY, endpoints only. «التقارير» is a door with no screen yet; saying otherwise is the
+// mistake this project has already made once.
+
+app.get("/admin/reports", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return {
+    ok: true,
+    reports: reports.REPORTS.map((r) => ({
+      id: r.id, title: r.title, question: r.question, source: r.source, dept: r.dept,
+      outcomeKeys: r.outcomeKeys,
+    })),
+  };
+});
+
+app.get("/admin/reports/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const def = reports.reportById(String((req.params as any).id ?? ""));
+  if (!def) return reply.code(404).send({ ok: false, error: "unknown_report" });
+  const rows = await db.runReport(def);
+  return {
+    ok: true,
+    report: { id: def.id, title: def.title, question: def.question },
+    // The empty state travels WITH the data, so a screen cannot render a blank table: an empty
+    // result and a broken query look identical to the reader unless the report says which it is.
+    empty: rows.length === 0 ? { title: def.emptyTitle, body: def.emptyBody } : null,
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
+    count: rows.length,
+    totalValue: rows.reduce((n, r) => n + r.value, 0),
+    rows,
+  };
+});
+
+app.get("/admin/sales/quarters", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const fsm = fiscalStartMonth();
+  const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
+  const year = Number(q.year) || now.year;
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
+  }
+  const bounds = [1, 2, 3, 4].map((quarter) => {
+    const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+    return { quarter, startMs: b.startMs, endMs: b.endMs };
+  });
+  return {
+    ok: true, year, fiscalStartMonth: fsm, currentQuarter: year === now.year ? now.quarter : null,
+    // Stated, never implied. The accounting basis is still undecided, so the screen is given the
+    // words rather than left to invent them.
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
+    quarters: await db.quarterlyPerformance(year, bounds),
+  };
 });
 
 app.post("/admin/sales/targets", async (req, reply) => {
@@ -748,9 +804,11 @@ app.post("/admin/tags/rename", async (req, reply) => {
   if ((await db.listTags()).some((t) => t.name === b)) {
     return reply.code(409).send({ error: "tag_exists" });
   }
-  const ok = await db.renameTag(a, b);
-  if (!ok) return reply.code(404).send({ error: "unknown_tag" });
-  return { status: "ok", renamed: true, from: a, to: b };
+  const r = await db.renameTag(a, b);
+  if (!r.ok) return reply.code(404).send({ error: "unknown_tag" });
+  // The per-table counts, not «تم». A rename touches ten tables and used to touch one; reporting
+  // what actually moved is how the caller can tell those two apart.
+  return { status: "ok", renamed: true, from: a, to: b, moved: r.moved };
 });
 
 app.post("/admin/tags/delete", async (req, reply) => {
