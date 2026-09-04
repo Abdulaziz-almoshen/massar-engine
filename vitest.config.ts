@@ -32,9 +32,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text-summary", "json-summary"],
+      // GLOB, not a list. This was four literal paths, which meant a NEW business-tier module
+      // landed OUTSIDE the gate however well it was tested — a green build proved nothing about
+      // the newest and least-exercised rules in the codebase. Every `*-domain.ts` is the business
+      // tier by the naming convention in STANDARDS.md §1, so the gate now follows the convention
+      // instead of a list somebody has to remember to edit.
       include: [
-        "src/opps-domain.ts", // business tier — the opportunity rules
-        "src/signal-domain.ts", // business tier — the client seriousness / momentum indicators
+        "src/*-domain.ts",    // business tier: opportunities, signals, and the commercial engine
         "src/facts.ts",       // the fact refusal ladder
         "src/audience.ts",    // the importer: header matching, phone normalisation, skip reasons
       ],
