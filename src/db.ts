@@ -2101,6 +2101,9 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
 
     let fromStage: string | null = null, toStage: string | null = null;
     let dept = "", nextAction = "";
+    // The ledger row this engagement produced, when it produced one. Null when the outcome moved no
+    // stage, which is the common case for a blocking outcome like «بانتظار المشتريات».
+    let stageEventId: number | null = null;
 
     if (input.oppId != null) {
       const cur = await client.query(
@@ -2117,10 +2120,11 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
           await client.query(
             `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2 WHERE id = $3`,
             [toStage, now, input.oppId]);
-          await client.query(
+          const ev = await client.query(
             `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
-             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7)`,
+             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7) RETURNING id`,
             [input.oppId, fromStage, toStage, input.outcomeKey, input.occurredAt, now, input.rep]);
+          stageEventId = Number(ev.rows[0].id);
         }
       }
     }
@@ -2143,8 +2147,12 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
       if (!dup.rows[0]) {
         await client.query(
           `INSERT INTO actions (opp_id, stage_event_id, engagement_id, dept, title, state, created_at, created_by)
-           VALUES ($1, NULL, $2, $3, $4, 'open', $5, $6)`,
-          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep]);
+           VALUES ($1, $7, $2, $3, $4, 'open', $5, $6)`,
+          // Was a literal NULL. The column exists to say WHICH transition owed this action, and a
+          // column nothing writes is the defect this project keeps shipping — here it silently
+          // broke three reports that joined on it. Null stays legitimate when the outcome moved no
+          // stage, which is most of them.
+          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep, stageEventId]);
         actionsCreated = 1;
       }
     }
@@ -2274,7 +2282,12 @@ export async function runReport(def: {
               ${OPP_VALUE_SQL} AS value
          FROM actions a
          JOIN opportunities o ON o.id = a.opp_id
-         LEFT JOIN track_stage_events e ON e.id = a.stage_event_id
+         -- Through ENGAGEMENTS, not the stage ledger. Most of these outcomes do not move the
+         -- stage — «بانتظار المشتريات» leaves the deal at negotiate — so no ledger row exists to
+         -- join to, and actions.stage_event_id was written as a literal NULL besides. Joining it
+         -- returned zero rows for three of the four reports, on demo data where every deal was
+         -- correctly blocked. engagements.outcome_key is the value the writer actually records.
+         LEFT JOIN engagements e ON e.id = a.engagement_id
         WHERE a.state = 'open'
           AND ($1::text IS NULL OR a.dept = $1)
           AND (cardinality($2::text[]) = 0 OR e.outcome_key = ANY($2))
@@ -2297,11 +2310,23 @@ export async function runReport(def: {
             GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - e.effective_at)) / 86400))::int AS days_waiting,
             ${OPP_VALUE_SQL} AS value
        FROM opportunities o
+       -- BOTH sources, because one key is unreachable in the other. «فشل التكامل» is recorded at
+       -- the tech stage and MOVES the deal to lost, so it lands in the ledger. «خسارة – تكامل» is
+       -- recorded on a deal that is ALREADY lost — no transition, therefore no ledger row, ever.
+       -- Measured: a deal lost that way had one ledger row (null -> lost, no outcome_key) and the
+       -- report missed it entirely while the deal sat there plainly lost to integration.
+       -- The engagement always carries the outcome; the ledger only sometimes does.
        JOIN LATERAL (
-         SELECT ee.effective_at, ee.outcome_key
-           FROM track_stage_events ee
-          WHERE ee.opp_id = o.id AND ee.outcome_key = ANY($1)
-          ORDER BY ee.effective_at DESC LIMIT 1
+         SELECT src.effective_at, src.outcome_key FROM (
+           SELECT ee.effective_at, ee.outcome_key
+             FROM track_stage_events ee
+            WHERE ee.opp_id = o.id AND ee.outcome_key = ANY($1)
+           UNION ALL
+           SELECT en.occurred_at AS effective_at, en.outcome_key
+             FROM engagements en
+            WHERE en.opp_id = o.id AND en.outcome_key = ANY($1)
+         ) src
+          ORDER BY src.effective_at DESC LIMIT 1
        ) e ON TRUE
       WHERE o.stage = 'lost'
       ORDER BY e.effective_at ASC`,

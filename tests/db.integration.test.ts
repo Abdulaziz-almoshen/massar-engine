@@ -372,32 +372,39 @@ d("db integration", () => {
   describe("R11 — the four named reports return real rows, not just empty states", () => {
     const now = () => Date.now();
 
-    const seedBlocked = async (outcomeKey: string, dept: string, product: string) => {
-      const t = now();
+    // Seeded through recordEngagement — the REAL writer — not by hand-built INSERTs.
+    //
+    // The first version of this helper wrote the actions and ledger rows directly, with
+    // stage_event_id populated and no engagement row. Those tests passed against a report query
+    // that joined on stage_event_id, and BOTH were wrong: the writer inserts that column as a
+    // literal NULL and records the outcome on `engagements` instead. The fixture was shaped to the
+    // bug, so the suite agreed with the defect and the three reports returned nothing on real data.
+    // A fixture the product cannot produce proves nothing about the product.
+    const seedBlocked = async (outcomeKey: string, stage: string, product: string) => {
+      const t = Date.now();
       await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
-      const o = await pool.query(
-        `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
-         VALUES ('عميل التقرير',$1,'negotiate',$2,100000,1,1,0,$2,$2) RETURNING id`, [product, t]);
-      const oppId = Number(o.rows[0].id);
-      const e = await pool.query(
-        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
-         VALUES ($1,'negotiate','negotiate',$2, now() - interval '9 days', $3, 'test') RETURNING id`,
-        [oppId, outcomeKey, t]);
-      await pool.query(
-        `INSERT INTO actions (opp_id, stage_event_id, dept, title, state, created_at)
-         VALUES ($1,$2,$3,'إجراء اختبار','open',$4)`,
-        [oppId, Number(e.rows[0].id), dept, t - 9 * 86400000]);
-      return oppId;
+      const [opp] = await db.createOppLines(
+        { account_name: "عميل التقرير", phone: null, source: "call", source_ref: null, created_by: "test" },
+        [{ product, stage, sale_price: 100000, qty: 1, years: 1, discount: 0 }]);
+      const r = await db.recordEngagement({
+        idemKey: `rep-${outcomeKey}-${opp.id}`, contactPhone: "966500000000", oppId: opp.id,
+        rep: "سارة", kind: "call", outcomeKey, occurredAt: Date.now() - 60_000, note: null });
+      expect(r.ok, `recordEngagement refused ${outcomeKey}: ${JSON.stringify(r)}`).toBe(true);
+      // Age the action so daysWaiting has something to measure. recordEngagement bounds backdating
+      // to two days on purpose, so the age is applied after the fact — a TEST concern, never a
+      // writer's.
+      await pool.query("UPDATE actions SET created_at = $2 WHERE opp_id = $1", [opp.id, t - 9 * 86400000]);
+      return opp.id as number;
     };
 
     it.each([
-      ["awaiting-procurement", "awaiting_procurement", "المشتريات"],
-      ["contract-edit", "contract_edit", "القانونية"],
-      ["blocked-on-tech", "awaiting_tech", "التقنية"],
-    ])("%s finds a blocked deal and counts the days", async (id, key, dept) => {
+      ["awaiting-procurement", "awaiting_procurement", "negotiate", "المشتريات"],
+      ["contract-edit", "contract_edit", "negotiate", "القانونية"],
+      ["blocked-on-tech", "awaiting_tech", "tech", "التقنية"],
+    ])("%s finds a blocked deal and counts the days", async (id, key, stage, dept) => {
       const { reportById } = await import("../src/reports-domain.js");
       const product = "منتج-تقرير-" + key;
-      const oppId = await seedBlocked(key, dept, product);
+      const oppId = await seedBlocked(key, stage, product);
       const rows = await db.runReport(reportById(id)!);
       const mine = rows.find((r) => r.oppId === oppId);
       expect(mine, `${id} returned nothing — an empty report reads as good news`).toBeDefined();
@@ -408,27 +415,35 @@ d("db integration", () => {
 
     it("a CLOSED action leaves the report", async () => {
       const { reportById } = await import("../src/reports-domain.js");
-      const oppId = await seedBlocked("contract_edit", "القانونية", "منتج-تقرير-مغلق");
+      const oppId = await seedBlocked("contract_edit", "negotiate", "منتج-تقرير-مغلق");
       await pool.query("UPDATE actions SET state='done', done_at=$1 WHERE opp_id=$2", [Date.now(), oppId]);
       const rows = await db.runReport(reportById("contract-edit")!);
       expect(rows.find((r) => r.oppId === oppId)).toBeUndefined();
     });
 
     // Both integration-loss keys must land in the same report; counting one undercounts.
-    it.each(["lost_integration", "integration_failed"])(
-      "lost-to-integration counts a deal lost with %s", async (key) => {
+    // The two keys arrive by DIFFERENT routes. «فشل التكامل» is recorded at tech and MOVES the deal
+    // to lost, so it reaches the ledger. «خسارة – تكامل» is recorded on a deal that is already lost,
+    // produces no transition, and therefore never reaches the ledger at all — which is exactly how
+    // it went missing from the report on demo data. Seeded through the real writer so that
+    // difference is real and not a fixture's invention.
+    it.each([
+      ["integration_failed", "tech"],
+      ["lost_integration", "lost"],
+    ])(
+      "lost-to-integration counts a deal lost with %s (recorded at %s)", async (key, stage) => {
         const { reportById } = await import("../src/reports-domain.js");
         const t = Date.now(), product = "منتج-خسارة-" + key;
         await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
-        const o = await pool.query(
-          `INSERT INTO opportunities (account_name, product, stage, stage_at, sale_price, years, qty, discount, created_at, updated_at)
-           VALUES ('عميل خاسر',$1,'lost',$2,250000,2,1,0,$2,$2) RETURNING id`, [product, t]);
-        const oppId = Number(o.rows[0].id);
-        await pool.query(
-          `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
-           VALUES ($1,'negotiate','lost',$2, now() - interval '3 days', $3, 'test')`, [oppId, key, t]);
+        const [opp] = await db.createOppLines(
+          { account_name: "عميل خاسر", phone: null, source: "call", source_ref: null, created_by: "test" },
+          [{ product, stage, sale_price: 250000, qty: 1, years: 2, discount: 0 }]);
+        const r = await db.recordEngagement({
+          idemKey: `loss-${key}-${opp.id}`, contactPhone: "966500000000", oppId: opp.id,
+          rep: "سارة", kind: "call", outcomeKey: key, occurredAt: Date.now() - 60_000, note: null });
+        expect(r.ok, `recordEngagement refused ${key}: ${JSON.stringify(r)}`).toBe(true);
         const rows = await db.runReport(reportById("lost-to-integration")!);
-        const mine = rows.find((r) => r.oppId === oppId);
+        const mine = rows.find((x) => x.oppId === opp.id);
         expect(mine, `a deal lost with ${key} is missing from the loss report`).toBeDefined();
         expect(mine!.value).toBe(500000);   // 250000 x 2 years
       });
