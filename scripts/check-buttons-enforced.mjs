@@ -42,10 +42,30 @@ for (const t of [
 // STRUCTURE: the conversion must sit on the send path, before the text wire.
 const src = readFileSync(join(root, "src/agent.ts"), "utf8");
 const i = src.indexOf("} else if (finalText) {");
-const body = src.slice(i, i + 1600);
+// Window widened 1600 -> 2400 on 2026-09-04. The block grew when the fallback stopped being
+// unconditional; the asserted string sits at offset ~1772 now. Widened rather than trimmed, and
+// paid for with the two stronger assertions below — a regression lock should get harder to pass
+// when the code it guards gets safer, not quietly shorter.
+const body = src.slice(i, i + 2400);
 c("the send path converts offered choices", body.includes("offeredChoices"));
 c("…via sendQuickReply", body.includes("gupshup.sendQuickReply"));
 c("…and falls back to text when Meta rejects the shape", body.includes("quick-reply rejected"));
+// The fallback must be GATED on a provider rejection. An unconditional re-send delivered the same
+// message twice whenever a send timed out after Gupshup had already accepted it.
+c("…only when the provider actually rejected it", body.includes("gupshup.isProviderRejection"));
+c("…and never re-sends on an unknown outcome", body.includes("NOT resent"));
+
+// The OTHER quick-reply fallback: rung one. Same three-way rule, and a different failure if it
+// is wrong. Marking RUNG_ONE_MARK after a LOCAL preflight throw (missing API key, no source
+// number) permanently suppresses a message that never reached the wire; not marking after a
+// timeout lets a message that DID land be sent a second time. agent.ts has no seam for a unit
+// test, so the structure is asserted here, the way the repo already guards the send path.
+const rungIdx = src.indexOf("const btns = rungOneButtons(opener);");
+const rung = rungIdx === -1 ? "" : src.slice(rungIdx, rungIdx + 1800);
+c("rung one has a fallback path at all", rung.includes("gupshup.sendQuickReply"));
+c("…falls back to text only on a provider rejection", rung.includes("gupshup.isProviderRejection"));
+c("…marks as delivered when the outcome is merely unknown", rung.includes("gupshup.isUnknownOutcome"));
+c("…and leaves a local failure eligible for retry", rung.includes("left eligible for retry"));
 c("…and skips titles over WhatsApp's 20-char limit", body.includes("x.length <= 20"));
 
 console.log(`\n${f ? f + " FAILURES" : "button enforcement: all green"}`);

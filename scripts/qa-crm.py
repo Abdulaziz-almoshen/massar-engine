@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8099"
-OUT = Path(__file__).resolve().parent.parent.parent / ".orbit/qa/campaigns-crm"
+OUT = Path(__file__).resolve().parent.parent.parent / "docs/qa/campaigns-crm"
 VIEWPORTS = [("375x812", 375, 812), ("768x1024", 768, 1024), ("1440x900", 1440, 900)]
 MIN_CHARS = 300
 

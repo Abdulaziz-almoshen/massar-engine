@@ -311,7 +311,10 @@ function tgtTagsPanel() {
       '<button class="btn btn-dark" onclick="tgtCreateTag()">أضف</button></div>' +
     (tags.length
       ? '<div class="tlist">' + tags.map(function (t) {
-          var q = JSON.stringify(t.name).replace(/"/g, "&quot;");
+          /* esc(), not a hand-rolled quote swap. JSON.stringify escapes " and \\ but leaves &
+             alone, so a tag literally named &quot;…&quot; came back through the HTML parser as a
+             real quote and broke out of the JS string. esc() escapes & first, which closes it. */
+          var q = esc(JSON.stringify(t.name));
           /* Renaming happens IN the row and deleting arms before it fires — the same two-step this
              screen already uses on a row, and no browser dialog anywhere. */
           if (tgtTagEdit === t.name) {

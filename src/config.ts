@@ -21,6 +21,37 @@ export const cfg = {
   // Header token (x-admin-token) for /admin/* endpoints.
   adminToken: process.env.ADMIN_TOKEN || "",
 
+  // Header token (x-integration-token) for /integration/* — the READ-ONLY, aggregate-only feed
+  // other Lean systems consume (today: Makeen's product dashboard, «العملاء المحتملون»).
+  //
+  // A SEPARATE secret from ADMIN_TOKEN by design. The admin token can move money-bearing rows and
+  // read every customer's phone and transcript; a sibling product that only needs six integers must
+  // never be handed it, because handing it over is what turns one system's leak into both systems'
+  // leak. Unset = the whole /integration surface is off (404), so the default posture is closed.
+  integrationToken: process.env.INTEGRATION_TOKEN || "",
+
+  // Header token (x-rep-token) for /rep/* — the sales rep's own surface.
+  //
+  // A THIRD secret, for the same reason integrationToken is a second one. Gate A needs a named rep
+  // using Massar for three weeks, and the only credential that existed could launch a WhatsApp
+  // campaign to real clinics and read every transcript. Handing that to a rep to run a pilot is not
+  // a pilot, it is an incident waiting for a mistap.
+  //
+  // Format is "name:secret", one per rep, comma-separated — because Gate A is judged per rep and an
+  // actor derived from a SHARED token attributes nothing. The name becomes the actor on every row
+  // that rep writes; it is never read from the request body.
+  //   REP_TOKENS="سارة القحطاني:s3cr3t,خالد الدوسري:0th3r"
+  // Unset = the whole /rep surface is off (404), so the default posture is closed.
+  repTokens: (process.env.REP_TOKENS || "")
+    .split(",")
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const i = pair.indexOf(":");
+      return i < 0 ? null : { name: pair.slice(0, i).trim(), secret: pair.slice(i + 1).trim() };
+    })
+    .filter((r): r is { name: string; secret: string } => Boolean(r && r.name && r.secret)),
+
   // Public base URL for serving media to Gupshup.
   publicBaseUrl: process.env.PUBLIC_BASE_URL || "https://massar-engine.fly.dev",
 
@@ -53,6 +84,7 @@ export function configReport() {
     sourceNumber: cfg.sourceNumber ? "set" : "MISSING — outbound disabled until GUPSHUP_SOURCE_NUMBER is set",
     webhookToken: cfg.webhookToken ? "set" : "MISSING (webhook is unauthenticated!)",
     adminToken: cfg.adminToken ? "set" : "MISSING (/admin disabled)",
+    repTokens: cfg.repTokens.length ? String(cfg.repTokens.length) + " rep(s)" : "none (/rep disabled)",
     autoOppFromHot: cfg.autoOppFromHot ? "on" : "off (AUTO_OPP=off)",
   };
 }

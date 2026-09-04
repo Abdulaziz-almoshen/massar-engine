@@ -19,6 +19,8 @@ import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
+import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
+import { SALES_DOMAIN_JS } from "./sales-domain.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
@@ -40,7 +42,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   body { font-family: 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
   ::selection { background: #3FB6B0; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
-  .ms-scroll::-webkit-scrollbar-thumb { background: #d5dae2; border-radius: 999px; }
+  .ms-scroll::-webkit-scrollbar-thumb { background: #C7C7C7; border-radius: 999px; }
   .app { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 
   /* ===== sidebar (Massar identity) ===== */
@@ -89,7 +91,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     flex:none; }
   .collapse:hover { background:#F3F3F3; }
   .collapse .cicon { color:#999999; font-size:14px; }
-  .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #1c3a5e; display: flex; align-items: center; justify-content: center; color: #cdd6e6; font-weight: 700; font-size: 14px; }
+  .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #E2E2E2; display: flex; align-items: center; justify-content: center; color: #525252; font-weight: 700; font-size: 14px; }
   .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
   .userbox .r { font-size: 11px; color: #8ea3c0; }
 
@@ -101,7 +103,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
   header.crumb .sep { font-size:13px; color:#C7C7C7; }
   header.crumb .s { font-size:13px; font-weight:450; color:#525252; }
-  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: -.2px; }
+  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: 0; }
   header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
   .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#7C7C7C;
     background:transparent; padding:0; border-radius:0; }
@@ -115,7 +117,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      loudest colour on the page. Frappe's number cards have no icon; neither do these now. */
   .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 10px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px; }
   .kpi .k { font-size: 12px; color: #7C7C7C; font-weight: 450; }
-  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
+  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .kpi .dl { font-size: 11.5px; font-weight: 450; color: #7C7C7C; }
   .kpi .v small { font-size: 12px; font-weight: 450; color: #999999; }
 
@@ -130,7 +132,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hlab { font-size: 12.5px; color: #7C7C7C; }
   .hero .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
   .hero .hfig { font-size: 44px; line-height: 1; font-weight: 600; color: #171717;
-    font-variant-numeric: tabular-nums; letter-spacing: -1.4px; }
+    font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .hero .hd { font-size: 13px; font-weight: 500; color: #027A48; background: #ECFDF3;
     border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
   .hero .hd.flat { color: #7C7C7C; background: #F3F3F3; }
@@ -235,7 +237,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   @media (max-width: 860px) { .aqa { display: none; } }
   .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
     margin-bottom:16px; }
-  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: .1px; }
+  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: 0; }
   .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:450;
     border-radius:6px; padding:3px 8px; white-space:nowrap; background:#F8F8F8;
     border:1px solid #EDEDED; color:#525252; }
@@ -250,8 +252,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .ptab { font-family:inherit; font-size:12px; font-weight:450; border:1px solid #EDEDED;
     background:#fff; color:#525252; border-radius:6px; padding:6px 12px; cursor:pointer; }
   .ptab.on { background:#EDEDED; color:#171717; border-color:#EDEDED; }
-  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E4E7EC; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
-  .inp:focus { border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.15); }
+  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E2E2E2; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
+  .inp:focus { border-color: #1F7A73; box-shadow: 0 0 0 3px rgba(31,122,115,.15); }
   .fun { margin-bottom: 13px; }
   .fun .r1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
   .fun .l { font-size: 12.5px; font-weight: 600; color: #171717; }
@@ -271,7 +273,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* Sparse-state rule (portal-wide): a screen with few rows must read as DELIBERATE, not
      half-loaded. One line, directly under the controls, that says what is here and where the
      rest is. Real data is still thin on most screens, so this recurs — it lives once. */
-  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E4E7EC; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
+  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E2E2E2; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
   .sparse b { color: #171717; font-weight: 700; }
   .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
   .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 12px; color: #7C7C7C; }
@@ -364,7 +366,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .t2 { font-size: 11.5px; color: #999999; margin-top: 4px; }
   .kbrow .ct { font-size: 11.5px; color: #999999; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
-  .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E4E7EC; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
+  .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E2E2E2; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
   .ptitle h1 { margin:0; font-size:18px; font-weight:600; color:#171717; letter-spacing:0;
     line-height:1.4; }
@@ -447,12 +449,27 @@ export const DASHBOARD_HTML = `<!doctype html>
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
   .pen[disabled] { cursor: not-allowed; color: #E2E2E2; }
   @media (hover: none) { .pen { opacity: 1; } }
+  /* A FINGER IS NOT A CURSOR. The control primitives are sized for a mouse — .kebab is 32px, the
+     filter pills 27px, the tabs content-sized — which measured 16 sub-44px targets on the customers
+     screen at 390px alone. Raising the minimum on coarse pointers only leaves every desktop
+     measurement exactly as it was. Height only: widths stay content-sized so a pill still reads as
+     a pill. */
+  @media (pointer: coarse) {
+    .btn, .qpill, .ptab, .crmsel, .inp, .vtog button, .rtabs button, .ctabs button { min-height: 44px; }
+    .kebab { width: 44px; height: 44px; }
+    .switcher { min-width: 44px; }
+    /* The row checkbox stops at 20px, not 44. A list row is 36px by DESIGN.md rule 8, so a 44px
+       control cannot sit in one without contradicting the token authority; 20px is the largest
+       honest improvement inside that rule. The tension is recorded in TODOS.md rather than settled
+       here, because it is a row-height decision, not a styling one. */
+    input[type="checkbox"] { width: 20px; height: 20px; }
+  }
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
   .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
   .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
   .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #999999; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F3F3F3; }
   .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
-  .crec :focus-visible { outline: 2px solid #2E7D77; outline-offset: 2px; }
+  .crec :focus-visible { outline: 2px solid #1F7A73; outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
     .fsaved { animation: fsaved .14s ease-out; }
     @keyframes fsaved { from { background: #ECFDF3; } to { background: transparent; } }
@@ -466,13 +483,21 @@ export const DASHBOARD_HTML = `<!doctype html>
     .pen { opacity: 1; width: 40px; height: 40px; top: 6px; }
     .cbar .mini { flex: 1 1 44%; min-height: 40px; }
   }
-  @media (max-width: 900px) { aside { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+  /* THE SIDEBAR BECOMES A STRIP, IT DOES NOT DISAPPEAR. It used to be display:none here, which
+     left a phone with no site name, no navigation and no search — the trunk test failed on every
+     route and the only way back was the browser's own back button. Same markup, same links, turned
+     on its side: the group labels and the collapse control go (they orient a column, not a strip),
+     the switcher keeps its mark, and every remaining target is 44px because a finger is not a
+     cursor. NO BACKTICKS IN THIS FILE'S COMMENTS — the CSS is inside a template literal and one
+     backtick ends it (ADR-0001, caught by this very cycle's build). */
+  @media (max-width: 900px) { .app { flex-direction: column; } aside { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 6px; padding-inline: 8px; overflow-x: auto; border-inline-end: none; border-block-end: 1px solid #EDEDED; } aside .switcher { width: auto; flex: none; height: 44px; padding: 6px; } aside .switcher > div, aside .switcher .chev { display: none; } aside .navsearch { width: auto; flex: none; min-width: 44px; height: 44px; justify-content: center; padding-inline: 10px; } aside .navsearch .lbl, aside .navsearch kbd { display: none; } aside #nav { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; } aside #nav .grp { display: none; } aside #nav .nv { width: auto; flex: none; height: 44px; white-space: nowrap; margin-bottom: 0; } aside .collapse { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
 ${TARGETS_CRM_CSS}
+${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${PALETTE_CSS}
 </style>
@@ -633,7 +658,7 @@ const NAV = [
   { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", i: "home" },
   { grp: "دورة البيع" }, { id: "customers", l: "العملاء", i: "users" }, { id: "opps", l: "فرص البيع", i: "target" }, { id: "pipeline", l: "لوحة المتابعة", i: "reply" }, { id: "tasks", l: "المهام", i: "check" }, { id: "notes", l: "الملاحظات", i: "doc" },
   { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", i: "send" }, { id: "kmon", l: "متابعة الحملات", i: "eye" }, { id: "kb", l: "معرفة الخدمة", i: "book" }, { id: "partners", l: "شركاء المبيعات", i: "spark" },
-  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "reports", l: "التقارير", i: "chart" },
+  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "perf", l: "المستهدفات والأداء", i: "chart" }, { id: "reports", l: "التقارير", i: "chart" },
   { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
 ];
 const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
@@ -645,6 +670,7 @@ const TITLES = {
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
+  perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
@@ -979,7 +1005,7 @@ function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #d5dae2;') +
+    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #C7C7C7;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -1757,7 +1783,33 @@ window.confirmLaunch = async () => {
     const d = await r.json().catch(() => ({}));
     closeLaunch();
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
-    alertBar("أُرسلت " + fmtN(d.sent) + " من " + fmtN(d.requested) + ". فتحنا لك لوحة الحملة.", false);
+    // The launch endpoint has always returned a per-recipient "failed" array carrying WHY each one
+    // did not go out (opted out, outside the 24h window, never wrote to us, invalid number). This
+    // screen read only d.sent and d.requested, so the operator saw "أُرسلت ٤٧ من ٥٠" and was never
+    // told what happened to the other three. A refusal the system computed and then hid is the
+    // project recurring defect: an emitted value nobody can read back.
+    var failedRows = Array.isArray(d.failed) ? d.failed : [];
+    var launchNote = "أُرسلت " + fmtN(d.sent) + " من " + fmtN(d.requested);
+    if (failedRows.length) {
+      // Object.create(null), not {}: reason strings become keys here, and a reason of "__proto__"
+      // or "constructor" silently corrupts a count on a normal object.
+      var byReason = Object.create(null);
+      failedRows.forEach(function (f) {
+        var why = (f && (f.reason || f.error)) || "سبب غير معروف";
+        byReason[why] = (byReason[why] || 0) + 1;
+      });
+      // No counted noun after the number: Arabic plurals are four-way and this file has no
+      // pluralize helper, so the count stands alone and the reason carries the meaning.
+      launchNote += " · لم تُرسل " + fmtN(failedRows.length) + ": " +
+        Object.keys(byReason).map(function (k) { return k + " (" + fmtN(byReason[k]) + ")"; }).join("، ");
+      // Counts alone still leave the operator asking WHICH clinic. Name the first few numbers so
+      // the answer is on screen instead of one query away.
+      var someNumbers = failedRows.slice(0, 3).map(function (f) { return f && f.phone; }).filter(Boolean);
+      if (someNumbers.length) {
+        launchNote += " (" + someNumbers.join("، ") + (failedRows.length > someNumbers.length ? "، …" : "") + ")";
+      }
+    }
+    alertBar(launchNote + ". فتحنا لك لوحة الحملة.", failedRows.length > 0);
     entSel.clear(); campName = ""; retargetCohort = null;
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) {
@@ -2121,7 +2173,7 @@ function vKbProduct(name) {
   h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
     '<div style="width:44px;height:44px;flex:none;border-radius:10px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;font-weight:500;font-size:18px;">' + esc(name.trim().charAt(0)) + "</div>" +
     '<div style="flex:1;min-width:220px;">' +
-    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:-.2px;">' + esc(name) + "</h1>" +
+    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:0;">' + esc(name) + "</h1>" +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
@@ -2806,8 +2858,158 @@ function vWinLoss() {
 // toneBadge is DELETED with its last caller (the ins.learning branch of فهم المساعد). A renderer
 // with no reader is an invented vocabulary waiting to be re-called, which is how the badge row
 // survived §5's deletion in one state after being removed from the other.
+// ---------------------------------------------------------------------------
+// مؤشرات المحادثة — the record's answer to «كيف تسير هذه المحادثة؟», as SIGNALS.
+//
+// The founder's instruction, and the reason this card exists: «we need indicators of what the
+// client is interested in, how serious they are, and what the AI recommends as the next action —
+// nobody wants to read text as an output of an AI.» The record answered that question with seven
+// prose blocks inside a tab the reader had to open. This is four figures, one chart and one line,
+// always visible, above the fold.
+//
+// EVERY FIGURE HERE IS EARNED. The score, the momentum, the speed and the silence are computed by
+// signal-domain.ts from what the ledger witnessed — messages, tags, recorded outcomes, the clock —
+// and «لماذا هذه القراءة» itemises them. No model produces any number on this card. The one model
+// output is the suggested next action, and it is marked as a suggestion.
+//
+// INTEREST IS NOT REPEATED HERE. It renders in the status strip directly above with its own
+// provenance mark, and a fourth rendering of a customer's interest is the exact duplication this
+// record has already had to delete twice.
+function vSignalBoard(d) {
+  const s = d.signal;
+  if (!s) return "";
+  const ins = d.insights || {};
+  // ink, wash — the band's own two colours, so the meter, the number and the word agree.
+  const BAND = { ready: ["#027A48", "#ECFDF3"], serious: ["#1F7A73", "#EAF6F5"], watch: ["#B54708", "#FFFAEB"], cold: ["#7C7C7C", "#F3F3F3"] };
+  const bd = BAND[s.band] || BAND.cold;
+  // A mark first and a colour second — «يتصاعد» must survive a greyscale print and a colour-blind
+  // reader, which a bare green dot does not.
+  const MOVE = { rising: ["▲", "#027A48"], steady: ["■", "#7C7C7C"], cooling: ["▼", "#B54708"], silent: ["○", "#B42318"], none: ["·", "#C7C7C7"] };
+  const mv = MOVE[s.momentum] || MOVE.none;
+
+  // THE METER — ten blocks, not a percentage bar. A continuous bar invites reading 62 against 58
+  // as a difference; the blocks say what the score actually is: a coarse band with a number on it.
+  let meter = "";
+  for (let i = 0; i < 10; i++) {
+    meter += '<span style="flex:1;height:8px;border-radius:2px;background:' +
+      (i * 10 < s.score ? bd[0] : "#EDEDED") + ';"></span>';
+  }
+
+  const stat = (label, value, ink) =>
+    '<div style="min-width:96px;"><div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">' + label + "</div>" +
+    '<div style="font-size:14px;font-weight:700;margin-top:3px;color:' + (ink || "#171717") + ';">' + value + "</div></div>";
+
+  // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
+  // answer, and arAgo already owns that agreement for the whole portal.
+  const speed = s.replyMinutes === null || s.replyMinutes === undefined
+    ? '<span style="color:#999999;font-weight:500;">لم يردّ بعد</span>'
+    : (s.replyMinutes < 1 ? "أقل من دقيقة"
+      : s.replyMinutes < 60 ? fmtN(s.replyMinutes) + (s.replyMinutes === 1 ? " دقيقة" : s.replyMinutes === 2 ? " دقيقتين" : s.replyMinutes <= 10 ? " دقائق" : " دقيقة")
+      : arAgo(Math.round(s.replyMinutes / 60)));
+  const silent = s.daysSilent === null || s.daysSilent === undefined
+    ? '<span style="color:#999999;font-weight:500;">—</span>'
+    : (s.daysSilent === 0 ? "اليوم" : s.daysSilent === 1 ? "أمس" : fmtN(s.daysSilent) + (s.daysSilent === 2 ? " يومين" : s.daysSilent <= 10 ? " أيام" : " يومًا"));
+
+  // THE CHART — 21 days of who spoke. Bars are stacked so one column is one day's total: two
+  // adjacent thin bars at this width read as noise, and the question the chart answers is «هل
+  // المحادثة حيّة؟», which is a shape over time rather than a pair of counts.
+  const act = d.activity || [];
+  // The ceiling has a FLOOR of three. Scaling purely to the observed peak drew one lone message as
+  // a full-height column — a dead thread rendering as its own busiest day, which is the opposite of
+  // what the chart is asked. Three is the smallest ceiling that keeps a single message reading as
+  // a single message.
+  let peak = 3, total = 0;
+  act.forEach((a) => { const t = (a.inbound || 0) + (a.outbound || 0); total += t; if (t > peak) peak = t; });
+  const H = 44;
+  let bars = "";
+  act.forEach((a) => {
+    const inb = a.inbound || 0, outb = a.outbound || 0;
+    const hi = Math.round((inb / peak) * H), ho = Math.round((outb / peak) * H);
+    const title = fmtD(a.day) + " · منه " + fmtN(inb) + " · منّا " + fmtN(outb);
+    bars += '<span title="' + esc(title) + '" style="flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;height:' + fmtN2(H) + 'px;">' +
+      (inb ? '<span style="display:block;height:' + fmtN2(Math.max(hi, 3)) + 'px;background:#1F7A73;border-radius:2px 2px 0 0;"></span>' : "") +
+      (outb ? '<span style="display:block;height:' + fmtN2(Math.max(ho, 2)) + 'px;background:#DCDCDC;border-radius:' + (inb ? "0" : "2px 2px 0 0") + ';"></span>' : "") +
+      (!inb && !outb ? '<span style="display:block;height:2px;background:#F3F3F3;border-radius:2px;"></span>' : "") + "</span>";
+  });
+
+  // «لماذا هذه القراءة» — native disclosure, closed by default. The itemisation is what makes the
+  // number arguable, and a number nobody can argue with is decoration.
+  const why = (s.factors || []).length
+    ? '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:11.5px;color:#2E7D77;font-weight:700;list-style:none;">لماذا هذه القراءة؟</summary>' +
+      '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
+      s.factors.map((f) =>
+        '<div style="display:flex;gap:9px;align-items:baseline;font-size:12px;line-height:1.8;">' +
+        '<span style="font-weight:700;min-width:34px;color:' + (f.points < 0 ? "#B42318" : f.points > 0 ? "#027A48" : "#7C7C7C") + ';">' +
+        (f.points === 0 ? "·" : (f.points < 0 ? "−" : "+") + fmtN(Math.abs(f.points))) + "</span>" +
+        '<span style="color:#171717;font-weight:600;min-width:96px;">' + esc(f.label) + "</span>" +
+        '<span style="color:#525252;flex:1;min-width:140px;">' + esc(f.evidence) + "</span></div>").join("") +
+      "</div></details>"
+    : "";
+
+  // THE ONE MODEL OUTPUT ON THIS CARD, named as a suggestion and carrying the same heading as the
+  // full block inside فهم المساعد — the same claim in its summary position, never a second claim.
+  const next = hasWords(ins.next_action)
+    ? '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:11px 14px;">' +
+      '<div style="font-size:10.5px;font-weight:700;color:#2E7D77;margin-bottom:4px;">اقتراح المساعد للخطوة التالية</div>' +
+      '<div style="font-size:13.5px;font-weight:700;color:#171717;line-height:1.85;">' + esc(ins.next_action) + "</div></div>"
+    : "";
+
+  return '<div class="card" style="margin:2px 0 14px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;">' +
+    '<h3 style="margin:0;font-size:15px;font-weight:600;color:#171717;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "مؤشرات المحادثة</h3>" +
+    '<span style="font-size:11px;color:#999999;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
+    '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;">' +
+    // 1 — the meter
+    '<div style="min-width:200px;flex:1;">' +
+    '<div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">الجدية</div>' +
+    '<div style="display:flex;align-items:baseline;gap:9px;margin-top:2px;">' +
+    '<span style="font-size:30px;font-weight:700;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
+    '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
+    '<div style="display:flex;gap:3px;margin-top:10px;max-width:230px;">' + meter + "</div>" +
+    '<div style="font-size:10.5px;color:#C7C7C7;margin-top:5px;">من ١٠٠</div></div>' +
+    // 2 — the three measured stats
+    '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">' +
+    stat("الزخم", '<span style="color:' + mv[1] + ';">' + mv[0] + "</span> " + esc(s.momentumLabel), null) +
+    stat("سرعة ردّه", speed, null) +
+    stat("آخر كلام منه", silent, null) +
+    stat("كتب بكلماته", fmtN(s.typedTurns) + (s.typedTurns === 1 ? " رسالة" : s.typedTurns === 2 ? " رسالتين" : s.typedTurns <= 10 ? " رسائل" : " رسالة"), null) +
+    "</div></div>" +
+    // 3 — the chart
+    '<div style="margin-top:18px;">' +
+    '<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">' +
+    '<span style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
+    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#1F7A73;margin-inline-end:5px;"></span>رسائله</span>' +
+    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#DCDCDC;margin-inline-end:5px;"></span>رسائلنا</span></div>' +
+    // No direction override: the portal's other time chart runs oldest at the START edge and today
+    // at the END, which in this RTL page means right to left. Two time axes pointing opposite ways
+    // on one product is a reading error waiting to happen.
+    (total
+      ? '<div style="display:flex;align-items:flex-end;gap:3px;margin-top:10px;">' + bars + "</div>" +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:#C7C7C7;">' +
+        '<span>' + esc(act.length ? fmtD(act[0].day) : "") + "</span><span>" +
+        esc(act.length ? fmtD(act[act.length - 1].day) : "") + "</span></div>"
+      : '<div style="font-size:12px;color:#999999;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
+    "</div>" +
+    next + why + "</div>";
+}
+/** Pixel counts are CSS, not Arabic prose — they must stay Latin or the style attribute is invalid.
+ *  Named so check-numerals sees a formatter rather than a raw concatenation, and so the next
+ *  reader cannot mistake it for fmtN and print «٣٨px» into a stylesheet. */
+function fmtN2(n) { return String(Number(n) || 0); }
+/** Counted days in agreeing Arabic, so the chart's own window length is never a hardcoded word
+ *  that a change to the window would quietly falsify. */
+function arDaysUi(n) {
+  const d = Number(n) || 0;
+  if (d === 1) return "يوم";
+  if (d === 2) return "يومين";
+  return fmtN(d) + (d <= 10 ? " أيام" : " يومًا");
+}
 function tlDot(kind) {
-  return { in: "#2F5F94", out: "#3FB6B0", camp: "#2E8F89", file: "#b5810f", tag: "#C9A227", st: "#999999", sys: "#E2E2E2" }[kind] || "#E2E2E2";
+  // ONE ACCENT, AND IT MARKS THE CUSTOMER. Seven kinds used to carry seven hues — navy, two teals,
+  // ochre and the retired gold — which taught the reader that colour meant something. It did not:
+  // the kind is already written next to the dot. Teal now marks the only turn that is the
+  // customer's own words; everything we did sits on the neutral ramp, ordered by weight.
+  return { in: "#1F7A73", out: "#7C7C7C", camp: "#999999", file: "#999999", tag: "#999999", st: "#C7C7C7", sys: "#E2E2E2" }[kind] || "#E2E2E2";
 }
 // ---------------------------------------------------------------------------
 // ملف العميل — the enrichable client record (cycle crm-record; design plan §3/§4).
@@ -3318,9 +3520,9 @@ function vCustomer(ph) {
     (function () {
       const it = d.interaction || {};
       const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
-      const idle = it.hoursSinceCustomer !== null && it.hoursSinceCustomer !== undefined
-        ? " · آخر كلام منه قبل " + esc(arAgo(it.hoursSinceCustomer)) : "";
-      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + idle + "</div>" : "";
+      // «آخر كلام منه» is DELETED from this line: مؤشرات المحادثة states it below under its own
+      // label, and one figure printed twice on a screen reads as two measurements that agree.
+      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + "</div>" : "";
     })() +
     "</div></div>";
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
@@ -3357,7 +3559,7 @@ function vCustomer(ph) {
     const ink = o ? o[1] : "#7C7C7C", bg = o ? o[2] : "#F8F8F8";
     const row = (label, body) =>
       '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:9px;">' +
-      '<span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
+      '<span style="font-size:11px;font-weight:700;letter-spacing:0;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
       '<span style="flex:1;min-width:180px;">' + body + "</span></div>";
 
     // 1 — OUTCOME
@@ -3441,6 +3643,11 @@ function vCustomer(ph) {
   // §1 region map. DOM order is panel THEN main, so the 372px track lands on the RIGHT — the
   // start side in RTL — and collapses at 900 with ملف العميل above فهم المساعد, deliberately:
   // what the team recorded outranks what the model inferred.
+  // مؤشرات المحادثة, ABOVE the grid and therefore outside the tab shell. Anything placed inside
+  // .crecmain is re-parented into a tab panel by record-tabs, and the default tab is المحادثة —
+  // so a signal card put there would be exactly as buried as the prose it replaces. The whole
+  // point is that these read without a click.
+  h += vSignalBoard(d);
   h += '<div class="crec">' + factsPanel + vAccountPanel(d) + '<div class="crecmain">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;">' +
@@ -3455,7 +3662,7 @@ function vCustomer(ph) {
     h += '<div style="font-size:13px;color:#525252;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
       '<div style="font-size:11.5px;color:#7C7C7C;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
-    h += '<div style="background:#fff;border:1px solid #E3EBF3;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
+    h += '<div style="background:#fff;border:1px solid #EDEDED;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
       '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
       '<div style="font-size:14px;font-weight:700;color:#171717;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
     // DELETED (design plan §5): the 2×2 mcards grid and the product_interest badge row.
@@ -3571,7 +3778,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -3580,6 +3787,7 @@ function render(fetchNew) {
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? vTargetsCrm()
+      : cur === "perf" ? vSalesPerf()
       : cur === "opps" ? vOppsCrm()
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
@@ -3927,13 +4135,19 @@ ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}
+${SALES_DOMAIN_JS}
 ${OPPS_CRM_JS}
+${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain
    var declarations, so placing this block after the bootstrap would let the first paint read an
    undefined selection map. */
 palInstall();   // one keydown listener and one overlay node, installed before the first paint
-if (!location.hash) location.hash = "kmon";
+// The first screen answers "what should I do today", not "here is a table". #home is
+// «مركز القيادة»: one figure at the size that says so, then the rows that owe work. #kmon opens on
+// the campaigns list, which is a fine second screen and a poor first one — a list has no point of
+// view, and DESIGN.md's list rule 13 asks every page to have one.
+if (!location.hash) location.hash = "home";
 refresh();
 tplLoad();
 setInterval(async () => {

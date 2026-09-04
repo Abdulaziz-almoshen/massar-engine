@@ -126,7 +126,7 @@ const SCENARIOS = [
 // a point estimate that cannot be defended.
 const REPEATS = Number(process.env.EVAL_REPEATS || 3);
 const stamp = process.env.EVAL_STAMP || "run";
-const outDir = join(root, "..", ".orbit", "artifacts", "agent-eval", stamp);
+const outDir = join(root, "..", "docs", "artifacts", "agent-eval", stamp);
 mkdirSync(outDir, { recursive: true });
 
 const results = [];

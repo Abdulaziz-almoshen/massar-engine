@@ -1,8 +1,11 @@
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { cfg, configReport } from "./config.js";
 import { DASHBOARD_HTML } from "./dashboard.js";
+import { REP_PAGE_HTML } from "./rep-page.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
+import * as sales from "./sales-domain.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
@@ -13,11 +16,83 @@ import * as accounts from "./accounts.js";
 import * as segments from "./segments.js";
 import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
-import { randomBytes } from "node:crypto";
+import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
+import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
+import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { monitorEventLoopDelay } from "node:perf_hooks";
+
+// THE RISK IS A BLOCKED LOOP, SO MEASURE THE LOOP. The queue scores contacts in synchronous JS on
+// one shared CPU that also serves the Gupshup webhook, and the dashboard polls every five seconds.
+// Contact count says nothing about that, and RSS only notices pressure after it exists — by which
+// point the symptom is a webhook that timed out, and a timed-out webhook can be a lost «إيقاف».
+//
+// resolution:20 keeps the histogram cheap; it samples, it does not instrument every tick.
+const LOOP_RESOLUTION_MS = 20;
+const loopDelay = monitorEventLoopDelay({ resolution: LOOP_RESOLUTION_MS });
+loopDelay.enable();
+const loopLagMs = (ns: number) =>
+  Math.max(0, Math.round((ns / 1e6 - LOOP_RESOLUTION_MS) * 10) / 10);
 import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
 await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+
+// One shared token, no users, no sessions, no rotation — and until now no lockout, so an online
+// guessing attack had unlimited attempts against the credential that can message real clinics.
+// Scoped to /admin AND /rep. NOT the webhook: Gupshup bursts delivery statuses far past any sane
+// per-minute cap during a campaign, and a throttled webhook drops inbound — which can be an
+// «إيقاف». Opt-out is sacred (CLAUDE.md §7), so the webhook keeps its token and no limiter.
+// /dashboard and /health stay open too: a limit that locks an operator out of the screen is a
+// limit someone removes.
+//
+// Registered global with an allowList that skips everything outside /admin, rather than
+// global:false plus per-route config — the per-route form needs the config on each route's own
+// definition, and setting it from an onRoute hook does NOT take: it was verified silently doing
+// nothing (40 wrong-token attempts, 40 x 401, zero 429).
+//
+// ONLY FAILED ATTEMPTS COUNT. The threat here is an online guessing attack on the one shared
+// token, not authorised traffic, so a request carrying a VALID token is allow-listed and consumes
+// no quota. Counting every admin call instead was measured breaking the product: a clean smoke run
+// of the dashboard's own screens blew past 120/min and #kmon and the client record came back 429
+// with a blank render. Limiting the credential check rather than the user costs the operator
+// nothing and still caps guessing at 20/min per IP.
+await app.register(rateLimit, {
+  global: true,
+  max: 20,
+  timeWindow: "1 minute",
+  // Fly puts the real client in fly-client-ip; req.ip is the proxy, and limiting the proxy would
+  // throttle every operator together the first time one of them typed a wrong token.
+  keyGenerator: (req: any) => String(req.headers["fly-client-ip"] || req.ip),
+  // Both guarded doors, and a VALID credential of either kind costs no quota. Allow-listing only
+  // adminOk would have counted every legitimate rep request as a failed admin attempt and throttled
+  // the pilot at 20 requests a minute; leaving /rep off the list entirely would have given the new
+  // door no brute-force protection at all.
+  allowList: (req: any) => {
+    const u = String(req.url || "");
+    if (!u.startsWith("/admin") && !u.startsWith("/rep")) return true;
+    return authorize(req) !== null;
+  },
+  // statusCode belongs ON the returned object: Fastify reads it off the error, and without it the
+  // correct body went out under a 500. Verified — 120 x 401 then 30 x 429.
+  errorResponseBuilder: () => ({ statusCode: 429, status: "too_many_requests", error: "محاولات كثيرة. انتظر دقيقة." }),
+});
+
+// No error handler existed, so Fastify's default returned err.message verbatim — which for a
+// database failure is the raw pg text, relation and column names included. Detail is logged
+// server-side; the caller gets the status and nothing that describes the schema.
+app.setErrorHandler((err: any, req, reply) => {
+  const status = Number(err?.statusCode) || 500;
+  if (status >= 500) {
+    console.error(JSON.stringify({
+      at: "http", level: "error", msg: "unhandled route error",
+      url: String(req.url || "").split("?")[0], err: String(err?.message ?? err).slice(0, 300),
+    }));
+    return reply.code(status).send({ status: "error", error: "تعذّر تنفيذ الطلب." });
+  }
+  // 4xx is the app's own deliberate answer (auth, validation, the rate limiter) — pass it through.
+  return reply.code(status).send(err?.status || err?.error ? err : { status: "error", error: String(err?.message ?? "") });
+});
 const startedAt = Date.now();
 
 function log(obj: Record<string, unknown>) {
@@ -31,25 +106,61 @@ app.get("/webhooks/gupshup", async () => "OK");
 
 app.post("/webhooks/gupshup", async (req, reply) => {
   const token = (req.query as any)?.token ?? "";
-  if (cfg.webhookToken && token !== cfg.webhookToken) {
+  // FAIL CLOSED. This used to read `if (cfg.webhookToken && ...)`, so an UNSET token made the
+  // guard evaluate false and accepted every POST — while configReport() printed "webhook is
+  // unauthenticated!" and the app booted anyway. A forged webhook can flip opt-out state and
+  // write the transcript the agent reads back, so an absent secret must refuse, not wave through.
+  if (!cfg.webhookToken || !secretEq(String(token), cfg.webhookToken)) {
     return reply.code(401).send({ status: "unauthorized" });
   }
 
-  // Ack immediately; process async so Gupshup never times out on us.
+  // Parse BEFORE acking, so anything we cannot turn into events is RECORDED rather than swallowed.
+  //
+  // Scope, stated rather than implied: Fastify parses the JSON body before this handler runs, so
+  // malformed JSON is already refused upstream and never reaches the catch below, which therefore
+  // only fires if normalizeWebhook itself throws. An unrecognised SHAPE does not land here at all —
+  // normalizeWebhook returns a {kind:"other"} event for any object, so it surfaces in the
+  // "unhandled event type" branch below, which now carries the raw body. That is the only thing
+  // that lets an operator recover an «إيقاف» that arrived inside an envelope we cannot yet read.
+  //
+  // It still acks 200 either way: the failure is deterministic, so a retry re-sends the same
+  // unreadable body, and an endpoint that answers 4xx in a loop is one a provider can disable —
+  // which would lose ALL inbound, including the opt-outs this fix exists to protect.
+  let events;
+  try {
+    events = gupshup.normalizeWebhook(req.body);
+  } catch (e) {
+    console.error(JSON.stringify({ at: "webhook", level: "error", msg: "normalize threw — event NOT processed, raw body logged for manual recovery", err: String(e).slice(0, 300), raw: JSON.stringify(req.body ?? null).slice(0, 2000) }));
+    return reply.send({ status: "ok" });
+  }
+
+  // Ack now; process async so Gupshup never times out on us.
   reply.send({ status: "ok" });
 
-  const events = gupshup.normalizeWebhook(req.body);
+  // Per-event try/catch. One malformed event must not abort the loop and take the events after it
+  // down with it — that is a silent partial loss, and this handler runs after the ack, so a throw
+  // here surfaces nowhere at all.
+  //
+  // KNOWN LIMIT, stated rather than implied: this makes the handler crash-resistant, not durable.
+  // A process death between the ack and the write still loses the event. The fix for that is the
+  // inbound_events table in phase 0 of docs/designs/massar-platform-implementation.md.
   for (const ev of events) {
-    if (ev.kind === "message") {
-      if (!ev.from) continue;
-      const contact = tracker.recordInbound(ev);
-      // Pass the tap-vs-typed provenance, not just the text. Without it the agent cannot tell a
-      // customer who TAPPED «لا» from one who wrote it as an answer to a question.
-      enqueue(ev.from, () => agent.handleInbound(contact, ev.text, gupshup.isButtonTap(ev)));
-    } else if (ev.kind === "status") {
-      tracker.recordStatus(ev);
-    } else {
-      log({ at: "webhook", msg: "unhandled event type", type: ev.type });
+    try {
+      if (ev.kind === "message") {
+        if (!ev.from) continue;
+        const contact = tracker.recordInbound(ev);
+        // Pass the tap-vs-typed provenance, not just the text. Without it the agent cannot tell a
+        // customer who TAPPED «لا» from one who wrote it as an answer to a question.
+        enqueue(ev.from, () => agent.handleInbound(contact, ev.text, gupshup.isButtonTap(ev)));
+      } else if (ev.kind === "status") {
+        tracker.recordStatus(ev);
+      } else {
+        // Raw body included on purpose: this is the real silent-drop path. A future provider
+        // envelope lands here, and if it carried an opt-out, this log is the only record of it.
+        console.error(JSON.stringify({ at: "webhook", level: "error", msg: "unhandled event type", type: ev.type, raw: JSON.stringify(req.body ?? null).slice(0, 2000) }));
+      }
+    } catch (e) {
+      console.error(JSON.stringify({ at: "webhook", level: "error", msg: "event dropped", kind: ev.kind, from: "from" in ev ? ev.from : "", err: String(e).slice(0, 300) }));
     }
   }
 });
@@ -73,13 +184,28 @@ app.get("/", async (req, reply) => {
 // ------------------------------ health ------------------------------
 
 app.get("/health", async () => ({
-  ok: true,
+  // Honest, not decorative. This returned `true` unconditionally, so a machine whose migration
+  // failed and fell back to memory-only mode (db.ts init catch) reported healthy while every write
+  // was being dropped. Still HTTP 200 on purpose: Fly restarts on a failing check, and a restart
+  // loop during a database outage is worse than a truthful body an operator can read.
+  ok: !db.enabled() || db.isConnected(),
   service: "massar-engine",
   uptimeSec: Math.round((Date.now() - startedAt) / 1000),
   model: agent.currentModel(),
   gupshupAppName: gupshup.appName() || "(unknown — learned from first webhook)",
   sourceNumber: gupshup.sourceNumber() || "(unset — auto-learns from v3 webhooks)",
   outbound: gupshup.outboundReady(),
+  // Milliseconds the event loop was late. p99 is the number that matters: a mean stays flat while
+  // one 300ms scoring pass a minute quietly delays every webhook behind it.
+  // The histogram measures the whole interval, so an IDLE process reads ~20ms at resolution 20.
+  // Reporting that raw would have an operator chasing a lag that is only the sampler. Subtracting
+  // the resolution makes the number mean what its name says: milliseconds the loop was LATE.
+  loop: {
+    meanMs: loopLagMs(loopDelay.mean),
+    p99Ms: loopLagMs(loopDelay.percentile(99)),
+    maxMs: loopLagMs(loopDelay.max),
+  },
+  contacts: tracker.contactCount(),
   db: { enabled: db.enabled(), connected: db.isConnected(), counts: await db.counts() },
   // The account graph, reported honestly: `known` counts entities in the snapshot, `withFacts`
   // counts the ones that actually carry a fact the agent can state. Before this cycle the second
@@ -88,10 +214,307 @@ app.get("/health", async () => ({
   config: configReport(),
 }));
 
+// --------------------- the commercial engine: performance and targets ---------------------
+//
+// ONE endpoint feeds the whole performance screen, from ONE grouped query, so no two tiles can
+// disagree and the executive view costs one connection rather than one per card.
+
+/** The fiscal calendar. January default because Lean's fiscal year start is still an open question
+ *  in the design doc — env-switchable so the answer is a config change, not a deploy of new code. */
+function fiscalStartMonth(): number {
+  const m = Number(process.env.FISCAL_START_MONTH || 1);
+  return Number.isFinite(m) && m >= 1 && m <= 12 ? Math.round(m) : 1;
+}
+
+app.get("/admin/sales/performance", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const fsm = fiscalStartMonth();
+  const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
+  const year = Number(q.year) || now.year;
+  const quarter = Number(q.quarter) || now.quarter;
+  if (quarter < 1 || quarter > 4) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
+  }
+  // Year was unchecked while quarter was, and the asymmetry was reachable: Date.UTC overflows past
+  // year 275760, riyadhPeriodBounds then returns NaN, pg serialises that as the string "NaN", and
+  // to_timestamp raises — surfacing the raw driver error, relation names included, as a 500.
+  // Same range POST /admin/sales/targets already enforces.
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
+  }
+  const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+  // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned close
+  // date belongs to the current period or to none, and the decision is made here rather than in SQL.
+  const isCurrentPeriod = year === now.year && quarter === now.quarter;
+  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter, isCurrentPeriod);
+  return {
+    ok: true, year, quarter, fiscalStartMonth: fsm,
+    periodStart: b.startMs, periodEnd: b.endMs, now: Date.now(),
+    rows,
+  };
+});
+
+app.post("/admin/sales/targets", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  if (!product) return reply.code(400).send({ ok: false, error: "invalid_field", field: "product" });
+  const known = new Set((await db.listTags()).map((t) => t.name));
+  if (!known.has(product)) {
+    // The count, not the catalogue: an error body is not a place to enumerate the product line.
+    return reply.code(400).send({ ok: false, error: "unknown_product", product, knownCount: known.size });
+  }
+  const year = Number(b.year), quarter = Number(b.quarter), amount = Number(b.amount);
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
+  }
+  if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
+  }
+  // A negative target is not a stretch goal, it is a typo that would flip every colour on the board.
+  if (!Number.isFinite(amount) || amount < 0 || amount > 1e12) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "amount" });
+  }
+  const ok = await db.setTarget(product, year, quarter, amount, adminName(req));
+  if (!ok) return reply.code(503).send({ ok: false, error: "not_persisted" });
+  return { ok: true, product, year, quarter, amount: Math.round(amount) };
+});
+
+// --------------------- integration (read-only, aggregate-only) ---------------------
+//
+// The ONE surface another Lean system may read. Three properties hold it in place, and each one is
+// a decision rather than an omission:
+//
+//   · READ-ONLY — GET only. Nothing here can move a deal, and a compromised consumer cannot write.
+//   · AGGREGATE-ONLY — integers and catalogue names. No account name, no phone, no transcript, no
+//     money. There is no field to redact because none is ever assembled.
+//   · CLOSED BY DEFAULT — with INTEGRATION_TOKEN unset the surface answers 404, the same as a route
+//     that does not exist. A misconfigured deploy therefore fails shut, and it does not advertise
+//     that an integration exists here for someone to go looking at.
+//
+// 404-not-401 for the unset case is deliberate: «not configured» and «wrong token» are different
+// facts, and only the second one should confirm to a caller that they found the right door.
+
+function integrationOk(req: any): boolean {
+  return Boolean(cfg.integrationToken) && req.headers["x-integration-token"] === cfg.integrationToken;
+}
+
+app.get("/integration/product-interest", async (req, reply) => {
+  if (!cfg.integrationToken) return reply.code(404).send({ status: "not_found" });
+  if (!integrationOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const opps = await db.listOpps();
+  const feed = countPotentialClientsByProduct(opps);
+  // Optional `?products=a|b` — the DISTINCT client count across a caller's chosen subset. Pipe
+  // separated because a catalogue name contains a comma («تكامل الأنظمة (HIS/ERP)» does not, but
+  // nothing stops the next one from doing so) and a separator that can appear inside a value is a
+  // parsing bug waiting for the entry that trips it.
+  const raw = String((req.query as Record<string, unknown> | undefined)?.products ?? "").trim();
+  const selectedNames = raw ? raw.split("|").map((p) => p.trim()).filter(Boolean).slice(0, 50) : [];
+  const selected = selectedNames.length
+    ? { products: selectedNames, ...countPotentialClientsAcross(opps, selectedNames) }
+    : null;
+  return {
+    ok: true,
+    generatedAt: Date.now(),
+    selected,
+    // The consumer displays what «محتمل» meant, rather than hardcoding its own copy of the rule.
+    // When the definition changes here, every dashboard reading it re-labels itself in the same
+    // deploy instead of quietly describing the old rule over the new number.
+    stages: CONFIRMED_INTEREST_STAGES.map((key) => {
+      const stage = OPP_STAGES.find((s) => s.key === key);
+      return { key, label: stage ? stage.label : key };
+    }),
+    ...feed,
+  };
+});
+
+/** THE GATE'S OWN INSTRUMENT. Gate A decides whether phases 4-8 ship as designed, and until now
+ *  nothing in the system measured either of its two thresholds — the gate could not be evaluated by
+ *  the software it judges. Every number here is computed by sales-domain, so the screen and the
+ *  verdict cannot disagree. */
+app.get("/admin/gate-a", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const days = Math.min(90, Math.max(1, Number(q.days) || 21));
+  const endMs = Date.now();
+  const startMs = endMs - days * 86_400_000;
+  const rep = q.rep ? String(q.rep) : undefined;
+
+  const rows = await db.gateARows(startMs, endMs, rep);
+  const byRep = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (!byRep.has(r.rep)) byRep.set(r.rep, []);
+    byRep.get(r.rep)!.push(r);
+  }
+
+  const reps = [...byRep.entries()].map(([name, rs]) => {
+    const counts: Record<string, number> = {};
+    for (const r of rs) {
+      const k = sales.riyadhDayKey(r.occurredAt);
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const median = sales.medianPerWorkingDay(counts, startMs, endMs);
+    const logged = sales.loggedWithinADay(rs);
+    const v = sales.gateAVerdict(median, logged.pct);
+    return {
+      rep: name, engagements: rs.length, medianPerWorkingDay: median,
+      loggedWithinADay: logged, verdict: v.verdict, reasons: v.reasons,
+      byDay: counts,
+    };
+  }).sort((a, b) => b.engagements - a.engagements);
+
+  return {
+    ok: true, days, periodStart: startMs, periodEnd: endMs,
+    // Stated on the response so the reader never has to guess what the gate means.
+    thresholds: { minMedianPerWorkingDay: sales.GATE_A_MIN_MEDIAN, minLoggedWithinADayPct: sales.GATE_A_MIN_LOGGED_PCT },
+    workingWeek: "الأحد إلى الخميس بتوقيت الرياض، وأيام بلا نشاط تُحتسب أصفارًا",
+    reps,
+  };
+});
+
+app.get("/admin/actions/stalled", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const groups = await db.stalledByDept();
+  return {
+    ok: true,
+    departments: sales.DEPARTMENTS,
+    groups,
+    totalOpen: groups.reduce((n, g) => n + g.openCount, 0),
+  };
+});
+
+app.post("/admin/actions/:id/close", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const state = String((req.body as any)?.state ?? "done");
+  if (state !== "done" && state !== "cancelled") {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "state" });
+  }
+  const done = await db.closeAction(id, state, adminName(req));
+  if (!done) return reply.code(404).send({ ok: false, error: "not_found_or_already_closed" });
+  return { ok: true, id, state };
+});
+
+// ------------------------------ /rep — the sales rep's surface ------------------------------
+//
+// Closed by default: with REP_TOKENS unset every route here answers 404, the same posture
+// /integration takes. «Not configured» and «wrong token» are different facts and only the second
+// should confirm to a caller that they found the right door.
+//
+// The whole surface is three routes. That is deliberate — a rep needs to see who to call, record
+// what happened, and read one account. Nothing here can launch a campaign or send a message.
+
+function repSurfaceOff(reply: any): boolean {
+  if (cfg.repTokens.length === 0) { reply.code(404).send({ status: "not_found" }); return true; }
+  return false;
+}
+
+// The page itself is public, exactly as /dashboard is: it contains no data, and the token that
+// bootstraps it arrives in the URL the rep is sent. Every byte of content behind it is gated.
+app.get("/rep", async (_req, reply) => {
+  if (cfg.repTokens.length === 0) return reply.code(404).send({ status: "not_found" });
+  return reply.type("text/html; charset=utf-8").send(REP_PAGE_HTML);
+});
+
+app.get("/rep/queue", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  const caller = authorize(req);
+  if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const rows = await db.repQueue(caller.actor, 50);
+  return { ok: true, rep: caller.actor, count: rows.length, rows };
+});
+
+app.post("/rep/engagements", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  const caller = authorize(req);
+  if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+
+  const kinds = ["call", "visit", "whatsapp", "email", "note"] as const;
+  const kind = String(b.kind ?? "call");
+  if (!(kinds as readonly string[]).includes(kind)) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "kind" });
+  }
+  const phone = String(b.contactPhone ?? "").replace(/\D/g, "");
+  if (!phone) return reply.code(400).send({ ok: false, error: "invalid_field", field: "contactPhone" });
+  // The client generates the key and REUSES it across retries. That is what makes a tap from a
+  // phone on a bad connection safe to send again.
+  const idemKey = String(b.idemKey ?? "").trim();
+  if (!idemKey) return reply.code(400).send({ ok: false, error: "invalid_field", field: "idemKey" });
+
+  const r = await db.recordEngagement({
+    idemKey,
+    contactPhone: phone,
+    oppId: b.oppId == null ? null : Number(b.oppId),
+    // NEVER from the body. The actor is the credential.
+    rep: caller.actor,
+    kind: kind as (typeof kinds)[number],
+    outcomeKey: b.outcomeKey == null ? null : String(b.outcomeKey),
+    occurredAt: b.occurredAt == null ? Date.now() : Number(b.occurredAt),
+    note: b.note == null ? null : String(b.note).slice(0, 1000),
+  });
+  if (!r.ok) return reply.code(400).send(r);
+  return r;
+});
+
+/** The outcomes a rep may pick, for the stage the deal is actually on. Sent to the client so the
+ *  picklist cannot offer a move the server would reject. */
+app.get("/rep/outcomes", async (req, reply) => {
+  if (repSurfaceOff(reply)) return;
+  if (!authorize(req)) return reply.code(401).send({ status: "unauthorized" });
+  const stage = String((req.query as any)?.stage ?? "");
+  const list = sales.STAGE_OUTCOMES.filter((o) => o.stage === stage);
+  return { ok: true, stage, outcomes: list };
+});
+
 // ------------------------------ admin (token-gated) ------------------------------
 
+/** WHO IS CALLING, decided in one place and derived from the CREDENTIAL, never from the body.
+ *
+ *  `adminName` used to read `req.body.by`, so "who recorded this" was whatever the caller typed.
+ *  That was survivable while one operator held one token. It is not survivable for Gate A, which is
+ *  judged per rep on engagements the rep themselves records — a self-declared actor makes the gate's
+ *  own numbers unverifiable, and lets any caller write history as anyone.
+ *
+ *  Roles are positive grants, so a surface nobody has granted is closed. A rep token authenticates
+ *  on /rep and is simply NOT an admin anywhere else. */
+export type Caller = { role: "admin" | "rep"; actor: string } | null;
+
+function authorize(req: any): Caller {
+  const admin = req.headers["x-admin-token"];
+  if (cfg.adminToken && typeof admin === "string" && secretEq(admin, cfg.adminToken)) {
+    // The admin is one human today (assumption A-3), so a label is all the actor can be. Unlike the
+    // old body-derived name, it cannot be spoofed into someone else's.
+    return { role: "admin", actor: "اللوحة" };
+  }
+  const rep = req.headers["x-rep-token"];
+  if (typeof rep === "string" && rep) {
+    for (const r of cfg.repTokens) if (secretEq(rep, r.secret)) return { role: "rep", actor: r.name };
+  }
+  return null;
+}
+
+/** Constant-time string compare for secrets. Lengths are compared first and separately, because
+ *  timingSafeEqual THROWS on a length mismatch and a secret's length is not what needs protecting. */
+function secretEq(got: string, want: string): boolean {
+  const a = Buffer.from(got, "utf8"), b = Buffer.from(want, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Constant-time, because `===` on a secret leaks its prefix through timing and this one token is
+ *  the entire authorization model: it can launch campaigns to real clinics and read every
+ *  transcript. Lengths are compared first and separately — timingSafeEqual THROWS on a length
+ *  mismatch, and the length of a token is not the secret worth protecting. */
 function adminOk(req: any): boolean {
-  return Boolean(cfg.adminToken) && req.headers["x-admin-token"] === cfg.adminToken;
+  return authorize(req)?.role === "admin";
+}
+
+/** /rep accepts a rep OR the admin, so the founder can walk the same screen the rep sees without a
+ *  second credential. /admin never accepts a rep. */
+function repOk(req: any): boolean {
+  return authorize(req) !== null;
 }
 /** WHO typed a fact. One operator today (assumption A-3), so the token is the authorization and
  *  this is only a label on the record.
@@ -101,7 +524,11 @@ function adminOk(req: any): boolean {
  *  measured, not assumed. A percent-encoded header would work and would also be a value the portal
  *  emits and cannot read back, which is this project's own recurring defect. */
 function adminName(req: any): string {
-  return String((req.body ?? {}).by ?? "").trim().slice(0, 60) || "اللوحة";
+  // Derived from the credential, not from the body. The old form read String(req.body.by), so any
+  // caller could sign a record as anyone — which for Gate A, judged per rep, made the numbers
+  // unverifiable. Falls back to the old label only when there is no caller, which cannot happen on
+  // a guarded route.
+  return authorize(req)?.actor ?? "اللوحة";
 }
 
 app.get("/admin/state", async (req, reply) => {
@@ -337,7 +764,10 @@ app.post("/admin/campaign/launch", async (req, reply) => {
       // REALITY CHECK (user's device, R32): quick_reply+document reported API success but
       // rendered as SEPARATE messages on WhatsApp. Document-with-caption is the native
       // guaranteed single bubble — that is the primary shape for asset launches now.
-      const rejectedShape = (e: unknown) => /gupshup 4\d\d:/.test(String(e));
+      // Was a local 4xx-only regex — the same defect the agent path carried: a Gupshup HTTP 200
+      // with {"status":"error"} is a definite refusal and was being rethrown instead of falling
+      // back to text, so that recipient got nothing. One predicate now, in gupshup.ts.
+      const rejectedShape = gupshup.isProviderRejection;
       const asset = introAsset;
       // The trade-off, made explicit instead of hardcoded. On the sandbox number the two cannot be
       // combined: document+caption is ONE bubble but carries no buttons; quick_reply with a
@@ -473,6 +903,18 @@ app.get("/admin/customer/:phone", async (req, reply) => {
     return Number.isFinite(w) ? w : 0;
   };
   const ins = insights.normalizeCached(await insights.getInsights(contact, entity, force));
+
+  // THE LIFETIME READ GETS THE LIFETIME TRANSCRIPT. The resident Map holds the last 50 messages
+  // per contact, so seriousness — which index.ts below calls deliberately lifetime — was silently
+  // a recent-50 question for any account worth opening. Loaded from Postgres per-record: this is
+  // one row's page view, not a hot path, and the honesty is worth the query. Falls back to the
+  // resident copy when there is no database, so a local dev still renders.
+  const lifetime = db.enabled() ? await db.fullTranscript(phone) : [];
+  const transcriptForSignal = lifetime.length ? lifetime : (contact.transcript || []);
+  // The chart is aggregated in Postgres over the WHOLE table, so 21 days means 21 days even for a
+  // contact with 400 messages. Computed from the resident copy only when there is no database.
+  const activityCounts = db.enabled() ? await db.activityCountsByDay(phone, 21) : null;
+
   return {
     contact, entity, insights: ins,
     // NFR-3 made visible: with no DATABASE_URL (or a dropped pool) a property write CANNOT persist,
@@ -501,6 +943,29 @@ app.get("/admin/customer/:phone", async (req, reply) => {
         : undefined,
     ),
     timeline: insights.buildTimeline(contact),
+    // THE INDICATORS the record now leads with. Computed here, on the server, and delivered ready
+    // to draw: these rules are the business tier (`signal-domain.ts`, unit-tested), and the record
+    // page is presentation. Shipping them to the browser would widen ADR-0001's closure contract
+    // for no second reader.
+    //
+    // Lifetime, deliberately NOT campaign-scoped like `interaction` above. «How serious is this
+    // client» is a question about the person, and a prospect who priced the deal last month is
+    // serious today even when today's campaign window holds one message.
+    signal: readSeriousness({
+      transcript: transcriptForSignal as never,
+      tags: contact.tags || [],
+      outcome: contact.outcome,
+      optedOut: contact.optedOut,
+      isButtonEcho: (t: string) => Boolean(templates.buttonIntent(t)),
+      now: Date.now(),
+    }),
+    // 21 days: three weeks is long enough to show a conversation going quiet and short enough that
+    // each bar is still a readable day on a 300px chart.
+    activity: activityCounts
+      ? activityFromCounts(activityCounts, Date.now(), 21)
+      : activityByDay(contact.transcript || [], Date.now(), 21),
+    // Stated on the response because it changes how the two figures above should be read.
+    transcriptSource: lifetime.length ? "lifetime" : "resident",
     // Newest FIRST, and carrying the launch time. Without a date and an order these rendered as a
     // row of identical blue chips, so the founder could not tell which campaign started the
     // conversation he was looking at — his words: «not sure which one is related to the last one».
@@ -950,7 +1415,7 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
   }
   if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
-  const row = await db.updateOpp(id, patch as never);
+  const row = await db.updateOpp(id, patch as never, adminName(req));
   if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
   return { ok: true, opp: row };
 });

@@ -216,6 +216,10 @@ export function formatInterest(tags: readonly { product: string; level: string }
 }
 
 const contacts = new Map<string, Contact>();
+
+/** How many contacts are resident. Reported on /health beside the loop delay: the two together say
+ *  whether a rising delay is the scoring loop growing with the contact set, or something else. */
+export function contactCount(): number { return contacts.size; }
 const counters: Record<string, number> = {};
 const recentEvents: { ts: number; kind: string; phone: string; note: string }[] = [];
 

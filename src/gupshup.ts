@@ -41,15 +41,63 @@ export function outboundReady(): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
+/** Marker for the ONE case where the outcome is genuinely unknown: we never got an answer. */
+const UNREACHABLE = "gupshup unreachable";
+
+/** True when the provider ANSWERED and refused the request — the message definitively did not go,
+ *  so a caller may safely retry a DIFFERENT shape. False when we never heard back (timeout, DNS,
+ *  socket): the message MAY already be on its way, and re-sending is how a clinic gets it twice.
+ *
+ *  Which statuses count, and why each one:
+ *    4xx  the provider refused the request. Definitively not sent. Safe.
+ *    2xx  postForm only throws on a 2xx when the body carries `{"status":"error"}` — an explicit
+ *         application-level refusal, which is why the `body.status === "error"` disjunct exists.
+ *         Definitively not sent. Safe. (A 4xx-only test read this as "unknown" and suppressed the
+ *         text fallback, so the customer received nothing at all.)
+ *    5xx  the provider broke AFTER accepting the request. Genuinely ambiguous — it may have gone
+ *         out. Treated as unknown, because a resend here is the duplicate this whole helper exists
+ *         to prevent, and a flaky provider is exactly when 5xx arrives. */
+export function isProviderRejection(e: unknown): boolean {
+  return /^gupshup [24]\d\d: /.test(bareMessage(e));
+}
+
+/** True when the message MAY already have gone out: we timed out, or the provider broke after
+ *  accepting. Callers that dedupe on "already delivered" should mark on THIS, never on a plain
+ *  failure — a local preflight throw (missing API key, no source number) never reached the wire,
+ *  so marking it would suppress a message that was never sent. */
+export function isUnknownOutcome(e: unknown): boolean {
+  const m = bareMessage(e);
+  return m.startsWith(UNREACHABLE) || /^gupshup 5\d\d: /.test(m);
+}
+
+/** Anchored matching needs the raw message. An unanchored test read a status echoed INSIDE a
+ *  provider error body as if it were our own prefix, which would flip a 5xx into a "safe to
+ *  resend" verdict — the exact duplicate these predicates exist to prevent. */
+function bareMessage(e: unknown): string {
+  return String(e).replace(/^Error:\s*/, "");
+}
+
 async function postForm(url: string, params: Record<string, string>): Promise<{ status: string; messageId?: string }> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      apikey: cfg.gupshupKey,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams(params).toString(),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        apikey: cfg.gupshupKey,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(params).toString(),
+      // undici has no default request timeout, so this call could hang for minutes and there was
+      // no AbortSignal anywhere in the codebase. A hung send is not a failed send: the message may
+      // already be on its way, which is exactly why the catch below refuses to look like a
+      // rejection.
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    // Deliberately NOT shaped like "gupshup 4xx:" — isProviderRejection must return false here so
+    // no caller treats an unknown outcome as a licence to send again.
+    throw new Error(`${UNREACHABLE} (outcome unknown, do not resend): ${String(e).slice(0, 200)}`);
+  }
   const text = await res.text();
   let body: any = {};
   try { body = JSON.parse(text); } catch { body = { raw: text }; }

@@ -143,8 +143,8 @@ export const CAMPAIGNS_CRM_CSS = `
   .rtabs button:focus-visible, .ctabs button:focus-visible, .nv:focus-visible,
   .switcher:focus-visible, .collapse:focus-visible, .kebab:focus-visible,
   .inp:focus-visible, .crmsel:focus-visible, .selcell input:focus-visible {
-    outline:2px solid #C7C7C7; outline-offset:1px; }
-  .inp:focus, .crmsel:focus { border-color:#C7C7C7; }
+    outline:2px solid #1F7A73; outline-offset:1px; }
+  .inp:focus, .crmsel:focus { border-color:#1F7A73; }
 
   /* actions reveal on row hover instead of shouting on every row (group-hover:opacity-100) */
   .crow .c-act { opacity:0; transition:opacity .14s ease-in; }

@@ -1,5 +1,7 @@
 import pg from "pg";
 import * as facts from "./facts.js";
+import { SALES_STAGES } from "./sales-domain.js";
+import * as sales from "./sales-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -49,7 +51,7 @@ async function reprobe(): Promise<boolean> {
     await pool.query("SELECT 1");
     // A boot whose init() died mid-migration reaches here with tables possibly missing — finish
     // the job before declaring the pool usable, or every read after "recovery" would still throw.
-    if (!migrated) { await pool.query(MIGRATION); migrated = true; }
+    if (!migrated) { await runMigrations(pool); migrated = true; }
     markConnected();
     console.log(JSON.stringify({ at: "db", msg: "reconnected after a pool error" }));
   } catch {
@@ -301,6 +303,290 @@ CREATE TABLE IF NOT EXISTS opp_auto (
 );
 `;
 
+// ---------------------------------------------------------------------------
+// Versioned migrations.
+//
+// WHY THIS EXISTS. Everything above is one idempotent string of CREATE TABLE IF NOT EXISTS, which
+// is fine for adding a table and useless for CHANGING one: `IF NOT EXISTS` alters no existing
+// CHECK, and re-running an ALTER fails. The commercial engine has to widen
+// `opportunities_stage_check` from six stages to eight on live rows, so the engine needs to know
+// what it has already applied.
+//
+// It also closes a race the review found: the 30-second reprobe timer can call the migration while
+// init() is still inside it, because `pool` exists while `migrated` is still false. The advisory
+// lock serialises that — one connection runs migrations, the other waits and then finds them
+// applied. Two machines during a deploy are covered by the same lock.
+//
+// Each step runs in ONE transaction with its version stamp, so a step either lands completely or
+// not at all. A half-applied schema is the failure this replaces.
+
+/** Arbitrary but fixed: the lock key for schema work on this database. */
+const MIGRATION_LOCK_KEY = 0x6d61_7361; // "masa"
+
+/** Ordered, append-only. NEVER edit or renumber a shipped step — add a new one. */
+const MIGRATIONS: readonly { version: string; sql: string }[] = [
+  {
+    version: "002-commercial-engine",
+    sql: `
+-- The eight-stage ladder, as data rather than a hardcoded enum.
+CREATE TABLE IF NOT EXISTS pipelines (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  product    TEXT,                       -- NULL = the default ladder every product inherits
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pipeline_stages (
+  id          BIGSERIAL PRIMARY KEY,
+  pipeline_id BIGINT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+  key         TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  weight_pct  INT  NOT NULL CHECK (weight_pct BETWEEN 0 AND 100),
+  position    INT  NOT NULL,
+  exit_criterion TEXT,
+  UNIQUE (pipeline_id, key)
+);
+
+-- THE LEDGER. Append-only. Without it the engine cannot answer "which deals were won in Q1":
+-- opportunities.stage_at is the moment the stage LAST MOVED and is overwritten by any later edit,
+-- and close_on is a PLANNED date. Every target, forecast and commission figure reads from here.
+CREATE TABLE IF NOT EXISTS track_stage_events (
+  id           BIGSERIAL PRIMARY KEY,
+  opp_id       BIGINT NOT NULL,
+  from_stage   TEXT,                     -- NULL on the opening event
+  to_stage     TEXT NOT NULL,
+  outcome_key  TEXT,                     -- dependent on from_stage; see sales-domain
+  outcome_reason TEXT,
+  effective_at TIMESTAMPTZ NOT NULL,     -- when it HAPPENED, in a type that carries its zone
+  recorded_at  BIGINT NOT NULL,          -- when we heard about it
+  actor        TEXT,
+  engagement_ref TEXT,                   -- supporting evidence, when there is any
+  corrects_id  BIGINT REFERENCES track_stage_events(id),
+  note         TEXT
+);
+CREATE INDEX IF NOT EXISTS tse_opp_idx ON track_stage_events (opp_id, effective_at DESC);
+CREATE INDEX IF NOT EXISTS tse_period_idx ON track_stage_events (effective_at, to_stage);
+
+-- CURRENT responsibility, which is a different fact from history. الإدارة المسؤولة lives here and
+-- not on an append-only engagement: an engagement records who handled a PAST interaction, so
+-- «أين تتعثّر الصفقات» built on it would list every department that ever touched the deal.
+CREATE TABLE IF NOT EXISTS actions (
+  id           BIGSERIAL PRIMARY KEY,
+  opp_id       BIGINT NOT NULL,
+  stage_event_id BIGINT REFERENCES track_stage_events(id),
+  dept         TEXT NOT NULL,
+  person       TEXT,
+  title        TEXT NOT NULL,
+  due_at       BIGINT,
+  state        TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','done','cancelled')),
+  done_at      BIGINT,
+  created_at   BIGINT NOT NULL,
+  created_by   TEXT
+);
+CREATE INDEX IF NOT EXISTS actions_open_idx ON actions (state, dept, due_at);
+CREATE INDEX IF NOT EXISTS actions_opp_idx ON actions (opp_id, state);
+
+-- The management layer. Products are TEXT names everywhere in this codebase (tags, product_kb,
+-- opportunities.product), so these key on the name too rather than introducing an id that nothing
+-- else uses yet and half-migrating the whole schema.
+CREATE TABLE IF NOT EXISTS sectors (
+  id         BIGSERIAL PRIMARY KEY,
+  name       TEXT NOT NULL UNIQUE,
+  created_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS product_meta (
+  product    TEXT PRIMARY KEY,
+  sector_id  BIGINT REFERENCES sectors(id),
+  owner      TEXT,
+  updated_at BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS targets (
+  product  TEXT   NOT NULL,
+  year     INT    NOT NULL,
+  quarter  INT    NOT NULL CHECK (quarter BETWEEN 1 AND 4),
+  amount   BIGINT NOT NULL CHECK (amount >= 0),
+  updated_at BIGINT NOT NULL,
+  updated_by TEXT,
+  PRIMARY KEY (product, year, quarter)
+);
+
+-- Widen the stage ladder from six to eight. The mapping is an identity: every live stage keeps its
+-- key, and discover and quote are new, so no row is reclassified and no rep's board changes.
+-- DROP then ADD, because CREATE TABLE IF NOT EXISTS alters no existing constraint.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_stage_check;
+ALTER TABLE opportunities ADD  CONSTRAINT opportunities_stage_check
+  CHECK (stage IN ('contact','discover','present','tech','quote','negotiate','won','lost'));
+
+-- Seed the opening event for every opportunity that predates the ledger, so a deal that already
+-- exists is not invisible to the targets model. effective_at is its best known moment: when the
+-- stage last moved. Marked so it can never be mistaken for a witnessed transition.
+INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor, note)
+SELECT o.id, NULL, o.stage, to_timestamp(o.stage_at / 1000.0), $NOW$, 'migration',
+       'backfilled from opportunities.stage_at — the stage was already here, the moment is approximate'
+FROM opportunities o
+WHERE NOT EXISTS (SELECT 1 FROM track_stage_events e WHERE e.opp_id = o.id);
+`,
+  },
+  {
+    version: "003-engagements",
+    sql: `
+-- WHAT THE REP DID, as distinct from what the DEAL did.
+--
+-- track_stage_events answers "when did this deal move", and updateOpp only writes a row when the
+-- stage actually CHANGES. That is correct for the money query and wrong for Gate A: a rep calls, the
+-- clinic says call me next week, the stage does not move, and nothing is recorded. That is most
+-- calls. Gate A counts engagements, so engagements need their own record.
+--
+-- The row is keyed on the CONTACT, not the opportunity. createOppLines deliberately creates several
+-- product lines per account, and a rep makes ONE call to ONE human: keying on opp_id would record
+-- two engagements for one conversation and inflate the very number the pilot is judged on.
+CREATE TABLE IF NOT EXISTS engagements (
+  id            BIGSERIAL PRIMARY KEY,
+  contact_phone TEXT   NOT NULL,
+  -- The line this call moved, when it moved one. ON DELETE SET NULL, not CASCADE: deleting one
+  -- product line must not erase the fact that a rep spoke to the person.
+  opp_id        BIGINT REFERENCES opportunities(id) ON DELETE SET NULL,
+  rep           TEXT   NOT NULL,
+  kind          TEXT   NOT NULL CHECK (kind IN ('call','visit','whatsapp','email','note')),
+  outcome_key   TEXT,
+  -- WHEN IT HAPPENED, as the rep reports it, bounded in code so backdating cannot manufacture
+  -- Gate A compliance. Separate from when we heard, because the gap between them IS the metric.
+  occurred_at   TIMESTAMPTZ NOT NULL,
+  recorded_at   BIGINT NOT NULL,
+  note          TEXT,
+  -- One command, one row. A retried tap from a phone on a bad connection must not count twice.
+  idem_key      TEXT   NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS eng_rep_day_idx  ON engagements (rep, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS eng_contact_idx  ON engagements (contact_phone, occurred_at DESC);
+
+-- Provenance for an action raised by a call that changed no stage. stage_event_id cannot carry it,
+-- because in that case there IS no stage event — which is the whole reason engagements exist.
+ALTER TABLE actions ADD COLUMN IF NOT EXISTS engagement_id BIGINT REFERENCES engagements(id) ON DELETE SET NULL;
+
+-- Close the orphan class. Both tables carried opp_id BIGINT NOT NULL with NO foreign key, so
+-- deleting an opportunity left its history pointing at nothing, forever and invisibly. These two
+-- ARE about the deal, so they go with it.
+DELETE FROM track_stage_events e WHERE NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.id = e.opp_id);
+DELETE FROM actions a           WHERE NOT EXISTS (SELECT 1 FROM opportunities o WHERE o.id = a.opp_id);
+ALTER TABLE track_stage_events DROP CONSTRAINT IF EXISTS tse_opp_fk;
+ALTER TABLE track_stage_events ADD  CONSTRAINT tse_opp_fk
+  FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
+ALTER TABLE actions DROP CONSTRAINT IF EXISTS actions_opp_fk;
+ALTER TABLE actions ADD  CONSTRAINT actions_opp_fk
+  FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
+`,
+  },
+];
+
+/** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
+async function runMigrations(p: pg.Pool): Promise<void> {
+  const client = await p.connect();
+  try {
+    // The lock comes FIRST, and the bookkeeping table is created on the locked client. Taking it
+    // after the CREATE left the one window the lock exists to close: CREATE TABLE IF NOT EXISTS is
+    // not concurrency-safe in Postgres, so two sessions racing it (a deploy overlap, or reprobe()
+    // landing on a boot) raise 23505/42P07 on pg_type_typname_nsp_index. That throw escapes init(),
+    // and the process falls back to memory-only — every write silently dropped until a restart.
+    await client.query("SELECT pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
+    // MIGRATION (the base schema) runs here too, for the same reason: it is a wall of
+    // CREATE TABLE IF NOT EXISTS, and it used to run on the bare pool before the lock was taken.
+    await client.query(MIGRATION);
+    await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      version TEXT PRIMARY KEY, applied_at BIGINT NOT NULL)`);
+    const done = new Set<string>(
+      (await client.query("SELECT version FROM schema_migrations")).rows.map((r: any) => String(r.version)));
+    for (const m of MIGRATIONS) {
+      if (done.has(m.version)) continue;
+      try {
+        await client.query("BEGIN");
+        await client.query(m.sql.replaceAll("$NOW$", String(Date.now())));
+        await client.query("INSERT INTO schema_migrations (version, applied_at) VALUES ($1,$2)",
+          [m.version, Date.now()]);
+        await client.query("COMMIT");
+        console.log(JSON.stringify({ at: "db", msg: "migration applied", version: m.version }));
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw new Error(`migration ${m.version} failed: ${String(e).slice(0, 300)}`);
+      }
+    }
+    await assertSchemaShape(client);
+    await seedDefaultPipeline(client);
+  } finally {
+    await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
+    client.release();
+  }
+}
+
+/** The columns the code will actually read and write. Asserted AFTER migrations run.
+ *
+ * WHY. `CREATE TABLE IF NOT EXISTS` is idempotent but NOT verifying: if a table already exists with
+ * the wrong shape — from a partial run, a hand-created table, or a future migration that collides —
+ * the step is skipped, the version is stamped applied, and the engine boots believing a schema it
+ * does not have. Measured, not assumed: planting `CREATE TABLE targets (wrong_column int)` and
+ * booting produced "migration applied" with `targets` still holding one wrong column.
+ *
+ * That defeats the whole reason the migration system was added. So the shape is checked, and a
+ * mismatch fails the boot loudly instead of surfacing later as a confusing runtime error on a write.
+ * `/health` reports ok:false in that state, so the failure is visible rather than silent. */
+const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
+  pipelines: ["id", "name", "product", "created_at"],
+  pipeline_stages: ["id", "pipeline_id", "key", "label", "weight_pct", "position"],
+  track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
+  actions: ["id", "opp_id", "dept", "title", "state", "created_at"],
+  sectors: ["id", "name"],
+  product_meta: ["product", "sector_id"],
+  targets: ["product", "year", "quarter", "amount"],
+  engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
+};
+
+async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
+  const want = Object.entries(REQUIRED_SHAPE);
+  const r = await client.query(
+    `SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = ANY($1)`,
+    [want.map(([t]) => t)]);
+  const have = new Map<string, Set<string>>();
+  for (const row of r.rows) {
+    const t = String(row.table_name);
+    if (!have.has(t)) have.set(t, new Set());
+    have.get(t)!.add(String(row.column_name));
+  }
+  const missing: string[] = [];
+  for (const [table, cols] of want) {
+    const got = have.get(table);
+    if (!got) { missing.push(`${table} (table absent)`); continue; }
+    for (const c of cols) if (!got.has(c)) missing.push(`${table}.${c}`);
+  }
+  if (missing.length) {
+    throw new Error(
+      `schema shape mismatch after migration — the engine would run against a schema it does not ` +
+      `have. Missing: ${missing.join(", ")}`);
+  }
+}
+
+/** The ladder is DATA, and sales-domain is its single source of truth. Re-seeded every boot by key
+ *  so a weight corrected in code reaches the database without anyone writing a migration for it. */
+async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
+  const r = await client.query("SELECT id FROM pipelines WHERE product IS NULL LIMIT 1");
+  let id: number;
+  if (r.rowCount) id = Number(r.rows[0].id);
+  else {
+    const ins = await client.query(
+      "INSERT INTO pipelines (name, product, created_at) VALUES ($1,NULL,$2) RETURNING id",
+      ["المسار الافتراضي", Date.now()]);
+    id = Number(ins.rows[0].id);
+  }
+  for (const st of SALES_STAGES) {
+    await client.query(
+      `INSERT INTO pipeline_stages (pipeline_id, key, label, weight_pct, position, exit_criterion)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (pipeline_id, key) DO UPDATE
+         SET label = EXCLUDED.label, weight_pct = EXCLUDED.weight_pct,
+             position = EXCLUDED.position, exit_criterion = EXCLUDED.exit_criterion`,
+      [id, st.key, st.label, st.weightPct, st.position, st.exitCriterion]);
+  }
+}
+
 export async function init(): Promise<void> {
   if (!enabled()) {
     console.log(JSON.stringify({ at: "db", msg: "DATABASE_URL not set — memory-only mode" }));
@@ -314,7 +600,7 @@ export async function init(): Promise<void> {
       connected = false;
       console.error(JSON.stringify({ at: "db", msg: "pool error — memory-only until recovery", err: String(e).slice(0, 200) }));
     });
-    await pool.query(MIGRATION);
+    await runMigrations(pool);
     migrated = true;
     markConnected();
     console.log(JSON.stringify({ at: "db", msg: "connected + migrated" }));
@@ -474,6 +760,115 @@ export async function loadAll(): Promise<{
     console.error(JSON.stringify({ at: "db", msg: "hydrate load failed", err: String(e).slice(0, 300) }));
     return null;
   }
+}
+
+/** ONE grouped query for the whole performance screen, deliberately.
+ *
+ *  The review's finding: "computed" must not mean recomputing every tile from the ledger on each
+ *  request. This machine is 512 MB with a pool of five and a health check already holding a
+ *  connection every 30 seconds, so the executive view takes ONE connection and returns every figure
+ *  from ONE snapshot — which also stops two tiles disagreeing mid-request.
+ *
+ *  `achieved` reads the stage-event ledger, not opportunities: a deal's stage_at is overwritten by
+ *  any later edit, so it cannot say WHEN a deal was won. That is the whole reason the ledger exists.
+ *
+ *  Returns raw money and raw counts. Attainment, coverage and the RAG band are computed by
+ *  sales-domain in the browser, so the arithmetic has exactly one home. */
+export async function salesPerformance(
+  startMs: number, endMs: number, year: number, quarter: number, isCurrentPeriod: boolean,
+): Promise<{
+  product: string; sector: string | null; target: number; achieved: number;
+  weightedOpen: number; openCount: number; wonCount: number;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    // The ledger says WHEN it happened; the row says whether it is STILL true. Joining the events
+    // alone got both wrong: a deal won and then corrected back out stayed in «المحقق» AND returned
+    // to open pipeline, so coverage counted the same money twice (measured: achieved held at
+    // 1,820,000 with openCount back to 3). And a deal won, reversed, then won again has two win
+    // events and would be summed twice. So: only opportunities currently at 'won', counted once,
+    // at the date of their LATEST transition into it.
+    `WITH won AS (
+       SELECT o.product,
+              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)) AS achieved,
+              COUNT(*) AS won_count
+         FROM opportunities o
+         JOIN LATERAL (
+           SELECT e.effective_at
+             FROM track_stage_events e
+            WHERE e.opp_id = o.id AND e.to_stage = 'won'
+            ORDER BY e.effective_at DESC
+            LIMIT 1
+         ) w ON TRUE
+        WHERE o.stage = 'won'
+          AND w.effective_at >= to_timestamp($1 / 1000.0)
+          AND w.effective_at <  to_timestamp($2 / 1000.0)
+        GROUP BY o.product
+     ),
+     -- Two bugs lived in this block and both were silent.
+     --
+     -- 1. The join had no pipeline_id, so it was 1:1 only while exactly one ladder existed. The
+     --    schema deliberately allows a per-product ladder (pipelines.product), and pipeline_stages
+     --    is unique on (pipeline_id, key) — NOT on key. The first second pipeline anyone inserted
+     --    would have doubled every product's weightedOpen and openCount with nothing on screen
+     --    saying so. Pinned to the default ladder until per-product ladders are actually resolved.
+     --
+     -- 2. It ignored $1/$2 entirely, so picking Q1 2024 returned TODAY's open pipeline and the
+     --    coverage tile added current deals to a closed quarter's achieved figure. Open value is
+     --    now what is expected to close IN the selected period. A deal with no close_on has no
+     --    period to belong to, so it counts only when the period is the one we are inside —
+     --    $5 is that flag, decided by the caller rather than guessed in SQL.
+     openv AS (
+       SELECT o.product,
+              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0) * ps.weight_pct / 100.0) AS weighted,
+              COUNT(*) AS open_count
+         FROM opportunities o
+         JOIN pipeline_stages ps
+           ON ps.key = o.stage
+          AND ps.pipeline_id = (SELECT id FROM pipelines WHERE product IS NULL ORDER BY id LIMIT 1)
+        WHERE o.stage NOT IN ('won','lost')
+          AND ( (o.close_on IS NOT NULL AND o.close_on >= $1 AND o.close_on < $2)
+             OR (o.close_on IS NULL AND $5) )
+        GROUP BY o.product
+     ),
+     tgt AS (
+       SELECT product, SUM(amount) AS amount FROM targets
+        WHERE year = $3 AND quarter = $4 GROUP BY product
+     )
+     SELECT t.name AS product, s.name AS sector,
+            COALESCE(tgt.amount, 0)      AS target,
+            COALESCE(won.achieved, 0)    AS achieved,
+            COALESCE(openv.weighted, 0)  AS weighted_open,
+            COALESCE(openv.open_count,0) AS open_count,
+            COALESCE(won.won_count, 0)   AS won_count
+       FROM tags t
+       LEFT JOIN product_meta pm ON pm.product = t.name
+       LEFT JOIN sectors s       ON s.id = pm.sector_id
+       LEFT JOIN won   ON won.product   = t.name
+       LEFT JOIN openv ON openv.product = t.name
+       LEFT JOIN tgt   ON tgt.product   = t.name
+      ORDER BY COALESCE(tgt.amount,0) DESC, t.name`,
+    [startMs, endMs, year, quarter, isCurrentPeriod]);
+  return r.rows.map((x: any) => ({
+    product: String(x.product), sector: x.sector ? String(x.sector) : null,
+    target: Number(x.target) || 0, achieved: Math.round(Number(x.achieved) || 0),
+    weightedOpen: Math.round(Number(x.weighted_open) || 0),
+    openCount: Number(x.open_count) || 0, wonCount: Number(x.won_count) || 0,
+  }));
+}
+
+/** Set one quarter's target for one product. Entered, never computed — it is the only figure on the
+ *  performance screen a human types, and that is deliberate: everything else is earned. */
+export async function setTarget(product: string, year: number, quarter: number, amount: number, by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  await pool.query(
+    `INSERT INTO targets (product, year, quarter, amount, updated_at, updated_by)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (product, year, quarter)
+       DO UPDATE SET amount = EXCLUDED.amount, updated_at = EXCLUDED.updated_at,
+                     updated_by = EXCLUDED.updated_by`,
+    [product, year, quarter, Math.round(amount), Date.now(), by]);
+  return true;
 }
 
 export async function counts(): Promise<{ contacts: number; messages: number; events: number } | null> {
@@ -934,7 +1329,7 @@ export async function deleteNote(id: number): Promise<boolean> {
 
 export type OppRow = {
   id: number; account_name: string; phone: string | null; product: string;
-  stage: "contact" | "present" | "tech" | "negotiate" | "won" | "lost";
+  stage: (typeof SALES_STAGES)[number]["key"];
   source: "whatsapp" | "call" | "visit" | "referral" | "inbound" | "other";
   source_ref: string | null;
   sale_price: number; years: number; qty: number; discount: number;
@@ -942,7 +1337,17 @@ export type OppRow = {
   created_by: string | null; created_at: number; updated_at: number; stage_at: number;
 };
 
-export const OPP_STAGES = ["contact", "present", "tech", "negotiate", "won", "lost"] as const;
+/** DERIVED from the one ladder in sales-domain.ts. Was a fifth hand-maintained copy of the stage
+ *  set, and the drift between it and opps-domain.ts is what made «اكتشاف الحاجة» and «عرض السعر»
+ *  unreachable: validateOppLine below rejected them with 400 invalid_field even though the Postgres
+ *  CHECK already accepted all eight.
+ *
+ *  SEQUENCING NOTE. Migration 002-commercial-engine already widened opportunities_stage_check to
+ *  eight values and is applied in production, so the immutable half of expand-then-migrate has
+ *  ALREADY shipped. This change is the second deploy: the application list catches up to the
+ *  constraint. The one combination that would break — a new bundle offering eight against a server
+ *  accepting six — cannot occur, because the bundle is generated by the same server that validates. */
+export const OPP_STAGES = SALES_STAGES.map((s) => s.key);
 export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", "other"] as const;
 
 /** Rejects what the CHECK constraints and the arithmetic would reject, before the query runs, so a
@@ -1006,6 +1411,14 @@ export async function createOppLines(head: {
         [head.account_name, head.phone, l.product, l.stage ?? null, head.source, head.source_ref,
          l.sale_price ?? 0, l.years ?? 1, l.qty ?? 1, l.discount ?? 0, l.owner ?? null,
          l.close_on ?? null, l.next_step ?? null, head.created_by, now]);
+      // The opening event, same transaction. Without it a deal created directly at a closed stage
+      // (an import of already-won business, or a rep logging a deal after the fact) would never
+      // appear in «المحقق» — the won CTE reads the ledger, and the migration backfill runs once
+      // and never sees rows created after it.
+      await client.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor, note)
+         VALUES ($1, NULL, $2, to_timestamp($3 / 1000.0), $3, $4, 'فتح الفرصة')`,
+        [q.rows[0].id, String(q.rows[0].stage), now, head.created_by || "اللوحة"]);
       out.push(rowToOpp(q.rows[0]));
     }
     await client.query("COMMIT");
@@ -1021,7 +1434,7 @@ export async function createOppLines(head: {
 /** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ ١٨ يومًا» counts days in the
  *  stage and not days since anyone last touched the row — editing a next step must not reset a
  *  stall the board exists to show. */
-export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<OppRow | null> {
+export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: string): Promise<OppRow | null> {
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
   for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
@@ -1035,8 +1448,46 @@ export async function updateOpp(id: number, patch: Partial<OppRow>): Promise<Opp
     vals.push(patch.stage, Date.now()); i += 2;
   }
   vals.push(id);
-  const q = await pool.query(`UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
-  return q.rows[0] ? rowToOpp(q.rows[0]) : null;
+
+  // THE LEDGER GETS ITS ROW HERE, IN THE SAME TRANSACTION AS THE UPDATE.
+  //
+  // Without this the whole targets screen is decoration, and it was: the ONLY insert into
+  // track_stage_events was the one-time migration backfill, so a rep marking a deal won moved
+  // opportunities.stage and wrote no event. The won CTE reads the ledger and never saw it; the
+  // openv CTE excludes won and lost. Measured on a real instance before the fix — a 1,440,000 SAR
+  // deal PATCHed to won: achieved stayed at 3,100,000 and openCount fell 3 to 2. The deal left the
+  // pipeline and never arrived anywhere. «المحقق» was frozen at migration-day values forever.
+  //
+  // One transaction, not two statements: a crash between the UPDATE and the INSERT would leave a
+  // won deal with no event, which is precisely the state this exists to make impossible.
+  // FOR UPDATE takes the row lock so two concurrent edits cannot both read the same from_stage
+  // and write two events for one transition.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const prev = await client.query("SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
+    if (!prev.rows[0]) { await client.query("ROLLBACK"); return null; }
+    const fromStage = String(prev.rows[0].stage);
+    const q = await client.query(
+      `UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
+    if (!q.rows[0]) { await client.query("ROLLBACK"); return null; }
+    const toStage = String(q.rows[0].stage);
+    // Only a real transition is an event. Re-saving a row without touching the stage must not
+    // write one, or every edit would look like movement and «المحقق» would count a deal twice.
+    if (toStage !== fromStage) {
+      await client.query(
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor)
+         VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), $4, $5)`,
+        [id, fromStage, toStage, Date.now(), actor || "اللوحة"]);
+    }
+    await client.query("COMMIT");
+    return rowToOpp(q.rows[0]);
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**
@@ -1099,6 +1550,328 @@ export async function hotReadings(): Promise<{ phone: string; product: string; w
     `SELECT DISTINCT t.phone, t.product, c.wa_name
        FROM interest_tags t LEFT JOIN contacts c ON c.phone = t.phone
       WHERE t.level = 'hot'`)).rows;
+}
+
+// ---------------------------------------------------------------------------
+// THE TRANSCRIPT HAS INCOMPATIBLE CONSUMERS, so it stopped being served by one policy.
+//
+// hydrate() keeps the last 50 messages per contact BY COUNT. Three things read that, and they want
+// different windows:
+//
+//   · readSeriousness is DELIBERATELY LIFETIME — index.ts states it: «a prospect who priced the
+//     deal last month is serious today». Truncating to 50 silently makes it a recent-50 question.
+//   · activityByDay draws 21 days. A chatty account blows past 50 messages inside a week, so the
+//     chart was already wrong today for exactly the accounts anyone would look at.
+//   · the agent needs recent context only, which is what the resident Map is genuinely for.
+//
+// A first attempt swapped the count for a 90-day window, which was the same mistake in a different
+// unit — it would have quietly redefined a lifetime signal. So the consumers were split instead:
+// the two exact questions are answered by SQL over the full table, and the Map stays what it always
+// should have been, the agent's working set.
+// ---------------------------------------------------------------------------
+
+/** Every message for one contact, oldest first. Loaded per-record, on demand, because the lifetime
+ *  read is a question about a person and a resident cache cannot bound it honestly. */
+export async function fullTranscript(phone: string): Promise<{ role: string; text: string; ts: number }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT role, text, ts FROM messages WHERE phone = $1 ORDER BY ts ASC`, [phone]);
+  // messages.ts is BIGINT epoch-ms, not a timestamp. node-pg returns bigint as a STRING, so
+  // new Date(x.ts) yields Invalid Date and every signal silently reads NaN.
+  return r.rows.map((x: any) => ({
+    role: String(x.role), text: String(x.text ?? ""), ts: Number(x.ts),
+  }));
+}
+
+/** Per-day message counts, aggregated in Postgres over the WHOLE table rather than over whatever
+ *  50 messages happen to be resident.
+ *
+ *  Buckets on the UTC day, matching activityByDay's existing boundary EXACTLY. Riyadh days would
+ *  arguably be more correct for a Saudi product, but moving the boundary would silently redraw a
+ *  shipped chart, and that is a design decision, not a side effect of making the data exact. The
+ *  only change here is correctness for talkative accounts. */
+export async function activityCountsByDay(phone: string, days: number): Promise<{ day: number; inbound: number; outbound: number }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    // ts is BIGINT epoch-ms. Bucketing is integer division, not date arithmetic, and the window is
+    // a plain lower bound — `extract(epoch FROM ts)` and `now() - interval` both fail on a bigint,
+    // which is how this surfaced: a 500 on the client record the first time it ran.
+    `SELECT (ts / 86400000) * 86400000 AS day,
+            COUNT(*) FILTER (WHERE role = 'customer') AS inbound,
+            COUNT(*) FILTER (WHERE role = 'agent')    AS outbound
+       FROM messages
+      WHERE phone = $1 AND ts >= $2
+      GROUP BY 1 ORDER BY 1`,
+    [phone, Date.now() - Math.max(1, Math.min(365, days)) * 86_400_000]);
+  return r.rows.map((x: any) => ({
+    day: Number(x.day), inbound: Number(x.inbound) || 0, outbound: Number(x.outbound) || 0,
+  }));
+}
+
+/** How many messages this contact has ever exchanged. Used for sorting «العملاء»; the resident
+ *  transcript length was a truncated proxy that ranked a 400-message account level with a 50. */
+export async function transcriptCounts(): Promise<Record<string, number>> {
+  if (!(await reprobe()) || !pool) return {};
+  const r = await pool.query(`SELECT phone, COUNT(*) n FROM messages GROUP BY phone`);
+  const out: Record<string, number> = {};
+  for (const x of r.rows) out[String(x.phone)] = Number(x.n) || 0;
+  return out;
+}
+
+/** The raw rows Gate A is computed from. Deliberately raw: the arithmetic lives in sales-domain
+ *  where it is pure and unit-tested, so the gate's verdict cannot be one thing in SQL and another
+ *  on screen. */
+export async function gateARows(startMs: number, endMs: number, rep?: string): Promise<{
+  rep: string; occurredAt: number; recordedAt: number;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const params: unknown[] = [startMs, endMs];
+  let where = "e.occurred_at >= to_timestamp($1 / 1000.0) AND e.occurred_at < to_timestamp($2 / 1000.0)";
+  if (rep) { params.push(rep); where += ` AND e.rep = $${params.length}`; }
+  const r = await pool.query(
+    `SELECT e.rep, e.occurred_at, e.recorded_at FROM engagements e WHERE ${where} ORDER BY e.occurred_at`,
+    params);
+  return r.rows.map((x: any) => ({
+    rep: String(x.rep),
+    occurredAt: new Date(x.occurred_at).getTime(),
+    recordedAt: Number(x.recorded_at),
+  }));
+}
+
+/** «أين تتعثّر الصفقات» — open work grouped by the department that owes it.
+ *
+ *  The founder's vision doc calls this "the screen Zoho's defaults do not give you and the reason
+ *  this product exists". It reads the actions table over actions_open_idx (state, dept, due_at),
+ *  which was built for exactly this and had never been read by anything. */
+export async function stalledByDept(): Promise<{
+  dept: string; openCount: number; oldestDays: number;
+  items: { id: number; oppId: number; account: string; product: string; stage: string;
+           title: string; ageDays: number; rep: string | null }[];
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT a.id, a.opp_id, a.dept, a.title, a.created_at, a.created_by,
+            o.account_name, o.product, o.stage
+       FROM actions a
+       JOIN opportunities o ON o.id = a.opp_id
+      WHERE a.state = 'open'
+      ORDER BY a.dept, a.created_at ASC`);
+  const now = Date.now();
+  const byDept = new Map<string, any[]>();
+  for (const x of r.rows) {
+    const dept = String(x.dept);
+    const ageDays = Math.floor((now - Number(x.created_at)) / 86_400_000);
+    if (!byDept.has(dept)) byDept.set(dept, []);
+    byDept.get(dept)!.push({
+      id: Number(x.id), oppId: Number(x.opp_id), account: String(x.account_name ?? ""),
+      product: String(x.product ?? ""), stage: String(x.stage ?? ""), title: String(x.title ?? ""),
+      ageDays, rep: x.created_by ? String(x.created_by) : null,
+    });
+  }
+  return [...byDept.entries()]
+    .map(([dept, items]) => ({
+      dept, openCount: items.length,
+      oldestDays: items.reduce((m, i) => Math.max(m, i.ageDays), 0),
+      items,
+    }))
+    .sort((a, b) => b.oldestDays - a.oldestDays || b.openCount - a.openCount);
+}
+
+/** Close or cancel one action. Without this the screen above fills with rows nobody can clear and
+ *  stops being read, which is how a dashboard dies — the mirror of the table-with-no-writer defect
+ *  and the reason the writer and this shipped in one diff. */
+export async function closeAction(id: number, state: "done" | "cancelled", by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const q = await pool.query(
+    `UPDATE actions SET state = $1, done_at = $2 WHERE id = $3 AND state = 'open'`,
+    [state, Date.now(), id]);
+  if ((q.rowCount ?? 0) > 0) {
+    console.log(JSON.stringify({ at: "actions", msg: "closed", id, state, by }));
+    return true;
+  }
+  return false;
+}
+
+/** THE REP'S DAY, filtered in SQL and grouped by the human being called.
+ *
+ *  Two shapes were wrong before this and both mattered:
+ *
+ *  · Scoring every contact in memory and filtering afterwards is O(all contacts) forever, on one
+ *    shared CPU that also serves the Gupshup webhook. Eligibility is a WHERE clause, so the JS only
+ *    ever scores rows a rep could actually call.
+ *
+ *  · One row per OPPORTUNITY tells a rep to phone the same clinic twice, because createOppLines
+ *    deliberately creates a line per product against one account. It also double-counts the
+ *    engagements Gate A is judged on. The row is the human; their open lines ride along.
+ *
+ *  Unowned deals are INCLUDED. Requiring owner to be set first would have made the pilot's queue
+ *  empty on day one, and the fix for that is not a backfill script, it is admitting that an
+ *  unclaimed deal is exactly what a rep should be shown. */
+export async function repQueue(rep: string, limit = 50): Promise<{
+  phone: string; account: string; owner: string | null;
+  lines: { id: number; product: string; stage: string; value: number }[];
+  lastEngagementAt: number | null;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT o.phone,
+            MIN(o.account_name)                       AS account,
+            MIN(o.owner)                              AS owner,
+            json_agg(json_build_object(
+              'id', o.id, 'product', o.product, 'stage', o.stage,
+              'value', ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))
+            ) ORDER BY o.stage_at DESC)               AS lines,
+            (SELECT MAX(e.occurred_at) FROM engagements e WHERE e.contact_phone = o.phone) AS last_eng
+       FROM opportunities o
+       LEFT JOIN contacts c ON c.phone = o.phone
+      WHERE o.stage NOT IN ('won','lost')
+        AND o.phone IS NOT NULL
+        AND (o.owner IS NULL OR o.owner = $1)
+        AND COALESCE(c.opted_out, false) = false
+      GROUP BY o.phone
+      ORDER BY last_eng ASC NULLS FIRST
+      LIMIT $2`,
+    [rep, limit]);
+  return r.rows.map((x: any) => ({
+    phone: String(x.phone),
+    account: String(x.account ?? ""),
+    owner: x.owner ? String(x.owner) : null,
+    lines: (x.lines || []).map((l: any) => ({
+      id: Number(l.id), product: String(l.product), stage: String(l.stage), value: Number(l.value) || 0,
+    })),
+    lastEngagementAt: x.last_eng ? new Date(x.last_eng).getTime() : null,
+  }));
+}
+
+/** How far back a rep may say a call happened. Gate A is judged on the gap between when a call
+ *  happened and when it was logged, so an unbounded occurred_at lets backdating manufacture
+ *  compliance. Two days covers a Thursday call logged on Sunday; anything older is a correction and
+ *  should be visibly one. */
+export const ENGAGEMENT_BACKDATE_LIMIT_MS = 2 * 24 * 60 * 60 * 1000;
+
+export type EngagementInput = {
+  idemKey: string;
+  contactPhone: string;
+  oppId: number | null;
+  rep: string;
+  kind: "call" | "visit" | "whatsapp" | "email" | "note";
+  outcomeKey: string | null;
+  occurredAt: number;
+  note: string | null;
+};
+export type EngagementResult =
+  | { ok: true; engagementId: number; replayed: boolean; fromStage: string | null; toStage: string | null; actionsCreated: number }
+  | { ok: false; error: string; field?: string };
+
+/**
+ * ONE COMMAND, ONE KEY, ONE TRANSACTION.
+ *
+ * A rep tapping an outcome on a phone produces up to four writes: the opportunity moves, the stage
+ * ledger gains a row, an engagement is recorded, and a department is put on the hook. Scoping
+ * idempotency per-table is not enough — an idempotent engagement insert followed by a retried
+ * action writer still duplicates the action. So the whole command lives or dies together, keyed on
+ * one idem_key the client generates and reuses across retries.
+ *
+ *     BEGIN
+ *       idem_key seen?  ── yes ──▶ return the original result, write nothing   (replay)
+ *            │ no
+ *            ▼
+ *       SELECT stage FOR UPDATE          ← the stage the outcome is judged against
+ *            ▼
+ *       resolveOutcome(fromStage, key)   ← target stage DERIVED, never taken from the request
+ *            ▼
+ *       stage moved?  ── yes ──▶ UPDATE opportunities + INSERT track_stage_events
+ *            ▼
+ *       INSERT engagements (idem_key UNIQUE)
+ *            ▼
+ *       dept owed?    ── yes ──▶ INSERT actions
+ *     COMMIT
+ *
+ * A call that moves no stage still lands an engagement, which is the entire reason this exists:
+ * updateOpp writes a ledger row ONLY on a real transition, and most calls do not move the stage.
+ */
+export async function recordEngagement(input: EngagementInput): Promise<EngagementResult> {
+  if (!(await reprobe()) || !pool) return { ok: false, error: "db_unavailable" };
+  const now = Date.now();
+  if (!input.idemKey || input.idemKey.length > 200) return { ok: false, error: "invalid_field", field: "idemKey" };
+  if (!input.contactPhone) return { ok: false, error: "invalid_field", field: "contactPhone" };
+  if (!input.rep) return { ok: false, error: "invalid_field", field: "rep" };
+  if (!Number.isFinite(input.occurredAt)) return { ok: false, error: "invalid_field", field: "occurredAt" };
+  // Bounded in both directions: the future is not a place a call can have happened, and a backdate
+  // beyond the limit would let a quiet week be rewritten into a compliant one.
+  if (input.occurredAt > now + 60_000) return { ok: false, error: "occurred_at_in_future", field: "occurredAt" };
+  if (input.occurredAt < now - ENGAGEMENT_BACKDATE_LIMIT_MS) return { ok: false, error: "occurred_at_too_old", field: "occurredAt" };
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const prior = await client.query(
+      "SELECT id, opp_id FROM engagements WHERE idem_key = $1", [input.idemKey]);
+    if (prior.rows[0]) {
+      await client.query("COMMIT");
+      return { ok: true, engagementId: Number(prior.rows[0].id), replayed: true,
+               fromStage: null, toStage: null, actionsCreated: 0 };
+    }
+
+    let fromStage: string | null = null, toStage: string | null = null;
+    let dept = "", nextAction = "";
+
+    if (input.oppId != null) {
+      const cur = await client.query(
+        "SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [input.oppId]);
+      if (!cur.rows[0]) { await client.query("ROLLBACK"); return { ok: false, error: "opp_not_found" }; }
+      fromStage = String(cur.rows[0].stage);
+
+      if (input.outcomeKey) {
+        const resolved = sales.resolveOutcome(fromStage, input.outcomeKey, sales.SALES_STAGES, sales.STAGE_OUTCOMES);
+        if (!resolved.ok) { await client.query("ROLLBACK"); return { ok: false, error: resolved.error, field: "outcomeKey" }; }
+        toStage = resolved.toStage; dept = resolved.dept; nextAction = resolved.nextAction;
+
+        if (toStage !== fromStage) {
+          await client.query(
+            `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2 WHERE id = $3`,
+            [toStage, now, input.oppId]);
+          await client.query(
+            `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
+             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7)`,
+            [input.oppId, fromStage, toStage, input.outcomeKey, input.occurredAt, now, input.rep]);
+        }
+      }
+    }
+
+    const ins = await client.query(
+      `INSERT INTO engagements (contact_phone, opp_id, rep, kind, outcome_key, occurred_at, recorded_at, note, idem_key)
+       VALUES ($1,$2,$3,$4,$5, to_timestamp($6 / 1000.0), $7,$8,$9) RETURNING id`,
+      [input.contactPhone, input.oppId, input.rep, input.kind, input.outcomeKey,
+       input.occurredAt, now, input.note, input.idemKey]);
+    const engagementId = Number(ins.rows[0].id);
+
+    // An action is owed only when a department other than sales is on the hook, and only for an
+    // outcome that did not close the deal. Deduped on the open action for the same deal and
+    // department: a rep chasing the same blocker three times owes التقنية one task, not three.
+    let actionsCreated = 0;
+    if (input.oppId != null && dept && toStage !== "lost" && toStage !== "won") {
+      const dup = await client.query(
+        `SELECT id FROM actions WHERE opp_id = $1 AND dept = $2 AND state = 'open' LIMIT 1`,
+        [input.oppId, dept]);
+      if (!dup.rows[0]) {
+        await client.query(
+          `INSERT INTO actions (opp_id, stage_event_id, engagement_id, dept, title, state, created_at, created_by)
+           VALUES ($1, NULL, $2, $3, $4, 'open', $5, $6)`,
+          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep]);
+        actionsCreated = 1;
+      }
+    }
+
+    await client.query("COMMIT");
+    return { ok: true, engagementId, replayed: false, fromStage, toStage, actionsCreated };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteOpp(id: number): Promise<boolean> {
