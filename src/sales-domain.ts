@@ -32,18 +32,34 @@ export type SalesStage = {
   /** What must be true to LEAVE this stage. Recovered verbatim from the archive; it is the
    *  difference between a stage a rep guesses at and one they can be held to. */
   readonly exitCriterion: string;
+  /** The board's marker colour. Lives here because this table is now the ONE stage source and the
+   *  board derives from it. The six pre-existing values are preserved verbatim rather than
+   *  re-picked: the palette violates DESIGN.md's teal-only rule and that is an open TODO
+   *  ("Amend DESIGN.md with a documented state palette"), not something to settle inside a
+   *  refactor. The two new rungs take neutral ramp values so this change adds no saturated hue. */
+  readonly dot: string;
+  /** Where deals actually go quiet. Was a separate hardcoded pair in TWO modules. */
+  readonly stalls: boolean;
+  /** Which end of the ladder, or null for the open rungs. Terminal stages are excluded from every
+   *  pipeline figure: a won deal is a CUSTOMER, not a potential one. */
+  readonly terminal: "won" | "lost" | null;
 };
 
 export const SALES_STAGES: readonly SalesStage[] = [
-  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
-  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
-  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
-  { key: "tech",      label: "التقييم التقني",      weightPct: 65,  position: 4, exitCriterion: "اجتاز التكامل مع صحة/صحتي ومتطلبات الأمن" },
-  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
-  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
-  { key: "won",       label: "إغلاق – ربح",        weightPct: 100, position: 7, exitCriterion: "تم التوقيع والاعتماد" },
-  { key: "lost",      label: "إغلاق – خسارة",      weightPct: 0,   position: 8, exitCriterion: "اعتذر العميل (سجّل السبب)" },
+  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, dot: "#999999", stalls: false, terminal: null,   exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
+  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, dot: "#7C7C7C", stalls: false, terminal: null,   exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
+  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, dot: "#2F5F94", stalls: false, terminal: null,   exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
+  { key: "tech",      label: "التقييم التقني",      weightPct: 65,  position: 4, dot: "#7A5CC4", stalls: true,  terminal: null,   exitCriterion: "اجتاز التكامل مع صحة/صحتي ومتطلبات الأمن" },
+  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, dot: "#525252", stalls: false, terminal: null,   exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
+  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, dot: "#1F7A73", stalls: true,  terminal: null,   exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
+  { key: "won",       label: "إغلاق – ربح",        weightPct: 100, position: 7, dot: "#027A48", stalls: false, terminal: "won",  exitCriterion: "تم التوقيع والاعتماد" },
+  { key: "lost",      label: "إغلاق – خسارة",      weightPct: 0,   position: 8, dot: "#B42318", stalls: false, terminal: "lost", exitCriterion: "اعتذر العميل (سجّل السبب)" },
 ];
+
+/** The threshold at which interest stops being a conversation and becomes a commitment of the
+ *  client's own time and budget. «التقييم التقني» is the first rung a prospect reaches only by
+ *  putting their people on it, and it sits at 65. */
+export const CONFIRMED_INTEREST_MIN_WEIGHT = 65;
 
 /** The six live stage keys, mapped forward. Every one maps to ITSELF — `discover` and `quote` are
  *  genuinely new, so no existing row is reclassified and no rep's board changes under them.
@@ -58,7 +74,8 @@ export const LEGACY_STAGE_MAP: Readonly<Record<string, string>> = {
 /** The two rungs where deals actually stall, and why. The archive states it plainly: they stall
  *  because RESPONSIBILITY CROSSES A DEPARTMENT BOUNDARY and nobody can see whose desk the deal is
  *  on. `opps-domain.ts` independently hardcoded the same two months earlier. */
-export const STALL_STAGES: readonly string[] = ["tech", "negotiate"];
+export const STALL_STAGES: readonly string[] =
+  SALES_STAGES.filter((s) => s.stalls).map((s) => s.key);
 export const STALL_DAYS = 14;
 
 /** الإدارة المسؤولة — who owes the next move. The whole differentiator is that this is a first-class

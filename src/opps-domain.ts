@@ -22,21 +22,30 @@
 
 /** One rung of the deal ladder. Ordered; `position` is what makes "forward" and "backward" mean
  *  anything. Taken from the design prototype's own five stages plus the terminal loss. */
+import {
+  SALES_STAGES, STALL_STAGES, STALL_DAYS, CONFIRMED_INTEREST_MIN_WEIGHT,
+  type SalesStage,
+} from "./sales-domain.js";
+
+/** The key set, derived so the union cannot drift from the table. */
+export type SalesStageKey = SalesStage["key"];
+
 export type OppStage = {
-  readonly key: "contact" | "present" | "tech" | "negotiate" | "won" | "lost";
+  readonly key: SalesStageKey;
   readonly label: string;
   readonly dot: string;
   readonly position: number;
 };
 
-export const OPP_STAGES: readonly OppStage[] = [
-  { key: "contact", label: "تواصل أولي", dot: "#999999", position: 1 },
-  { key: "present", label: "عرض المنتج", dot: "#2F5F94", position: 2 },
-  { key: "tech", label: "التقييم الفني والمالي", dot: "#7A5CC4", position: 3 },
-  { key: "negotiate", label: "التفاوض والاعتماد", dot: "#1F7A73", position: 4 },
-  { key: "won", label: "إغلاق الصفقة", dot: "#027A48", position: 5 },
-  { key: "lost", label: "خسارة", dot: "#B42318", position: 6 },
-];
+/** DERIVED, not declared. This array used to be a second hand-maintained ladder, and the drift
+ *  between it and SALES_STAGES produced both stage defects found on 2026-09-04: two rungs
+ *  («اكتشاف الحاجة», «عرض السعر») that no UI could set because they existed in one list and not the
+ *  other, and a confirmed-interest pair that silently dropped a deal out of the Makeen feed.
+ *
+ *  There is now ONE ladder. Adding a rung is one edit in sales-domain.ts, and this array, the stall
+ *  set, the interest set, the Postgres CHECK and the browser bundle all follow. */
+export const OPP_STAGES: readonly OppStage[] =
+  SALES_STAGES.map((s) => ({ key: s.key, label: s.label, dot: s.dot, position: s.position }));
 
 /** Where a deal came from. The founder's own distinction, and the reason opportunities are a table
  *  rather than a view over conversations: only `whatsapp` is something this system can witness by
@@ -52,22 +61,30 @@ export const OPP_SOURCES: Readonly<Record<string, string>> = {
 
 /** The two rungs where deals actually go quiet, and how long is too long. Not a guess: these are
  *  the prototype's own `stallStages` / `stallDays`. */
-export const OPP_STALL_STAGES: readonly string[] = ["tech", "negotiate"];
-export const OPP_STALL_DAYS = 14;
+export const OPP_STALL_STAGES: readonly string[] = STALL_STAGES;
+export const OPP_STALL_DAYS = STALL_DAYS;
 
 /** The rungs that mean a real, CONFIRMED buyer — not merely someone who has heard the pitch.
  *  «التقييم الفني والمالي» is the first stage a prospect reaches only by putting their own people
  *  on it, and «التفاوض والاعتماد» is the one before signature. Below these two, interest is a
  *  conversation; at or above them it is a commitment of the client's time and budget.
  *
- *  Deliberately NOT a `position >= 3` range test. «إغلاق الصفقة» sits at position 5 and is a
- *  CUSTOMER, not a potential one, so a range would silently fold won deals into a number the
- *  product side reads as pipeline. Naming the two rungs makes that exclusion visible and makes a
- *  future stage insert a decision instead of an accident. */
-export const CONFIRMED_INTEREST_STAGES: readonly string[] = ["tech", "negotiate"];
+ *  DERIVED, and the exclusion above is the load-bearing half. The original comment warned against
+ *  a `position >= 3` range test because «إغلاق الصفقة» is a CUSTOMER, not a potential one, and a
+ *  range would fold won deals into a number the product side reads as pipeline. A first attempt at
+ *  this refactor replaced the pair with `weightPct >= 65` and walked straight back into that trap,
+ *  because won carries weightPct 100. The terminal exclusion is therefore explicit and is what the
+ *  test at tests/interest.test.ts asserts.
+ *
+ *  Derived rather than named so that a future rung between «التقييم التقني» and signature is
+ *  included by DEFINITION instead of by somebody remembering to add it here — which is exactly
+ *  what went wrong with «عرض السعر». */
+export const CONFIRMED_INTEREST_STAGES: readonly string[] = SALES_STAGES
+  .filter((s) => s.weightPct >= CONFIRMED_INTEREST_MIN_WEIGHT && s.terminal === null)
+  .map((s) => s.key);
 
 export function isConfirmedInterestStage(stage: string): boolean {
-  return stage === "tech" || stage === "negotiate";
+  return CONFIRMED_INTEREST_STAGES.includes(stage);
 }
 
 /** The shape the rules operate on — the stored columns they read, and nothing else. Deliberately
