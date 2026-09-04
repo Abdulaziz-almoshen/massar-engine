@@ -459,6 +459,7 @@ d("db integration", () => {
     }));
 
     it("returns all four quarters, in order, even with no data", async () => {
+      await pool.query("DELETE FROM targets WHERE year = 2031");
       const q = await db.quarterlyPerformance(2031, bounds(2031));
       expect(q.map((x) => x.quarter)).toEqual([1, 2, 3, 4]);
       expect(q.every((x) => x.achieved === 0)).toBe(true);
@@ -466,6 +467,14 @@ d("db integration", () => {
 
     it("puts a target and its win in the SAME quarter, and leaves the others alone", async () => {
       const year = 2032, t = Date.now(), product = "منتج-ربعي";
+      // Self-cleaning. quarterlyPerformance aggregates EVERY product in the year, so a fixture left
+      // behind by the previous run does not just collide on the target PK — it also inflates the
+      // figure this test asserts. A suite that only passes on a fresh database is a suite that goes
+      // red at random, which is the same defect as a flaky gate.
+      await pool.query("DELETE FROM targets WHERE year = $1", [year]);
+      await pool.query(
+        `DELETE FROM track_stage_events WHERE opp_id IN (SELECT id FROM opportunities WHERE product = $1)`, [product]);
+      await pool.query("DELETE FROM opportunities WHERE product = $1", [product]);
       await pool.query("INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,'t') ON CONFLICT DO NOTHING", [product, t]);
       await pool.query("INSERT INTO targets (product, year, quarter, amount, updated_at) VALUES ($1,$2,3,400000,$3)", [product, year, t]);
       const o = await pool.query(
