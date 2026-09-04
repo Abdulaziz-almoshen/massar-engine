@@ -303,6 +303,84 @@ export const SALES_DOMAIN_JS: string = [
   ...DOMAIN_FNS.map((fn) => fn.toString()),
 ].join("\n");
 
+// ---------------------------------------------------------------------------
+// GATE A. The threshold the pilot is judged on, defined precisely enough to be reproducible.
+//
+// The plan stated it as "fewer than three engagements on a median working day, or fewer than half
+// the calls they say they made appearing within 24 hours". Neither half was decidable as written:
+// «working day» was undefined, zero-activity days silently dropped out of a median computed over
+// only the days that had rows, and an unbounded occurred_at meant a quiet week could be backdated
+// into a compliant one. The last of those is fixed at the write (ENGAGEMENT_BACKDATE_LIMIT_MS);
+// these two functions fix the rest.
+// ---------------------------------------------------------------------------
+
+/** Riyadh's working week is Sunday to Thursday. Friday and Saturday are the weekend, so a rep who
+ *  records nothing on a Friday has not missed a day. UTC+3 with no DST, ever, so the offset is
+ *  exact arithmetic rather than a timezone library. */
+export function isRiyadhWorkingDay(atMs: number): boolean {
+  const d = new Date(atMs + 3 * 60 * 60 * 1000);
+  const dow = d.getUTCDay();            // 0 = Sunday … 6 = Saturday
+  return dow !== 5 && dow !== 6;        // not Friday, not Saturday
+}
+
+/** The Riyadh calendar day an instant falls on, as YYYY-MM-DD. The grouping key for everything
+ *  below, so a call at 01:00 Riyadh counts for that day and not the UTC one before it. */
+export function riyadhDayKey(atMs: number): string {
+  return new Date(atMs + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** ZERO-ACTIVITY DAYS COUNT. This is the whole point: a median taken over only the days a rep
+ *  recorded something answers "how busy were they when they were busy", which is never the
+ *  question. Every working day in the window is a sample, and a day with no engagements is a zero.
+ *
+ *  Returns null for a window containing no working days at all, because "the median of nothing" is
+ *  not zero, it is unmeasured. */
+export function medianPerWorkingDay(
+  countsByDay: Readonly<Record<string, number>>, startMs: number, endMs: number,
+): number | null {
+  const samples: number[] = [];
+  const DAY = 86_400_000;
+  // Walk from the first Riyadh midnight at or after the start, so partial days at either edge do
+  // not become misleading zeroes.
+  for (let t = startMs; t < endMs; t += DAY) {
+    if (!isRiyadhWorkingDay(t)) continue;
+    samples.push(countsByDay[riyadhDayKey(t)] ?? 0);
+  }
+  if (!samples.length) return null;
+  samples.sort((a, b) => a - b);
+  const mid = samples.length >> 1;
+  return samples.length % 2 ? samples[mid] : (samples[mid - 1] + samples[mid]) / 2;
+}
+
+/** The share of engagements recorded within a day of happening. The DENOMINATOR is every
+ *  engagement in the window, stated explicitly because "half the calls they say they made" left it
+ *  ambiguous: calls that were never logged at all cannot be in it, so this measures logging
+ *  LATENCY, not logging completeness. Completeness needs the rep's own end-of-day count, which is
+ *  a separate self-reported number and is not mixed into this one. */
+export function loggedWithinADay(
+  rows: readonly { occurredAt: number; recordedAt: number }[],
+): { total: number; within: number; pct: number | null } {
+  const DAY = 86_400_000;
+  const total = rows.length;
+  const within = rows.filter((r) => r.recordedAt - r.occurredAt <= DAY).length;
+  return { total, within, pct: total === 0 ? null : (within / total) * 100 };
+}
+
+/** Gate A's verdict, from the two numbers above. Explicit thresholds, so the pass/fail is a
+ *  computation rather than a judgement made three weeks later from memory. */
+export const GATE_A_MIN_MEDIAN = 3;
+export const GATE_A_MIN_LOGGED_PCT = 50;
+
+export function gateAVerdict(
+  median: number | null, loggedPct: number | null,
+): { verdict: "pass" | "fail" | "unmeasured"; reasons: string[] } {
+  if (median === null) return { verdict: "unmeasured", reasons: ["لا أيام عمل في المدة المختارة"] };
+  const reasons: string[] = [];
+  if (median < GATE_A_MIN_MEDIAN) reasons.push("الوسيط أقل من ٣ تفاعلات في يوم العمل");
+  if (loggedPct !== null && loggedPct < GATE_A_MIN_LOGGED_PCT) reasons.push("أقل من نصف التفاعلات سُجّلت خلال ٢٤ ساعة");
+  return { verdict: reasons.length ? "fail" : "pass", reasons };
+}
+
 /** WHAT AN OUTCOME IS ALLOWED TO DO. An outcome key on its own is not a command: «مهتم» means
  *  something only relative to the rung the deal is standing on, and nothing stopped
  *  `contact/interested` being submitted as a move to «إغلاق – خسارة».

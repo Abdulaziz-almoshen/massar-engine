@@ -1552,6 +1552,26 @@ export async function hotReadings(): Promise<{ phone: string; product: string; w
       WHERE t.level = 'hot'`)).rows;
 }
 
+/** The raw rows Gate A is computed from. Deliberately raw: the arithmetic lives in sales-domain
+ *  where it is pure and unit-tested, so the gate's verdict cannot be one thing in SQL and another
+ *  on screen. */
+export async function gateARows(startMs: number, endMs: number, rep?: string): Promise<{
+  rep: string; occurredAt: number; recordedAt: number;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const params: unknown[] = [startMs, endMs];
+  let where = "e.occurred_at >= to_timestamp($1 / 1000.0) AND e.occurred_at < to_timestamp($2 / 1000.0)";
+  if (rep) { params.push(rep); where += ` AND e.rep = $${params.length}`; }
+  const r = await pool.query(
+    `SELECT e.rep, e.occurred_at, e.recorded_at FROM engagements e WHERE ${where} ORDER BY e.occurred_at`,
+    params);
+  return r.rows.map((x: any) => ({
+    rep: String(x.rep),
+    occurredAt: new Date(x.occurred_at).getTime(),
+    recordedAt: Number(x.recorded_at),
+  }));
+}
+
 /** «أين تتعثّر الصفقات» — open work grouped by the department that owes it.
  *
  *  The founder's vision doc calls this "the screen Zoho's defaults do not give you and the reason

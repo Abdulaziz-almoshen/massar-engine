@@ -304,6 +304,50 @@ app.get("/integration/product-interest", async (req, reply) => {
   };
 });
 
+/** THE GATE'S OWN INSTRUMENT. Gate A decides whether phases 4-8 ship as designed, and until now
+ *  nothing in the system measured either of its two thresholds — the gate could not be evaluated by
+ *  the software it judges. Every number here is computed by sales-domain, so the screen and the
+ *  verdict cannot disagree. */
+app.get("/admin/gate-a", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const days = Math.min(90, Math.max(1, Number(q.days) || 21));
+  const endMs = Date.now();
+  const startMs = endMs - days * 86_400_000;
+  const rep = q.rep ? String(q.rep) : undefined;
+
+  const rows = await db.gateARows(startMs, endMs, rep);
+  const byRep = new Map<string, typeof rows>();
+  for (const r of rows) {
+    if (!byRep.has(r.rep)) byRep.set(r.rep, []);
+    byRep.get(r.rep)!.push(r);
+  }
+
+  const reps = [...byRep.entries()].map(([name, rs]) => {
+    const counts: Record<string, number> = {};
+    for (const r of rs) {
+      const k = sales.riyadhDayKey(r.occurredAt);
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const median = sales.medianPerWorkingDay(counts, startMs, endMs);
+    const logged = sales.loggedWithinADay(rs);
+    const v = sales.gateAVerdict(median, logged.pct);
+    return {
+      rep: name, engagements: rs.length, medianPerWorkingDay: median,
+      loggedWithinADay: logged, verdict: v.verdict, reasons: v.reasons,
+      byDay: counts,
+    };
+  }).sort((a, b) => b.engagements - a.engagements);
+
+  return {
+    ok: true, days, periodStart: startMs, periodEnd: endMs,
+    // Stated on the response so the reader never has to guess what the gate means.
+    thresholds: { minMedianPerWorkingDay: sales.GATE_A_MIN_MEDIAN, minLoggedWithinADayPct: sales.GATE_A_MIN_LOGGED_PCT },
+    workingWeek: "الأحد إلى الخميس بتوقيت الرياض، وأيام بلا نشاط تُحتسب أصفارًا",
+    reps,
+  };
+});
+
 app.get("/admin/actions/stalled", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const groups = await db.stalledByDept();
