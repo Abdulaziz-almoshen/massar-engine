@@ -107,25 +107,20 @@ function vReportsCrm() {
 
   /* An empty result and a broken query look identical to the reader, so the report says which. */
   if (cur.empty) {
-    h += '<div class="crm-empty"><b>' + esc(cur.empty.title) + '</b>' + esc(cur.empty.body) + '</div>';
+    h += shEmpty("clock", cur.empty.title, cur.empty.body);
     return h;
   }
 
   h += '<div class="rp-tot">' + fmtN(cur.count) + ' فرصة · ' + fmtN(Math.round(cur.totalValue)) + ' ر.س</div>';
-  h += '<div class="crm-scroll"><table class="crm-tbl"><thead><tr>' +
-    '<th>الجهة</th><th>المنتج</th><th>المرحلة</th><th>الإدارة</th><th>منذ</th><th class="crm-money">القيمة</th>' +
-    '</tr></thead><tbody>';
+  h += '<div class="sh-cards">';
   cur.rows.forEach(function (r) {
-    h += '<tr>' +
-      '<td>' + esc(r.account || "—") + '</td>' +
-      '<td>' + esc(r.product) + '</td>' +
-      '<td>' + esc(rpStage(r.stage)) + '</td>' +
-      '<td>' + esc(r.dept || "—") + '</td>' +
-      '<td>' + rpAge(r.daysWaiting) + '</td>' +
-      '<td class="crm-money">' + fmtN(Math.round(r.value)) + ' ر.س</td>' +
-    '</tr>';
+    h += '<div class="sh-card"><div><div class="nm">' + esc(r.account || "—") + '</div>' +
+      '<div class="sub">' + esc(r.product) + ' · ' + esc(rpStage(r.stage)) +
+        (r.dept ? ' · ' + esc(r.dept) : '') + '</div></div>' +
+      '<div class="end"><span class="money">' + fmtN(Math.round(r.value)) + ' ر.س</span>' +
+      rpAge(r.daysWaiting) + '</div></div>';
   });
-  h += '</tbody></table></div>';
+  h += '</div>';
 
   h += vReportRollups();
 
@@ -148,14 +143,14 @@ function vReportRollups() {
   var h = '<div class="rp-sec"><div class="rp-h">أين تتعثّر الصفقات</div>' +
     '<div class="rp-hs">الإجراءات المفتوحة حسب الإدارة المسؤولة، مرتّبة بالأقدم توقّفًا لا بالأكثر عددًا.</div>';
   if (!rpRoll.byDept.length) {
-    h += '<div class="crm-empty"><b>' + esc(rpRoll.empty.dept.title) + '</b>' + esc(rpRoll.empty.dept.body) + '</div>';
+    h += shEmpty("clock", rpRoll.empty.dept.title, rpRoll.empty.dept.body);
   } else {
-    h += '<div class="mo-stagger">';
+    h += '<div class="mo-stagger sh-cards">';
     rpRoll.byDept.forEach(function (d) {
-      h += '<div class="crm-row"><span class="crm-nm">' + esc(d.dept) + '</span>' +
-        '<span class="crm-sub">' + fmtN(d.openCount) + ' إجراء مفتوح</span>' +
-        '<span class="crm-end"><span class="rp-tot" style="margin:0">' + fmtN(Math.round(d.value)) + ' ر.س</span>' +
-        rpAge(d.oldestDays) + '</span></div>';
+      h += '<div class="sh-card"><div><div class="nm">' + esc(d.dept) + '</div>' +
+        '<div class="sub">' + fmtN(d.openCount) + ' إجراء مفتوح</div></div>' +
+        '<div class="end"><span class="money">' + fmtN(Math.round(d.value)) + ' ر.س</span>' +
+        rpAge(d.oldestDays) + '</div></div>';
     });
     h += '</div>';
   }
@@ -164,18 +159,21 @@ function vReportRollups() {
   h += '<div class="rp-sec"><div class="rp-h">الخسائر حسب السبب</div>' +
     '<div class="rp-hs">كل صفقة مغلقة خسارةً، حسب النتيجة التي أغلقتها. النتيجة تُقرأ من السجل ومن النشاط معًا: نتيجة تُسجَّل على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل السجل.</div>';
   if (!rpRoll.byReason.length) {
-    h += '<div class="crm-empty"><b>' + esc(rpRoll.empty.reason.title) + '</b>' + esc(rpRoll.empty.reason.body) + '</div>';
+    h += shEmpty("chart", rpRoll.empty.reason.title, rpRoll.empty.reason.body);
   } else {
     var top = rpRoll.byReason[0].value || 1;
+    /* One stacked bar over the reasons, then a card each — the same treatment the sector board
+       gets, because the question is identical in shape: which part is biggest. */
+    var COLR = ["#D9534F", "#B37F00", "#416CAD", "#8C959F", "#629CCD"];
+    h += shStack(rpRoll.byReason.map(function (r, i) {
+      return { n: r.label, v: r.value || 0, c: COLR[i % COLR.length] }; }));
+    h += '<div class="sh-cards" style="margin-block-start:var(--s3)">';
     rpRoll.byReason.forEach(function (r) {
-      var pct = Math.round((r.value / top) * 100);
-      h += '<div class="crm-row"><span class="crm-nm">' + esc(r.label) + '</span>' +
-        '<span class="crm-sub">' + fmtN(r.count) + ' صفقة</span>' +
-        '<span class="crm-end">' +
-          '<div class="crm-bar" style="max-width:120px"><i style="width:' + pct + '%"></i></div>' +
-          '<span class="rp-tot" style="margin:0">' + fmtN(Math.round(r.value)) + ' ر.س</span>' +
-        '</span></div>';
+      h += '<div class="sh-card"><div><div class="nm">' + esc(r.label) + '</div>' +
+        '<div class="sub">' + fmtN(r.count) + ' صفقة</div></div>' +
+        '<div class="end"><span class="money">' + fmtN(Math.round(r.value)) + ' ر.س</span></div></div>';
     });
+    h += '</div>';
   }
   h += '</div>';
   return h;
