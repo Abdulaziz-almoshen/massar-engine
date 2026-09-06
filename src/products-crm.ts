@@ -299,36 +299,92 @@ window.pcRetire = function (id, name) {
 function vExecBand() {
   pcLoad(false);
   if (!pcSectors || !pcQuarters) return "";
+
+  var secs = pcSectors.sectors || [];
+  var prods = pcQuarters.byProduct || [];
+  var anyTarget = secs.some(function (x) { return x.target > 0; }) ||
+                  prods.some(function (x) { return x.annualTarget > 0; });
+  var openTotal = secs.reduce(function (n, x) { return n + (x.weightedOpen || 0); }, 0);
+  var openCount = secs.reduce(function (n, x) { return n + (x.openCount || 0); }, 0);
+  var wonTotal = secs.reduce(function (n, x) { return n + (x.achieved || 0); }, 0);
+
+  /* NO TARGETS ANYWHERE. Rendering eight rows of «٠ ر.س من ٠ ر.س · بلا مستهدف» is honest and
+     useless — a wall of zeros reads as broken, and DESIGN.md 7.13 asks a page to have a point of
+     view. So the band leads with the figures that DO exist (open pipeline, won, deal counts), says
+     in one line that no target is set, and points at where to set one. The coverage layout returns
+     the moment a target exists. */
+  if (!anyTarget) {
+    var h0 = '<div class="pc-sec">' +
+      '<div class="crm-kpis crm-hasLead">' +
+        '<div class="crm-kpi crm-lead"><div class="crm-k">المتوقع من الفرص المفتوحة</div>' +
+          '<div class="crm-v">' + pcMoney(openTotal) + '</div>' +
+          '<div class="crm-s">' + fmtN(openCount) + ' فرصة · مرجّحة بوزن المرحلة</div></div>' +
+        '<div class="crm-kpi"><div class="crm-k">المحقق</div><div class="crm-v">' + pcMoney(wonTotal) + '</div>' +
+          '<div class="crm-s">في الفترة الحالية</div></div>' +
+        '<div class="crm-kpi"><div class="crm-k">القطاعات</div><div class="crm-v">' + fmtN(secs.filter(function (x) { return !x.isUnclassified; }).length) + '</div>' +
+          '<div class="crm-s">' + fmtN(prods.length) + ' منتجًا</div></div>' +
+        '<div class="crm-kpi"><div class="crm-k">المستهدفات</div><div class="crm-v" style="font-size:var(--t-lg)">لم تُحدَّد</div>' +
+          '<div class="crm-s">لا تغطية بلا مستهدف</div></div>' +
+      '</div>' +
+      '<div class="crm-empty"><b>لا مستهدف محدَّد لهذه السنة</b>' +
+        'التغطية نسبةٌ إلى رقم، وبلا مستهدف لا يوجد رقم تُنسب إليه — فالمعروض أعلاه هو ما في السجل فعلًا: ' +
+        'المفتوح والمحقق. حدِّد المستهدف الربعي من «المستهدفات والأداء» وتعود لوحة التغطية كما هي.' +
+        '<div style="margin-block-start:10px;"><a class="btn btn-teal crm-focusable" href="#perf" ' +
+        'style="text-decoration:none;display:inline-flex;align-items:center;">حدِّد المستهدفات</a></div></div></div>';
+
+    /* Even with no target, WHERE the open pipeline sits is a real answer. */
+    var withOpen = secs.filter(function (x) { return x.openCount > 0; });
+    if (withOpen.length) {
+      var topOpen = withOpen.reduce(function (m, x) { return Math.max(m, x.weightedOpen || 0); }, 0) || 1;
+      h0 += '<div class="pc-sec"><div class="pc-h">أين المفتوح الآن</div>' +
+        '<div class="pc-sub">المتوقع من الفرص المفتوحة لكل قطاع. اضغط قطاعًا للوحته.</div>';
+      withOpen.sort(function (a, b) { return (b.weightedOpen || 0) - (a.weightedOpen || 0); }).forEach(function (sc) {
+        h0 += '<div class="crm-row' + (sc.isUnclassified ? "" : " crm-click") + '"' +
+          (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
+          '<span class="crm-nm">' + esc(sc.sector) + '</span>' +
+          '<span class="crm-sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</span>' +
+          '<span class="crm-end"><span class="pc-price">' + pcMoney(sc.weightedOpen) + '</span>' +
+          '<div class="crm-bar" style="max-width:120px"><i style="width:' +
+            Math.round(((sc.weightedOpen || 0) / topOpen) * 100) + '%"></i></div></span></div>';
+      });
+      h0 += '</div>';
+    }
+    return h0;
+  }
+
+  /* ---- the coverage layout, for when targets exist ---- */
   var h = '<div class="pc-sec"><div class="pc-h">القطاعات</div>' +
     '<div class="pc-sub">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>';
-  pcSectors.sectors.forEach(function (sc) {
+  secs.forEach(function (sc) {
     var cov = sc.coveragePct;
     var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
     h += '<div class="crm-row' + (sc.isUnclassified ? "" : " crm-click") + '"' +
       (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
       '<span class="crm-nm">' + esc(sc.sector) + '</span>' +
       '<span class="crm-sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</span>' +
-      '<span class="crm-end"><span class="pc-price">' + pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) + '</span>' +
+      '<span class="crm-end"><span class="pc-price">' +
+        (sc.target > 0 ? pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) : pcMoney(sc.weightedOpen) + ' مفتوح') +
+      '</span>' +
       pcBar(cov === null ? 0 : cov) +
       '<span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></span></div>';
   });
   h += '</div>';
 
-  var bp = (pcQuarters.byProduct || []).slice().sort(function (a, b) {
-    var ac = a.coveragePct === null ? 999 : a.coveragePct, bc = b.coveragePct === null ? 999 : b.coveragePct;
-    return ac - bc;   /* worst attainment first: this band exists to show where to worry */
-  }).slice(0, 5);
-  if (bp.length) {
+  /* Only products that HAVE a target can be ranked by attainment. Listing five products all reading
+     «بلا مستهدف» is five rows saying one thing once. */
+  var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
+  var untargeted = prods.length - targeted.length;
+  if (targeted.length) {
     h += '<div class="pc-sec"><div class="pc-h">المنتجات حسب الإنجاز</div>' +
-      '<div class="pc-sub">الأقل إنجازًا أولًا. المنتج بلا مستهدف يُعرض أخيرًا، لأن غياب المستهدف ليس تعثّرًا.</div>';
-    bp.forEach(function (p) {
+      '<div class="pc-sub">الأقل إنجازًا أولًا' +
+      (untargeted ? ' · ' + fmtN(untargeted) + ' منتجًا بلا مستهدف لا تُرتَّب هنا' : '') + '.</div>';
+    targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
       var c = p.coveragePct;
-      var cls = c === null ? "crm-none" : (c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad"));
+      var cls = c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad");
       h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(p.product) + '">' +
         '<span class="crm-nm">' + esc(p.product) + '</span>' +
         '<span class="crm-end"><span class="pc-price">' + pcMoney(p.achieved) + ' من ' + pcMoney(p.annualTarget) + '</span>' +
-        pcBar(c === null ? 0 : c) +
-        '<span class="crm-st ' + cls + '"><i></i>' + (c === null ? "بلا مستهدف" : fmtN(c) + "٪") + '</span></span></div>';
+        pcBar(c) + '<span class="crm-st ' + cls + '"><i></i>' + fmtN(c) + '٪</span></span></div>';
     });
     h += '</div>';
   }
@@ -338,7 +394,7 @@ function vExecBand() {
     var isNow = q.quarter === pcQuarters.currentQuarter;
     h += '<div class="pc-qc' + (isNow ? " now" : "") + '"><div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
       '<div class="v">' + pcMoney(q.achieved) + '</div>' +
-      '<div class="t">من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") + '</div>' +
+      '<div class="t">' + (q.target > 0 ? 'من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : 'بلا مستهدف') + '</div>' +
       pcBar(q.coveragePct === null ? 0 : q.coveragePct, 999) + '</div>';
   });
   h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' + esc(pcQuarters.valueBasis.note) + '</div></div>';

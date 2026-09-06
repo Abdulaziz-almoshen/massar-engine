@@ -1481,9 +1481,12 @@ function vHome(d) {
     '<div class="hside">' + heroSide.map((r) =>
       '<div class="hs"><span class="k">' + r[0] + (r[2] ? "<em>" + r[2] + "</em>" : "") + "</span>" +
       '<span class="v">' + r[1] + "</span></div>").join("") + "</div></div>";
-  h += vActionQueue(cs, d.notifyNumber, nTest);
+  // «ما يستحق المتابعة الآن» removed from الرئيسية on the founder's instruction (2026-09-06).
+  // vActionQueue is left defined and #opps still carries «لوحة الفرز الكاملة», which was already
+  // the link this card pointed at — the ranking is not lost, only its second home on this page.
   h += vHomeCharts(cs);
-  h += vWinLoss();
+  // «كيف صُنّفت المحادثات؟» removed from الرئيسية on the founder's instruction (2026-09-06).
+  // vWinLoss is left defined; the win/loss judgement still reaches #reports and the intel route.
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
   h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:12px;font-weight:600;color:#306DB5;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
@@ -2911,11 +2914,8 @@ function vHomeCharts(cs) {
   // does not exist. Teal is the accent; the ramp behind it is neutral.
   h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#306DB5") : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
   h += "</div>";
-  const facets = [["المدينة", cityRows], ["الحجم", sizeRows], ["القطاع", secRows]].filter((f) => f[1].length);
-  h += chartCard("تركيبة قائمتك", fmtN(entities.length) + " جهة · من أعمدة ملفك", facets.length
-    ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:4px;">' +
-      facets.map((f) => '<div><div style="font-size:12px;font-weight:500;color:#536170;padding-bottom:2px;">' + f[0] + "</div>" + hbarRows(f[1], "#306DB5") + "</div>").join("") + "</div>"
-    : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
+  // «تركيبة قائمتك» removed on the founder's instruction (2026-09-06). The other three charts on
+  // this row stay. cityRows/sizeRows/secRows are still computed above and still feed #targets.
   return h;
 }
 // The founder's own wording, and his own note that it must read «محققة», not «محققة محاسبية».
