@@ -100,6 +100,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
 
   * { box-sizing: border-box; }
+  /* Form controls do NOT inherit type by default: a <button> with no font-size falls back to the
+     UA's 13.3333px, which is off the DESIGN.md ladder. A checker that scans font-size declarations
+     cannot see this, because the declaration is exactly what is missing — the runtime audit is what
+     found it. Element specificity is the lowest there is, so every .btn/.sub/.prod rule still wins. */
+  button, input, select, textarea { font-family: inherit; font-size: inherit; }
   html, body { margin: 0; padding: 0; height: 100%; }
   /* Cairo is the platform font (founder's call). It is a VARIABLE face on Google Fonts
      (wght 200..1000), so it holds 450 — the weight the Frappe translation is built on — natively;
@@ -433,7 +438,10 @@ export const DASHBOARD_HTML = `<!doctype html>
   .step .ht { font-size: 14px; font-weight: 600; color: #212529; }
   .step .hs { font-size: 12px; color: #536170; margin-top: 4px; }
   .prods { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 14px; }
-  .prod { text-align: right; font-family: inherit; background: #fff; border: 1.5px solid #E3E9F1; border-radius: 16px; padding: 18px; cursor: pointer; }
+  /* font-SIZE as well as family: a <button> with neither falls back to the UA default of
+     13.3333px, which is off the DESIGN.md ladder and cannot be seen by a checker that scans
+     font-size declarations — the declaration is the thing that is missing. */
+  .prod { text-align: right; font-family: inherit; font-size: 14px; background: #fff; border: 1.5px solid #E3E9F1; border-radius: 16px; padding: 18px; cursor: pointer; }
   .prod.on { background: #EAF1F8; border-color: #629CCD; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
   .prod .pn { font-size: 14px; font-weight: 600; color: #212529; margin-bottom: 12px; }
   .prod .sc { font-size: 22px; font-weight: 600; }
@@ -2212,7 +2220,7 @@ function vAimkt() {
     // the launch route reads. It used to draw three hardcoded titles that no template used.
     tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:600;color:#416CAD;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:12px;color:#B37F00;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
+    (selAsset ? "" : '<div style="font-size:12px;color:#7A5600;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
