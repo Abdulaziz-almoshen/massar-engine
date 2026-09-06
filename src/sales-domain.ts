@@ -520,6 +520,14 @@ export const PRODUCT_SECTOR: readonly (readonly [string, string, boolean, string
   ["الشهادات الصحية",          "قطاع الصيدليات",  false, "اشتراك سنوي يحدده المختص"],
   ["خدمات التطعيمات",          "قطاع الصيدليات",  true,  "اشتراك سنوي يحدده المختص"],
   ["فحص الموظفين",             "قطاع الأعمال",    true,  "اشتراك سنوي بتسعير لكل فحص، يحدده المختص وفق الحجم"],
+
+  // The two products that exist in PRODUCTION and not in agent.ts. They have no bestFor audience
+  // to reason from, so both are flagged: «سجل التطعيمات الوطني» is placed beside خدمات التطعيمات,
+  // and «صحة أعمال Plus» on the strength of أعمال in its own name. Neither has a published price,
+  // so the catalogue prints «لا سعر منشور» rather than inventing one. Correcting either is a single
+  // UPDATE — a deal never stores its sector.
+  ["سجل التطعيمات الوطني",     "قطاع الصيدليات",  true,  null],
+  ["صحة أعمال Plus",           "قطاع الأعمال",    true,  null],
 ];
 
 /** One sector's line on the sector board, plus the unclassified bucket. */

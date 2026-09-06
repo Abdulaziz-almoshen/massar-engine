@@ -74,16 +74,35 @@ describe("the seeded sector map", () => {
     }
   });
 
-  it("flags exactly the two products whose bestFor contradicts the placement", () => {
+  // A flag has TWO causes and the distinction matters when someone comes to confirm them:
+  // the first pair has a bestFor audience that CONTRADICTS the placement; the second pair has no
+  // bestFor at all, because those products exist in production and not in agent.ts.
+  it("flags the two products whose bestFor contradicts the placement", () => {
     const assumed = PRODUCT_SECTOR.filter(([, , a]) => a).map(([p]) => p);
-    expect(assumed).toEqual(["خدمات التطعيمات", "فحص الموظفين"]);
+    expect(assumed).toContain("خدمات التطعيمات");
+    expect(assumed).toContain("فحص الموظفين");
+  });
+
+  it("also flags the two production-only products, which have no bestFor to reason from", () => {
+    const assumed = PRODUCT_SECTOR.filter(([, , a]) => a).map(([p]) => p);
+    expect(assumed).toContain("سجل التطعيمات الوطني");
+    expect(assumed).toContain("صحة أعمال Plus");
+    expect(assumed).toHaveLength(4);
+  });
+
+  it("covers every product the PRODUCTION tag table carries, not just the agent catalogue", () => {
+    // Measured against production on 2026-09-06: 8 tags. agent.ts knows 6.
+    expect(PRODUCT_SECTOR).toHaveLength(8);
   });
 
   // «الإجازات المرضية» is the only product with published packages, so it is the only one whose
   // price is not a note. offListPct depends on this being true.
-  it("gives a pricing note to every product except the one with real packages", () => {
+  it("leaves a price unstated rather than inventing one", () => {
     const noNote = PRODUCT_SECTOR.filter(([, , , n]) => n === null).map(([p]) => p);
-    expect(noNote).toEqual(["الإجازات المرضية"]);
+    // «الإجازات المرضية» has real published packages, so a note would duplicate them. The two
+    // production-only products have no known pricing at all, and the catalogue prints
+    // «لا سعر منشور» rather than guessing.
+    expect(noNote).toEqual(["الإجازات المرضية", "سجل التطعيمات الوطني", "صحة أعمال Plus"]);
   });
 
   it("does not seed the analyst catch-all as a product", () => {
