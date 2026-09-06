@@ -46,20 +46,20 @@ export const OPPS_CRM_CSS = `
   @media (max-width: 860px) { .opgrid { grid-template-columns:1fr; } }
   .opcard { background:#fff; border:1px solid #E3E9F1; border-radius:14px; overflow:hidden;
     display:flex; flex-direction:column; }
-  .opcard:hover { border-color:#A9B4C0; }
+  .opcard:hover { border-color:#536170; }
   .opcard .oph { padding:15px 18px; }
   .opcard .opt { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
   .opcard .av { width:38px; height:38px; flex:none; border-radius:9px; background:#EDF1F7; color:#3A3A3A;
     display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:500; }
   .opcard .nm { font-size:14.5px; font-weight:500; color:#212529; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
-  .opcard .sub { font-size:11.5px; color:#A9B4C0; margin-top:3px; overflow:hidden;
+  .opcard .sub { font-size:11.5px; color:#536170; margin-top:3px; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .opcard .opm { display:flex; align-items:center; justify-content:space-between; gap:8px;
     margin-top:13px; flex-wrap:wrap; }
   .opcard .val { font-size:16px; font-weight:600; color:#306DB5; font-variant-numeric:tabular-nums;
     white-space:nowrap; }
-  .opcard .brk { font-size:11px; color:#A9B4C0; font-variant-numeric:tabular-nums; }
+  .opcard .brk { font-size:11px; color:#536170; font-variant-numeric:tabular-nums; }
   .opst { flex:none; font-size:11px; font-weight:500; padding:4px 11px; border-radius:999px; white-space:nowrap; }
   .opsrc { font-size:10.5px; font-weight:500; color:#3A3A3A; background:#EDF1F7; border-radius:999px;
     padding:3px 9px; white-space:nowrap; }
@@ -80,13 +80,13 @@ export const OPPS_CRM_CSS = `
     font-variant-numeric:tabular-nums; }
   /* the inline expander — the detail screen the prototype spends a page on, as six controls */
   .opedit { border-bottom:1px solid #EDF1F7; padding:4px 0 13px; }
-  .opedit .lb { font-size:11px; color:#A9B4C0; margin:9px 0 6px; }
+  .opedit .lb { font-size:11px; color:#536170; margin:9px 0 6px; }
   .opedit .rail { display:flex; flex-wrap:wrap; gap:6px; }
   .opedit .rung { font-family:inherit; font-size:11.5px; font-weight:500; border-radius:999px;
     padding:6px 11px; cursor:pointer; color:#3A3A3A; background:#fff; border:1px solid #E3E9F1;
     display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
   .opedit .rung .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .opedit .rung.on { color:#212529; background:#EDF1F7; border-color:#A9B4C0; }
+  .opedit .rung.on { color:#212529; background:#EDF1F7; border-color:#536170; }
   .opedit .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px; }
   .opedit .inp { padding:8px 11px; font-size:12px; border-radius:8px; width:100%; }
   .opedit .acts { display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap; }
@@ -123,7 +123,7 @@ export const OPPS_CRM_CSS = `
   .opstrip .opsc { font-family:inherit; flex:1; min-width:118px; text-align:start; cursor:pointer;
     background:#fff; border:1px solid #E3E9F1; border-radius:12px; padding:10px 13px;
     display:flex; flex-direction:column; gap:3px; }
-  .opstrip .opsc:hover { border-color:#A9B4C0; }
+  .opstrip .opsc:hover { border-color:#536170; }
   .opstrip .opsc.on { border-color:#629CCD; background:#EAF1F8; }
   .opstrip .opsc .t { font-size:11.5px; color:#536170; display:flex; align-items:center; gap:6px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -132,7 +132,7 @@ export const OPPS_CRM_CSS = `
   .opstrip .opsc .v { font-size:11.5px; color:#306DB5; font-variant-numeric:tabular-nums;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .opstrip .opsc .u { color:#7A5600; margin-inline-start:6px; }
-  .opstrip .opsc .u2 { color:#A9B4C0; margin-inline-start:6px; }
+  .opstrip .opsc .u2 { color:#536170; margin-inline-start:6px; }
 
   /* bulk-bar controls, on the dark bar the campaigns list already established */
   .bulkbar .opbulk { font-family:inherit; font-size:11.5px; height:30px; border-radius:999px;
@@ -162,14 +162,14 @@ export const OPPS_CRM_CSS = `
   .opsheet .sh .t { font-size:16px; font-weight:600; color:#212529; }
   .opsheet .hint { font-size:12px; color:#536170; line-height:1.9; margin-top:6px; }
   .opsheet .fld { margin-top:13px; }
-  .opsheet .fld > label { display:block; font-size:11.5px; color:#A9B4C0; margin-bottom:6px; }
+  .opsheet .fld > label { display:block; font-size:11.5px; color:#536170; margin-bottom:6px; }
   .opsheet .inp, .opsheet select.inp { width:100%; height:38px; padding:0 12px; font-size:13px; border-radius:9px; }
   .opsheet .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   @media (max-width: 560px) { .opsheet .two { grid-template-columns:1fr; } }
   .opsheet .lrow { border:1px solid #E3E9F1; border-radius:11px; padding:11px; margin-top:9px; background:#F4F6F9; }
   .opsheet .lrow .num { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   @media (max-width: 560px) { .opsheet .lrow .num { grid-template-columns:1fr 1fr; } }
-  .opsheet .lrow .num label { display:block; font-size:10.5px; color:#A9B4C0; margin-bottom:4px; }
+  .opsheet .lrow .num label { display:block; font-size:10.5px; color:#536170; margin-bottom:4px; }
   .opsheet .lfoot { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-top:9px; }
   .opsheet .lfoot .v { font-size:12.5px; font-weight:500; color:#306DB5; font-variant-numeric:tabular-nums; }
   .opsheet .tot { display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -475,7 +475,7 @@ function opCard(g) {
     '<span class="brk">قائمة ' + fmtN(open) + " · ربح " + fmtN(won) + " · خسارة " + fmtN(lost) + "</span></div>" +
     (g.lines.some(opPriced)
       ? '<span class="val">' + opMoney(opGroupValue(g)) + "</span>"
-      : '<span class="val" style="color:#A9B4C0;font-size:13px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
+      : '<span class="val" style="color:#536170;font-size:13px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
   h += "</div>";
   h += '<div class="oplines">' + g.lines.map(function (l) {
     var st = opStage(l.stage);
@@ -486,7 +486,7 @@ function opCard(g) {
       "</span>" +
       (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") +
       '<span class="sg">' + st.label + "</span>" +
-      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#A9B4C0;font-weight:450;"') + ">" +
+      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#536170;font-weight:450;"') + ">" +
       (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span></div>";
     return row + (opOpen === l.id ? opLineEditor(l) : "");
   }).join("") + "</div>";
@@ -513,7 +513,7 @@ function opLineEditor(l) {
     '<input class="inp" type="number" min="1" max="20" value="' + esc(l.years) + '" onchange="opSaveField(' + l.id + ',&quot;years&quot;,this.value)">' +
     '<input class="inp" type="number" min="1" value="' + esc(l.qty) + '" onchange="opSaveField(' + l.id + ',&quot;qty&quot;,this.value)">' +
     '<input class="inp" type="number" min="0" max="100" value="' + esc(l.discount) + '" onchange="opSaveField(' + l.id + ',&quot;discount&quot;,this.value)"></div>';
-  h += '<div class="acts"><span style="font-size:11.5px;color:#A9B4C0;">' +
+  h += '<div class="acts"><span style="font-size:11.5px;color:#536170;">' +
     "مصدرها " + esc(OPP_SRC[l.source] || OPP_SRC.other) +
     (l.source === "whatsapp" && l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
     (l.created_by ? " · سجّلها " + esc(l.created_by) : "") +
@@ -550,7 +550,7 @@ function opListView() {
     '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
     (allOn ? " checked" : "") + ' onclick="opTogglePage()"></span><span>الفرصة</span><span style="flex:1"></span><span>المرحلة</span></div>';
   if (!page.length) {
-    h += '<div style="padding:26px 20px;text-align:center;font-size:12.5px;color:#A9B4C0;">' +
+    h += '<div style="padding:26px 20px;text-align:center;font-size:12.5px;color:#536170;">' +
       (oppRows.length ? "لا بند يطابق ما اخترته." : "لا فرص مسجّلة بعد.") + "</div>";
   }
   page.forEach(function (l) {
@@ -564,11 +564,11 @@ function opListView() {
         (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
       '<div class="o-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span>" +
         (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") + "</div>" +
-      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#A9B4C0;font-weight:450;"') + ">" +
+      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#536170;font-weight:450;"') + ">" +
         (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>" +
       '<div class="o-sr"><span class="opsrc">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span></div>" +
       '<div class="o-nx">' + (l.owner ? '<b style="font-weight:500;color:#3A3A3A;">' + esc(clip(l.owner, 18)) + "</b> · " : "") +
-        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#A9B4C0;">لم تُحدَّد خطوة</span>') + "</div>" +
+        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#536170;">لم تُحدَّد خطوة</span>') + "</div>" +
       "</div>";
     if (opOpen === l.id) h += '<div class="opexp">' + opLineEditor(l) + "</div>";
   });
@@ -666,7 +666,7 @@ function vOppsCrm() {
     return '<button class="' + (opMode === v[0] ? "on" : "") + '" onclick="opSetMode(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
   }).join("") + "</span>";
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:170px;max-width:260px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + "</span>" +
     '<input id="opq" class="inp" value="' + esc(opQ) + '" oninput="opSearch(this)" placeholder="جهة، خدمة، مسؤول…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<select class="crmsel' + (opSrc !== "all" ? " on" : "") + '" onchange="opSetSrc(this.value)"' +
@@ -704,8 +704,8 @@ function vOppsCrm() {
     h += '<details class="optriage rise"' + (oppRows.length ? "" : " open") + ">" +
       "<summary>" + ic("reply", 16) + '<b style="font-weight:500;color:#212529;">' + opNEnt(un.length) +
       " أبدت اهتمامًا في واتساب ولا فرصة مسجّلة لها</b>" +
-      '<span style="color:#A9B4C0;font-size:11.5px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
-      '<span style="flex:1"></span><span style="color:#A9B4C0;font-size:12px;">اضغط للعرض</span></summary>' +
+      '<span style="color:#536170;font-size:11.5px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
+      '<span style="flex:1"></span><span style="color:#536170;font-size:12px;">اضغط للعرض</span></summary>' +
       shown.map(function (c) {
         var pr = opReadProduct(c);
         return '<div class="trow3"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
@@ -713,7 +713,7 @@ function vOppsCrm() {
           '<button class="btn btn-ghost" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;)">سجّل فرصة</button></div>';
       }).join("") +
       (un.length > shown.length
-        ? '<div class="trow3"><span class="nm" style="color:#A9B4C0;">' +
+        ? '<div class="trow3"><span class="nm" style="color:#536170;">' +
           "وبقيّتها في «فرز الردود» — " + opNEnt(un.length - shown.length) + " أخرى</span></div>"
         : "") +
       "</details>";
@@ -731,7 +731,7 @@ function vOppsCrm() {
   if (opMode === "cards") {
     var groups = opMatches();
     if (!groups.length) {
-      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12.5px;color:#A9B4C0;">' +
+      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12.5px;color:#536170;">' +
         "لا فرصة تطابق ما اخترته.</div>";
     }
     var page = pageSlice("opps", groups);
@@ -776,7 +776,7 @@ function opSheetHtml() {
     return '<option value="' + esc(e.name) + '"></option>';
   }).join("") + "</datalist>";
   if (entities.length > accts.length) {
-    h += '<div style="font-size:11px;color:#A9B4C0;margin-top:5px;">الاقتراحات تعرض أول ' +
+    h += '<div style="font-size:11px;color:#536170;margin-top:5px;">الاقتراحات تعرض أول ' +
       fmtN(accts.length) + " جهة من " + fmtN(entities.length) + " — اكتب اسم أي جهة أخرى كاملًا.</div>";
   }
   h += '<div class="fld two"><div><label>مصدر الفرصة</label><select class="inp" onchange="opDraft(&quot;source&quot;,this.value)">' +

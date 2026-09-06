@@ -64,7 +64,7 @@ export const CAMPAIGNS_CRM_CSS = `
   .bulkbar button { font-family:inherit; font-size:11.5px; font-weight:700; border-radius:999px;
     padding:7px 13px; cursor:pointer; border:1px solid rgba(255,255,255,.22); background:transparent;
     color:#fff; white-space:nowrap; }
-  .bulkbar button.pri { background:#629CCD; border-color:#629CCD; color:#06312e; }
+  .bulkbar button.pri { background:#629CCD; border-color:#629CCD; color:#212529; }
   .bulkbar button.x { border:none; background:transparent; font-size:16px; padding:4px 8px; }
 
   /* ===== kanban / group ===== */
@@ -75,7 +75,7 @@ export const CAMPAIGNS_CRM_CSS = `
   .kcolh .lb { font-size:12.5px; font-weight:700; color:#212529; }
   .kcard { background:#fff; border:1px solid #E3E9F1; border-radius:10px; padding:12px;
     margin-bottom:9px; cursor:pointer; display:block; text-decoration:none; }
-  .kcard:hover { border-color:#A9B4C0; }
+  .kcard:hover { border-color:#536170; }
   .kcard:focus-visible { outline:2px solid #306DB5; outline-offset:-2px; }
   .kcard .ktitle { display:flex; align-items:center; gap:8px; min-width:0; }
   .kcard .kline { font-size:13px; font-weight:450; color:#3A3A3A; margin-top:6px;
@@ -84,12 +84,12 @@ export const CAMPAIGNS_CRM_CSS = `
     border-top:1px solid #E3E9F1; margin-block-start:10px; padding-block-start:8px; }
   .kcard .kfoot .kl { font-size:12px; color:#536170; }
   .kcard .kfoot .kv { font-size:13px; font-weight:500; color:#212529; font-variant-numeric:tabular-nums; }
-  .kcard .kfoot .ksep { color:#A9B4C0; font-size:12px; }
+  .kcard .kfoot .ksep { color:#536170; font-size:12px; }
   .kcard:hover { border-color:#629CCD; }
   .kcard .nm { font-size:14px; font-weight:500; color:#212529; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .kdrop { border:1.5px dashed #CBD7E4; border-radius:11px; padding:18px 12px; text-align:center;
-    color:#A9B4C0; font-size:11.5px; }
+    color:#536170; font-size:11.5px; }
 
   /* ===== detail: spec strip + tabs ===== */
   .spec { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; background:#F4F6F9;
@@ -103,9 +103,9 @@ export const CAMPAIGNS_CRM_CSS = `
     line-height:24px; white-space:pre-wrap; word-break:break-word; }
   .spec .clamp { max-height:48px; overflow:hidden; }
   .spec .facts { flex:none; display:flex; flex-direction:column; gap:10px; min-width:150px; }
-  .spec .facts .k { font-size:10.5px; color:#A9B4C0; font-weight:700; }
+  .spec .facts .k { font-size:10.5px; color:#536170; font-weight:700; }
   .spec .facts .v { font-size:12.5px; color:#212529; font-weight:700; margin-top:2px; }
-  .spec .ro { flex-basis:100%; font-size:11px; color:#A9B4C0; }
+  .spec .ro { flex-basis:100%; font-size:11px; color:#536170; }
   /* EXACT-1: tab list min-height 45px, gap-7.5 = 30px, px-5 */
   .ctabs { display:flex; gap:30px; min-height:45px; align-items:center; padding-inline:20px;
     border-bottom:1px solid #E3E9F1; margin-bottom:16px; flex-wrap:wrap; }
@@ -218,7 +218,7 @@ export const CAMPAIGNS_CRM_CSS = `
     .crow .c-meta .c-state { flex:none; }
     .crow .c-fig   { display:flex; grid-row: 3; grid-column: 2 / 4; flex-wrap:wrap; }
     .crow .c-num   { text-align:start; }
-    .crow .c-num .lbl-ph { display:inline; color:#A9B4C0; font-weight:600; }
+    .crow .c-num .lbl-ph { display:inline; color:#536170; font-weight:600; }
     /* التقدّم is the one column that cannot survive as text here: it becomes a hairline meter on
        the row's block-end edge, so stacked rows read as a scannable column of bars. */
     .crow .c-prog  { display:none; }
@@ -354,7 +354,7 @@ function crmControlBar(nShown, nTotal) {
     ["test", "تجريبية", campaigns.filter(function (c) { return campIsTest(c); }).length]];
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<span class="vtog">' +
     [["list", "قائمة"], ["group", "تجميع"], ["kanban", "كانبان"]].map(function (v) {
@@ -384,7 +384,7 @@ function crmControlBar(nShown, nTotal) {
      again under the board. */
   if (crmView !== "list") {
     var kd = crmKeyDef(crmActiveKey());
-    h += '<div style="flex-basis:100%;font-size:10.5px;color:#A9B4C0;padding-top:2px;">' +
+    h += '<div style="flex-basis:100%;font-size:10.5px;color:#536170;padding-top:2px;">' +
       esc(kd[1]) + " — " + esc(kd[3]) +
       (crmView === "kanban" && crmActiveKey() !== "class" ? " · هذه اللوحة للعرض فقط." : "") + '</div>';
   }
@@ -436,9 +436,9 @@ function crmRow(c, st) {
     '</div>' +
     '<div class="c-prog">' +
       (prog === null
-        ? '<span style="font-size:12px;color:#A9B4C0;">لا جهات استهداف</span>'
+        ? '<span style="font-size:12px;color:#536170;">لا جهات استهداف</span>'
         : !crmWasSent(st)
-        ? '<span style="font-size:12px;color:#A9B4C0;">لم تُرسل بعد</span>'
+        ? '<span style="font-size:12px;color:#536170;">لم تُرسل بعد</span>'
         : '<div class="prog" style="flex:1;height:6px;background:#E3E9F1;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#306DB5;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#536170;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + '٪</span>') +
     '</div>' +
     '<div class="c-act" style="text-align:center;"><button class="kebab" title="' + actTitle + '" aria-label="' + actTitle + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + ic("target", 17, isTest ? "#CBD7E4" : "#306DB5") + '</button></div>' +
@@ -489,8 +489,8 @@ function crmListView(withStAll) {
 }
 
 function crmEmptyList() {
-  if (campQ.trim()) return '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#A9B4C0;">امسح البحث أو جرّب تبويبًا آخر.</span></div>';
-  return '<div style="padding:44px;text-align:center;color:#A9B4C0;font-size:13px;">لا حملات في هذا التبويب</div>';
+  if (campQ.trim()) return '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#536170;">امسح البحث أو جرّب تبويبًا آخر.</span></div>';
+  return '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;">لا حملات في هذا التبويب</div>';
 }
 
 /* --------------------------------- grouping --------------------------------- */
@@ -544,7 +544,7 @@ function crmGroupView(withStAll) {
       '<div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
       crmHeaderRow(false);
     rows.forEach(function (x) { h += crmRow(x.c, x.st); });
-    if (!rows.length) h += '<div style="padding:26px;text-align:center;color:#A9B4C0;font-size:12px;">لا حملات في هذه المجموعة</div>';
+    if (!rows.length) h += '<div style="padding:26px;text-align:center;color:#536170;font-size:12px;">لا حملات في هذه المجموعة</div>';
     h += '</div></div>';
     if (over > 0) h += '<div class="tfoot"><span style="color:#7A5600;font-weight:700;">تُعرض ' + fmtN(rows.length) + " من " + fmtN(g.by[k].length) + " في هذه المجموعة.</span></div>";
     h += '</div>';
@@ -646,7 +646,7 @@ function crmSpecStrip(camp, st) {
   var body = msg
     ? '<div class="bub2' + (crmMsgOpen ? "" : " clamp") + '" id="crmmsg">' + esc(msg) + '</div>' +
       '<div id="crmmsgmore" style="margin-top:7px;' + (crmMsgOpen ? "" : "display:none;") + '"><span class="lnk" onclick="crmToggleMsg()" style="color:#306DB5;font-weight:700;font-size:11.5px;cursor:pointer;">' + (crmMsgOpen ? "طيّ النص" : "عرض النص كاملًا") + '</span></div>'
-    : '<div style="font-size:12px;color:#A9B4C0;padding:8px 2px;">لم يُحفظ نص هذه الحملة.</div>';
+    : '<div style="font-size:12px;color:#536170;padding:8px 2px;">لم يُحفظ نص هذه الحملة.</div>';
   return '<div class="spec rise">' +
     '<div class="wa">' + body + '</div>' +
     '<div class="facts">' +
@@ -757,7 +757,7 @@ function vKmonDetailCrm(id, d) {
         '<div class="p">' + caption + '</div>' +
         '<div class="mb"><i style="width:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%;background:' + c[2] + ';"></i></div></div>';
     }).join("") + '</div>' +
-    '<div style="font-size:11.5px;color:#A9B4C0;margin-top:10px;">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</div>';
+    '<div style="font-size:11.5px;color:#536170;margin-top:10px;">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</div>';
     return h;
   }
 
@@ -794,7 +794,7 @@ function vKmonDetailCrm(id, d) {
 
   h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #E3E9F1;background:#fff;">' +
     '<span style="font-size:13px;font-weight:700;color:#212529;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#A9B4C0;flex:none;">' + fmtN(shown.length) + ' من ' + fmtN(rows.length) + '</span>' +
+    '<span style="font-size:11px;color:#536170;flex:none;">' + fmtN(shown.length) + ' من ' + fmtN(rows.length) + '</span>' +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="font-size:12.5px;border-radius:6px;color:#306DB5;background:#fff;border:1px solid #306DB5;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ')</button>' : "") +
     filters.map(function (f) {
@@ -803,7 +803,7 @@ function vKmonDetailCrm(id, d) {
     '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #E3E9F1;border-radius:999px;padding:7px 13px;background:#F4F6F9;width:130px;">' +
     '</div>';
   h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
-    (shown.length ? crmTargetRows(shown, cwin) : '<div style="padding:30px;text-align:center;color:#A9B4C0;font-size:12.5px;">لا نتائج</div>') +
+    (shown.length ? crmTargetRows(shown, cwin) : '<div style="padding:30px;text-align:center;color:#536170;font-size:12.5px;">لا نتائج</div>') +
     '</div></div></div>';
   h += crmDetailBulkBar(camp);
   return h;
@@ -836,7 +836,7 @@ function crmTargetRows(shown, cwin) {
     /* cap the interest chips: three stacked chips is what made these rows 90px */
     var tags = (c.tags || []).slice();
     var chips = interestChips({ tags: tags.slice(0, 2), phone: c.phone });
-    var extra = tags.length > 2 ? '<span style="font-size:12px;color:#A9B4C0;">+' + fmtN(tags.length - 2) + '</span>' : "";
+    var extra = tags.length > 2 ? '<span style="font-size:12px;color:#536170;">+' + fmtN(tags.length - 2) + '</span>' : "";
     out += '<div class="trow km krow crow tgtrow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
       '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(nm) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggleD(&quot;' + esc(c.phone) + '&quot;)"></div>' +
       '<div class="c-name" style="display:flex;align-items:center;gap:10px;min-width:0;">' +

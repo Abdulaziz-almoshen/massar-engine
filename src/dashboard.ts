@@ -57,8 +57,23 @@ export const DASHBOARD_HTML = `<!doctype html>
     --s-issued:#1E9E63; --s-issued-soft:#E4F5EC; --s-issued-text:#12633F;
     --s-attn:#D99A00;   --s-attn-soft:#FFF5D6;   --s-attn-text:#7A5600; --s-attn-deep:#B37F00;
     --s-fail:#D9534F;   --s-fail-soft:#FBE7E6;   --s-fail-text:#8E2A27;
-    --s-sched:#629CCD;  --s-review:#416CAD;
-    --s-off:#A9B4C0;    --s-off-soft:#EEF1F4;    --s-attend:#306DB5;
+    --s-sched:#629CCD;  --s-sched-soft:#E8F0F8;  --s-sched-text:#2A5988;
+    --s-review:#416CAD; --s-review-soft:#E9EEF7; --s-review-text:#2C4A78;
+    --s-attend:#306DB5; --s-attend-soft:#EAF1F8; --s-attend-text:#255490;
+    --s-off:#A9B4C0;    --s-off-soft:#EEF1F4;    --s-off-text:#4A5560;
+    /* MARK tier. A status DOT must clear 3:1 as a non-text mark; the base fills do not:
+       --s-attn 2.45, --s-sched 2.93, --s-off 2.10 on --paper. No founder-approved value was
+       changed to fix this — the fills stay, and dots use these. */
+    --s-attn-mark:#B37F00;  --s-sched-mark:#4A7FB0;  --s-off-mark:#8C959F;
+
+    --z-base:0; --z-sticky:100; --z-dropdown:200; --z-overlay:300;
+    --z-modal:310; --z-toast:400; --z-tooltip:500;
+    --bp-sm:560px; --bp-md:900px; --bp-lg:1280px; --content-max:1180px;
+    --i-sm:16px; --i-md:20px; --i-lg:24px;
+    --skeleton:#EDF1F7; --skeleton-hi:#F4F6F9;
+    --r-none:0;
+    --lh-tight:1.3; --lh-body:1.45; --lh-loose:1.7;
+    --w-body:450; --w-med:500; --w-semi:600;
 
     --t-xs:12px; --t-sm:14px; --t-md:16px; --t-lg:18px;
     --t-xl:22px; --t-2xl:28px; --t-3xl:40px; --t-num:44px;
@@ -74,6 +89,7 @@ export const DASHBOARD_HTML = `<!doctype html>
        --fast is a state the user is holding, --base is the default open/close/swap, --slow is a
        large surface or a distance the eye has to follow. Exit is faster than entry. */
     --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
+    --flash:900ms; --spinner-delay:300ms; --stagger:24ms;
   }
 
   /* interior.dev, failure 3: "Motion is the only channel." With reduced motion on, the
@@ -103,7 +119,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     height:52px; padding:10px 12px; background:transparent; border:none;
     border-bottom:1px solid #E3E9F1; cursor:pointer; text-align:start; }
   .switcher:hover { background:#EDF1F7; }
-  .switcher .chev { color:#A9B4C0; font-size:12px; flex:none; }
+  .switcher .chev { color:#536170; font-size:12px; flex:none; }
   .switcher .logo { width:28px; height:28px; flex:none; border-radius:6px;
     background:linear-gradient(135deg,#629CCD,#306DB5); display:flex; align-items:center;
     justify-content:center; font-weight:700; font-size:15px; color:#fff; }
@@ -112,7 +128,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .switcher .t2 { font-size:11px; font-weight:450; color:#536170; margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   nav { flex:1; min-height:0; overflow-y:auto; padding:8px; }
-  .grp { font-size:11px; font-weight:500; color:#A9B4C0; padding:6px 10px; margin-block-start:12px; }
+  .grp { font-size:11px; font-weight:500; color:#536170; padding:6px 10px; margin-block-start:12px; }
   .grp:first-child { margin-block-start:4px; }
   .nv { display:flex; align-items:center; gap:10px; width:100%; font-family:inherit; height:32px;
     font-size:13px; font-weight:450; color:#3A3A3A; background:transparent; border:none;
@@ -139,10 +155,14 @@ export const DASHBOARD_HTML = `<!doctype html>
     background:transparent; border:none; border-radius:6px; cursor:pointer; text-align:start;
     flex:none; }
   .collapse:hover { background:#EDF1F7; }
-  .collapse .cicon { color:#A9B4C0; font-size:14px; }
+  .collapse .cicon { color:#536170; font-size:14px; }
   .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #CBD7E4; display: flex; align-items: center; justify-content: center; color: #3A3A3A; font-weight: 700; font-size: 14px; }
   .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
-  .userbox .r { font-size: 11px; color: #8ea3c0; }
+  /* DEAD CSS: .userbox is not in the DOM — it is a leftover of the retired navy sidebar, and
+     .userbox .n still sets color:#fff, which would be invisible on today's light rail. Tokenised
+     rather than deleted because ADR-0001 limits this file to anchored single-property edits.
+     Removal is tracked in TODOS.md. */
+  .userbox .r { font-size: 11px; color: #536170; }
 
   /* ===== main ===== */
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -150,7 +170,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   header.crumb { height:42px; flex:none; display:flex; align-items:center; gap:8px;
     padding-inline:20px; background:#fff; border-bottom:1px solid #E3E9F1; }
   header.crumb .t { font-size:14px; font-weight:500; color:#212529; }
-  header.crumb .sep { font-size:13px; color:#A9B4C0; }
+  header.crumb .sep { font-size:13px; color:#536170; }
   header.crumb .s { font-size:13px; font-weight:450; color:#3A3A3A; }
   /* The tab strip under the crumb. DESIGN.md: teal is the only accent, radii are 6/10/999/0, and a
      selected state is NOT a filled chip — so the active tab is ink-weight text over a 2px teal
@@ -175,8 +195,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* First paint must not slide in from the origin: there was no previous tab to come from. */
   .subnav .ind.noanim { transition:none; }
   /* «قريبًا» screens stay visible and reachable, and say so by weight rather than by hiding. */
-  .subnav .sub.soon { color:#A9B4C0; }
-  .subnav .sub.soon:hover { color:#A9B4C0; }
+  .subnav .sub.soon { color:#536170; }
+  .subnav .sub.soon:hover { color:#536170; }
   .subnav .sub .sbdg { font-size:11px; font-weight:600; color:#7A5600; font-variant-numeric:tabular-nums; }
   .subnav .sub:focus { outline:none; }
   .subnav .sub:focus-visible { outline:2px solid #306DB5; outline-offset:-2px; }
@@ -197,7 +217,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kpi .k { font-size: 12px; color: #536170; font-weight: 450; }
   .kpi .v { font-size: 25px; font-weight: 600; color: #212529; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
   .kpi .dl { font-size: 11.5px; font-weight: 450; color: #536170; }
-  .kpi .v small { font-size: 12px; font-weight: 450; color: #A9B4C0; }
+  .kpi .v small { font-size: 12px; font-weight: 450; color: #536170; }
 
   /* ===== the hero band =====
      Five identical white boxes is a spreadsheet, not a command centre: every figure carries the
@@ -216,13 +236,13 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hd.flat { color: #536170; background: #EDF1F7; }
   .hero .hnote { font-size: 12.5px; color: #536170; margin-top: 8px; line-height: 1.7; }
   .hero .hspark { margin-top: auto; padding-top: 14px; }
-  .hero .haxis { display: flex; justify-content: space-between; font-size: 11px; color: #A9B4C0; margin-top: 4px; }
+  .hero .haxis { display: flex; justify-content: space-between; font-size: 11px; color: #536170; margin-top: 4px; }
   .hero .hside { border-inline-start: 1px solid #E3E9F1; background: #FCFCFC; display: flex; flex-direction: column; }
   .hero .hs { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 20px; border-top: 1px solid #E3E9F1; }
   .hero .hs:first-child { border-top: 0; }
   .hero .hs .k { font-size: 12.5px; color: #536170; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .hero .hs .k em { font-style: normal; font-size: 11.5px; color: #A9B4C0; }
+  .hero .hs .k em { font-style: normal; font-size: 11.5px; color: #536170; }
   .hero .hs .v { font-size: 19px; font-weight: 600; color: #212529; font-variant-numeric: tabular-nums; }
 
   @media (max-width: 900px) {
@@ -239,7 +259,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .affin { background: #F4F6F9; border: 1px solid #E3E9F1; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
   .affin .ah { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
   .affin .ah .t { font-size: 13px; font-weight: 500; color: #212529; }
-  .affin .ah .s { font-size: 12px; color: #A9B4C0; }
+  .affin .ah .s { font-size: 12px; color: #536170; }
   .affin .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 11px; }
   .affin .fld { display: flex; align-items: center; gap: 7px; }
   .affin .fld > span { font-size: 12.5px; color: #536170; white-space: nowrap; }
@@ -249,7 +269,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .excl { font-family: inherit; font-size: 12.5px; font-weight: 500; border-radius: 999px; padding: 7px 14px;
     cursor: pointer; border: 1px solid #CBD7E4; background: #fff; color: #3A3A3A; white-space: nowrap;
     transition: background .14s ease, border-color .14s ease, color .14s ease; }
-  .excl:hover { background: #EDF1F7; border-color: #A9B4C0; }
+  .excl:hover { background: #EDF1F7; border-color: #536170; }
   .excl.on { background: #306DB5; border-color: #306DB5; color: #fff; }
   .affin .why { font-size: 12px; color: #7A5600; margin-top: 10px; line-height: 1.7; }
   .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
@@ -362,14 +382,14 @@ export const DASHBOARD_HTML = `<!doctype html>
   .pgnav button, .pgsize { font-family: inherit; font-size: 12px; color: #3A3A3A; background: #fff;
     border: 1px solid #CBD7E4; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
     transition: background .14s ease, border-color .14s ease; }
-  .pgnav button:hover:not(:disabled), .pgsize:hover { background: #EDF1F7; border-color: #A9B4C0; }
-  .pgnav button:disabled { color: #A9B4C0; cursor: default; background: #F4F6F9; }
+  .pgnav button:hover:not(:disabled), .pgsize:hover { background: #EDF1F7; border-color: #536170; }
+  .pgnav button:disabled { color: #536170; cursor: default; background: #F4F6F9; }
   .pgnav .at { font-variant-numeric: tabular-nums; color: #212529; padding: 0 4px; white-space: nowrap; }
   .pgrange { font-variant-numeric: tabular-nums; color: #3A3A3A; }
   .pgrange b { color: #212529; font-weight: 500; }
   .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #E3E9F1; background: #fff; color: #3A3A3A; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .pgbtn.on { background: #212529; color: #fff; border-color: #212529; }
-  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #A9B4C0; font-size: 17px; cursor: pointer; line-height: 1; }
+  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #536170; font-size: 17px; cursor: pointer; line-height: 1; }
   .kebab:hover { background: #EDF1F7; color: #3A3A3A; }
   .swt { width: 38px; height: 22px; border-radius: 999px; background: #E3E9F1; position: relative; flex: none; transition: background .18s ease; }
   .swt.on { background: #306DB5; }
@@ -383,9 +403,9 @@ export const DASHBOARD_HTML = `<!doctype html>
   .cust { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EDF1F7; display: flex; align-items: center; justify-content: center; color: #3A3A3A; font-weight: 700; font-size: 15px; }
   .cust .nm { font-size: 13.5px; font-weight: 700; color: #212529; }
-  .cust .ph { font-size: 11px; color: #A9B4C0; direction: ltr; text-align: right; }
+  .cust .ph { font-size: 11px; color: #536170; direction: ltr; text-align: right; }
   .lastm { font-size: 12px; color: #536170; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tm { font-size: 11px; color: #A9B4C0; font-variant-numeric: tabular-nums; }
+  .tm { font-size: 11px; color: #536170; font-variant-numeric: tabular-nums; }
   .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 18px; }
   .statc { background:#fff; border:1px solid #E3E9F1; border-radius:10px; padding:14px 16px; }
   .statc .l { font-size: 11.5px; color: #536170; margin-bottom: 8px; font-weight: 600; }
@@ -418,7 +438,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .prod.on { background: #EAF1F8; border-color: #629CCD; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
   .prod .pn { font-size: 13.5px; font-weight: 700; color: #212529; margin-bottom: 12px; }
   .prod .sc { font-size: 21px; font-weight: 700; }
-  .prod .scl { font-size: 10.5px; color: #A9B4C0; }
+  .prod .scl { font-size: 10.5px; color: #536170; }
   .prod .bar { height: 6px; background: #EDF1F7; border-radius: 999px; overflow: hidden; margin: 10px 0; }
   .prod .bar i { display: block; height: 100%; border-radius: 999px; }
   .wa-prev { background: #E5DDD4; border-radius: 16px; padding: 18px; max-width: 480px; }
@@ -427,10 +447,16 @@ export const DASHBOARD_HTML = `<!doctype html>
   .btn { font-family:inherit; font-size:13px; font-weight:500; border:none; border-radius:6px;
     padding:0 12px; height:32px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .btn-teal { color: #fff; background: #306DB5; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
+  /* A blue ring on the blue button measures 1.00:1 — the most important control on every screen
+     had NO visible keyboard focus. WCAG 2.4.7. The ring inverts to paper on any blue ground, with
+     a blue halo outside it so it reads against the page too. */
+  .btn-teal:focus-visible, .btn-dark:focus-visible {
+    outline: 2px solid var(--paper); outline-offset: -3px;
+    box-shadow: 0 0 0 3px rgba(48,109,181,.45); }
   .btn-dark { color: #fff; background: #212529; }
   .btn-ghost { color: #212529; background: #fff; border: 1px solid #CBD7E4; }
   .btn:hover { filter: brightness(.97); }
-  .btn-dis { color: #A9B4C0; background: #EDF1F7; cursor: not-allowed; }
+  .btn-dis { color: #536170; background: #EDF1F7; cursor: not-allowed; }
   .note { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #E3E9F1;
     border-inline-start:3px solid #7A5600; border-radius:10px; padding:12px 16px; font-size:12px;
     color:#3A3A3A; font-weight:450; margin-top:14px; }
@@ -441,8 +467,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kbrow .dt { width: 9px; height: 9px; flex: none; border-radius: 999px; }
   .kbrow .ti { flex: 1; min-width: 0; }
   .kbrow .t1 { font-size: 13.5px; font-weight: 700; color: #212529; }
-  .kbrow .t2 { font-size: 11.5px; color: #A9B4C0; margin-top: 4px; }
-  .kbrow .ct { font-size: 11.5px; color: #A9B4C0; }
+  .kbrow .t2 { font-size: 11.5px; color: #536170; margin-top: 4px; }
+  .kbrow .ct { font-size: 11.5px; color: #536170; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
   .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #CBD7E4; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
@@ -466,7 +492,7 @@ export const DASHBOARD_HTML = `<!doctype html>
     @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
   }
   .skel { background: linear-gradient(90deg, #EDF1F7 25%, #E3E9F1 37%, #EDF1F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
-  .sec .meta { font-size: 11.5px; font-weight: 600; color: #A9B4C0; margin-inline-start: 8px; }
+  .sec .meta { font-size: 11.5px; font-weight: 600; color: #536170; margin-inline-start: 8px; }
   /* The launch bar is docked chrome; on a phone it must not eat the step it sits under. */
   @media (max-width: 430px) {
     .lbar { gap: 8px !important; padding: 12px 14px !important; }
@@ -519,11 +545,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   .fval { font-size:14px; font-weight:450; color:#212529; line-height:1.5; min-height:28px;
     margin-top:0; }
   .fval-a { font-size:14px; font-weight:450; color:#3A3A3A; }
-  .fval-m { font-size:14px; font-weight:450; color:#A9B4C0; margin-top:0; min-height:28px; }
-  .sig { font-size:11px; color:#A9B4C0; margin-top:3px; font-weight:450; }
+  .fval-m { font-size:14px; font-weight:450; color:#536170; margin-top:0; min-height:28px; }
+  .sig { font-size:11px; color:#536170; margin-top:3px; font-weight:450; }
   .quote { font-size:12px; color:#536170; margin-top:4px; line-height:1.7; }
   .ferr { font-size: 11.5px; color: #8E2A27; font-weight: 700; margin-top: 6px; line-height: 1.7; }
-  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #A9B4C0; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
+  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #536170; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
   .pen[disabled] { cursor: not-allowed; color: #CBD7E4; }
   @media (hover: none) { .pen { opacity: 1; } }
@@ -545,7 +571,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
   .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
   .add { font-size: 11.5px; font-weight: 700; color: #306DB5; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
-  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #A9B4C0; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #EDF1F7; }
+  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #536170; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #EDF1F7; }
   .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
   .crec :focus-visible { outline: 2px solid #306DB5; outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
@@ -614,7 +640,7 @@ ${PALETTE_CSS}
       <span class="chev">⌄</span>
     </button>
     <button class="navsearch" onclick="palOpenBox()" aria-label="الانتقال السريع">
-      <svg width="15" height="15" style="flex:none;color:#A9B4C0"><use href="#i-search"/></svg>
+      <svg width="15" height="15" style="flex:none;color:#536170"><use href="#i-search"/></svg>
       <span class="lbl">الانتقال السريع…</span>
       <kbd>⌘K</kbd>
     </button>
@@ -1149,8 +1175,8 @@ function renderConvo() {
     '<aside class="convo" role="dialog" aria-label="المحادثة">' +
     '<div class="hd"><div class="av">' + esc(nm.trim().charAt(0)) + '</div>' +
     '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#212529;">' + esc(nm) + '</div>' +
-    '<div style="font-size:11px;color:#A9B4C0;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
-    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#A9B4C0;background:#EDF1F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
+    '<div style="font-size:11px;color:#536170;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
+    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#536170;background:#EDF1F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
     '<div style="padding:9px 16px;border-bottom:1px solid #EDF1F7;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
       // Sandbox plumbing is not conversation. The handshake «Proxy massar» and the replies the
@@ -1187,7 +1213,7 @@ function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
   return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#212529;background:#E3E9F1;border:1px solid #E3E9F1;' : 'color:#A9B4C0;background:#fff;border:1px dashed #A9B4C0;') +
+    (showTest ? 'color:#212529;background:#E3E9F1;border:1px solid #E3E9F1;' : 'color:#536170;background:#fff;border:1px dashed #A9B4C0;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -1229,7 +1255,7 @@ function vKmon(d) {
   }
   h += '<div class="tblwrap rise">';
   h += '<div class="ttoolbar"><span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:220px;max-width:380px;">' +
-    '<span style="position:absolute;inset-inline-start:14px;color:#A9B4C0;display:flex;">' + ic("search", 18) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:14px;color:#536170;display:flex;">' + ic("search", 18) + "</span>" +
     '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:42px;height:46px;border-radius:999px;"></span>' +
     '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#212529;">' +
     '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
@@ -1252,7 +1278,7 @@ function vKmon(d) {
     h += '<div class="trow km" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
       '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#CBD7E4" : "#306DB5") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
       '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
-      '<div style="font-size:11px;color:#A9B4C0;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
+      '<div style="font-size:11px;color:#536170;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
       '<div style="font-size:12.5px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
       "<div>" + stChip + "</div>" +
       '<div style="text-align:center;font-size:13px;font-weight:700;color:#212529;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + "</div>" +
@@ -1266,10 +1292,10 @@ function vKmon(d) {
     // Say which of the two reasons this is: an empty class, or a search that matched nothing.
     // Rendering «لا نتائج مطابقة» beside a «تعرض ٠ حملة فعلية» explainer gave two answers at once.
     h += campQ.trim()
-      ? '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#A9B4C0;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
+      ? '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#536170;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
       : (campTab === "real"
         ? '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#306DB5;font-weight:700;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
-        : '<div style="padding:44px;text-align:center;color:#A9B4C0;font-size:13px;">لا حملات في هذا التبويب</div>');
+        : '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;">لا حملات في هذا التبويب</div>');
   }
   h += "</div></div>";
   // The page control was hardcoded to «1», so one row sat under a pager implying more pages
@@ -1385,7 +1411,7 @@ function vKmonDetail(id, d) {
   };
   h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #E3E9F1;background:#fff;">' +
     '<span style="font-size:13px;font-weight:700;color:#212529;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#A9B4C0;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
+    '<span style="font-size:11px;color:#536170;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
     (shown.length ? '<button class="btn" style="font-size:12.5px;border-radius:6px;color:#306DB5;background:#fff;border:1px solid #306DB5;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
     filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
@@ -1394,7 +1420,7 @@ function vKmonDetail(id, d) {
     '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #E3E9F1;border-radius:999px;padding:7px 13px;background:#F4F6F9;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#A9B4C0;font-size:12.5px;">لا نتائج</div>') + "</div>";
+    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#536170;font-size:12.5px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
@@ -1434,7 +1460,7 @@ function vHome(d) {
     '<span class="hd' + (newQual ? "" : " flat") + '">' +
       (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
     '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
-    '<div class="hspark"><div style="font-size:11.5px;color:#A9B4C0;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
+    '<div class="hspark"><div style="font-size:11.5px;color:#536170;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
     sparkArea(series, 320, 62) +
     '<div class="haxis"><span>قبل ١٤ يومًا</span><span>اليوم</span></div></div></div>' +
     '<div class="hside">' + heroSide.map((r) =>
@@ -1450,10 +1476,10 @@ function vHome(d) {
           const st = campStats(cp);
           return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #EDF1F7;">' +
             '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip">تجريبية</span>' : "") + "</div>" +
-            '<div style="font-size:10.5px;color:#A9B4C0;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
+            '<div style="font-size:10.5px;color:#536170;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#A9B4C0;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
+      : '<div style="font-size:12px;color:#536170;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
   h += "</div>";
   return h;
 }
@@ -1894,7 +1920,7 @@ function vSegBuilder() {
     '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\\'comparator\\',this.value)">' +
       '<option value="happened"' + (c.comparator === "happened" ? " selected" : "") + ">حدث</option>" +
       '<option value="never_happened"' + (c.comparator === "never_happened" ? " selected" : "") + ">لم يحدث</option></select>" +
-    '<span style="font-size:11px;color:#A9B4C0;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
+    '<span style="font-size:11px;color:#536170;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
     '<button class="btn" style="height:36px;padding:0 12px;color:#8E2A27;background:#fff;border:1px solid #F7D4D1;" onclick="segDelCond(' + i + ')">حذف</button></div>').join("");
   h += '<button class="btn" style="font-size:12px;color:#306DB5;background:#EAF1F8;border:1px solid #C4E8E5;margin-bottom:14px;" onclick="segAddCond()">+ أضف شرطًا</button>';
 
@@ -1907,7 +1933,7 @@ function vSegBuilder() {
       '<div style="font-size:12.5px;color:#306DB5;line-height:1.9;">' + esc(pv.describe) + "</div>" +
       '<div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;"><span style="font-size:24px;font-weight:700;color:#306DB5;">' + fmtN(pv.matched) + "</span>" +
       '<span style="font-size:12px;font-weight:600;color:#306DB5;">جهة تطابق الآن</span>' +
-      '<span style="font-size:11px;color:#7FA9A5;">العضوية تُحدَّث تلقائيًا</span></div>';
+      '<span style="font-size:11px;color:#536170;">العضوية تُحدَّث تلقائيًا</span></div>';
     const notes = [];
     if ((pv.suppressed || []).length) notes.push("مستبعد بالتبريد: " + fmtN(pv.suppressed.length) + " (رُوسلوا حديثًا)");
     if ((pv.tooNew || []).length) notes.push("أحدث من النافذة: " + fmtN(pv.tooNew.length));
@@ -2097,7 +2123,7 @@ function vAimkt() {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
       chipBtn("حسب الملف", audMode === "file", "setAudMode(\\'file\\')") +
       chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\\'behaviour\\')") +
-      '<span style="flex:1"></span><span style="font-size:11.5px;color:#A9B4C0;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
+      '<span style="flex:1"></span><span style="font-size:11.5px;color:#536170;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
   }
   if (!retargetCohort && audMode === "behaviour") {
     h += vSegBuilder();
@@ -2120,7 +2146,7 @@ function vAimkt() {
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
       '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #E3E9F1;border-radius:10px;padding:9px 13px;background:#F4F6F9;">' +
-      '<button class="btn" style="font-size:12px;color:#1F4470;background:#DDEAF3;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
+      '<button class="btn" style="font-size:12px;color:#2A5988;background:#DDEAF3;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
       (selN ? '<button class="btn" style="font-size:12px;color:#536170;background:#fff;border:1px solid #CBD7E4;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     const shown = pageSlice("aud", m);
     if (m.length > PAGE_SIZE) {
@@ -2135,9 +2161,9 @@ function vAimkt() {
           '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#416CAD;" : "border:1.5px solid #CBD7E4;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
           '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#212529;">' + esc(e.name) + "</span>" +
           prodChips(e) + attrChips(e, 2) +
-          '<span style="font-size:11px;color:#A9B4C0;direction:ltr;">+' + esc(e.phone) + "</span></div>";
+          '<span style="font-size:11px;color:#536170;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#A9B4C0;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>" +
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#536170;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>" +
       (m.length ? '<div class="tfoot" style="border:1px solid #E3E9F1;border-top:0;border-radius:0 0 12px 12px;">' + pageBar("aud", m.length, "جهة") + "</div>" : "");
   }
   h += "</div>";
@@ -2157,7 +2183,7 @@ function vAimkt() {
           ";background:" + (on ? "#306DB5" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
           '<span style="font-size:12.5px;font-weight:700;color:#212529;">' + esc(t.label) + "</span></div>" +
           '<div style="font-size:11.5px;color:#536170;line-height:1.75;">' + esc(t.hint) + "</div>" +
-          '<div style="font-size:10.5px;color:#A9B4C0;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
+          '<div style="font-size:10.5px;color:#536170;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
           '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;">' +
           t.buttons.map((b) => '<span style="font-size:11.5px;font-weight:700;color:#416CAD;background:#DDEAF3;border-radius:999px;padding:4px 12px;">' + esc(b) + "</span>").join("") +
           "</div></div>";
@@ -2179,7 +2205,7 @@ function vAimkt() {
     // the launch route reads. It used to draw three hardcoded titles that no template used.
     tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#416CAD;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
+    (selAsset ? "" : '<div style="font-size:10.5px;color:#B37F00;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
@@ -2198,13 +2224,13 @@ function vAimkt() {
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
       ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:500;color:#212529;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
-        '<div style="font-size:10.5px;color:#A9B4C0;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
+        '<div style="font-size:10.5px;color:#536170;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
       : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#212529;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
     // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
     // State what will actually be sent, next to the button that sends it.
     (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
-        '<div class="lsub" style="font-size:10.5px;color:#A9B4C0;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+        '<div class="lsub" style="font-size:10.5px;color:#536170;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
@@ -2212,7 +2238,7 @@ function vAimkt() {
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #629CCD;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:17px;font-weight:700;color:#212529;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
     '<div style="font-size:13px;color:#3A3A3A;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#306DB5;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
-    (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
+    (selN > 50 ? '<div style="font-size:12px;color:#B37F00;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#3A3A3A;background:#EDF1F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
@@ -2312,7 +2338,7 @@ function vKb() {
       '<span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#629CCD,#306DB5);display:flex;align-items:center;justify-content:center;color:#fff;flex:none;">' + ic("spark", 18) + "</span>" +
       '<span style="flex:1;min-width:220px;font-size:12.5px;color:#3A3A3A;line-height:1.8;">' +
       '<b style="color:#212529;font-weight:700;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
-      ' <span style="direction:ltr;color:#A9B4C0;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
+      ' <span style="direction:ltr;color:#536170;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
   }
   h += '<div class="tblwrap crmflat kbflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
@@ -2326,9 +2352,9 @@ function vKb() {
       (x.r.hub ? "معتمدة" : "لا معرفة بعد") + "</span>" +
     '<span class="st">' + (x.asset
       ? '<span class="d" style="background:#306DB5;"></span><span class="fn">' + esc(clip(x.asset.filename, 30)) + "</span>"
-      : '<span style="color:#A9B4C0;">—</span>') + "</span>" +
-    '<span class="fig">' + (x.camps ? fmtN(x.camps) : '<span style="color:#A9B4C0;">—</span>') + "</span>" +
-    '<span class="fig">' + (x.warm ? fmtN(x.warm) : '<span style="color:#A9B4C0;">—</span>') + "</span>" +
+      : '<span style="color:#536170;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.camps ? fmtN(x.camps) : '<span style="color:#536170;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.warm ? fmtN(x.warm) : '<span style="color:#536170;">—</span>') + "</span>" +
     '<span class="go">افتح ←</span></a>').join("");
   h += '</div></div><div class="tfoot"><span>' + ic("book", 14) + " " + fmtN(rows.length) + " خدمة · " +
     fmtN(rows.filter((x) => x.r.hub).length) + " منها بمعرفة معتمدة</span></div></div>";
@@ -2359,7 +2385,7 @@ function vKbProduct(name) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
-    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#A9B4C0;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#536170;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div>" +
     '<button class="btn btn-dark" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
     "</div>";
@@ -2392,7 +2418,7 @@ function vKbProduct(name) {
     '<div style="font-size:11.5px;color:#536170;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
     chip + '<button class="btn btn-ghost" style="font-size:12px;padding:9px 16px;" onclick="' + onclick + '">' + btnLabel + "</button></div>";
   h += '<div class="card" style="padding:0;overflow:hidden;"><div style="padding:18px 22px 0;"><h3 style="margin:0 0 4px;">ملفات الخدمة</h3>' +
-    '<div style="font-size:11.5px;color:#A9B4C0;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
+    '<div style="font-size:11.5px;color:#536170;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
     fileRow("الملف التعريفي", "يُرسل مع افتتاحية الحملة وعند طلب العميل للتفاصيل" + (pa ? ' · <span style="direction:ltr;">' + esc(pa.filename) + "</span>" : ""),
       (pa ? '<span class="chip c-ok">مرفق</span>' : '<span class="chip c-grey">غير مرفق</span>'),
       (pa ? "استبدال" : "رفع PDF"), "paPick()") +
@@ -2600,7 +2626,7 @@ function vMorningList() {
     label + " (" + fmtN(counts[k]) + ")</button>").join("") +
     '<span style="flex:1"></span>' +
     '<span style="position:relative;display:inline-flex;align-items:center;min-width:190px;max-width:280px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + "</span>" +
     '<input id="oq" class="inp" value="' + esc(oppQ) + '" oninput="oppSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>' +
     '<span style="font-size:12px;color:#536170;">' + fmtN(cs.length) + " جهة في السجل" +
@@ -2621,9 +2647,9 @@ function vMorningList() {
       '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + ink + ';"></span>' +
       '<span style="font-size:13px;font-weight:500;color:#212529;">' + label + "</span>" +
       '<span class="cntpill">' + fmtN(rows.length) + "</span>" +
-      '<span style="font-size:12px;color:#A9B4C0;">' + hint + "</span></div>";
+      '<span style="font-size:12px;color:#536170;">' + hint + "</span></div>";
     if (!rows.length) {
-      h += '<div style="padding:16px 20px;font-size:12.5px;color:#A9B4C0;">' +
+      h += '<div style="padding:16px 20px;font-size:12.5px;color:#536170;">' +
         (oq ? "لا أحد في هذه المجموعة يطابق «" + esc(oq) + "»." : "لا أحد في هذه المجموعة بعد.") + "</div></div>";
       continue;
     }
@@ -2643,15 +2669,15 @@ function vMorningList() {
       const when = key === "scheduled" && c.scheduledSaid
         ? '<span style="font-size:12.5px;font-weight:500;color:#212529;">«' + esc(c.scheduledSaid) + "»</span>" +
           (conf ? '<span style="font-size:12px;color:#12633F;"> · مؤكَّد ' + conf + "</span>"
-            : ap ? '<span style="font-size:12px;color:#A9B4C0;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
-                 : '<span style="font-size:12px;color:#A9B4C0;"> · لم نقرأ تاريخًا</span>')
+            : ap ? '<span style="font-size:12px;color:#536170;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
+                 : '<span style="font-size:12px;color:#536170;"> · لم نقرأ تاريخًا</span>')
         // A confirmed day answers «متى؟» in EVERY group, not only in موعد محدد: an interested
         // clinic with a day the operator wrote down is exactly what his third question asks for.
         : conf
           ? '<span style="font-size:12px;color:#12633F;">موعد مؤكَّد: ' + conf + "</span>"
           : c.outcomeReason
             ? '<span style="font-size:12px;color:#536170;">«' + esc(String(c.outcomeReason).slice(0, 80)) + "»</span>"
-            : '<span style="font-size:12px;color:#A9B4C0;">—</span>';
+            : '<span style="font-size:12px;color:#536170;">—</span>';
       return '<div class="oprow" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
         '<span class="av">' + esc(nm.trim().charAt(0)) + "</span>" +
         '<span class="nm">' + esc(nm) + "</span>" +
@@ -2663,7 +2689,7 @@ function vMorningList() {
       "</div>";
   }
   if (unsorted.length) {
-    h += '<div style="font-size:12.5px;color:#A9B4C0;padding:4px 2px 8px;">' +
+    h += '<div style="font-size:12.5px;color:#536170;padding:4px 2px 8px;">' +
       fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة.</div>";
   }
   return h;
@@ -2755,17 +2781,17 @@ function ratesStrip(agg) {
   return '<div class="card rise" style="margin:0;padding-bottom:2px;">' +
     '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:4px;">' +
     '<h3 style="margin:0;">معدلات الأداء</h3>' +
-    '<span style="font-size:10.5px;color:#A9B4C0;">كل نسبة ومقامها معها</span></div>' +
+    '<span style="font-size:10.5px;color:#536170;">كل نسبة ومقامها معها</span></div>' +
     rows.map((r) => '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #E3E9F1;">' +
       '<span style="flex:0 0 106px;font-size:12.5px;color:#212529;">' + r[0] + "</span>" +
       '<span style="flex:0 0 52px;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#A9B4C0" : "#212529") +
-        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#A9B4C0;font-weight:450;">٪</span>') + "</span>" +
-      '<span style="flex:0 0 88px;font-size:12px;color:#A9B4C0;">' + r[2] + "</span>" +
+        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#536170;font-weight:450;">٪</span>') + "</span>" +
+      '<span style="flex:0 0 88px;font-size:12px;color:#536170;">' + r[2] + "</span>" +
       '<span style="flex:1;min-width:60px;height:6px;background:#EDF1F7;border-radius:999px;overflow:hidden;">' +
         (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#306DB5;border-radius:999px;"></i>') + "</span></div>").join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
-  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#A9B4C0;">' + sub + "</span></div>" + inner + "</div>";
+  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#536170;">' + sub + "</span></div>" + inner + "</div>";
 }
 function hbarRows(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
@@ -2795,7 +2821,7 @@ function dailyActivitySvg(cs) {
   const path = (get) => days.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(get(d)).toFixed(1)).join(" ");
   const areaOf = (p) => p + " L0," + H + " L" + W + "," + H + " Z";
   const total = days.reduce((a, d) => a + d.inN + d.outN, 0);
-  if (!total) return '<div style="font-size:12px;color:#A9B4C0;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
+  if (!total) return '<div style="font-size:12px;color:#536170;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
   const stack = path((d) => d.inN + d.outN), inner = path((d) => d.inN);
   return '<div dir="ltr" style="margin-top:12px;"><svg viewBox="0 0 ' + W + " " + H +
     '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block;" role="img" aria-label="نشاط الرسائل خلال ١٤ يومًا">' +
@@ -2806,7 +2832,7 @@ function dailyActivitySvg(cs) {
     '<path d="' + stack + '" fill="none" stroke="#A9B4C0" stroke-width="1.2" stroke-linejoin="round"/>' +
     '<path d="' + areaOf(inner) + '" fill="url(#agr)"/>' +
     '<path d="' + inner + '" fill="none" stroke="#306DB5" stroke-width="1.6" stroke-linejoin="round"/></svg></div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#A9B4C0;margin-top:4px;">' +
+    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#536170;margin-top:4px;">' +
     '<span>' + esc(days[0].label) + '</span><span>' + esc(days[days.length - 1].label) + "</span></div>" +
     '<div style="display:flex;gap:16px;margin-top:9px;font-size:12px;color:#536170;">' +
     '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#306DB5;margin-inline-end:6px;"></i>واردة من العملاء</span>' +
@@ -2859,7 +2885,7 @@ function vHomeCharts(cs) {
   // ROW A — conversion. The funnel and the rates answer the same question at two resolutions, so
   // they belong side by side; splitting them left the rates as a full-width strip of thin bars.
   h += '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr);gap:16px;align-items:start;margin-bottom:16px;" class="chgrid">';
-  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#A9B4C0;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#536170;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += ratesStrip(agg);
   h += "</div>";
   // ROW B — what is moving, and in which service.
@@ -2868,13 +2894,13 @@ function vHomeCharts(cs) {
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
-  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#306DB5") : '<div style="font-size:12px;color:#A9B4C0;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#306DB5") : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
   h += "</div>";
   const facets = [["المدينة", cityRows], ["الحجم", sizeRows], ["القطاع", secRows]].filter((f) => f[1].length);
   h += chartCard("تركيبة قائمتك", fmtN(entities.length) + " جهة · من أعمدة ملفك", facets.length
     ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:4px;">' +
       facets.map((f) => '<div><div style="font-size:11.5px;font-weight:500;color:#536170;padding-bottom:2px;">' + f[0] + "</div>" + hbarRows(f[1], "#306DB5") + "</div>").join("") + "</div>"
-    : '<div style="font-size:12px;color:#A9B4C0;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
+    : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
   return h;
 }
 // The founder's own wording, and his own note that it must read «محققة», not «محققة محاسبية».
@@ -2945,7 +2971,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
   let h = '<div class="card rise' + (anyAct ? "" : " noact") + '" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;">' +
     '<div><h3 style="margin:0;">ما يستحق المتابعة الآن</h3>' +
-    '<div style="font-size:11.5px;color:#A9B4C0;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
+    '<div style="font-size:11.5px;color:#536170;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
     '<span style="display:inline-flex;gap:6px;align-items:center;">' +
     (items.length ? '<span class="cntpill">' + fmtN(items.length) + " إجراء</span>" : "") + testToggleChip(nTest) + "</span></div>";
   // What the queue is a TOP-OF, stated. Four idle + four fresh + two stalled is a shortlist; the
@@ -3012,7 +3038,7 @@ function vWinLoss() {
   }
   h += "</div>";
   if (!nWin || !nLoss) {
-    h += '<div style="font-size:12px;color:#A9B4C0;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #E3E9F1;" : "10px;") + '">' +
+    h += '<div style="font-size:12px;color:#536170;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #E3E9F1;" : "10px;") + '">' +
       (!nWin && !nLoss ? "لا عوامل مصنَّفة بعد على أي من الجانبين."
         : !nLoss ? "لا أسباب توقّف مصنَّفة بعد — وهذا خبر جيد." : "لا عوامل تقدّم مصنَّفة بعد.") + "</div>";
   }
@@ -3022,7 +3048,7 @@ function vWinLoss() {
     h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E3E9F1;">' +
       judgedProducts.map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
         '<span style="flex:1;min-width:0;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
-        '<span style="color:#12633F;">' + fmtN(pr.won) + ' محققة</span><span style="color:#A9B4C0;">·</span>'  +
+        '<span style="color:#12633F;">' + fmtN(pr.won) + ' محققة</span><span style="color:#536170;">·</span>'  +
         '<span style="color:#8E2A27;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
   }
   h += "</div>";
@@ -3084,12 +3110,12 @@ function vSignalBoard(d) {
   // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
   // answer, and arAgo already owns that agreement for the whole portal.
   const speed = s.replyMinutes === null || s.replyMinutes === undefined
-    ? '<span style="color:#A9B4C0;font-weight:500;">لم يردّ بعد</span>'
+    ? '<span style="color:#536170;font-weight:500;">لم يردّ بعد</span>'
     : (s.replyMinutes < 1 ? "أقل من دقيقة"
       : s.replyMinutes < 60 ? fmtN(s.replyMinutes) + (s.replyMinutes === 1 ? " دقيقة" : s.replyMinutes === 2 ? " دقيقتين" : s.replyMinutes <= 10 ? " دقائق" : " دقيقة")
       : arAgo(Math.round(s.replyMinutes / 60)));
   const silent = s.daysSilent === null || s.daysSilent === undefined
-    ? '<span style="color:#A9B4C0;font-weight:500;">—</span>'
+    ? '<span style="color:#536170;font-weight:500;">—</span>'
     : (s.daysSilent === 0 ? "اليوم" : s.daysSilent === 1 ? "أمس" : fmtN(s.daysSilent) + (s.daysSilent === 2 ? " يومين" : s.daysSilent <= 10 ? " أيام" : " يومًا"));
 
   // THE CHART — 21 days of who spoke. Bars are stacked so one column is one day's total: two
@@ -3139,7 +3165,7 @@ function vSignalBoard(d) {
   return '<div class="card" style="margin:2px 0 14px;">' +
     '<div style="display:flex;align-items:center;gap:8px;">' +
     '<h3 style="margin:0;font-size:15px;font-weight:600;color:#212529;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#306DB5") + "مؤشرات المحادثة</h3>" +
-    '<span style="font-size:11px;color:#A9B4C0;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
+    '<span style="font-size:11px;color:#536170;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
     '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;">' +
     // 1 — the meter
     '<div style="min-width:200px;flex:1;">' +
@@ -3148,7 +3174,7 @@ function vSignalBoard(d) {
     '<span style="font-size:30px;font-weight:700;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
     '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
     '<div style="display:flex;gap:3px;margin-top:10px;max-width:230px;">' + meter + "</div>" +
-    '<div style="font-size:10.5px;color:#A9B4C0;margin-top:5px;">من ١٠٠</div></div>' +
+    '<div style="font-size:10.5px;color:#536170;margin-top:5px;">من ١٠٠</div></div>' +
     // 2 — the three measured stats
     '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">' +
     stat("الزخم", '<span style="color:' + mv[1] + ';">' + mv[0] + "</span> " + esc(s.momentumLabel), null) +
@@ -3167,10 +3193,10 @@ function vSignalBoard(d) {
     // on one product is a reading error waiting to happen.
     (total
       ? '<div style="display:flex;align-items:flex-end;gap:3px;margin-top:10px;">' + bars + "</div>" +
-        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:#A9B4C0;">' +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:#536170;">' +
         '<span>' + esc(act.length ? fmtD(act[0].day) : "") + "</span><span>" +
         esc(act.length ? fmtD(act[act.length - 1].day) : "") + "</span></div>"
-      : '<div style="font-size:12px;color:#A9B4C0;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
+      : '<div style="font-size:12px;color:#536170;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
     "</div>" +
     next + why + "</div>";
 }
@@ -3389,7 +3415,7 @@ function propRow(o) {
   const open = propEdit && propEdit.key === o.key;
   const reading = st === "reading" && !open;
   let body = '<div class="flab">' + o.label +
-    (o.suffix ? ' <span style="color:#A9B4C0;font-weight:450;">' + o.suffix + "</span>" : "") + "</div>";
+    (o.suffix ? ' <span style="color:#536170;font-weight:450;">' + o.suffix + "</span>" : "") + "</div>";
   if (open) {
     body += propEditorHtml(o.key, propEdit.val, propEdit.err);
   } else if (st === "missing") {
@@ -3646,7 +3672,7 @@ function vCustomer(ph) {
       return '<span class="chip" style="font-size:12.5px;padding:4px 10px;" title="' + esc(sg.hint) + '">' +
         '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + sg.dot + ';"></span>' +
         sg.label + "</span>" +
-        (since ? '<span style="font-size:12px;color:#A9B4C0;">منذ ' + fmtAgo(Date.now() - since) + "</span>" : "");
+        (since ? '<span style="font-size:12px;color:#536170;">منذ ' + fmtAgo(Date.now() - since) + "</span>" : "");
     })() +
     (c.test ? ' <span class="chip">تجريبي</span>' : "") +
     (c.human ? ' <span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
@@ -3658,7 +3684,7 @@ function vCustomer(ph) {
     '<div style="font-size:12px;color:#536170;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
     // «أول ظهور» deleted — it never changed a decision. Last activity stays: it tells you whether
     // this person is warm right now.
-    '<div style="font-size:11px;color:#A9B4C0;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
+    '<div style="font-size:11px;color:#536170;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
     // PROVENANCE, not analytics. These used to be a row of identical blue chips in arbitrary
     // order, so the founder could not say which campaign started the conversation in front of him.
     // The payload now arrives newest-first with launch times: the most recent is stated as a
@@ -3681,12 +3707,12 @@ function vCustomer(ph) {
         (scoped ? "مقصور على حملة: " : "بدأت هذه المحادثة من: ") +
         '<a href="#customer/' + esc(c.phone) + "/" + first.id + '" style="color:#306DB5;font-weight:700;text-decoration:none;">' +
         esc(String(first.name).slice(0, 40)) + "</a>" +
-        (known ? ' <span style="color:#A9B4C0;">· ' + esc(when) + "</span>"
-               : ' <span style="color:#A9B4C0;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
-        (others > 0 ? ' <span style="color:#A9B4C0;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
-        (testN > 0 && showTest ? ' <span style="color:#A9B4C0;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
-        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#A9B4C0;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
-        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#A9B4C0;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
+        (known ? ' <span style="color:#536170;">· ' + esc(when) + "</span>"
+               : ' <span style="color:#536170;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
+        (others > 0 ? ' <span style="color:#536170;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
+        (testN > 0 && showTest ? ' <span style="color:#536170;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
+        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#536170;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
+        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#536170;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
         "</div>";
     })() : "") +
     "</div></div>" +
@@ -3704,7 +3730,7 @@ function vCustomer(ph) {
       const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
       // «آخر كلام منه» is DELETED from this line: مؤشرات المحادثة states it below under its own
       // label, and one figure printed twice on a screen reads as two measurements that agree.
-      return turn ? '<div style="font-size:11.5px;color:#A9B4C0;margin-top:6px;">' + turn + "</div>" : "";
+      return turn ? '<div style="font-size:11.5px;color:#536170;margin-top:6px;">' + turn + "</div>" : "";
     })() +
     "</div></div>";
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
@@ -3776,9 +3802,9 @@ function vCustomer(ph) {
     } else if (ins.intent && ins.intent !== "none") {
       const rd = ins.intent === "high" ? ["c-ok", "نية مرتفعة"] : ins.intent === "medium" ? ["c-warn", "اهتمام مبدئي"] : ["c-grey", "فاتر"];
       interestBody = '<span class="chip c-read ' + rd[0] + '"><span class="rd">قراءة</span>' + rd[1] + "</span>" +
-        '<div style="font-size:11.5px;color:#A9B4C0;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
+        '<div style="font-size:11.5px;color:#536170;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
     } else {
-      interestBody = '<span style="color:#A9B4C0;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
+      interestBody = '<span style="color:#536170;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
     }
 
     // 3 — STAGE, one chip. An unjustified reading renders visibly WEAKER than a justified one:
@@ -3792,10 +3818,10 @@ function vCustomer(ph) {
         "</span>" +
         (justified
           ? '<div style="font-size:12.5px;color:#3A3A3A;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
-          : '<div style="font-size:11.5px;color:#A9B4C0;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
+          : '<div style="font-size:11.5px;color:#536170;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
             '<a href="javascript:void(0)" onclick="refreshInsights()" style="color:#306DB5;font-weight:700;">حدّث القراءة</a></div>');
     } else {
-      stageBody = '<span style="color:#A9B4C0;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
+      stageBody = '<span style="color:#536170;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
     }
 
     /* neutral surface: the tint was the last coloured band on this record (DESIGN.md §2) */
@@ -3876,7 +3902,7 @@ function vCustomer(ph) {
   h += "</div>";
   // timeline
   h += '<div class="card" style="margin:0;"><h3 style="margin:0 0 4px;">سجل التفاعل</h3>' +
-    '<div style="font-size:11px;color:#A9B4C0;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
+    '<div style="font-size:11px;color:#536170;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
     '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
     ((d.timeline || []).length ? d.timeline.map((ev) =>
       '<div style="display:flex;gap:13px;padding:11px 2px;position:relative;">' +
@@ -3884,7 +3910,7 @@ function vCustomer(ph) {
       '<span style="width:12px;height:12px;flex:none;margin-top:5px;border-radius:999px;background:#fff;border:2.5px solid ' + tlDot(ev.kind) + ';position:relative;z-index:1;"></span>' +
       '<div style="flex:1;min-width:0;"><div style="font-size:10.5px;font-weight:700;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
       '<div style="font-size:12.5px;color:#212529;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
-      : '<div style="padding:20px;text-align:center;color:#A9B4C0;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
+      : '<div style="padding:20px;text-align:center;color:#536170;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
   h += "</div></div>";
   return h;
 }

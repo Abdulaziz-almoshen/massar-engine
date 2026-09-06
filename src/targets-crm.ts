@@ -68,7 +68,7 @@ export const TARGETS_CRM_CSS = `
   .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #E3E9F1; }
   .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:13.5px; color:#212529;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tagsheet .trow2 .ct { font-size:12px; color:#A9B4C0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tagsheet .trow2 .ct { font-size:12px; color:#536170; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
   .tagsheet .trow2 .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
   @media (max-width: 939px) {
@@ -125,7 +125,7 @@ function tgtFacetBar() {
   var groups = segGroups();
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:190px;max-width:300px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tq" class="inp" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   groups.forEach(function (g, ki) {
@@ -185,7 +185,7 @@ function tgtRow(e) {
     '<div class="t-seg">' + (function () {
       var pc = prodChips(e);
       var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
-      return pc + attrChips(e, budget) || '<span style="color:#A9B4C0;font-size:12px;">—</span>';
+      return pc + attrChips(e, budget) || '<span style="color:#536170;font-size:12px;">—</span>';
     })() + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
@@ -205,7 +205,7 @@ function tgtImportBox() {
   return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
     'style="background:#fff;border:1px solid #E3E9F1;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
     '<summary style="font-size:12.5px;color:#3A3A3A;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
-    '<div style="font-size:12px;color:#A9B4C0;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
+    '<div style="font-size:12px;color:#536170;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-dark" onclick="entManualSave()">حفظ الجهات ←</button>' +

@@ -22,9 +22,9 @@ export const PALETTE_CSS = `
     height:32px; padding-inline:10px; font-family:inherit; font-size:13px; color:#536170;
     background:#fff; border:1px solid #E3E9F1; border-radius:6px; cursor:pointer; text-align:start;
     transition:border-color .14s ease, color .14s ease; }
-  .navsearch:hover { border-color:#A9B4C0; color:#3A3A3A; }
+  .navsearch:hover { border-color:#536170; color:#3A3A3A; }
   .navsearch .lbl { flex:1; min-width:0; }
-  .navsearch kbd { font-family:inherit; font-size:11px; color:#A9B4C0; background:#EDF1F7;
+  .navsearch kbd { font-family:inherit; font-size:11px; color:#536170; background:#EDF1F7;
     border-radius:4px; padding:2px 6px; flex:none; letter-spacing:.02em;
     direction:ltr; unicode-bidi:isolate; }
   aside.mini .navsearch .lbl, aside.mini .navsearch kbd { display:none; }
@@ -32,9 +32,9 @@ export const PALETTE_CSS = `
 
   /* «قريبًا»: the four routes that open onto a placeholder do not get to sit at the same weight as
      the ten that work. A menu that offers a door onto «coming soon» is a menu that lies. */
-  .nv.soon { color:#A9B4C0; }
+  .nv.soon { color:#536170; }
   .nv.soon .lbl { opacity:.75; }
-  .nv.soon::after { content:"قريبًا"; font-size:10.5px; color:#A9B4C0; flex:none; }
+  .nv.soon::after { content:"قريبًا"; font-size:10.5px; color:#536170; flex:none; }
   aside.mini .nv.soon::after { display:none; }
 
   /* ===== the palette ===== */
@@ -51,12 +51,12 @@ export const PALETTE_CSS = `
   .palbox .top { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #E3E9F1; }
   .palbox input { flex:1; min-width:0; font-family:inherit; font-size:15.5px; color:#212529;
     border:none; outline:none; background:transparent; }
-  .palbox input::placeholder { color:#A9B4C0; }
-  .palbox .esc { font-size:11px; color:#A9B4C0; background:#EDF1F7; border-radius:4px; padding:3px 7px; flex:none; }
+  .palbox input::placeholder { color:#536170; }
+  .palbox .esc { font-size:11px; color:#536170; background:#EDF1F7; border-radius:4px; padding:3px 7px; flex:none; }
   .palbody { overflow-y:auto; padding:6px 0 4px; }
   .palgrp { display:flex; align-items:baseline; gap:7px; padding:9px 16px 4px; }
-  .palgrp .g { font-size:11.5px; font-weight:500; color:#A9B4C0; }
-  .palgrp .n { font-size:11px; color:#A9B4C0; font-variant-numeric:tabular-nums; }
+  .palgrp .g { font-size:11.5px; font-weight:500; color:#536170; }
+  .palgrp .n { font-size:11px; color:#536170; font-variant-numeric:tabular-nums; }
   .palrow { display:flex; align-items:center; gap:11px; padding:8px 16px; cursor:pointer; }
   .palrow.on { background:#EDF1F7; }
   .palrow .ic { width:26px; height:26px; flex:none; border-radius:7px; background:#EDF1F7;
@@ -64,13 +64,13 @@ export const PALETTE_CSS = `
   .palrow.on .ic { background:#fff; }
   .palrow .tx { flex:1; min-width:0; }
   .palrow .t1 { display:block; font-size:13.5px; color:#212529; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .palrow .t2 { display:block; font-size:12px; color:#A9B4C0; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .palrow .t2 { display:block; font-size:12px; color:#536170; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .palrow .st { display:flex; align-items:center; gap:6px; flex:none; font-size:12px; color:#536170; }
   .palrow .st .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .palrow .ph { flex:none; font-size:12px; color:#A9B4C0; direction:ltr; font-variant-numeric:tabular-nums; }
-  .palnone { padding:30px 16px; text-align:center; color:#A9B4C0; font-size:13px; line-height:1.9; }
+  .palrow .ph { flex:none; font-size:12px; color:#536170; direction:ltr; font-variant-numeric:tabular-nums; }
+  .palnone { padding:30px 16px; text-align:center; color:#536170; font-size:13px; line-height:1.9; }
   .palfoot { display:flex; align-items:center; gap:14px; padding:9px 16px; border-top:1px solid #E3E9F1;
-    background:#F4F6F9; font-size:11.5px; color:#A9B4C0; }
+    background:#F4F6F9; font-size:11.5px; color:#536170; }
   .palfoot b { font-weight:450; color:#536170; background:#fff; border:1px solid #E3E9F1;
     border-radius:4px; padding:1px 5px; margin-inline-end:4px; }
 `;

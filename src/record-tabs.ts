@@ -42,7 +42,7 @@ export const RECORD_TABS_CSS = `
   .rconv .b.sy { align-self:center; background:transparent; border:0; color:#536170; font-size:12px;
     box-shadow:none; text-align:center; max-width:80%; }
   /* no min-width: «نعم» should be a small bubble, not a 150px box with the word pushed to one edge */
-  .rconv .t { font-size:10.5px; color:#8a8a8a; margin-top:3px; text-align:end; }
+  .rconv .t { font-size:10.5px; color:#536170; margin-top:3px; text-align:end; }
   .rconv .b.sy .t { display:none; }
 
   /* Frappe's side panel sections collapse. The rail was 856px beside a 456px main. */
@@ -50,7 +50,7 @@ export const RECORD_TABS_CSS = `
   .rsec.shut > *:not(h3):not(.rsechd) { display:none; }
   .rsechd { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
     font-size:13px; font-weight:600; color:#212529; }
-  .rsechd .cv { margin-inline-start:auto; color:#A9B4C0; font-size:12px; transition:transform .12s; }
+  .rsechd .cv { margin-inline-start:auto; color:#536170; font-size:12px; transition:transform .12s; }
   .rsec.shut .rsechd .cv { transform:rotate(-90deg); }
 
   /* tasks + notes */
@@ -58,12 +58,12 @@ export const RECORD_TABS_CSS = `
   .rtask:first-of-type { border-top:0; }
   .rtask .cb { width:16px; height:16px; accent-color:#306DB5; margin-top:2px; flex:none; cursor:pointer; }
   .rtask .ti { font-size:14px; font-weight:450; color:#212529; }
-  .rtask.done .ti { color:#A9B4C0; text-decoration:line-through; }
+  .rtask.done .ti { color:#536170; text-decoration:line-through; }
   .rtask .mt { font-size:12px; color:#536170; margin-top:3px; display:flex; gap:10px; flex-wrap:wrap; }
   .rnote { border:1px solid #E3E9F1; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
   .rnote .nt { font-size:14px; font-weight:500; color:#212529; }
   .rnote .nc { font-size:13px; color:#3A3A3A; line-height:1.8; margin-top:5px; white-space:pre-wrap; }
-  .rnote .nm { font-size:12px; color:#A9B4C0; margin-top:6px; }
+  .rnote .nm { font-size:12px; color:#536170; margin-top:6px; }
   .radd { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
   .radd input, .radd select { font-family:inherit; font-size:13px; height:32px; border:1px solid #E3E9F1;
     border-radius:6px; padding:0 10px; background:#fff; color:#212529; }

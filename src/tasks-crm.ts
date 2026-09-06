@@ -14,16 +14,16 @@
 export const TASKS_CRM_CSS = `
   .tskflat .crow { grid-template-columns: 40px 2.4fr 1fr .9fr 1.1fr 1fr; }
   @media (max-width: 939px) { .tskflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; } }
-  .tsk-done .tt { color:#A9B4C0; text-decoration:line-through; }
+  .tsk-done .tt { color:#536170; text-decoration:line-through; }
   /* Frappe's Notes are a card grid (h-48 = 192px), the one place it leaves its list chrome */
   .ngrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
   .ncard { border:1px solid #E3E9F1; border-radius:10px; padding:14px 16px; background:#fff;
     height:192px; display:flex; flex-direction:column; overflow:hidden; cursor:default; }
-  .ncard:hover { border-color:#A9B4C0; }
+  .ncard:hover { border-color:#536170; }
   .ncard .t { font-size:14px; font-weight:500; color:#212529; }
   .ncard .c { font-size:13px; color:#3A3A3A; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
     white-space:pre-wrap; }
-  .ncard .m { font-size:12px; color:#A9B4C0; margin-top:8px; display:flex; gap:10px; align-items:center; }
+  .ncard .m { font-size:12px; color:#536170; margin-top:8px; display:flex; gap:10px; align-items:center; }
 `;
 
 export const TASKS_CRM_JS = `
@@ -66,7 +66,7 @@ function tskFiltered() {
 /* The ref is rendered by resolving it; an unresolvable ref reads «سجل محذوف» rather than showing a
    bare id or silently hiding the row — the third obligation of a link with no foreign key. */
 function tskRefLabel(t) {
-  if (!t.ref_kind) return '<span style="color:#A9B4C0;">—</span>';
+  if (!t.ref_kind) return '<span style="color:#536170;">—</span>';
   if (t.ref_kind === "contact") {
     var c = contactByPhone(t.ref_id);
     if (c) return '<a href="#customer/' + esc(t.ref_id) + '" style="color:#306DB5;text-decoration:none;">' + esc(c.waName || t.ref_id) + '</a>';
@@ -86,7 +86,7 @@ function tskRow(t) {
     '<div class="c-name"><span class="tt" style="font-size:14px;font-weight:450;color:#212529;">' + esc(t.title) + '</span></div>' +
     '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + st.l + '</span></div></div>' +
     '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:13px;color:#3A3A3A;">' +
-      (t.priority ? TSK_PRI[t.priority] : '<span style="color:#A9B4C0;">—</span>') + '</div></div>' +
+      (t.priority ? TSK_PRI[t.priority] : '<span style="color:#536170;">—</span>') + '</div></div>' +
     '<div style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tskRefLabel(t) + '</div>' +
     '<div style="font-size:12px;color:' + (overdue ? "#8E2A27" : "#536170") + ';white-space:nowrap;">' +
       (t.due_at ? fmtD(t.due_at) : "—") + '</div>' +
@@ -107,7 +107,7 @@ function vTasksCrm() {
 
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tskq" class="inp" value="' + esc(tskQ) + '" oninput="tskSearch(this)" placeholder="ابحث في المهام…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += [["open", "المفتوحة", open], ["overdue", "متأخرة", over], ["done", "منجزة", doneN], ["all", "الكل", all.length]]
     .map(function (t) { return '<button class="qpill' + (tskTab === t[0] ? " on" : "") + '" onclick="tskSetTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>"; }).join("");
@@ -140,7 +140,7 @@ function vNotesCrm() {
   });
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="nteq" class="inp" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<span style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " ملاحظة</span></div>";
   if (!rows.length) {

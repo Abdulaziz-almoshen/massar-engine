@@ -84,9 +84,9 @@ function actRow(e) {
     '<div class="c-name"><span class="evt"><span class="d" style="background:' + meta.dot + ';"></span>' +
       '<span class="lbl">' + meta.label + '</span></span></div>' +
     '<div class="c-meta"><div class="c-prod" style="font-size:13px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-      (e.text ? esc(clip(e.text, 90)) : '<span style="color:#A9B4C0;">—</span>') + '</div></div>' +
+      (e.text ? esc(clip(e.text, 90)) : '<span style="color:#536170;">—</span>') + '</div></div>' +
     '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;">' + esc(nm) +
-      '<span style="font-size:12px;color:#A9B4C0;direction:ltr;"> ' + esc(e.phone) + '</span></div></div>' +
+      '<span style="font-size:12px;color:#536170;direction:ltr;"> ' + esc(e.phone) + '</span></div></div>' +
     '<div class="c-prog" style="font-size:12px;color:#536170;">' + fmtD(e.ts) + ' · ' + fmtT(e.ts) + '</div>' +
   '</div>';
 }
@@ -108,7 +108,7 @@ function actControlBar(n) {
               ["failed", "إخفاقات", count("failed")]];
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="actq" class="inp" value="' + esc(actQ) + '" oninput="actSearch(this)" placeholder="ابحث في الأحداث…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += tabs.map(function (t) {
     return '<button class="qpill' + (actTab === t[0] ? " on" : "") + '" onclick="actSetTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>";

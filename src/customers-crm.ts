@@ -119,17 +119,17 @@ function cusRow(c) {
     '<div class="c-meta">' +
       '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + oc.label + '</span></div>' +
       '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#7A5600;">تدخّل بشري</span>' :
-        (since ? '<span style="font-size:12px;color:#A9B4C0;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
+        (since ? '<span style="font-size:12px;color:#536170;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
     '</div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num" style="text-align:start;">' + (lvl
         ? '<span class="taglvl"><span class="d" style="background:' + lvl.dot + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + lvl.label + '</span></span>' +
-          '<span style="font-size:12px;color:#A9B4C0;"> · ' + esc(tag.product) + '</span>'
-        : '<span style="font-size:13px;color:#A9B4C0;">—</span>') + '</div>' +
+          '<span style="font-size:12px;color:#536170;"> · ' + esc(tag.product) + '</span>'
+        : '<span style="font-size:13px;color:#536170;">—</span>') + '</div>' +
       '<div class="c-num">' + fmtN(msgs) + '</div>' +
       '<div class="c-num" style="text-align:start;font-weight:450;color:#536170;font-size:12px;">' + (c.lastEventAt ? fmtD(c.lastEventAt) : "—") + '</div>' +
     '</div>' +
-    '<div class="c-act" style="text-align:center;"><span style="color:#A9B4C0;font-size:14px;">‹</span></div>' +
+    '<div class="c-act" style="text-align:center;"><span style="color:#536170;font-size:14px;">‹</span></div>' +
   '</div>';
 }
 
@@ -162,7 +162,7 @@ function cusControlBar(nTotal) {
   ];
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#A9B4C0;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="cusq" class="inp" value="' + esc(cusQ) + '" oninput="cusSearch(this)" placeholder="ابحث بالاسم أو الرقم أو الخدمة…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<span class="vtog">' + [["list", "قائمة"], ["group", "تجميع"]].map(function (v) {
       return '<button class="' + (cusView === v[0] ? "on" : "") + '" onclick="cusSetView(&quot;' + v[0] + '&quot;)">' + v[1] + '</button>';
