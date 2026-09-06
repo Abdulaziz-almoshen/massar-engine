@@ -63,7 +63,10 @@ const LADDER = new Set([12, 14, 16, 18, 22, 28, 40, 44]);
 
 for (const f of files) {
   const src = fs.readFileSync(new URL(f, SRC), "utf8");
-  src.split("\n").forEach((line, i) => {
+  src.split("\n").forEach((raw, i) => {
+    // A value quoted inside a comment is not a declaration. Without this the checker reports its
+    // own documentation — the same false-positive class as matching `border-color:` as text.
+    const line = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/, "");
     const at = `${f}:${i + 1}`;
     // TEXT colour only. `border-color:` and `outline-color:` also end in "color:", and an earlier
     // version of this check used a (?<!background-) lookbehind that let both through — it reported

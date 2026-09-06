@@ -117,15 +117,15 @@ function cusRow(c) {
          contact was rendering the same number twice, at two different weights. */
       (c.waName ? '<span style="font-size:12px;color:#536170;flex:none;direction:ltr;">' + esc(c.phone) + '</span>' : "") + '</div>' +
     '<div class="c-meta">' +
-      '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + oc.label + '</span></div>' +
+      '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:14px;color:#3A3A3A;">' + oc.label + '</span></div>' +
       '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#7A5600;">تدخّل بشري</span>' :
         (since ? '<span style="font-size:12px;color:#536170;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
     '</div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num" style="text-align:start;">' + (lvl
-        ? '<span class="taglvl"><span class="d" style="background:' + lvl.dot + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + lvl.label + '</span></span>' +
+        ? '<span class="taglvl"><span class="d" style="background:' + lvl.dot + ';"></span><span style="font-size:14px;color:#3A3A3A;">' + lvl.label + '</span></span>' +
           '<span style="font-size:12px;color:#536170;"> · ' + esc(tag.product) + '</span>'
-        : '<span style="font-size:13px;color:#536170;">—</span>') + '</div>' +
+        : '<span style="font-size:14px;color:#536170;">—</span>') + '</div>' +
       '<div class="c-num">' + fmtN(msgs) + '</div>' +
       '<div class="c-num" style="text-align:start;font-weight:450;color:#536170;font-size:12px;">' + (c.lastEventAt ? fmtD(c.lastEventAt) : "—") + '</div>' +
     '</div>' +
@@ -193,7 +193,7 @@ function cusControlBar(nTotal) {
           esc(clip(t.name, 26)) + "</option>";
       }).join("") + "</select>";
   }
-  h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12.5px;" onclick="cusExport()">' + ic("doc", 15) + ' تصدير CSV</button>';
+  h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12px;" onclick="cusExport()">' + ic("doc", 15) + ' تصدير CSV</button>';
   h += '<span class="cntpill">' + fmtN(nTotal) + " جهة</span></div>";
   return h;
 }
@@ -205,7 +205,7 @@ function cusListView(rows) {
   var h = '<div class="tblwrap crmflat cusflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + cusHeader(allOn);
   shown.forEach(function (c) { h += cusRow(c); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">' +
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;line-height:1.9;">' +
       (cusQ.trim() ? 'لا جهة تطابق «' + esc(cusQ.trim()) + '».' : 'لا جهات في هذا التبويب.') + '</div>';
   }
   h += '</div></div>';
@@ -243,7 +243,7 @@ function cusGroupView(rows) {
     var g = by[k].slice(0, LIST_CAP);   /* per-group preview; the flat list paginates */
     h += '<div class="tblwrap crmflat cusflat rise" style="margin-bottom:14px;">' +
       '<div style="display:flex;align-items:center;gap:9px;padding:8px 20px 8px 12px;border-bottom:1px solid #E3E9F1;background:#F4F6F9;">' +
-      '<span style="font-size:13px;font-weight:500;color:#212529;">' + esc(k) + '</span>' +
+      '<span style="font-size:14px;font-weight:500;color:#212529;">' + esc(k) + '</span>' +
       '<span class="cntpill">' + fmtN(by[k].length) + '</span></div>' +
       '<div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + cusHeader(false);
     g.forEach(function (c) { h += cusRow(c); });
@@ -283,7 +283,7 @@ function cusPaintCrumb() {
   if (ps) ps.textContent = cusView === "group" ? "تجميع" : "قائمة";
   if (act) {
     act.innerHTML = '<a href="#targets" class="btn" style="text-decoration:none;display:inline-flex;' +
-      'align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:13px;' +
+      'align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:14px;' +
       'font-weight:500;color:#fff;background:#306DB5;border:none;">' + ic("up", 15, "#fff") + ' استيراد جهات</a>';
   }
 }

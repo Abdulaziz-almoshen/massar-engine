@@ -12,19 +12,25 @@
 
 export const PRODUCTS_CRM_CSS = `
 .pc-sec{margin-block-end:26px}
-.pc-h{font-size:13px;font-weight:600;color:var(--ink,#212529);margin-block-end:3px}
-.pc-sub{font-size:11.5px;color:var(--muted,#536170);margin-block-end:12px;max-width:70ch;line-height:1.7}
-.pc-note{font-size:11.5px;color:var(--muted,#536170);margin-block-start:8px;line-height:1.7;
+.pc-h{font-size:14px;font-weight:600;color:var(--ink,#212529);margin-block-end:3px}
+.pc-sub{font-size:12px;color:var(--muted,#536170);margin-block-end:12px;max-width:70ch;line-height:1.7}
+.pc-note{font-size:12px;color:var(--muted,#536170);margin-block-start:8px;line-height:1.7;
   padding-inline-start:9px;border-inline-start:2px solid var(--line2,#CBD7E4);max-width:66ch}
-.pc-assumed{font-size:10.5px;font-weight:600;color:#7A5600;margin-inline-start:5px}
+.pc-assumed{font-size:12px;font-weight:600;color:#7A5600;margin-inline-start:5px}
 .pc-price{font-size:12px;color:var(--ink2,#3A3A3A);font-variant-numeric:tabular-nums}
-.pc-pkg{font-size:11.5px;color:var(--muted,#536170)}
+.pc-pkg{font-size:12px;color:var(--muted,#536170)}
 .pc-q{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .pc-qc{background:var(--strip,#F4F6F9);border-radius:10px;padding:12px 14px}
-.pc-qc .k{font-size:11.5px;color:var(--muted,#536170);font-weight:600}
-.pc-qc .v{font-size:17px;font-weight:700;margin-block:4px 2px;font-variant-numeric:tabular-nums}
-.pc-qc .t{font-size:11px;color:var(--muted,#536170);font-variant-numeric:tabular-nums}
+.pc-qc .k{font-size:12px;color:var(--muted,#536170);font-weight:600}
+.pc-qc .v{font-size:16px;font-weight:600;margin-block:4px 2px;font-variant-numeric:tabular-nums}
+.pc-qc .t{font-size:12px;color:var(--muted,#536170);font-variant-numeric:tabular-nums}
 .pc-qc.now{background:#EAF1F8}
+/* Four quarters at 84px each on a phone is four unreadable columns. Two rows of two. 560 = --bp-sm
+   (DESIGN.md 2); a media query cannot read a custom property. */
+@media (max-width:560px){
+  .pc-q{grid-template-columns:repeat(2,1fr)}
+  .pc-sub,.pc-note{max-width:none}
+}
 `;
 
 export const PRODUCTS_CRM_JS = `

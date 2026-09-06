@@ -26,11 +26,11 @@ export const TARGETS_CRM_CSS = `
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
   .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#EDF1F7;
     color:#3A3A3A; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
-  .tgtflat .crow .t-nm .lb { font-size:13.5px; font-weight:450; color:#212529; overflow:hidden;
+  .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#212529; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .t-seg { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; min-width:0; }
-  .tgtflat .crow .t-ph { font-size:12.5px; color:#536170; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
-  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#3A3A3A; min-width:0; }
+  .tgtflat .crow .t-ph { font-size:12px; color:#536170; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
+  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#3A3A3A; min-width:0; }
   .tgtflat .crow .t-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
   .tgtflat .crow .t-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .c-act { display:flex; justify-content:flex-end; }
@@ -55,18 +55,18 @@ export const TARGETS_CRM_CSS = `
   .tgtflat .crow .tgtdel.arm, .tgtflat .crow .tgtdel.armx { opacity:1; }
   @media (pointer:coarse) { .tgtflat .crow .tgtdel { opacity:1; } }
   /* إدارة الوسوم */
-  .tagsheet { position:fixed; inset:0; z-index:140; background:rgba(23,23,23,.32);
+  .tagsheet { position:fixed; inset:0; z-index:var(--z-toast); background:rgba(23,23,23,.32);
     display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
   .tagsheet .sheet { background:#fff; border:1px solid #E3E9F1; border-radius:14px; width:100%;
     max-width:520px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
   .tagsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .tagsheet .sh .t { font-size:16px; font-weight:600; color:#212529; }
-  .tagsheet .hint { font-size:12.5px; color:#536170; line-height:1.8; margin-top:6px; }
+  .tagsheet .hint { font-size:12px; color:#536170; line-height:1.8; margin-top:6px; }
   .tagsheet .mk { display:flex; gap:8px; margin:14px 0 4px; }
   .tagsheet .mk input { flex:1; min-width:0; height:34px; }
   .tagsheet .tlist { margin-top:6px; max-height:52vh; overflow-y:auto; }
   .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #E3E9F1; }
-  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:13.5px; color:#212529;
+  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:14px; color:#212529;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tagsheet .trow2 .ct { font-size:12px; color:#536170; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
@@ -204,7 +204,7 @@ function tgtRow(e) {
 function tgtImportBox() {
   return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
     'style="background:#fff;border:1px solid #E3E9F1;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
-    '<summary style="font-size:12.5px;color:#3A3A3A;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
+    '<summary style="font-size:12px;color:#3A3A3A;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
     '<div style="font-size:12px;color:#536170;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
@@ -214,7 +214,7 @@ function tgtImportBox() {
     '<button class="btn btn-ghost" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
     '<div id="pastebox" style="display:none;margin-top:12px;">' +
     '<div style="font-size:12px;color:#536170;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#212529;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12.5px;line-height:2;resize:vertical;"></textarea>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12px;line-height:2;resize:vertical;"></textarea>' +
     '<button class="btn btn-ghost" style="margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
     "</details>";
 }
@@ -243,7 +243,7 @@ function vTargetsCrm() {
   h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
   shown.forEach(function (e) { h += tgtRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;">لا جهة تطابق هذا الفرز.</div>';
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;">لا جهة تطابق هذا الفرز.</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
@@ -265,7 +265,7 @@ function tgtBulkBar() {
        only fail; the bar says what is missing and where to fix it. */
     return '<div class="bulkbar"><div>' +
       '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-      '<span style="font-size:12.5px;">لا وسوم بعد.</span>' +
+      '<span style="font-size:12px;">لا وسوم بعد.</span>' +
       '<button class="pri" onclick="tgtOpenTags()">أنشئ أول وسم</button>' +
       '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
   }

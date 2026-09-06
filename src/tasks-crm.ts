@@ -21,7 +21,7 @@ export const TASKS_CRM_CSS = `
     height:192px; display:flex; flex-direction:column; overflow:hidden; cursor:default; }
   .ncard:hover { border-color:#536170; }
   .ncard .t { font-size:14px; font-weight:500; color:#212529; }
-  .ncard .c { font-size:13px; color:#3A3A3A; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
+  .ncard .c { font-size:14px; color:#3A3A3A; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
     white-space:pre-wrap; }
   .ncard .m { font-size:12px; color:#536170; margin-top:8px; display:flex; gap:10px; align-items:center; }
 `;
@@ -84,10 +84,10 @@ function tskRow(t) {
   return '<div class="trow km krow crow' + (done ? " tsk-done" : "") + '">' +
     '<div class="selcell"><input type="checkbox" aria-label="إنجاز ' + esc(t.title) + '"' + (done ? " checked" : "") + ' onclick="tskToggle(' + t.id + ',this.checked)"></div>' +
     '<div class="c-name"><span class="tt" style="font-size:14px;font-weight:450;color:#212529;">' + esc(t.title) + '</span></div>' +
-    '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:13px;color:#3A3A3A;">' + st.l + '</span></div></div>' +
-    '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:13px;color:#3A3A3A;">' +
+    '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:14px;color:#3A3A3A;">' + st.l + '</span></div></div>' +
+    '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:14px;color:#3A3A3A;">' +
       (t.priority ? TSK_PRI[t.priority] : '<span style="color:#536170;">—</span>') + '</div></div>' +
-    '<div style="font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tskRefLabel(t) + '</div>' +
+    '<div style="font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tskRefLabel(t) + '</div>' +
     '<div style="font-size:12px;color:' + (overdue ? "#8E2A27" : "#536170") + ';white-space:nowrap;">' +
       (t.due_at ? fmtD(t.due_at) : "—") + '</div>' +
   '</div>';
@@ -122,7 +122,7 @@ function vTasksCrm() {
     '<div class="thead-narrow"><span>المهمة</span><span style="flex:1"></span><span>الحالة</span></div>';
   rows.forEach(function (t) { h += tskRow(t); });
   if (!rows.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;line-height:1.9;">' +
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;line-height:1.9;">' +
       (all.length ? "لا مهام في هذا التبويب." : "لا مهام بعد — أضف مهمة من ملف أي عميل.") + '</div>';
   }
   h += '</div></div><div class="tfoot"><span>' + ic("clock", 14) + ' المهام سجلات داخلية. لا تُرسل شيئًا للعميل.</span></div></div>';

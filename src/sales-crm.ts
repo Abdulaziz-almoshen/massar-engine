@@ -22,31 +22,31 @@ export const SALES_CRM_CSS = `
 .perf-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .perf-per{display:flex;gap:6px;align-items:center}
 .perf-per .q{border:1px solid var(--line,#CBD7E4);background:var(--card,#fff);border-radius:999px;
-  padding:5px 13px;font-size:12.5px;cursor:pointer;color:var(--ink2,#3A3A3A);min-height:32px}
-.perf-per .q.on{background:#306DB5;border-color:#306DB5;color:#fff;font-weight:700}
+  padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#3A3A3A);min-height:32px}
+.perf-per .q.on{background:#306DB5;border-color:#306DB5;color:#fff;font-weight:600}
 .perf-note{margin-inline-start:auto;font-size:12px;color:var(--muted,#536170);max-width:46ch;text-align:end}
 /* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
    four equal cards made it the last of four with no more weight than the rest. */
 .perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
 .perf-kpi.lead{background:#EAF1F8}
-.perf-kpi.lead .v{font-size:30px}
+.perf-kpi.lead .v{font-size:28px}
 .perf-kpi{background:var(--strip,#F4F6F9);border-radius:10px;padding:13px 15px}
-.perf-kpi .k{font-size:11.5px;color:var(--muted,#536170);font-weight:600}
-.perf-kpi .v{font-size:21px;font-weight:700;margin-top:3px;letter-spacing:0}
-.perf-kpi .s{font-size:11.5px;color:var(--muted,#536170);margin-top:2px}
-.perf-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.perf-kpi .k{font-size:12px;color:var(--muted,#536170);font-weight:600}
+.perf-kpi .v{font-size:22px;font-weight:600;margin-top:3px;letter-spacing:0}
+.perf-kpi .s{font-size:12px;color:var(--muted,#536170);margin-top:2px}
+.perf-tbl{width:100%;border-collapse:collapse;font-size:14px}
 /* Logical properties only, per DESIGN.md: "no left/right, no physical offsets". The physical
    the physical shorthand landed on the correct side ONLY because this document is RTL — it would
    flip the moment anything renders LTR. And rows take border-TOP, which is what invariant 8
    specifies for a flush list. (No backticks in this comment: it lives INSIDE a template literal,
    and one terminates the string. Third time this session.) */
-.perf-tbl th{text-align:start;font-size:11.5px;font-weight:600;color:var(--muted,#536170);
+.perf-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted,#536170);
   padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#CBD7E4);white-space:nowrap}
 .perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#E3E9F1);height:36px;vertical-align:middle}
 .perf-tbl tr:hover td{background:var(--strip,#F4F6F9)}
 .perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
 .perf-prod{font-weight:600}
-.perf-sec{font-size:11.5px;color:var(--muted,#536170);font-weight:400}
+.perf-sec{font-size:12px;color:var(--muted,#536170);font-weight:400}
 /* No overflow:hidden — it clipped the pace tick's own overhang, so the "extend past the track so
    it reads as a marker" intent was dead code. The fill clips itself with its own border-radius. */
 .perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#E3E9F1);
@@ -75,11 +75,11 @@ export const SALES_CRM_CSS = `
    exists nowhere in Massar. Same treatment as every other control here. */
 .perf-per .q:focus, .perf-set:focus{outline:none}
 .perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #306DB5;outline-offset:1px}
-.perf-empty{padding:26px 0;color:var(--muted,#536170);font-size:13.5px;max-width:56ch;line-height:1.6}
-.perf-empty b{color:var(--ink,#212529);display:block;margin-bottom:5px;font-size:14.5px}
+.perf-empty{padding:26px 0;color:var(--muted,#536170);font-size:14px;max-width:56ch;line-height:1.6}
+.perf-empty b{color:var(--ink,#212529);display:block;margin-bottom:5px;font-size:14px}
 @media (max-width:820px){
   .perf-kpis{grid-template-columns:repeat(2,1fr)}
-  .perf-kpi.lead .v{font-size:24px}
+  .perf-kpi.lead .v{font-size:22px}
   .perf-sechide{display:none}
 }
 @media (pointer:coarse){
@@ -236,7 +236,7 @@ function vSalesPerf() {
     var why = !d
       ? '<div class="perf-empty">جارٍ حساب الأداء من السجل…</div>'
       : '<div class="perf-empty"><b>تعذّر تحميل الأداء</b>' + esc(String(d.error)) +
-        '<br><span style="font-size:12.5px">أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>';
+        '<br><span style="font-size:12px">أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>';
     return perfShell(perfState.quarter || 0, perfState.year || 0) + perfKpis(null, null, null, null, 0, 0, 0) + why;
   }
 

@@ -27,7 +27,7 @@ export const ACTIVITY_CRM_CSS = `
   }
   .evt { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
   .evt .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .evt .lbl { font-size:13px; color:#3A3A3A; }
+  .evt .lbl { font-size:14px; color:#3A3A3A; }
 `;
 
 export const ACTIVITY_CRM_JS = `
@@ -83,7 +83,7 @@ function actRow(e) {
     '<div class="selcell"></div>' +
     '<div class="c-name"><span class="evt"><span class="d" style="background:' + meta.dot + ';"></span>' +
       '<span class="lbl">' + meta.label + '</span></span></div>' +
-    '<div class="c-meta"><div class="c-prod" style="font-size:13px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+    '<div class="c-meta"><div class="c-prod" style="font-size:14px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
       (e.text ? esc(clip(e.text, 90)) : '<span style="color:#536170;">—</span>') + '</div></div>' +
     '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;">' + esc(nm) +
       '<span style="font-size:12px;color:#536170;direction:ltr;"> ' + esc(e.phone) + '</span></div></div>' +
@@ -143,7 +143,7 @@ function vActivityCrm() {
   h += '<div class="tblwrap crmflat actflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + actHeader();
   shown.forEach(function (e) { h += actRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:13px;">' +
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;">' +
       (actQ.trim() ? 'لا حدث يطابق «' + esc(actQ.trim()) + '».' : 'لا أحداث في هذه الفترة.') + '</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("act", rows.length, "حدث") +

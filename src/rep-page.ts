@@ -21,27 +21,37 @@ export const REP_PAGE_HTML: string = `<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@450;600;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --ink:#212529; --ink2:#3A3A3A; --muted:#536170; --line:#CBD7E4; --line2:#E3E9F1;
-         --strip:#F4F6F9; --card:#fff; --teal:#306DB5; }
+  /* The rep page is a SEPARATE document, so it carries its own copy of the tokens. It had drifted
+     to pre-rebrand names (--teal, --strip, --line2) pointing at post-rebrand values. Now it uses
+     the DESIGN.md 2 names, with the three old names kept as aliases so existing var() calls in
+     this file keep resolving. A second token vocabulary is how two surfaces of one product start
+     looking like two products. */
+  :root{ --paper:#FFFFFF; --surface:#F4F6F9; --line:#CBD7E4; --line-soft:#E3E9F1;
+         --ink:#212529; --ink-2:#3A3A3A; --muted:#536170; --blue:#306DB5;
+         --z-base:0; --z-sticky:100; --z-dropdown:200; --z-overlay:300;
+         --z-modal:310; --z-toast:400; --z-tooltip:500;
+         --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
+         /* aliases, pre-rebrand names still referenced in this file */
+         --ink2:#3A3A3A; --line2:#E3E9F1; --strip:#F4F6F9; --card:#FFFFFF; --teal:#306DB5; }
   *{box-sizing:border-box}
   body{margin:0;background:var(--strip);color:var(--ink);
-       font-family:Cairo,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:450;font-size:15px;
+       font-family:Cairo,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:450;font-size:14px;
        -webkit-text-size-adjust:100%}
   header{position:sticky;inset-block-start:0;background:var(--card);border-block-end:1px solid var(--line);
-         padding:14px 16px;display:flex;align-items:baseline;gap:10px;z-index:5}
-  header .t{font-size:17px;font-weight:700}
-  header .who{font-size:12.5px;color:var(--muted);margin-inline-start:auto}
+         padding:14px 16px;display:flex;align-items:baseline;gap:10px;z-index:var(--z-sticky)}
+  header .t{font-size:16px;font-weight:600}
+  header .who{font-size:12px;color:var(--muted);margin-inline-start:auto}
   main{padding:0 0 90px}
   .row{background:var(--card);border-block-start:1px solid var(--line2);padding:13px 16px}
   .row:first-child{border-block-start:0}
-  .acct{font-weight:600;font-size:15.5px}
-  .meta{font-size:12.5px;color:var(--muted);margin-block-start:3px}
+  .acct{font-weight:600;font-size:14px}
+  .meta{font-size:12px;color:var(--muted);margin-block-start:3px}
   .lines{margin-block-start:9px;display:flex;flex-direction:column;gap:5px}
-  .line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+  .line{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink2)}
   .dot{width:7px;height:7px;border-radius:999px;background:var(--muted);flex:none}
   .val{margin-inline-start:auto;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}
   .acts{margin-block-start:11px;display:flex;gap:8px;flex-wrap:wrap}
-  button{font-family:inherit;font-weight:600;font-size:13.5px;border-radius:6px;cursor:pointer;
+  button{font-family:inherit;font-weight:600;font-size:14px;border-radius:6px;cursor:pointer;
          min-height:44px;padding-inline:14px;border:1px solid var(--line);background:var(--card);color:var(--ink2)}
   button.primary{background:var(--teal);border-color:var(--teal);color:#fff}
   button:disabled{opacity:.45;cursor:default}
@@ -49,16 +59,16 @@ export const REP_PAGE_HTML: string = `<!doctype html>
   button:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
   .empty{padding:56px 22px;text-align:center;color:var(--muted);line-height:1.7;max-width:44ch;margin:0 auto}
   .empty b{display:block;color:var(--ink);font-size:16px;margin-block-end:6px}
-  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:flex-end;z-index:20}
+  .sheet{position:fixed;inset:0;background:rgba(0,0,0,.32);display:flex;align-items:flex-end;z-index:var(--z-sticky)}
   .sheet .in{background:var(--card);width:100%;border-start-start-radius:10px;border-start-end-radius:10px;
              padding:16px 16px 26px;max-height:82vh;overflow:auto}
   .sheet h3{margin:0 0 4px;font-size:16px}
-  .sheet .sub{font-size:12.5px;color:var(--muted);margin-block-end:12px}
+  .sheet .sub{font-size:12px;color:var(--muted);margin-block-end:12px}
   .opt{width:100%;text-align:start;margin-block-end:8px;min-height:52px;display:block}
   .opt .k{font-weight:600;color:var(--ink)}
   .opt .r{font-size:12px;color:var(--muted);margin-block-start:2px}
   .pending{position:fixed;inset-block-end:0;inset-inline:0;background:var(--ink);color:#fff;
-           padding:11px 16px;font-size:13px;display:none;z-index:30}
+           padding:11px 16px;font-size:14px;display:none;z-index:var(--z-dropdown)}
   .pending.on{display:block}
 </style></head><body>
 <header><span class="t">ما يستحق اتصالك اليوم</span><span class="who" id="who"></span></header>

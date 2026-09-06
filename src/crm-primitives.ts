@@ -28,8 +28,8 @@ export const CRM_PRIMITIVES_CSS = `
 .crm-row{display:flex;align-items:center;gap:12px;min-height:36px;padding-block:8px;
   border-block-start:1px solid var(--line, #E3E9F1)}
 .crm-row:first-child{border-block-start:0}
-.crm-row .crm-nm{font-weight:600;font-size:13.5px;min-width:150px}
-.crm-row .crm-sub{font-size:11.5px;color:var(--muted, #536170);font-weight:450}
+.crm-row .crm-nm{font-weight:600;font-size:14px;min-width:150px}
+.crm-row .crm-sub{font-size:12px;color:var(--muted, #536170);font-weight:450}
 .crm-row .crm-end{margin-inline-start:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
   justify-content:flex-end}
 .crm-row.crm-click{cursor:pointer;transition:background var(--fast) var(--ease)}
@@ -79,17 +79,17 @@ export const CRM_PRIMITIVES_CSS = `
 .crm-kpi.crm-click{cursor:pointer}
 .crm-kpi.crm-click:hover{box-shadow:var(--sh-3);transform:translateY(-2px)}
 .crm-kpi.crm-lead{background:#EAF1F8}
-.crm-kpi .crm-k{font-size:11.5px;color:var(--muted, #536170);font-weight:600}
-.crm-kpi .crm-v{font-size:21px;font-weight:700;margin-block-start:3px;letter-spacing:0;
+.crm-kpi .crm-k{font-size:12px;color:var(--muted, #536170);font-weight:600}
+.crm-kpi .crm-v{font-size:22px;font-weight:600;margin-block-start:3px;letter-spacing:0;
   font-variant-numeric:tabular-nums}
-.crm-kpi.crm-lead .crm-v{font-size:30px}
-.crm-kpi .crm-s{font-size:11.5px;color:var(--muted, #536170);margin-block-start:2px}
+.crm-kpi.crm-lead .crm-v{font-size:28px}
+.crm-kpi .crm-s{font-size:12px;color:var(--muted, #536170);margin-block-start:2px}
 
 /* ---- table. Same flush idiom as the row, for the cases that genuinely need columns. Logical
        properties only: a physical padding-right lands correctly here ONLY because the document is
        RTL, and flips the moment anything renders LTR. ---- */
-.crm-tbl{width:100%;border-collapse:collapse;font-size:13px}
-.crm-tbl th{text-align:start;font-size:11.5px;font-weight:600;color:var(--muted, #536170);
+.crm-tbl{width:100%;border-collapse:collapse;font-size:14px}
+.crm-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted, #536170);
   padding-inline-end:12px;padding-block-end:8px;white-space:nowrap;
   border-block-end:1px solid var(--line2, #CBD7E4)}
 .crm-tbl td{padding-inline-end:12px;border-block-start:1px solid var(--line, #E3E9F1);
@@ -100,9 +100,9 @@ export const CRM_PRIMITIVES_CSS = `
 
 /* ---- the honest empty state. A screen with nothing in it still has to say why, because an empty
        grid and a broken query look identical to the reader. ---- */
-.crm-empty{padding:26px 4px;color:var(--muted, #536170);font-size:13px;max-width:58ch;
+.crm-empty{padding:26px 4px;color:var(--muted, #536170);font-size:14px;max-width:58ch;
   line-height:1.6}
-.crm-empty b{display:block;color:var(--ink, #212529);font-size:14.5px;margin-block-end:5px}
+.crm-empty b{display:block;color:var(--ink, #212529);font-size:14px;margin-block-end:5px}
 
 /* ---- focus. Every control on a new screen is expected to pick this up; the product's older
        focus-ring list lives in campaigns-crm and had to be extended by hand for each new class,
@@ -117,5 +117,17 @@ export const CRM_PRIMITIVES_CSS = `
 
 @media (pointer:coarse){
   .crm-focusable{min-height:44px}
+}
+
+/* T2. Measured at 390px before this existed: four KPI tiles at 73.7px each, labels wrapping to
+   four lines. repeat(4,1fr) does not become responsive by being asked nicely.
+   The breakpoint VALUE is written literally because a media query cannot read a custom property —
+   @media (max-width: var(--bp-sm)) is invalid CSS. DESIGN.md 2 remains the source of the number;
+   this is its only legal transcription. 560 = --bp-sm. */
+@media (max-width:560px){
+  .crm-kpis, .crm-kpis.crm-hasLead{grid-template-columns:repeat(2,1fr)}
+  .crm-row{flex-wrap:wrap}
+  .crm-row .crm-end{margin-inline-start:0;width:100%;justify-content:flex-start}
+  .crm-row .crm-nm{min-width:0}
 }
 `;
