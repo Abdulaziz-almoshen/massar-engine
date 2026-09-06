@@ -285,6 +285,66 @@ window.pcRetire = function (id, name) {
     .catch(function () { /* the list reloads on the next paint either way */ });
 };
 
+/* The mockup's V.exec, as a band at the top of الرئيسية.
+ *
+ * A DELIBERATE DEPARTURE from the mockup, stated rather than slipped in. The mockup switched a
+ * state.role between four homes: exec, sector manager, product manager, sales rep. Three of those
+ * four are now real DESTINATIONS in the product — #sector/<name>, #product/<name>, and /rep, which
+ * is a separate page on a phone. A mode toggle that re-renders one screen into four is chrome on
+ * top of navigation that already exists, and it hides three views behind a control instead of
+ * putting them one click away. So: the exec band lives on الرئيسية, and every row in it is a link
+ * into the role board it summarises.
+ *
+ * #home is off the 5s tick (R14), so this band does not inherit a poll. */
+function vExecBand() {
+  pcLoad(false);
+  if (!pcSectors || !pcQuarters) return "";
+  var h = '<div class="pc-sec"><div class="pc-h">القطاعات</div>' +
+    '<div class="pc-sub">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>';
+  pcSectors.sectors.forEach(function (sc) {
+    var cov = sc.coveragePct;
+    var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
+    h += '<div class="crm-row' + (sc.isUnclassified ? "" : " crm-click") + '"' +
+      (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
+      '<span class="crm-nm">' + esc(sc.sector) + '</span>' +
+      '<span class="crm-sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</span>' +
+      '<span class="crm-end"><span class="pc-price">' + pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) + '</span>' +
+      pcBar(cov === null ? 0 : cov) +
+      '<span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></span></div>';
+  });
+  h += '</div>';
+
+  var bp = (pcQuarters.byProduct || []).slice().sort(function (a, b) {
+    var ac = a.coveragePct === null ? 999 : a.coveragePct, bc = b.coveragePct === null ? 999 : b.coveragePct;
+    return ac - bc;   /* worst attainment first: this band exists to show where to worry */
+  }).slice(0, 5);
+  if (bp.length) {
+    h += '<div class="pc-sec"><div class="pc-h">المنتجات حسب الإنجاز</div>' +
+      '<div class="pc-sub">الأقل إنجازًا أولًا. المنتج بلا مستهدف يُعرض أخيرًا، لأن غياب المستهدف ليس تعثّرًا.</div>';
+    bp.forEach(function (p) {
+      var c = p.coveragePct;
+      var cls = c === null ? "crm-none" : (c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad"));
+      h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(p.product) + '">' +
+        '<span class="crm-nm">' + esc(p.product) + '</span>' +
+        '<span class="crm-end"><span class="pc-price">' + pcMoney(p.achieved) + ' من ' + pcMoney(p.annualTarget) + '</span>' +
+        pcBar(c === null ? 0 : c) +
+        '<span class="crm-st ' + cls + '"><i></i>' + (c === null ? "بلا مستهدف" : fmtN(c) + "٪") + '</span></span></div>';
+    });
+    h += '</div>';
+  }
+
+  h += '<div class="pc-sec"><div class="pc-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div><div class="pc-q">';
+  pcQuarters.quarters.forEach(function (q) {
+    var isNow = q.quarter === pcQuarters.currentQuarter;
+    h += '<div class="pc-qc' + (isNow ? " now" : "") + '"><div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
+      '<div class="v">' + pcMoney(q.achieved) + '</div>' +
+      '<div class="t">من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") + '</div>' +
+      pcBar(q.coveragePct === null ? 0 : q.coveragePct, 999) + '</div>';
+  });
+  h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' + esc(pcQuarters.valueBasis.note) + '</div></div>';
+  return h;
+}
+
 function vSectorDrill(name) {
   pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);

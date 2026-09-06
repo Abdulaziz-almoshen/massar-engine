@@ -1426,6 +1426,10 @@ function vKmonDetail(id, d) {
 }
 
 function vHome(d) {
+  // The executive band leads الرئيسية: sectors, the five worst-attaining products, and the four
+  // quarters. Placed FIRST because DESIGN.md §7.13 asks a page to have a point of view, and the
+  // question this screen answers for a founder is «أين نحن من المستهدف», not «من ردّ اليوم».
+  const execBand = (typeof vExecBand === "function") ? vExecBand() : "";
   const csAll = d.contacts || [];
   const cs = showTest ? csAll : csAll.filter((c) => !c.test);
   const nTest = csAll.filter((c) => c.test).length;
@@ -1449,7 +1453,9 @@ function vHome(d) {
     ["وصلت الرسائل", fmtN(delivered), ""],
     ["ردّوا", fmtN(replied), newReplied ? "+" + fmtN(newReplied) + " هذا الأسبوع" : ""],
   ];
-  let h = '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
+  // The exec band leads, before «مركز القيادة». DESIGN.md §7.13: a page must have a point of view,
+  // and the first question this screen answers for a founder is «أين نحن من المستهدف».
+  let h = execBand + '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
     '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
     '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
   // «جهات في قوائمك» is deliberately NOT called «جهات الاستهداف»: the funnel below uses that label
