@@ -85,7 +85,7 @@ function rpAge(d) {
 
 function vReportsCrm() {
   rpLoad();
-  if (!rpList) return '<div class="crm-empty"><b>جارٍ تحميل التقارير…</b></div>';
+  if (!rpList) return moSkeleton(4, ["w40", "w80", "w60"]);
   if (!rpList.length) return '<div class="crm-empty"><b>لا تقارير</b>لم يُعرَّف أي تقرير.</div>';
 
   var h = '<div class="rp-tabs">';
@@ -101,7 +101,7 @@ function vReportsCrm() {
   setTimeout(function () { moveInd(document.querySelector(".rp-tabs")); }, 0);
 
   var cur = rpData[rpPick];
-  if (!cur) return h + '<div class="crm-empty"><b>جارٍ الحساب…</b></div>';
+  if (!cur) return h + moSkeleton(4, ["w60", "w80", "w40"]);
 
   h += '<div class="rp-q">' + esc(cur.report.question) + '</div>';
 
@@ -143,19 +143,21 @@ function vReportsCrm() {
    for three, and sorting by count buries the row the block exists to surface. */
 function vReportRollups() {
   rpRollLoad();
-  if (!rpRoll || rpRoll === "loading") return '<div class="rp-sec"><div class="crm-empty">جارٍ حساب التجميعات…</div></div>';
+  if (!rpRoll || rpRoll === "loading") return '<div class="rp-sec">' + moSkeleton(3, ["w60", "w40"]) + '</div>';
 
   var h = '<div class="rp-sec"><div class="rp-h">أين تتعثّر الصفقات</div>' +
     '<div class="rp-hs">الإجراءات المفتوحة حسب الإدارة المسؤولة، مرتّبة بالأقدم توقّفًا لا بالأكثر عددًا.</div>';
   if (!rpRoll.byDept.length) {
     h += '<div class="crm-empty"><b>' + esc(rpRoll.empty.dept.title) + '</b>' + esc(rpRoll.empty.dept.body) + '</div>';
   } else {
+    h += '<div class="mo-stagger">';
     rpRoll.byDept.forEach(function (d) {
       h += '<div class="crm-row"><span class="crm-nm">' + esc(d.dept) + '</span>' +
         '<span class="crm-sub">' + fmtN(d.openCount) + ' إجراء مفتوح</span>' +
         '<span class="crm-end"><span class="rp-tot" style="margin:0">' + fmtN(Math.round(d.value)) + ' ر.س</span>' +
         rpAge(d.oldestDays) + '</span></div>';
     });
+    h += '</div>';
   }
   h += '</div>';
 

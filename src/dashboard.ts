@@ -17,6 +17,7 @@ import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
+import { MOTION_CSS, MOTION_JS } from "./motion.js";
 import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS, PRODUCTS_DRILL_JS } from "./products-crm.js";
 import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
 import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
@@ -602,6 +603,7 @@ export const DASHBOARD_HTML = `<!doctype html>
      cursor. NO BACKTICKS IN THIS FILE'S COMMENTS — the CSS is inside a template literal and one
      backtick ends it (ADR-0001, caught by this very cycle's build). */
   @media (max-width: 900px) { .app { flex-direction: column; } aside { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 6px; padding-inline: 8px; overflow-x: auto; border-inline-end: none; border-block-end: 1px solid #E3E9F1; } aside .switcher { width: auto; flex: none; height: 44px; padding: 6px; } aside .switcher > div, aside .switcher .chev { display: none; } aside .navsearch { width: auto; flex: none; min-width: 44px; height: 44px; justify-content: center; padding-inline: 10px; } aside .navsearch .lbl, aside .navsearch kbd { display: none; } aside #nav { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; } aside #nav .grp { display: none; } aside #nav .nv { width: auto; flex: none; height: 44px; white-space: nowrap; margin-bottom: 0; } aside .collapse { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+${MOTION_CSS}
 ${CRM_PRIMITIVES_CSS}
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
@@ -4060,6 +4062,15 @@ function render(fetchNew) {
   } else {
     b.innerHTML = vPlaceholder(cur);
   }
+  // number-pop-in, applied once per paint. moNumber animates ONLY when the value differs from the
+  // last render, which matters because #body is rewritten on every keystroke — an entrance replayed
+  // on each one is the jump DESIGN.md §8.6 forbids.
+  try {
+    document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
+      moNumber(el, (el.textContent || "").trim() + "#" + i);
+    });
+  } catch (e) { /* motion is never allowed to stop a paint */ }
+
   // The #pathNow / #pathScroll scroll-into-view went with the stage rail that produced those two
   // ids. Nothing renders them any more, so it ran on every paint and could never fire.
   // After the first paint of a route the entrance animation is noise: every keystroke re-renders
@@ -4397,6 +4408,7 @@ ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
+${MOTION_JS}
 ${PRODUCTS_CRM_JS}
 ${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}

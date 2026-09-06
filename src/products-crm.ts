@@ -67,7 +67,14 @@ function pcBar(pct, cap) {
 
 function vProductsCrm() {
   pcLoad(false);
-  if (!pcCat) return '<div class="crm-empty"><b>جارٍ تحميل الكتالوج…</b>القطاعات والباقات والمستهدفات، من السجل.</div>';
+  /* skeleton-swap, not a spinner: the layout is KNOWN here, so blocks at the shape of the content
+     read as "this is arriving" rather than "something is happening somewhere". */
+  if (!pcCat) return '<div class="crm-kpis">' +
+    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div></div>' +
+    '<div style="margin-block-start:20px">' + moSkeleton(5, ["w80", "w60", "w40"]) + '</div>';
 
   var withPkg = pcCat.filter(function (p) { return p.packages && p.packages.length; }).length;
   var noSector = pcCat.filter(function (p) { return !p.sector; }).length;
@@ -179,8 +186,9 @@ export const PRODUCTS_DRILL_JS = `
    adds a spinner and a failure mode for nothing. */
 
 function pcBack() {
-  return '<a href="#products" style="display:inline-flex;align-items:center;gap:6px;font-size:var(--t-xs);' +
-    'font-weight:600;color:var(--muted);text-decoration:none;margin-block-end:14px;">\u2192 كل المنتجات</a>';
+  return '<a href="#products" class="mo-more" style="display:inline-flex;align-items:center;gap:6px;' +
+    'font-size:var(--t-xs);font-weight:600;color:var(--muted);text-decoration:none;margin-block-end:14px;">' +
+    '<span class="mo-arrow">\u2192</span> كل المنتجات</a>';
 }
 
 function pcOppsFor(pred) {
@@ -196,7 +204,7 @@ function pcVal(o) {
 function vProductDrill(name) {
   pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);
-  if (!pcCat) return pcBack() + '<div class="crm-empty"><b>جارٍ التحميل…</b></div>';
+  if (!pcCat) return pcBack() + moSkeleton(6, ["w60", "w80", "w40"]);
   var p = pcCat.filter(function (x) { return x.product === name; })[0];
   if (!p) return pcBack() + '<div class="crm-empty"><b>منتج غير موجود</b>لا يوجد وسم بهذا الاسم في السجل.</div>';
 
@@ -230,7 +238,7 @@ function vProductDrill(name) {
       h += '<div class="crm-row"><span class="crm-nm">' + esc(k.name) + '</span>' +
         '<span class="crm-sub">' + (k.scope ? esc(k.scope) : "—") + ' · ' + fmtN(k.years) + ' سنة</span>' +
         '<span class="crm-end"><span class="pc-price">' + pcMoney(k.listPrice) + '</span>' +
-        '<button class="btn btn-ghost mini crm-focusable" onclick="pcRetire(' + k.id + ',' + JSON.stringify(k.name) + ')">تقاعد</button>' +
+        '<button class="btn btn-ghost mini crm-focusable" data-retire="' + k.id + '" data-nm="' + esc(k.name) + '">تقاعد</button>' +
         '</span></div>';
     });
   }
@@ -277,12 +285,29 @@ document.addEventListener("click", function (ev) {
   location.hash = kind + "/" + encodeURIComponent(nm);
 });
 
-window.pcRetire = function (id, name) {
+/* Delegated, like the drill rows. An inline onclick carrying JSON.stringify(name) puts DOUBLE
+   quotes inside a double-quoted attribute and closes it — the same bug as the drill rows, made
+   twice in one file. A data attribute carries the name as data and getAttribute decodes it once. */
+document.addEventListener("click", function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest("[data-retire]") : null;
+  if (!b) return;
+  pcRetire(Number(b.getAttribute("data-retire")), b.getAttribute("data-nm"), b);
+});
+
+window.pcRetire = function (id, name, btn) {
   if (!window.confirm("تقاعد الباقة «" + name + "»؟ لن تظهر للبيع، وتبقى الصفقات المرتبطة بها كما هي.")) return;
+  /* text-states-swap: the label changes and the button does NOT resize, so the row beneath it does
+     not move under the cursor. The width is reserved from the longest state before the first click. */
+  if (btn) { moReserve(btn, ["تقاعد", "جارٍ…"]); moBusy(btn, "جارٍ…"); }
   fetch("/admin/packages/" + id + "/retire", { method: "POST", headers: { "x-admin-token": TOKEN } })
     .then(function (r) { return r.json(); })
-    .then(function () { pcCat = null; pcLoad(true); })
-    .catch(function () { /* the list reloads on the next paint either way */ });
+    .then(function (j) {
+      if (btn) moIdle(btn);
+      /* The outcome is SAID, not implied by a list quietly changing under the reader. */
+      moToast(j && j.ok === false ? "تعذّر تقاعد الباقة" : "تقاعدت الباقة «" + name + "»");
+      pcCat = null; pcLoad(true);
+    })
+    .catch(function () { if (btn) moIdle(btn); moToast("تعذّر الاتصال — لم يتغيّر شيء"); });
 };
 
 /* The mockup's V.exec, as a band at the top of الرئيسية.
@@ -347,7 +372,7 @@ function vExecBand() {
           '<div class="crm-bar" style="max-width:120px"><i style="width:' +
             Math.round(((sc.weightedOpen || 0) / topOpen) * 100) + '%"></i></div></span></div>';
       });
-      h0 += '</div>';
+      h0 += '</div></div>';
     }
     return h0;
   }
@@ -404,7 +429,7 @@ function vExecBand() {
 function vSectorDrill(name) {
   pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);
-  if (!pcSectors) return pcBack() + '<div class="crm-empty"><b>جارٍ التحميل…</b></div>';
+  if (!pcSectors) return pcBack() + moSkeleton(6, ["w60", "w80", "w40"]);
   var sec = pcSectors.sectors.filter(function (x) { return x.sector === name; })[0];
   if (!sec) return pcBack() + '<div class="crm-empty"><b>قطاع غير موجود</b></div>';
 

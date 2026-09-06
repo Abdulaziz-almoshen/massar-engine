@@ -24,7 +24,6 @@ export const SALES_CRM_CSS = `
 .perf-per .q{border:1px solid var(--line,#CBD7E4);background:var(--card,#fff);border-radius:999px;
   padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#3A3A3A);min-height:32px}
 .perf-per .q.on{background:#306DB5;border-color:#306DB5;color:#fff;font-weight:600}
-.perf-note{margin-inline-start:auto;font-size:12px;color:var(--muted,#536170);max-width:46ch;text-align:end}
 /* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
    four equal cards made it the last of four with no more weight than the rest. */
 .perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
@@ -197,12 +196,10 @@ function perfShell(quarter, year) {
     // THE BASIS IS STATED ON THE SCREEN, because it was never decided. The plan named this as its
     // single unresolved business question — bookings, ACV, or TCV — and the code shipped one
     // answer: sale_price x qty x years, the whole contract booked into the quarter it was won.
-    // A director reads an unlabelled riyal figure as revenue. This one is not, and until the
-    // founder rules, the screen says so rather than letting the number imply it.
-    '<div class="perf-note">كل رقم هنا محسوب من السجل — عدا المستهدف، وهو الوحيد الذي يُكتب بيد إنسان. ' +
-    'العلامة على الشريط هي موضعنا من الربع.<br>' +
-    '<b>المحقق يُحتسب بإجمالي قيمة العقد لكل سنواته، ويُسجَّل كاملًا في ربع الإغلاق</b> — ' +
-    'وهو أساس لم يُعتمد بعد.</div></div>';
+    // The explanatory note was removed on the founder's instruction (2026-09-06). The basis it
+    // described is still stated where a figure is actually read against a target — DESIGN.md's
+    // VALUE_BASIS_NOTE renders under the quarters on المنتجات and under every report table.
+    '</div>';
 }
 
 /** The four figures. Nulls render as «—» rather than as zero: "not loaded yet" and "zero riyals"
