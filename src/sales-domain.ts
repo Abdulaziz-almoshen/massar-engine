@@ -46,14 +46,14 @@ export type SalesStage = {
 };
 
 export const SALES_STAGES: readonly SalesStage[] = [
-  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, dot: "#999999", stalls: false, terminal: null,   exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
-  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, dot: "#7C7C7C", stalls: false, terminal: null,   exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
-  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, dot: "#2F5F94", stalls: false, terminal: null,   exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
+  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, dot: "#A9B4C0", stalls: false, terminal: null,   exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
+  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, dot: "#536170", stalls: false, terminal: null,   exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
+  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, dot: "#416CAD", stalls: false, terminal: null,   exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
   { key: "tech",      label: "التقييم التقني",      weightPct: 65,  position: 4, dot: "#7A5CC4", stalls: true,  terminal: null,   exitCriterion: "اجتاز التكامل مع صحة/صحتي ومتطلبات الأمن" },
-  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, dot: "#525252", stalls: false, terminal: null,   exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
-  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, dot: "#1F7A73", stalls: true,  terminal: null,   exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
-  { key: "won",       label: "إغلاق – ربح",        weightPct: 100, position: 7, dot: "#027A48", stalls: false, terminal: "won",  exitCriterion: "تم التوقيع والاعتماد" },
-  { key: "lost",      label: "إغلاق – خسارة",      weightPct: 0,   position: 8, dot: "#B42318", stalls: false, terminal: "lost", exitCriterion: "اعتذر العميل (سجّل السبب)" },
+  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, dot: "#3A3A3A", stalls: false, terminal: null,   exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
+  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, dot: "#306DB5", stalls: true,  terminal: null,   exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
+  { key: "won",       label: "إغلاق – ربح",        weightPct: 100, position: 7, dot: "#12633F", stalls: false, terminal: "won",  exitCriterion: "تم التوقيع والاعتماد" },
+  { key: "lost",      label: "إغلاق – خسارة",      weightPct: 0,   position: 8, dot: "#8E2A27", stalls: false, terminal: "lost", exitCriterion: "اعتذر العميل (سجّل السبب)" },
 ];
 
 /** The threshold at which interest stops being a conversation and becomes a commitment of the
@@ -304,6 +304,40 @@ export const SALES_DOMAIN_JS: string = [
 ].join("\n");
 
 // ---------------------------------------------------------------------------
+// WHICH PRICE IS AUTHORITATIVE. Three numbers now describe one deal and they are NOT
+// interchangeable:
+//
+//   packages.list_price          the PUBLISHED reference, per year. What we ask.
+//   opportunities.sale_price     the NEGOTIATED price, per year. What this customer agreed.
+//   opportunities.discount       a further reduction the rep applied on top of sale_price.
+//
+// «قيمة الفرصة» is UNCHANGED by any of this: sale_price x qty x years x (1 - discount/100). It was
+// correct before packages existed and 37 live deals are computed from it, so it keeps its exact
+// meaning and its exact arithmetic. Adding a reference price adds a NEW question, it does not
+// redefine the old answer.
+//
+// The new question is «كم تحت السعر المعلن بيعت», and it is answerable only against the price that
+// was quoted AT THE TIME — quoted_list_price on the deal, not today's packages.list_price. Reading
+// the live package would make every historical figure move the moment anyone edits a price.
+// ---------------------------------------------------------------------------
+
+/** How far under the published price a deal landed, as a percentage. Positive means below list.
+ *
+ *  Returns NULL when there is no quoted reference, and that is the common case rather than an edge
+ *  one: five of the six products publish no price at all («يحدده المختص» — quoted case by case).
+ *  A screen must render «لم يُحدَّد» for those, never ٠٪, because zero percent off list is a claim
+ *  and no-published-price is the absence of one. */
+export function offListPct(
+  value: number, quotedListPrice: number | null, quantity: number, quotedYears: number | null,
+): number | null {
+  if (quotedListPrice == null || quotedYears == null) return null;
+  const qty = Number(quantity) || 1;
+  const reference = quotedListPrice * qty * quotedYears;
+  if (!(reference > 0)) return null;
+  return (1 - value / reference) * 100;
+}
+
+// ---------------------------------------------------------------------------
 // GATE A. The threshold the pilot is judged on, defined precisely enough to be reproducible.
 //
 // The plan stated it as "fewer than three engagements on a median working day, or fewer than half
@@ -457,3 +491,122 @@ export function checkSalesDomainClosure(): string[] {
   }
   return bad;
 }
+
+// ---------------------------------------------------------------- market sectors
+
+/**
+ * The three sectors Massar sells into. MARKET sectors, not customer segments and not government:
+ * the founder corrected both readings. Order is display order, biggest catalogue first.
+ */
+export const SECTORS = ["قطاع المستشفيات", "قطاع الصيدليات", "قطاع الأعمال"] as const;
+
+/**
+ * Which sector each catalogue product sells into: [product, sector, assumed, pricingNote].
+ *
+ * `assumed` is true where agent.ts's own bestFor audience CONTRADICTS the placement, so a screen can
+ * print «مُستنتَج» rather than presenting a guess at the same weight as a fact. Four are evidenced.
+ *
+ * `pricingNote` is the verbatim pricing line from agent.ts, and it is null for exactly one product
+ * — «الإجازات المرضية» is the only one with published packages, which live in `packages`. The other
+ * five say «يحدده المختص», so a price column renders those words instead of an empty cell that
+ * reads as missing data. This is why offListPct returns null rather than 0 for five of six.
+ *
+ * «خدمة أخرى» is absent on purpose: it is the analyst's catch-all bucket, not a product.
+ */
+export const PRODUCT_SECTOR: readonly (readonly [string, string, boolean, string | null])[] = [
+  ["الإجازات المرضية",        "قطاع المستشفيات", false, null],
+  ["التقارير الطبية",          "قطاع المستشفيات", false, "اشتراك سنوي يحدده المختص وفق الحجم"],
+  ["تكامل الأنظمة (HIS/ERP)",  "قطاع المستشفيات", false, "مشروع تكامل واشتراك سنوي، يحدده المختص"],
+  ["الشهادات الصحية",          "قطاع الصيدليات",  false, "اشتراك سنوي يحدده المختص"],
+  ["خدمات التطعيمات",          "قطاع الصيدليات",  true,  "اشتراك سنوي يحدده المختص"],
+  ["فحص الموظفين",             "قطاع الأعمال",    true,  "اشتراك سنوي بتسعير لكل فحص، يحدده المختص وفق الحجم"],
+
+  // The two products that exist in PRODUCTION and not in agent.ts. They have no bestFor audience
+  // to reason from, so both are flagged: «سجل التطعيمات الوطني» is placed beside خدمات التطعيمات,
+  // and «صحة أعمال Plus» on the strength of أعمال in its own name. Neither has a published price,
+  // so the catalogue prints «لا سعر منشور» rather than inventing one. Correcting either is a single
+  // UPDATE — a deal never stores its sector.
+  ["سجل التطعيمات الوطني",     "قطاع الصيدليات",  true,  null],
+  ["صحة أعمال Plus",           "قطاع الأعمال",    true,  null],
+];
+
+/** One sector's line on the sector board, plus the unclassified bucket. */
+export type SectorRollup = {
+  sector: string;            // the sector name, or UNCLASSIFIED_SECTOR
+  isUnclassified: boolean;
+  products: string[];
+  target: number; achieved: number; weightedOpen: number;
+  openCount: number; wonCount: number;
+  coveragePct: number | null; // achieved+weightedOpen over target; null when no target is set
+};
+
+/**
+ * The bucket for a product with no sector. NOT a fourth sector: it is the visible hole where a
+ * decision has not been made yet.
+ */
+export const UNCLASSIFIED_SECTOR = "بلا قطاع";
+
+/**
+ * Group per-product performance into sectors.
+ *
+ * WHY THIS IS A PURE FUNCTION AND NOT SQL. salesPerformance already computes every figure per
+ * product, driven off `tags` with a LEFT JOIN to product_meta. Writing a second query to group them
+ * would be a fifth hand-written copy of «قيمة الفرصة» and a second place for the two to disagree.
+ * Grouping is arithmetic, so it belongs here where it can be unit-tested without a database.
+ *
+ * WHY UNCLASSIFIED IS A ROW AND NOT A FILTER. Production carries products the catalogue in agent.ts
+ * has never heard of («سجل التطعيمات الوطني», «صحة أعمال Plus»), and the analyst files anything it
+ * cannot match under «خدمة أخرى». Dropping unmapped rows would make the sector totals sum to less
+ * than the pipeline while every individual line still looked right — the exact failure this project
+ * keeps shipping. So they get a row, with their real numbers, named as unclassified.
+ */
+export function rollupBySector(
+  rows: readonly { product: string; sector: string | null; target: number; achieved: number;
+                   weightedOpen: number; openCount: number; wonCount: number }[],
+  sectorOrder: readonly string[] = SECTORS,
+): SectorRollup[] {
+  const by = new Map<string, SectorRollup>();
+  const blank = (sector: string): SectorRollup => ({
+    sector, isUnclassified: sector === UNCLASSIFIED_SECTOR, products: [],
+    target: 0, achieved: 0, weightedOpen: 0, openCount: 0, wonCount: 0, coveragePct: null,
+  });
+  for (const r of rows) {
+    const key = r.sector ?? UNCLASSIFIED_SECTOR;
+    const acc = by.get(key) ?? blank(key);
+    acc.products.push(r.product);
+    acc.target += r.target; acc.achieved += r.achieved; acc.weightedOpen += r.weightedOpen;
+    acc.openCount += r.openCount; acc.wonCount += r.wonCount;
+    by.set(key, acc);
+  }
+  for (const acc of by.values()) {
+    // A sector with no target has no coverage, which is different from 0% coverage. Reporting 0
+    // would paint an untargeted sector red on a board whose whole job is showing where to worry.
+    acc.coveragePct = acc.target > 0
+      ? Math.round(((acc.achieved + acc.weightedOpen) / acc.target) * 100)
+      : null;
+    acc.products.sort((a, b) => a.localeCompare(b, "ar"));
+  }
+  // Declared sector order first, then any sector seeded later, then unclassified last: the hole
+  // belongs at the bottom of the board, not sorted into the middle of the real sectors.
+  const rank = (s: string) => {
+    if (s === UNCLASSIFIED_SECTOR) return 9999;
+    const i = sectorOrder.indexOf(s);
+    return i === -1 ? 999 : i;
+  };
+  return [...by.values()].sort((a, b) => rank(a.sector) - rank(b.sector) || a.sector.localeCompare(b.sector, "ar"));
+}
+
+// ---------------------------------------------------------------- what the money figure IS
+
+/**
+ * «المحقق» is the FULL CONTRACT VALUE: price x qty x years, discount taken off.
+ *
+ * The accounting basis — bookings, ACV, or TCV — was never decided, and it is still open. Until it
+ * is, the screen must not print a bare «المحقق» beside a target and let the reader supply their own
+ * basis: a CFO reading TCV as ACV is wrong by the number of years, which on a three-year deal is
+ * 300%. So the label says what the arithmetic actually did, and the note says the basis is undecided
+ * rather than implying one was chosen.
+ */
+export const VALUE_BASIS_LABEL = "قيمة العقد الكاملة — السعر × الكمية × السنوات، ناقص الخصم";
+export const VALUE_BASIS_NOTE =
+  "الأساس المحاسبي (حجوزات · ACV · TCV) لم يُحسم بعد. الرقم أعلاه قيمة العقد الكاملة، لا القيمة السنوية.";

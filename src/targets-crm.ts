@@ -24,23 +24,23 @@ export const TARGETS_CRM_CSS = `
      the same number in both directions — the arity bug class that wrapped three earlier tables. */
   .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.2fr 1.1fr 1fr 128px; padding-inline:20px 12px; }
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
-  .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#F3F3F3;
-    color:#525252; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
-  .tgtflat .crow .t-nm .lb { font-size:13.5px; font-weight:450; color:#171717; overflow:hidden;
+  .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#EDF1F7;
+    color:#3A3A3A; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
+  .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#212529; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .t-seg { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; min-width:0; }
-  .tgtflat .crow .t-ph { font-size:12.5px; color:#7C7C7C; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
-  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#525252; min-width:0; }
+  .tgtflat .crow .t-ph { font-size:12px; color:#536170; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
+  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#3A3A3A; min-width:0; }
   .tgtflat .crow .t-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
   .tgtflat .crow .t-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .c-act { display:flex; justify-content:flex-end; }
-  .tgtdel { font-family:inherit; font-size:12px; color:#7C7C7C; background:transparent; border:1px solid #EDEDED;
+  .tgtdel { font-family:inherit; font-size:12px; color:#536170; background:transparent; border:1px solid #E3E9F1;
     border-radius:6px; height:26px; padding:0 8px; cursor:pointer; white-space:nowrap; }
-  .tgtdel:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
-  .tgtdel.arm { color:#B42318; border-color:#B42318; background:#FEF3F2; opacity:1 !important; }
-  .tgtopp { font-family:inherit; font-size:12px; color:#2E7D77; background:#fff; border:1px solid #EDEDED;
+  .tgtdel:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
+  .tgtdel.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; opacity:1 !important; }
+  .tgtopp { font-family:inherit; font-size:12px; color:#306DB5; background:#fff; border:1px solid #E3E9F1;
     border-radius:6px; height:26px; padding:0 9px; cursor:pointer; white-space:nowrap; }
-  .tgtopp:hover { border-color:#3FB6B0; background:#F4FCFB; }
+  .tgtopp:hover { border-color:#629CCD; background:#EAF1F8; }
   /* The shared .crow rule hides the ENTIRE action cell until hover, which is right for a delete and
      wrong for the one thing this screen is asked for: «I onboarded leads, I called one, now what».
      An affordance you must already know about to discover is not an answer to that question. So the
@@ -55,22 +55,22 @@ export const TARGETS_CRM_CSS = `
   .tgtflat .crow .tgtdel.arm, .tgtflat .crow .tgtdel.armx { opacity:1; }
   @media (pointer:coarse) { .tgtflat .crow .tgtdel { opacity:1; } }
   /* إدارة الوسوم */
-  .tagsheet { position:fixed; inset:0; z-index:140; background:rgba(23,23,23,.32);
+  .tagsheet { position:fixed; inset:0; z-index:var(--z-toast); background:rgba(23,23,23,.32);
     display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
-  .tagsheet .sheet { background:#fff; border:1px solid #EDEDED; border-radius:14px; width:100%;
+  .tagsheet .sheet { background:#fff; border:1px solid #E3E9F1; border-radius:14px; width:100%;
     max-width:520px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
   .tagsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#171717; }
-  .tagsheet .hint { font-size:12.5px; color:#7C7C7C; line-height:1.8; margin-top:6px; }
+  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#212529; }
+  .tagsheet .hint { font-size:12px; color:#536170; line-height:1.8; margin-top:6px; }
   .tagsheet .mk { display:flex; gap:8px; margin:14px 0 4px; }
   .tagsheet .mk input { flex:1; min-width:0; height:34px; }
   .tagsheet .tlist { margin-top:6px; max-height:52vh; overflow-y:auto; }
-  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #EDEDED; }
-  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:13.5px; color:#171717;
+  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #E3E9F1; }
+  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:14px; color:#212529;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tagsheet .trow2 .ct { font-size:12px; color:#999999; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tagsheet .trow2 .ct { font-size:12px; color:#536170; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
-  .tagsheet .trow2 .dngr:hover { color:#B42318; border-color:#F3C7C2; background:#FEF3F2; }
+  .tagsheet .trow2 .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
   @media (max-width: 939px) {
     .tgtflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
     .tgtflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
@@ -125,13 +125,13 @@ function tgtFacetBar() {
   var groups = segGroups();
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:190px;max-width:300px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tq" class="inp" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   groups.forEach(function (g, ki) {
     var on = Boolean(tgtFilters[g.key]);
     h += '<select class="crmsel' + (on ? " on" : "") + '" onchange="tgtSetAttr(' + ki + ', Number(this.value))"' +
-      (on ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + '>' +
+      (on ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + '>' +
       '<option value="-1">' + esc(g.key) + ": الكل</option>" +
       g.values.map(function (v, vi) {
         return '<option value="' + vi + '"' + (tgtFilters[g.key] === v[0] ? " selected" : "") + '>' +
@@ -141,7 +141,7 @@ function tgtFacetBar() {
   var withProd = affinityProducts().filter(function (p) { return p.uses > 0 || p.name === tgtProd; });
   if (withProd.length) {
     h += '<select class="crmsel' + (tgtProd ? " on" : "") + '" onchange="tgtSetProd(this.value)"' +
-      (tgtProd ? ' style="border-color:#3FB6B0;color:#2E7D77;background:#DCF1EF;"' : "") + '>' +
+      (tgtProd ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + '>' +
       '<option value="">الخدمة المستخدمة: الكل</option>' +
       withProd.map(function (p) {
         return '<option value="' + esc(p.name) + '"' + (tgtProd === p.name ? " selected" : "") + '>' +
@@ -158,7 +158,7 @@ function tgtFacetBar() {
 }
 
 function tgtHeader(allOn) {
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;">' +
+  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
       (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></div>' +
     "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>المرحلة</div><div></div></div>" +
@@ -185,7 +185,7 @@ function tgtRow(e) {
     '<div class="t-seg">' + (function () {
       var pc = prodChips(e);
       var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
-      return pc + attrChips(e, budget) || '<span style="color:#C7C7C7;font-size:12px;">—</span>';
+      return pc + attrChips(e, budget) || '<span style="color:#536170;font-size:12px;">—</span>';
     })() + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
@@ -203,9 +203,9 @@ function tgtRow(e) {
 
 function tgtImportBox() {
   return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
-    'style="background:#fff;border:1px solid #EDEDED;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
-    '<summary style="font-size:12.5px;color:#525252;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
-    '<div style="font-size:12px;color:#999999;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
+    'style="background:#fff;border:1px solid #E3E9F1;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
+    '<summary style="font-size:12px;color:#3A3A3A;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
+    '<div style="font-size:12px;color:#536170;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-dark" onclick="entManualSave()">حفظ الجهات ←</button>' +
@@ -213,8 +213,8 @@ function tgtImportBox() {
     '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
     '<button class="btn btn-ghost" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
     '<div id="pastebox" style="display:none;margin-top:12px;">' +
-    '<div style="font-size:12px;color:#7C7C7C;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#171717;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12.5px;line-height:2;resize:vertical;"></textarea>' +
+    '<div style="font-size:12px;color:#536170;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#212529;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12px;line-height:2;resize:vertical;"></textarea>' +
     '<button class="btn btn-ghost" style="margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
     "</details>";
 }
@@ -243,7 +243,7 @@ function vTargetsCrm() {
   h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
   shown.forEach(function (e) { h += tgtRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;">لا جهة تطابق هذا الفرز.</div>';
+    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;">لا جهة تطابق هذا الفرز.</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
@@ -265,13 +265,13 @@ function tgtBulkBar() {
        only fail; the bar says what is missing and where to fix it. */
     return '<div class="bulkbar"><div>' +
       '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-      '<span style="font-size:12.5px;">لا وسوم بعد.</span>' +
+      '<span style="font-size:12px;">لا وسوم بعد.</span>' +
       '<button class="pri" onclick="tgtOpenTags()">أنشئ أول وسم</button>' +
       '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
   }
   return '<div class="bulkbar"><div>' +
     '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#171717;border-radius:999px;">' +
+    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#212529;border-radius:999px;">' +
     tags.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(clip(t.name, 30)) + "</option>"; }).join("") +
     "</select>" +
     '<button class="pri"' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(true)">' +
@@ -325,9 +325,9 @@ function tgtTagsPanel() {
           }
           if (tgtTagArm === t.name) {
             return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +
-              '<span class="ct" style="color:#B42318;">' +
+              '<span class="ct" style="color:#8E2A27;">' +
                 (t.count ? "سيُزال عن " + fmtN(t.count) + " جهة" : "بلا جهات") + "</span>" +
-              '<button class="btn btn-ghost dngr" style="border-color:#B42318;color:#B42318;" onclick="tgtDeleteTag(' + q + ')">تأكيد الحذف</button>' +
+              '<button class="btn btn-ghost dngr" style="border-color:#8E2A27;color:#8E2A27;" onclick="tgtDeleteTag(' + q + ')">تأكيد الحذف</button>' +
               '<button class="btn btn-ghost" onclick="tgtArmTag(&quot;&quot;)">تراجع</button></div>';
           }
           return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +

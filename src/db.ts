@@ -1,6 +1,6 @@
 import pg from "pg";
 import * as facts from "./facts.js";
-import { SALES_STAGES } from "./sales-domain.js";
+import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
 
 // ---------------------------------------------------------------------------
@@ -476,6 +476,120 @@ ALTER TABLE actions ADD  CONSTRAINT actions_opp_fk
   FOREIGN KEY (opp_id) REFERENCES opportunities(id) ON DELETE CASCADE;
 `,
   },
+  {
+    version: "004-pricing",
+    sql: `
+-- THE REFERENCE PRICE, and it lives on the PACKAGE.
+--
+-- A first design put it on the product with packages as named durations. The company's own
+-- published price list disproves that: agent.ts carries «الباقة القياسية (فرع واحد): 18,000 ر.س
+-- سنويًا · باقة المؤسسات (حتى 10 فروع): 95,000 ر.س سنويًا» — one product, BOTH annual, and the
+-- differentiator is BRANCH COUNT, not duration. A single per-year product price cannot produce
+-- both numbers. Found by the Codex outside voice; two reviewers and the founder had all chosen
+-- the other model before anyone opened that file.
+--
+-- AND MOST PRODUCTS HAVE NO LIST PRICE AT ALL. Five of the six say «يحدده المختص» — quoted case
+-- by case. So an empty price is not a gap waiting to be filled, it is the truth, and the screens
+-- must say so rather than render a zero.
+CREATE TABLE IF NOT EXISTS packages (
+  id          BIGSERIAL PRIMARY KEY,
+  product     TEXT   NOT NULL,
+  name        TEXT   NOT NULL,
+  -- Per YEAR. The published reference, never what was negotiated.
+  list_price  BIGINT NOT NULL CHECK (list_price >= 0),
+  years       INT    NOT NULL DEFAULT 1 CHECK (years > 0),
+  -- What actually differentiates this package from its siblings: «فرع واحد», «حتى ١٠ فروع».
+  -- Text on purpose — the axis differs per product and inventing a numeric one would be a guess.
+  scope       TEXT,
+  -- Lifecycle is RETIRE, never delete. A won deal must keep pointing at the package it was sold
+  -- under, so nothing that a deal references may ever be removed.
+  retired_at  BIGINT,
+  created_at  BIGINT NOT NULL,
+  UNIQUE (product, name),
+  -- Not redundant with the primary key: it is what lets the opportunity carry a COMPOSITE foreign
+  -- key below, so a deal on product X cannot reference a package belonging to product Y.
+  UNIQUE (id, product)
+);
+CREATE INDEX IF NOT EXISTS packages_product_idx ON packages (product) WHERE retired_at IS NULL;
+
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS package_id BIGINT;
+-- THE SNAPSHOT. Without it, editing a package's price silently reprices every deal ever quoted
+-- from it, including WON ones, and «المحقق» moves with nobody touching a deal. That is the same
+-- class of defect as the ledger that had no writer. The quote is a fact about a moment.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS quoted_list_price BIGINT;
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS quoted_years INT;
+
+-- Composite FK: (package_id, product) must exist together in packages. MATCH SIMPLE means a NULL
+-- package_id satisfies it, so every pre-existing deal passes untouched. RESTRICT rather than
+-- CASCADE or SET NULL, because retirement is the lifecycle and a referenced package must not go.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opp_package_product_fk;
+ALTER TABLE opportunities ADD  CONSTRAINT opp_package_product_fk
+  FOREIGN KEY (package_id, product) REFERENCES packages (id, product) ON DELETE RESTRICT;
+
+-- The two REAL packages, verbatim from agent.ts. The only published prices this company has.
+INSERT INTO packages (product, name, list_price, years, scope, created_at)
+SELECT 'الإجازات المرضية', 'الباقة القياسية', 18000, 1, 'فرع واحد', $NOW$
+WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'الباقة القياسية');
+INSERT INTO packages (product, name, list_price, years, scope, created_at)
+SELECT 'الإجازات المرضية', 'باقة المؤسسات', 95000, 1, 'حتى ١٠ فروع', $NOW$
+WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'باقة المؤسسات');
+
+-- For the five products that are quoted case by case, the verbatim wording, so a screen can say
+-- «يحدده المختص» instead of rendering an empty cell that reads as missing data.
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS pricing_note TEXT;
+`,
+  },
+  {
+    version: "005-sector-provenance",
+    sql: `
+-- WHICH SECTOR ASSIGNMENT IS EVIDENCED, AND WHICH IS A GUESS.
+--
+-- Four of the six products carry their own answer: agent.ts lists a bestFor audience per product,
+-- and it is the closest thing to a stated market this repo has. It also OVERTURNED the mapping I
+-- had inferred: «الإجازات المرضية», the only product with a published price and the largest line
+-- in the pipeline, lists مجمعات طبية / مراكز طبية / مستشفيات / مراكز أسنان. It is a hospital
+-- product. I had placed it under أعمال because the employer is who consumes a sick note, which
+-- confuses who USES the document with who BUYS the system.
+--
+-- Two remain guesses and are flagged, because bestFor contradicts the placement:
+--   خدمات التطعيمات → صيدليات, but bestFor leads with مراكز صحية
+--   فحص الموظفين    → أعمال,   but bestFor leads with مستشفيات and names شركات third
+--
+-- Seeding all six keeps a sector rollup complete; the flag keeps it honest, and a screen prints
+-- «مُستنتَج» beside a flagged product so nobody reads a guess as a fact. Correcting one is a single
+-- UPDATE: a deal never stores a sector, it derives one through product_meta.product.
+--
+-- «خدمة أخرى» is deliberately NOT seeded. It is the analyst's catch-all, not a product, so it gets
+-- no sector — and the sector board must therefore show an explicit unclassified total rather than
+-- let those deals fall out of the sum. A rollup that silently drops rows is the defect this
+-- project keeps shipping.
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS sector_assumed BOOLEAN NOT NULL DEFAULT false;
+`,
+  },
+  {
+    version: "006-rename-cascade",
+    sql: `
+-- A PRODUCT RENAME HAS TO MOVE TEN TABLES AT ONCE.
+--
+-- The product name is a STRING key in ten tables, and renameTag updated exactly one of them plus
+-- entities.product_tags. Measured: renaming a tag returned true, moved the tag, and left the
+-- «targets» row on the old name — so the quarterly target silently disappeared from the board,
+-- because salesPerformance joins targets ON tgt.product = t.name. Same shape as the won deal that
+-- vanished from «المحقق»: every figure still rendered, and one of them was quietly wrong.
+--
+-- opportunities carries a COMPOSITE foreign key (package_id, product) -> packages (id, product).
+-- That makes the two sides impossible to update one at a time: whichever moves first violates the
+-- constraint against the other. Deferring it to COMMIT lets one transaction move both and still be
+-- checked before anything is durable. INITIALLY IMMEDIATE, so it keeps behaving exactly as it does
+-- today for every other writer; only renameTag asks for the deferral, and only for its own
+-- transaction.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opp_package_product_fk;
+ALTER TABLE opportunities ADD CONSTRAINT opp_package_product_fk
+  FOREIGN KEY (package_id, product) REFERENCES packages (id, product)
+  ON DELETE RESTRICT
+  DEFERRABLE INITIALLY IMMEDIATE;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -511,6 +625,7 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     }
     await assertSchemaShape(client);
     await seedDefaultPipeline(client);
+    await seedSectors(client);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
     client.release();
@@ -537,6 +652,7 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   product_meta: ["product", "sector_id"],
   targets: ["product", "year", "quarter", "amount"],
   engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
+  packages: ["id", "product", "name", "list_price", "years", "scope", "retired_at", "created_at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -566,6 +682,47 @@ async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
 
 /** The ladder is DATA, and sales-domain is its single source of truth. Re-seeded every boot by key
  *  so a weight corrected in code reaches the database without anyone writing a migration for it. */
+/**
+ * The three market sectors and which product sells into each.
+ *
+ * WHY THIS IS A BOOT SEED AND NOT MIGRATION SQL. Two reasons, and the second is the important one.
+ *
+ * 1. It is the ONLY writer these two tables have. Nothing in the product creates a sector: there is
+ *    no admin screen for it, and the eng review's answer was that there should not be one for three
+ *    rows that change once a year. But `scripts/check-ledger-writers.mjs` (gate step 18) exists
+ *    because four tables shipped here that a screen read and nothing ever wrote — one of them made
+ *    a 1,440,000 SAR won deal vanish. The guard deliberately ignores migration bodies, since SQL
+ *    frozen in a versioned string is not a writer: it runs once, on one database, and never again.
+ *    Putting the seed here makes the claim true rather than exempting the table from the check.
+ *    That was open item R7, and this is its resolution.
+ *
+ * 2. It is INSERT-IF-ABSENT, never an update. seedDefaultPipeline above uses DO UPDATE because
+ *    SALES_STAGES is code-owned truth and the database should be dragged back to it on every boot.
+ *    A sector mapping is the opposite: it is a business fact that two rows below are openly a
+ *    guess. If a founder corrects «فحص الموظفين» with one UPDATE, the next deploy must not silently
+ *    revert it. So a row that already exists is left exactly as found.
+ */
+async function seedSectors(client: pg.PoolClient): Promise<void> {
+  const now = Date.now();
+  for (const name of SECTORS) {
+    await client.query(
+      "INSERT INTO sectors (name, created_at) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING",
+      [name, now]);
+  }
+  const ids = new Map<string, number>();
+  for (const r of (await client.query("SELECT id, name FROM sectors")).rows) {
+    ids.set(String(r.name), Number(r.id));
+  }
+  for (const [product, sector, assumed, note] of PRODUCT_SECTOR) {
+    const sectorId = ids.get(sector);
+    if (sectorId === undefined) continue; // unreachable: SECTORS was just inserted above
+    await client.query(
+      `INSERT INTO product_meta (product, sector_id, owner, updated_at, sector_assumed, pricing_note)
+       VALUES ($1,$2,NULL,$3,$4,$5) ON CONFLICT (product) DO NOTHING`,
+      [product, sectorId, now, assumed, note]);
+  }
+}
+
 async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
   const r = await client.query("SELECT id FROM pipelines WHERE product IS NULL LIMIT 1");
   let id: number;
@@ -774,6 +931,30 @@ export async function loadAll(): Promise<{
  *
  *  Returns raw money and raw counts. Attainment, coverage and the RAG band are computed by
  *  sales-domain in the browser, so the arithmetic has exactly one home. */
+/**
+ * «قيمة الفرصة», as SQL, in ONE place.
+ *
+ * Unit price times quantity times years, then the discount taken off. This expression was written
+ * out by hand in three separate queries — the targets rollup, the weighted-pipeline rollup and the
+ * account drilldown — which is three chances for a fourth screen to disagree with the first three
+ * about what a deal is worth. The sector rollup below would have been the fourth copy.
+ *
+ * IT ROUNDS PER ROW, and that is the whole point. calculateLineValue (opps-domain.ts) rounds each
+ * line, because a deal is worth a whole number of riyals and that rounded figure is what «فرص
+ * البيع» prints on the card. SUMming the UNROUNDED expression therefore produced a different total
+ * from adding up the cards the reader can see. Measured on three deals at a 50% discount on an odd
+ * price: the cards read 4 + 2 + 51 = 57 and «المستهدفات والأداء» read 56. One riyal, on twelve
+ * rows — but it scales with the row count, it always favours neither side predictably, and a
+ * founder who adds up the board and gets a different number stops trusting both screens.
+ *
+ * So the rounding boundary is the LINE, in both languages, and tests/value-parity.test.ts drives
+ * the same inputs through this string and through calculateLineValue and asserts they agree —
+ * including the .5 ties, where JS Math.round and Postgres ROUND(numeric) both go away from zero.
+ * That test is the unification: the two implementations cannot literally share code, so what is
+ * shared is a proof that they answer identically.
+ */
+export const OPP_VALUE_SQL = "ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))";
+
 export async function salesPerformance(
   startMs: number, endMs: number, year: number, quarter: number, isCurrentPeriod: boolean,
 ): Promise<{
@@ -790,7 +971,7 @@ export async function salesPerformance(
     // at the date of their LATEST transition into it.
     `WITH won AS (
        SELECT o.product,
-              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0)) AS achieved,
+              SUM(${OPP_VALUE_SQL}) AS achieved,
               COUNT(*) AS won_count
          FROM opportunities o
          JOIN LATERAL (
@@ -820,7 +1001,7 @@ export async function salesPerformance(
      --    $5 is that flag, decided by the caller rather than guessed in SQL.
      openv AS (
        SELECT o.product,
-              SUM(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0) * ps.weight_pct / 100.0) AS weighted,
+              SUM(${OPP_VALUE_SQL} * ps.weight_pct / 100.0) AS weighted,
               COUNT(*) AS open_count
          FROM opportunities o
          JOIN pipeline_stages ps
@@ -1002,24 +1183,71 @@ export async function createTag(name: string, by: string): Promise<boolean> {
  * DISTINCT is load-bearing. An account already carrying the destination name would otherwise end up
  * holding it twice, and a duplicate inside the array makes every count off by one.
  */
-export async function renameTag(from: string, to: string): Promise<boolean> {
-  if (!pool || !connected) return false;
+/**
+ * Every table that keys work by PRODUCT NAME. The name is a string key in ten places, so a rename
+ * is a ten-table write or it is data loss.
+ *
+ * Derived by asking the database, not by memory:
+ *   SELECT table_name FROM information_schema.columns WHERE column_name = 'product'
+ * The old renameTag moved ONE of them. `scripts/check-rename-cascade.mjs` re-asks that question on
+ * every build, so a new table with a `product` column fails the gate until it is listed here.
+ */
+const PRODUCT_NAME_TABLES = [
+  "opportunities", "targets", "packages", "product_meta", "pipelines",
+  "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb",
+] as const;
+
+export type RenameResult = { ok: boolean; moved: Record<string, number> };
+
+/**
+ * Rename a product, everywhere it is written down.
+ *
+ * WHAT THIS FIXES. The old version updated `tags` and `entities.product_tags` and returned true.
+ * Measured against Postgres: after a rename the `targets` row still carried the OLD name, and
+ * salesPerformance joins targets ON tgt.product = t.name — so the founder's quarterly target
+ * silently left the board while every figure on it still rendered. Nine tables behaved that way.
+ *
+ * WHY THE CONSTRAINT IS DEFERRED. opportunities has a composite FK (package_id, product) into
+ * packages (id, product). Whichever side moves first violates it against the other, so neither can
+ * move alone. Deferring to COMMIT lets both move and still be checked before anything is durable —
+ * the check is not skipped, only postponed. Migration 006 made the constraint DEFERRABLE for this.
+ *
+ * Returns per-table counts rather than a boolean, because «تم» after a ten-table write says nothing
+ * about whether the write found anything, and this function's whole history is of silently missing
+ * rows.
+ */
+export async function renameTag(from: string, to: string): Promise<RenameResult> {
+  const moved: Record<string, number> = {};
+  if (!pool || !connected) return { ok: false, moved };
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Postponed, not skipped: still verified at COMMIT, so a rename that would break the package
+    // link still rolls the whole thing back.
+    await client.query("SET CONSTRAINTS opp_package_product_fk DEFERRED");
     const r = await client.query(`UPDATE tags SET name = $2 WHERE name = $1`, [from, to]);
-    if (!(r.rowCount ?? 0)) { await client.query("ROLLBACK"); return false; }
-    await client.query(
+    if (!(r.rowCount ?? 0)) { await client.query("ROLLBACK"); return { ok: false, moved }; }
+    moved.tags = r.rowCount ?? 0;
+
+    for (const t of PRODUCT_NAME_TABLES) {
+      // Identifier is from a frozen const list, never from a caller; the VALUES are parameterised.
+      const u = await client.query(`UPDATE ${t} SET product = $2 WHERE product = $1`, [from, to]);
+      if (u.rowCount) moved[t] = u.rowCount;
+    }
+
+    const e = await client.query(
       `UPDATE entities
           SET product_tags = (
             SELECT COALESCE(jsonb_agg(DISTINCT CASE WHEN v = to_jsonb($1::text) THEN to_jsonb($2::text) ELSE v END), '[]'::jsonb)
               FROM jsonb_array_elements(product_tags) AS v)
         WHERE product_tags @> jsonb_build_array($1::text)`, [from, to]);
+    if (e.rowCount) moved.entities = e.rowCount;
+
     await client.query("COMMIT");
-    return true;
-  } catch (e) {
+    return { ok: true, moved };
+  } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
-    throw e;
+    throw err;
   } finally { client.release(); }
 }
 
@@ -1692,6 +1920,63 @@ export async function closeAction(id: number, state: "done" | "cancelled", by: s
   return false;
 }
 
+export type PackageRow = {
+  id: number; product: string; name: string; listPrice: number; years: number;
+  scope: string | null; retiredAt: number | null;
+};
+
+/** Live packages for a product, or all of them. Retired ones are excluded by default: a retired
+ *  package must stay readable for the deals that reference it, but must not be offerable on a new
+ *  quote. */
+export async function listPackages(product?: string, includeRetired = false): Promise<PackageRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const where: string[] = [], vals: unknown[] = [];
+  if (product) { vals.push(product); where.push(`product = $${vals.length}`); }
+  if (!includeRetired) where.push("retired_at IS NULL");
+  const r = await pool.query(
+    `SELECT id, product, name, list_price, years, scope, retired_at FROM packages
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      ORDER BY product, list_price`, vals);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), product: String(x.product), name: String(x.name),
+    listPrice: Number(x.list_price), years: Number(x.years),
+    scope: x.scope ? String(x.scope) : null,
+    retiredAt: x.retired_at == null ? null : Number(x.retired_at),
+  }));
+}
+
+/** Create or update one package. Keyed on (product, name), which is the pair a human actually
+ *  names it by. */
+export async function upsertPackage(p: {
+  product: string; name: string; listPrice: number; years: number; scope: string | null;
+}): Promise<PackageRow | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const known = new Set((await listTags()).map((t) => t.name));
+  if (!known.has(p.product)) return null;
+  const r = await pool.query(
+    `INSERT INTO packages (product, name, list_price, years, scope, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (product, name) DO UPDATE
+       SET list_price = EXCLUDED.list_price, years = EXCLUDED.years, scope = EXCLUDED.scope
+     RETURNING id, product, name, list_price, years, scope, retired_at`,
+    [p.product, p.name, Math.round(p.listPrice), Math.round(p.years), p.scope, Date.now()]);
+  const x = r.rows[0];
+  return { id: Number(x.id), product: String(x.product), name: String(x.name),
+           listPrice: Number(x.list_price), years: Number(x.years),
+           scope: x.scope ? String(x.scope) : null,
+           retiredAt: x.retired_at == null ? null : Number(x.retired_at) };
+}
+
+/** RETIRE, never delete. A won deal must keep pointing at the package it was sold under, and the
+ *  database enforces that: the composite foreign key is ON DELETE RESTRICT, so a DELETE of a
+ *  referenced package is refused outright. Retirement is the only exit. */
+export async function retirePackage(id: number, retire: boolean): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const q = await pool.query(
+    `UPDATE packages SET retired_at = $1 WHERE id = $2`, [retire ? Date.now() : null, id]);
+  return (q.rowCount ?? 0) > 0;
+}
+
 /** THE REP'S DAY, filtered in SQL and grouped by the human being called.
  *
  *  Two shapes were wrong before this and both mattered:
@@ -1719,7 +2004,7 @@ export async function repQueue(rep: string, limit = 50): Promise<{
             MIN(o.owner)                              AS owner,
             json_agg(json_build_object(
               'id', o.id, 'product', o.product, 'stage', o.stage,
-              'value', ROUND(o.sale_price * o.qty * o.years * (1 - o.discount / 100.0))
+              'value', ${OPP_VALUE_SQL}
             ) ORDER BY o.stage_at DESC)               AS lines,
             (SELECT MAX(e.occurred_at) FROM engagements e WHERE e.contact_phone = o.phone) AS last_eng
        FROM opportunities o
@@ -1816,6 +2101,9 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
 
     let fromStage: string | null = null, toStage: string | null = null;
     let dept = "", nextAction = "";
+    // The ledger row this engagement produced, when it produced one. Null when the outcome moved no
+    // stage, which is the common case for a blocking outcome like «بانتظار المشتريات».
+    let stageEventId: number | null = null;
 
     if (input.oppId != null) {
       const cur = await client.query(
@@ -1832,10 +2120,11 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
           await client.query(
             `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2 WHERE id = $3`,
             [toStage, now, input.oppId]);
-          await client.query(
+          const ev = await client.query(
             `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
-             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7)`,
+             VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7) RETURNING id`,
             [input.oppId, fromStage, toStage, input.outcomeKey, input.occurredAt, now, input.rep]);
+          stageEventId = Number(ev.rows[0].id);
         }
       }
     }
@@ -1858,8 +2147,12 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
       if (!dup.rows[0]) {
         await client.query(
           `INSERT INTO actions (opp_id, stage_event_id, engagement_id, dept, title, state, created_at, created_by)
-           VALUES ($1, NULL, $2, $3, $4, 'open', $5, $6)`,
-          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep]);
+           VALUES ($1, $7, $2, $3, $4, 'open', $5, $6)`,
+          // Was a literal NULL. The column exists to say WHICH transition owed this action, and a
+          // column nothing writes is the defect this project keeps shipping — here it silently
+          // broke three reports that joined on it. Null stays legitimate when the outcome moved no
+          // stage, which is most of them.
+          [input.oppId, engagementId, dept, nextAction || "متابعة", now, input.rep, stageEventId]);
         actionsCreated = 1;
       }
     }
@@ -1901,4 +2194,214 @@ export async function getAssetByPublicId(publicId: string):
   if (!pool || !connected) return null;
   const r = await pool.query(`SELECT filename, content_type, bytes FROM product_assets WHERE public_id = $1`, [publicId]);
   return r.rows[0] ?? null;
+}
+
+export type CatalogueRow = {
+  product: string; sector: string | null; sectorAssumed: boolean;
+  owner: string | null; pricingNote: string | null;
+  packages: { id: number; name: string; listPrice: number; years: number; scope: string | null }[];
+};
+
+/**
+ * Every product the product actually sells, with its sector, its provenance flag and its published
+ * packages. Feeds the products screen and the package selector.
+ *
+ * Driven off `tags`, NOT off the catalogue constant in agent.ts, because tags is what a deal stores
+ * and what every board groups by. Production carries 8 tags where agent.ts knows 6, so reading the
+ * constant here would silently hide two live products. product_meta is LEFT JOINed for the same
+ * reason: a product with no sector row must still appear, carrying null, so the gap is visible
+ * instead of the row vanishing.
+ */
+export async function productCatalogue(): Promise<CatalogueRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT t.name AS product, s.name AS sector,
+            COALESCE(pm.sector_assumed, false) AS sector_assumed,
+            pm.owner, pm.pricing_note,
+            COALESCE(
+              (SELECT json_agg(json_build_object(
+                        'id', p.id, 'name', p.name, 'listPrice', p.list_price,
+                        'years', p.years, 'scope', p.scope) ORDER BY p.list_price)
+                 FROM packages p
+                WHERE p.product = t.name AND p.retired_at IS NULL), '[]'::json) AS packages
+       FROM tags t
+       LEFT JOIN product_meta pm ON pm.product = t.name
+       LEFT JOIN sectors s       ON s.id = pm.sector_id
+      ORDER BY t.name`);
+  return r.rows.map((x: any) => ({
+    product: String(x.product),
+    sector: x.sector ? String(x.sector) : null,
+    sectorAssumed: Boolean(x.sector_assumed),
+    owner: x.owner ? String(x.owner) : null,
+    pricingNote: x.pricing_note ? String(x.pricing_note) : null,
+    packages: (x.packages ?? []).map((p: any) => ({
+      id: Number(p.id), name: String(p.name), listPrice: Number(p.listPrice),
+      years: Number(p.years), scope: p.scope ? String(p.scope) : null,
+    })),
+  }));
+}
+
+/** The three sectors as stored, for a selector. Ordered as seeded. */
+export async function listSectors(): Promise<{ id: number; name: string }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query("SELECT id, name FROM sectors ORDER BY id");
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name) }));
+}
+
+export type ReportRow = {
+  oppId: number; account: string | null; product: string; stage: string;
+  outcomeKey: string | null; title: string | null; dept: string | null;
+  since: number;            // epoch ms of the blocking event / the loss
+  daysWaiting: number;      // whole days, computed in SQL against now()
+  value: number;            // «قيمة الفرصة», the ONE definition
+};
+
+/**
+ * Run one of the four named reports (R11).
+ *
+ * The definition comes from reports-domain.ts, not from here: this function knows how to ASK, and
+ * the report knows what it IS. That separation is what lets assertReportKeys check the filters
+ * against the shipped ladder without a database.
+ *
+ * Both shapes order OLDEST FIRST. A stalled-deal report sorted newest-first buries the deal that
+ * has been stuck longest under the ones that just arrived, which inverts the only reason to read it.
+ */
+export async function runReport(def: {
+  source: "open_actions" | "lost_deals"; outcomeKeys: readonly string[]; dept: string | null;
+}): Promise<ReportRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+
+  if (def.source === "open_actions") {
+    // Open actions only: a closed action is answered work, and leaving it here would grow the
+    // report forever and make «كم عالق؟» unanswerable.
+    const r = await pool.query(
+      `SELECT a.opp_id, o.account_name, o.product, o.stage, a.title, a.dept,
+              e.outcome_key,
+              a.created_at AS since,
+              GREATEST(0, FLOOR((EXTRACT(EPOCH FROM now()) * 1000 - a.created_at) / 86400000))::int AS days_waiting,
+              ${OPP_VALUE_SQL} AS value
+         FROM actions a
+         JOIN opportunities o ON o.id = a.opp_id
+         -- Through ENGAGEMENTS, not the stage ledger. Most of these outcomes do not move the
+         -- stage — «بانتظار المشتريات» leaves the deal at negotiate — so no ledger row exists to
+         -- join to, and actions.stage_event_id was written as a literal NULL besides. Joining it
+         -- returned zero rows for three of the four reports, on demo data where every deal was
+         -- correctly blocked. engagements.outcome_key is the value the writer actually records.
+         LEFT JOIN engagements e ON e.id = a.engagement_id
+        WHERE a.state = 'open'
+          AND ($1::text IS NULL OR a.dept = $1)
+          AND (cardinality($2::text[]) = 0 OR e.outcome_key = ANY($2))
+        ORDER BY a.created_at ASC`,
+      [def.dept, def.outcomeKeys]);
+    return r.rows.map((x: any) => ({
+      oppId: Number(x.opp_id), account: x.account_name ?? null, product: String(x.product),
+      stage: String(x.stage), outcomeKey: x.outcome_key ?? null, title: x.title ?? null,
+      dept: x.dept ?? null, since: Number(x.since), daysWaiting: Number(x.days_waiting),
+      value: Number(x.value),
+    }));
+  }
+
+  // lost_deals: the row's CURRENT stage decides it is lost, the ledger dates it. Same rule the won
+  // CTE uses — a deal lost and then reopened must not still appear on a loss report.
+  const r = await pool.query(
+    `SELECT o.id AS opp_id, o.account_name, o.product, o.stage, e.outcome_key,
+            NULL::text AS title, NULL::text AS dept,
+            (EXTRACT(EPOCH FROM e.effective_at) * 1000)::bigint AS since,
+            GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - e.effective_at)) / 86400))::int AS days_waiting,
+            ${OPP_VALUE_SQL} AS value
+       FROM opportunities o
+       -- BOTH sources, because one key is unreachable in the other. «فشل التكامل» is recorded at
+       -- the tech stage and MOVES the deal to lost, so it lands in the ledger. «خسارة – تكامل» is
+       -- recorded on a deal that is ALREADY lost — no transition, therefore no ledger row, ever.
+       -- Measured: a deal lost that way had one ledger row (null -> lost, no outcome_key) and the
+       -- report missed it entirely while the deal sat there plainly lost to integration.
+       -- The engagement always carries the outcome; the ledger only sometimes does.
+       JOIN LATERAL (
+         SELECT src.effective_at, src.outcome_key FROM (
+           SELECT ee.effective_at, ee.outcome_key
+             FROM track_stage_events ee
+            WHERE ee.opp_id = o.id AND ee.outcome_key = ANY($1)
+           UNION ALL
+           SELECT en.occurred_at AS effective_at, en.outcome_key
+             FROM engagements en
+            WHERE en.opp_id = o.id AND en.outcome_key = ANY($1)
+         ) src
+          ORDER BY src.effective_at DESC LIMIT 1
+       ) e ON TRUE
+      WHERE o.stage = 'lost'
+      ORDER BY e.effective_at ASC`,
+    [def.outcomeKeys]);
+  return r.rows.map((x: any) => ({
+    oppId: Number(x.opp_id), account: x.account_name ?? null, product: String(x.product),
+    stage: String(x.stage), outcomeKey: x.outcome_key ?? null, title: null, dept: null,
+    since: Number(x.since), daysWaiting: Number(x.days_waiting), value: Number(x.value),
+  }));
+}
+
+export type QuarterLine = {
+  quarter: number; startMs: number; endMs: number;
+  target: number; achieved: number; wonCount: number; coveragePct: number | null;
+};
+
+/**
+ * All four quarters of a fiscal year, in ONE query (R13).
+ *
+ * `targets` is keyed (product, year, quarter) and always has been, but the screen asked for one
+ * quarter at a time — so «الإنجاز الربعي: أربعة أشرطة» meant four round trips, four chances for the
+ * clock to tick between them, and no way to see the shape of a year at all.
+ *
+ * The quarter BOUNDS are computed by the caller and passed in, not derived in SQL, for the same
+ * reason isCurrentPeriod is: Riyadh is UTC+3 with no DST, and the fiscal start month is a config
+ * value. SQL would have to be told both anyway, and a second implementation of a calendar is a
+ * second calendar to get wrong.
+ */
+export async function quarterlyPerformance(
+  year: number, bounds: readonly { quarter: number; startMs: number; endMs: number }[],
+): Promise<QuarterLine[]> {
+  const empty = bounds.map((b) => ({ ...b, target: 0, achieved: 0, wonCount: 0, coveragePct: null }));
+  if (!(await reprobe()) || !pool) return empty;
+  const vals = bounds.map((b, i) => `($${i * 3 + 1}::int, $${i * 3 + 2}::bigint, $${i * 3 + 3}::bigint)`).join(",");
+  const params = bounds.flatMap((b) => [b.quarter, b.startMs, b.endMs]);
+  const r = await pool.query(
+    `WITH q(quarter, start_ms, end_ms) AS (VALUES ${vals}),
+     won AS (
+       SELECT q.quarter,
+              COALESCE(SUM(${OPP_VALUE_SQL}), 0) AS achieved,
+              COUNT(o.id) AS won_count
+         FROM q
+         LEFT JOIN opportunities o ON o.stage = 'won'
+          AND EXISTS (
+            SELECT 1 FROM LATERAL (
+              SELECT e.effective_at FROM track_stage_events e
+               WHERE e.opp_id = o.id AND e.to_stage = 'won'
+               ORDER BY e.effective_at DESC LIMIT 1
+            ) w
+             WHERE w.effective_at >= to_timestamp(q.start_ms / 1000.0)
+               AND w.effective_at <  to_timestamp(q.end_ms / 1000.0))
+        GROUP BY q.quarter
+     ),
+     tgt AS (
+       SELECT q.quarter, COALESCE(SUM(t.amount), 0) AS amount
+         FROM q LEFT JOIN targets t ON t.year = $${params.length + 1} AND t.quarter = q.quarter
+        GROUP BY q.quarter
+     )
+     SELECT q.quarter, q.start_ms, q.end_ms,
+            COALESCE(tgt.amount, 0) AS target,
+            COALESCE(won.achieved, 0) AS achieved,
+            COALESCE(won.won_count, 0) AS won_count
+       FROM q
+       LEFT JOIN won ON won.quarter = q.quarter
+       LEFT JOIN tgt ON tgt.quarter = q.quarter
+      ORDER BY q.quarter`,
+    [...params, year]);
+  return r.rows.map((x: any) => {
+    const target = Number(x.target), achieved = Number(x.achieved);
+    return {
+      quarter: Number(x.quarter), startMs: Number(x.start_ms), endMs: Number(x.end_ms),
+      target, achieved, wonCount: Number(x.won_count),
+      // null, not 0. A quarter with no target set has no coverage; printing 0% paints an
+      // untargeted quarter red on a board whose job is showing where to worry.
+      coveragePct: target > 0 ? Math.round((achieved / target) * 100) : null,
+    };
+  });
 }

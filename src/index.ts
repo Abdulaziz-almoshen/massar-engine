@@ -6,6 +6,7 @@ import { REP_PAGE_HTML } from "./rep-page.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
 import * as sales from "./sales-domain.js";
+import * as reports from "./reports-domain.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
 import { enqueue } from "./queue.js";
@@ -226,32 +227,130 @@ function fiscalStartMonth(): number {
   return Number.isFinite(m) && m >= 1 && m <= 12 ? Math.round(m) : 1;
 }
 
+/**
+ * Resolve ?year and ?quarter into fiscal period bounds, or name the bad field.
+ *
+ * Shared by every period-scoped sales route. It is a function rather than copied lines because both
+ * checks below were bugs: quarter was validated while year was not, and an out-of-range year
+ * overflowed Date.UTC into NaN, which pg serialises as the string "NaN" and to_timestamp rejects,
+ * surfacing the raw driver error with relation names as a 500. A second route pasting this block
+ * would have inherited that on day one.
+ */
+function resolvePeriod(q: any): { bad: string } | {
+  year: number; quarter: number; fsm: number; startMs: number; endMs: number; isCurrentPeriod: boolean;
+} {
+  const fsm = fiscalStartMonth();
+  const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
+  const year = Number(q?.year) || now.year;
+  const quarter = Number(q?.quarter) || now.quarter;
+  if (quarter < 1 || quarter > 4) return { bad: "quarter" };
+  if (!Number.isFinite(year) || year < 2020 || year > 2100) return { bad: "year" };
+  const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+  return {
+    year, quarter, fsm, startMs: b.startMs, endMs: b.endMs,
+    // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned
+    // close date belongs to the current period or to none; decided here, not guessed in SQL.
+    isCurrentPeriod: year === now.year && quarter === now.quarter,
+  };
+}
+
 app.get("/admin/sales/performance", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const per = resolvePeriod(req.query);
+  if ("bad" in per) return reply.code(400).send({ ok: false, error: "invalid_field", field: per.bad });
+  const rows = await db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod);
+  return {
+    ok: true, year: per.year, quarter: per.quarter, fiscalStartMonth: per.fsm,
+    periodStart: per.startMs, periodEnd: per.endMs, now: Date.now(),
+    rows,
+  };
+});
+
+// ---- the sector board, the products screen and the sector selector (R10) -------------------
+//
+// READ-ONLY, and they are endpoints only: no screen mounts them yet. Saying otherwise is the
+// mistake made once already on this project, where a commit claimed a screen shipped and what
+// actually shipped was an HTTP route no nav item reached. The screens are open item R12.
+
+app.get("/admin/sales/sectors", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const per = resolvePeriod(req.query);
+  if ("bad" in per) return reply.code(400).send({ ok: false, error: "invalid_field", field: per.bad });
+  const rows = await db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod);
+  const sectors = sales.rollupBySector(rows);
+  return {
+    ok: true, year: per.year, quarter: per.quarter, fiscalStartMonth: per.fsm,
+    periodStart: per.startMs, periodEnd: per.endMs, now: Date.now(),
+    sectors,
+    // Stated, not left for a caller to derive: every product figure is inside exactly one bucket
+    // above, so a screen that renders these rows renders the whole pipeline.
+    productCount: rows.length,
+    unclassifiedCount: sectors.find((x) => x.isUnclassified)?.products.length ?? 0,
+  };
+});
+
+app.get("/admin/products", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return { ok: true, products: await db.productCatalogue() };
+});
+
+app.get("/admin/sectors", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return { ok: true, sectors: await db.listSectors() };
+});
+
+// ---- the four named reports (R11) and the four-quarter view (R13) -------------------------
+// READ-ONLY, endpoints only. «التقارير» is a door with no screen yet; saying otherwise is the
+// mistake this project has already made once.
+
+app.get("/admin/reports", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  return {
+    ok: true,
+    reports: reports.REPORTS.map((r) => ({
+      id: r.id, title: r.title, question: r.question, source: r.source, dept: r.dept,
+      outcomeKeys: r.outcomeKeys,
+    })),
+  };
+});
+
+app.get("/admin/reports/:id", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const def = reports.reportById(String((req.params as any).id ?? ""));
+  if (!def) return reply.code(404).send({ ok: false, error: "unknown_report" });
+  const rows = await db.runReport(def);
+  return {
+    ok: true,
+    report: { id: def.id, title: def.title, question: def.question },
+    // The empty state travels WITH the data, so a screen cannot render a blank table: an empty
+    // result and a broken query look identical to the reader unless the report says which it is.
+    empty: rows.length === 0 ? { title: def.emptyTitle, body: def.emptyBody } : null,
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
+    count: rows.length,
+    totalValue: rows.reduce((n, r) => n + r.value, 0),
+    rows,
+  };
+});
+
+app.get("/admin/sales/quarters", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const q = (req.query as any) || {};
   const fsm = fiscalStartMonth();
   const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
   const year = Number(q.year) || now.year;
-  const quarter = Number(q.quarter) || now.quarter;
-  if (quarter < 1 || quarter > 4) {
-    return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
-  }
-  // Year was unchecked while quarter was, and the asymmetry was reachable: Date.UTC overflows past
-  // year 275760, riyadhPeriodBounds then returns NaN, pg serialises that as the string "NaN", and
-  // to_timestamp raises — surfacing the raw driver error, relation names included, as a 500.
-  // Same range POST /admin/sales/targets already enforces.
   if (!Number.isFinite(year) || year < 2020 || year > 2100) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
   }
-  const b = sales.riyadhPeriodBounds(year, quarter, fsm);
-  // Whether the caller is looking at the quarter we are inside. Open pipeline with no planned close
-  // date belongs to the current period or to none, and the decision is made here rather than in SQL.
-  const isCurrentPeriod = year === now.year && quarter === now.quarter;
-  const rows = await db.salesPerformance(b.startMs, b.endMs, year, quarter, isCurrentPeriod);
+  const bounds = [1, 2, 3, 4].map((quarter) => {
+    const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+    return { quarter, startMs: b.startMs, endMs: b.endMs };
+  });
   return {
-    ok: true, year, quarter, fiscalStartMonth: fsm,
-    periodStart: b.startMs, periodEnd: b.endMs, now: Date.now(),
-    rows,
+    ok: true, year, fiscalStartMonth: fsm, currentQuarter: year === now.year ? now.quarter : null,
+    // Stated, never implied. The accounting basis is still undecided, so the screen is given the
+    // words rather than left to invent them.
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
+    quarters: await db.quarterlyPerformance(year, bounds),
   };
 });
 
@@ -371,6 +470,59 @@ app.get("/admin/gate-a", async (req, reply) => {
     workingWeek: "الأحد إلى الخميس بتوقيت الرياض، وأيام بلا نشاط تُحتسب أصفارًا",
     reps,
   };
+});
+
+// ------------------------------ packages (الباقات) ------------------------------
+//
+// THE PRODUCT KEY TRAVELS IN THE QUERY OR THE BODY, NEVER IN THE PATH. One shipped product is
+// «تكامل الأنظمة (HIS/ERP)» and that slash would split a path parameter — /admin/packages/تكامل
+// الأنظمة (HIS/ERP) is two segments, not one. Product names are also mutable display text, so a
+// rename would change every URL. Found by the Codex outside voice and verified against the live
+// tags table.
+
+app.get("/admin/packages", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const q = (req.query as any) || {};
+  const product = q.product ? String(q.product) : undefined;
+  const includeRetired = String(q.retired ?? "") === "1";
+  return { ok: true, packages: await db.listPackages(product, includeRetired) };
+});
+
+app.post("/admin/packages", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  const name = String(b.name ?? "").trim().slice(0, 120);
+  if (!product) return reply.code(400).send({ ok: false, error: "invalid_field", field: "product" });
+  if (!name) return reply.code(400).send({ ok: false, error: "invalid_field", field: "name" });
+  const listPrice = Number(b.listPrice);
+  // Bounded, like every other money field on this surface: a price of 1e15 renders as a number
+  // nobody can read and a negative one inverts every discount figure downstream.
+  if (!Number.isFinite(listPrice) || listPrice < 0 || listPrice > 1e12) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "listPrice" });
+  }
+  const years = Number(b.years ?? 1);
+  if (!Number.isInteger(years) || years < 1 || years > 10) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "years" });
+  }
+  const row = await db.upsertPackage({
+    product, name, listPrice, years,
+    scope: b.scope == null ? null : String(b.scope).trim().slice(0, 120) || null,
+  });
+  // Null means the product is not in the catalogue. Same guard the targets endpoint uses: a
+  // package for a product that does not exist would be invisible on every screen.
+  if (!row) return reply.code(400).send({ ok: false, error: "unknown_product", product });
+  return { ok: true, package: row };
+});
+
+app.post("/admin/packages/:id/retire", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isFinite(id)) return reply.code(400).send({ ok: false, error: "bad_id" });
+  const retire = (req.body as any)?.retire !== false;
+  const done = await db.retirePackage(id, retire);
+  if (!done) return reply.code(404).send({ ok: false, error: "not_found" });
+  return { ok: true, id, retired: retire };
 });
 
 app.get("/admin/actions/stalled", async (req, reply) => {
@@ -652,9 +804,11 @@ app.post("/admin/tags/rename", async (req, reply) => {
   if ((await db.listTags()).some((t) => t.name === b)) {
     return reply.code(409).send({ error: "tag_exists" });
   }
-  const ok = await db.renameTag(a, b);
-  if (!ok) return reply.code(404).send({ error: "unknown_tag" });
-  return { status: "ok", renamed: true, from: a, to: b };
+  const r = await db.renameTag(a, b);
+  if (!r.ok) return reply.code(404).send({ error: "unknown_tag" });
+  // The per-table counts, not «تم». A rename touches ten tables and used to touch one; reporting
+  // what actually moved is how the caller can tell those two apart.
+  return { status: "ok", renamed: true, from: a, to: b, moved: r.moved };
 });
 
 app.post("/admin/tags/delete", async (req, reply) => {

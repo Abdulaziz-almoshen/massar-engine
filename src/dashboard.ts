@@ -17,6 +17,9 @@ import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
+import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS } from "./products-crm.js";
+import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
+import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
@@ -34,80 +37,174 @@ export const DASHBOARD_HTML = `<!doctype html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap" rel="stylesheet">
 <style>
+  /* ===================== BRAND TOKENS — DESIGN.md is the authority =====================
+     The Seha design system approved 2026-09-03. Before this block existed the palette lived as
+     1,299 hardcoded hexes across src/, which is why the rebrand had to be a mechanical remap:
+     there was no single place to change. There is now. New code uses var(--x); a raw hex in a
+     component is a bug unless DESIGN.md says otherwise (WhatsApp's own bubble colours are the
+     documented exception, since they quote another product's surface).
+     ==================================================================================== */
+  :root {
+    --blue:#306DB5; --blue-deep:#416CAD; --blue-light:#629CCD;
+    --blue-tint:#EAF1F8; --blue-wash:#DDEAF3;
+    --grad:linear-gradient(270deg,#306DB5,#629CCD);
+    --wash:linear-gradient(180deg,#DDEAF3,#FFFFFF);
+
+    --paper:#FFFFFF; --surface:#F4F6F9; --surface-2:#EDF1F7;
+    --line:#CBD7E4; --line-soft:#E3E9F1;
+    --ink:#212529; --ink-2:#3A3A3A; --muted:#536170;
+
+    --s-issued:#1E9E63; --s-issued-soft:#E4F5EC; --s-issued-text:#12633F;
+    --s-attn:#D99A00;   --s-attn-soft:#FFF5D6;   --s-attn-text:#7A5600; --s-attn-deep:#B37F00;
+    --s-fail:#D9534F;   --s-fail-soft:#FBE7E6;   --s-fail-text:#8E2A27;
+    --s-sched:#629CCD;  --s-sched-soft:#E8F0F8;  --s-sched-text:#2A5988;
+    --s-review:#416CAD; --s-review-soft:#E9EEF7; --s-review-text:#2C4A78;
+    --s-attend:#306DB5; --s-attend-soft:#EAF1F8; --s-attend-text:#255490;
+    --s-off:#A9B4C0;    --s-off-soft:#EEF1F4;    --s-off-text:#4A5560;
+    /* MARK tier. A status DOT must clear 3:1 as a non-text mark; the base fills do not:
+       --s-attn 2.45, --s-sched 2.93, --s-off 2.10 on --paper. No founder-approved value was
+       changed to fix this — the fills stay, and dots use these. */
+    --s-attn-mark:#B37F00;  --s-sched-mark:#4A7FB0;  --s-off-mark:#8C959F;
+
+    --z-base:0; --z-sticky:100; --z-dropdown:200; --z-overlay:300;
+    --z-modal:310; --z-toast:400; --z-tooltip:500;
+    --bp-sm:560px; --bp-md:900px; --bp-lg:1280px; --content-max:1180px;
+    --i-sm:16px; --i-md:20px; --i-lg:24px;
+    --skeleton:#EDF1F7; --skeleton-hi:#F4F6F9;
+    --r-none:0;
+    --lh-tight:1.3; --lh-body:1.45; --lh-loose:1.7;
+    --w-body:450; --w-med:500; --w-semi:600;
+
+    --t-xs:12px; --t-sm:14px; --t-md:16px; --t-lg:18px;
+    --t-xl:22px; --t-2xl:28px; --t-3xl:40px; --t-num:44px;
+
+    --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:32px; --s6:48px; --s7:64px;
+    --r-sm:8px; --r-md:10px; --r-lg:16px; --r-pill:999px;
+
+    --sh-1:0 0 4px rgba(83,97,112,.08);
+    --sh-2:0 4px 8px rgba(83,97,112,.16);
+    --sh-3:0 3px 6px -4px rgba(0,0,0,.12),0 6px 16px rgba(0,0,0,.08),0 9px 28px 8px rgba(0,0,0,.05);
+
+    /* Three durations and ONE easing. Chosen by usage, not by number (transitions.dev):
+       --fast is a state the user is holding, --base is the default open/close/swap, --slow is a
+       large surface or a distance the eye has to follow. Exit is faster than entry. */
+    --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
+    --flash:900ms; --spinner-delay:300ms; --stagger:24ms;
+  }
+
+  /* interior.dev, failure 3: "Motion is the only channel." With reduced motion on, the
+     information still has to arrive — the trip is optional, the destination is not. Every surface
+     must be correct and complete with every transition removed. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; }
   /* Cairo is the platform font (founder's call). It is a VARIABLE face on Google Fonts
      (wght 200..1000), so it holds 450 — the weight the Frappe translation is built on — natively;
      the earlier swap to IBM Plex existed only because static Cairo jumps 400→500. */
-  body { font-family: 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #171717; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
-  ::selection { background: #3FB6B0; color: #fff; }
+  body { font-family: 'Cairo', system-ui, 'Segoe UI', 'Geeza Pro', Tahoma, 'Noto Naskh Arabic', sans-serif; background: #FFFFFF; color: #212529; font-size: 14px; font-weight: 450; line-height: 1.45; letter-spacing: 0; }
+  ::selection { background: #629CCD; color: #fff; }
   .ms-scroll::-webkit-scrollbar { height: 8px; width: 8px; }
-  .ms-scroll::-webkit-scrollbar-thumb { background: #C7C7C7; border-radius: 999px; }
+  .ms-scroll::-webkit-scrollbar-thumb { background: #A9B4C0; border-radius: 999px; }
   .app { display: flex; height: 100vh; width: 100%; overflow: hidden; }
 
   /* ===== sidebar (Massar identity) ===== */
   /* V2: the sidebar is light. Navy and gold are retired from the product — with no dark surface
      they have no legal home. border-inline-end, not border-left: logical properties only. */
-  aside { width: 250px; flex: none; background: #F8F8F8; color: #525252; display: flex;
-    flex-direction: column; border-inline-end: 1px solid #EDEDED; }
+  aside { width: 250px; flex: none; background: #F4F6F9; color: #3A3A3A; display: flex;
+    flex-direction: column; border-inline-end: 1px solid #E3E9F1; }
   .switcher { display:flex; align-items:center; gap:10px; width:100%; font-family:inherit;
     height:52px; padding:10px 12px; background:transparent; border:none;
-    border-bottom:1px solid #EDEDED; cursor:pointer; text-align:start; }
-  .switcher:hover { background:#F3F3F3; }
-  .switcher .chev { color:#C7C7C7; font-size:12px; flex:none; }
+    border-bottom:1px solid #E3E9F1; cursor:pointer; text-align:start; }
+  .switcher:hover { background:#EDF1F7; }
+  .switcher .chev { color:#536170; font-size:12px; flex:none; }
   .switcher .logo { width:28px; height:28px; flex:none; border-radius:6px;
-    background:linear-gradient(135deg,#3FB6B0,#1F7A73); display:flex; align-items:center;
-    justify-content:center; font-weight:700; font-size:15px; color:#fff; }
-  .switcher .t1 { font-size:13px;
-    font-weight:700; color:#171717; line-height:1.3; }
-  .switcher .t2 { font-size:11px; font-weight:450; color:#7C7C7C; margin-top:1px;
+    background:linear-gradient(135deg,#629CCD,#306DB5); display:flex; align-items:center;
+    justify-content:center; font-weight:600; font-size:14px; color:#fff; }
+  .switcher .t1 { font-size:14px;
+    font-weight:600; color:#212529; line-height:1.3; }
+  .switcher .t2 { font-size:12px; font-weight:450; color:#536170; margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   nav { flex:1; min-height:0; overflow-y:auto; padding:8px; }
-  .grp { font-size:11px; font-weight:500; color:#999999; padding:6px 10px; margin-block-start:12px; }
+  .grp { font-size:12px; font-weight:500; color:#536170; padding:6px 10px; margin-block-start:12px; }
   .grp:first-child { margin-block-start:4px; }
   .nv { display:flex; align-items:center; gap:10px; width:100%; font-family:inherit; height:32px;
-    font-size:13px; font-weight:450; color:#525252; background:transparent; border:none;
+    font-size:14px; font-weight:450; color:#3A3A3A; background:transparent; border:none;
     border-radius:6px; padding-inline:10px; cursor:pointer; text-align:start; margin-bottom:1px; }
-  .nv:hover { background:#F3F3F3; }
-  .nv.on { font-weight:500; color:#171717; background:#EDEDED; }
+  .nv:hover { background:#EDF1F7; }
+  .nv.on { font-weight:500; color:#212529; background:#E3E9F1; }
   .nv .gx { width: 20px; height: 20px; flex: none; display: flex; align-items: center; justify-content: center; }
   .nv .lbl { flex: 1; }
   .nv .dot { display:none; }
-  .g-sq { width: 13px; height: 13px; border-radius: 3px; background: #999999; }
-  .g-ci { width: 13px; height: 13px; border-radius: 999px; background: #999999; }
-  .g-di { width: 11px; height: 11px; background: #999999; transform: rotate(45deg); border-radius: 2px; }
-  .g-tr { width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-bottom: 12px solid #999999; }
-  .g-ba { width: 13px; height: 13px; border-right: 3px solid #999999; border-left: 3px solid #999999; border-radius: 1px; }
-  .g-ri { width: 13px; height: 13px; border-radius: 999px; border: 3px solid #999999; }
-  .g-tb { width: 13px; height: 13px; border-top: 3px solid #999999; border-bottom: 3px solid #999999; }
-  .g-tree { width: 13px; height: 13px; border: 2px solid #999999; border-radius: 3px; }
-  .nv.on .gx > * { background-color:#525252; border-color:#525252; }
-  .nv.on .g-tr { background:none; border-bottom-color:#525252; }
+  .g-sq { width: 13px; height: 13px; border-radius: 3px; background: #A9B4C0; }
+  .g-ci { width: 13px; height: 13px; border-radius: 999px; background: #A9B4C0; }
+  .g-di { width: 11px; height: 11px; background: #A9B4C0; transform: rotate(45deg); border-radius: 2px; }
+  .g-tr { width: 0; height: 0; border-right: 7px solid transparent; border-left: 7px solid transparent; border-bottom: 12px solid #A9B4C0; }
+  .g-ba { width: 13px; height: 13px; border-right: 3px solid #A9B4C0; border-left: 3px solid #A9B4C0; border-radius: 1px; }
+  .g-ri { width: 13px; height: 13px; border-radius: 999px; border: 3px solid #A9B4C0; }
+  .g-tb { width: 13px; height: 13px; border-top: 3px solid #A9B4C0; border-bottom: 3px solid #A9B4C0; }
+  .g-tree { width: 13px; height: 13px; border: 2px solid #A9B4C0; border-radius: 3px; }
+  .nv.on .gx > * { background-color:#3A3A3A; border-color:#3A3A3A; }
+  .nv.on .g-tr { background:none; border-bottom-color:#3A3A3A; }
   /* flex:none — without it the card is squeezed by the scrolling nav above and the last nav
      item reads as clipped behind it, on every screen. */
   .collapse { display:flex; align-items:center; gap:10px; font-family:inherit; height:32px;
-    margin:8px; width:calc(100% - 16px); padding-inline:10px; font-size:12px; color:#7C7C7C;
+    margin:8px; width:calc(100% - 16px); padding-inline:10px; font-size:12px; color:#536170;
     background:transparent; border:none; border-radius:6px; cursor:pointer; text-align:start;
     flex:none; }
-  .collapse:hover { background:#F3F3F3; }
-  .collapse .cicon { color:#999999; font-size:14px; }
-  .userbox .av { width: 38px; height: 38px; flex: none; border-radius: 999px; background: #E2E2E2; display: flex; align-items: center; justify-content: center; color: #525252; font-weight: 700; font-size: 14px; }
-  .userbox .n { font-size: 13px; font-weight: 700; color: #fff; }
-  .userbox .r { font-size: 11px; color: #8ea3c0; }
+  .collapse:hover { background:#EDF1F7; }
+  .collapse .cicon { color:#536170; font-size:14px; }
+  /* T6: .userbox is GONE. It was the navy sidebar's user block, retired in V2; nothing has
+     rendered it since, and .userbox .n still set color:#fff — invisible on the light rail that
+     replaced it. Verified absent from the DOM before removal. */
 
   /* ===== main ===== */
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
   /* EXACT-1: header is h-10.5 = 42px, padding-inline 20 (pl-5). */
   header.crumb { height:42px; flex:none; display:flex; align-items:center; gap:8px;
-    padding-inline:20px; background:#fff; border-bottom:1px solid #EDEDED; }
-  header.crumb .t { font-size:14px; font-weight:500; color:#171717; }
-  header.crumb .sep { font-size:13px; color:#C7C7C7; }
-  header.crumb .s { font-size:13px; font-weight:450; color:#525252; }
-  header .t { font-size: 21px; font-weight: 700; color: #171717; letter-spacing: 0; }
-  header .s { font-size: 12.5px; color: #7C7C7C; margin-top: 3px; }
-  .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#7C7C7C;
+    padding-inline:20px; background:#fff; border-bottom:1px solid #E3E9F1; }
+  header.crumb .t { font-size:14px; font-weight:500; color:#212529; }
+  header.crumb .sep { font-size:14px; color:#536170; }
+  header.crumb .s { font-size:14px; font-weight:450; color:#3A3A3A; }
+  /* The tab strip under the crumb. DESIGN.md: teal is the only accent, radii are 6/10/999/0, and a
+     selected state is NOT a filled chip — so the active tab is ink-weight text over a 2px teal
+     underline, and every other tab is muted with no fill at all. 13px sits on the type ladder. */
+  .subnav { position:relative; height:36px; flex:none; display:flex; align-items:stretch; gap:2px; padding-inline:20px;
+    background:#fff; border-bottom:1px solid #E3E9F1; overflow-x:auto; scrollbar-width:none; }
+  .subnav::-webkit-scrollbar { display:none; }
+  .subnav .sub { appearance:none; background:transparent; border:0; border-radius:0; cursor:pointer;
+    font-family:inherit; font-size:var(--t-sm); font-weight:450; color:var(--muted); letter-spacing:0;
+    padding-inline:10px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;
+    position:relative; transition:color var(--fast) var(--ease); }
+  .subnav .sub:hover { color:#212529; }
+  .subnav .sub.on { color:var(--ink); font-weight:600; }
+  /* transitions.dev «Tabs sliding»: the indicator FOLLOWS the active tab instead of cutting to it.
+     One element that moves, so the eye tracks a thing rather than re-finding a new one. transform
+     and width only — both composite. It is positioned from JS because CSS cannot measure a
+     sibling. */
+  .subnav .ind { position:absolute; inset-block-end:0; inset-inline-start:0; height:2px;
+    background:var(--blue); border-radius:var(--r-pill) var(--r-pill) 0 0; width:0;
+    transform:translateX(0); transition:transform var(--base) var(--ease), width var(--base) var(--ease);
+    pointer-events:none; }
+  /* First paint must not slide in from the origin: there was no previous tab to come from. */
+  .subnav .ind.noanim { transition:none; }
+  /* «قريبًا» screens stay visible and reachable, and say so by weight rather than by hiding. */
+  .subnav .sub.soon { color:#536170; }
+  .subnav .sub.soon:hover { color:#536170; }
+  .subnav .sub .sbdg { font-size:12px; font-weight:600; color:#7A5600; font-variant-numeric:tabular-nums; }
+  .subnav .sub:focus { outline:none; }
+  .subnav .sub:focus-visible { outline:2px solid #306DB5; outline-offset:-2px; }
+  /* T4. Measured 43px: the strip was 44px but carries a 1px bottom border, so the button inside
+     it fell one pixel short of the DESIGN.md 3.10 floor. The BUTTON is what gets tapped, so the
+     minimum belongs on the button. */
+  @media (pointer:coarse) { .subnav { height:45px; } .subnav .sub { min-height:44px; } }
+  header .t { font-size: 22px; font-weight: 600; color: #212529; letter-spacing: 0; }
+  header .s { font-size: 12px; color: #536170; margin-top: 3px; }
+  .livechip { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#536170;
     background:transparent; padding:0; border-radius:0; }
-  .livechip .d { width: 7px; height: 7px; border-radius: 999px; background: #3FB6B0; }
+  .livechip .d { width: 7px; height: 7px; border-radius: 999px; background: #629CCD; }
   .body { flex: 1; overflow-y: auto; padding: 30px 32px 56px; }
 
   /* ===== components (reference-grade) ===== */
@@ -115,11 +212,11 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* A number card carries a label and a number. The 40px pastel disc that used to sit here held a
      droplet for «مهتمة» and a checkmark for «وصلت» — decoration standing in for meaning, and the
      loudest colour on the page. Frappe's number cards have no icon; neither do these now. */
-  .kpi { background: #fff; border: 1px solid #EDEDED; border-radius: 10px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px; }
-  .kpi .k { font-size: 12px; color: #7C7C7C; font-weight: 450; }
-  .kpi .v { font-size: 25px; font-weight: 600; color: #171717; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
-  .kpi .dl { font-size: 11.5px; font-weight: 450; color: #7C7C7C; }
-  .kpi .v small { font-size: 12px; font-weight: 450; color: #999999; }
+  .kpi { background: #fff; border: 1px solid #E3E9F1; border-radius: 10px; padding: 15px 17px; display: flex; flex-direction: column; gap: 7px; }
+  .kpi .k { font-size: 12px; color: #536170; font-weight: 450; }
+  .kpi .v { font-size: 22px; font-weight: 600; color: #212529; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .kpi .dl { font-size: 12px; font-weight: 450; color: #536170; }
+  .kpi .v small { font-size: 12px; font-weight: 450; color: #536170; }
 
   /* ===== the hero band =====
      Five identical white boxes is a spreadsheet, not a command centre: every figure carries the
@@ -127,30 +224,30 @@ export const DASHBOARD_HTML = `<!doctype html>
      figure leads — the pipeline the operator is actually judged on — with its own seven-day
      movement and a fourteen-day shape behind it; everything else supports it at a smaller size. */
   .hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(230px, .65fr); gap: 0;
-    background: #fff; border: 1px solid #EDEDED; border-radius: 12px; overflow: hidden; margin-bottom: 18px; }
+    background: #fff; border: 1px solid #E3E9F1; border-radius: 12px; overflow: hidden; margin-bottom: 18px; }
   .hero .hmain { padding: 22px 24px 16px; min-width: 0; display: flex; flex-direction: column; }
-  .hero .hlab { font-size: 12.5px; color: #7C7C7C; }
+  .hero .hlab { font-size: 12px; color: #536170; }
   .hero .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
-  .hero .hfig { font-size: 44px; line-height: 1; font-weight: 600; color: #171717;
+  .hero .hfig { font-size: 44px; line-height: 1; font-weight: 700; color: #212529;
     font-variant-numeric: tabular-nums; letter-spacing: 0; }
-  .hero .hd { font-size: 13px; font-weight: 500; color: #027A48; background: #ECFDF3;
+  .hero .hd { font-size: 14px; font-weight: 500; color: #12633F; background: #E4F5EC;
     border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
-  .hero .hd.flat { color: #7C7C7C; background: #F3F3F3; }
-  .hero .hnote { font-size: 12.5px; color: #7C7C7C; margin-top: 8px; line-height: 1.7; }
+  .hero .hd.flat { color: #536170; background: #EDF1F7; }
+  .hero .hnote { font-size: 12px; color: #536170; margin-top: 8px; line-height: 1.7; }
   .hero .hspark { margin-top: auto; padding-top: 14px; }
-  .hero .haxis { display: flex; justify-content: space-between; font-size: 11px; color: #C7C7C7; margin-top: 4px; }
-  .hero .hside { border-inline-start: 1px solid #EDEDED; background: #FCFCFC; display: flex; flex-direction: column; }
+  .hero .haxis { display: flex; justify-content: space-between; font-size: 12px; color: #536170; margin-top: 4px; }
+  .hero .hside { border-inline-start: 1px solid #E3E9F1; background: #FCFCFC; display: flex; flex-direction: column; }
   .hero .hs { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 12px 20px; border-top: 1px solid #EDEDED; }
+    padding: 12px 20px; border-top: 1px solid #E3E9F1; }
   .hero .hs:first-child { border-top: 0; }
-  .hero .hs .k { font-size: 12.5px; color: #7C7C7C; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .hero .hs .k em { font-style: normal; font-size: 11.5px; color: #999999; }
-  .hero .hs .v { font-size: 19px; font-weight: 600; color: #171717; font-variant-numeric: tabular-nums; }
+  .hero .hs .k { font-size: 12px; color: #536170; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hero .hs .k em { font-style: normal; font-size: 12px; color: #536170; }
+  .hero .hs .v { font-size: 18px; font-weight: 600; color: #212529; font-variant-numeric: tabular-nums; }
 
   @media (max-width: 900px) {
     .hero { grid-template-columns: 1fr; }
-    .hero .hside { border-inline-start: 0; border-top: 1px solid #EDEDED; }
-    .hero .hfig { font-size: 36px; }
+    .hero .hside { border-inline-start: 0; border-top: 1px solid #E3E9F1; }
+    .hero .hfig { font-size: 40px; }
   }
 
   /* The funnel is drawn as a funnel. Six equal-length bars encode the ONE thing a funnel exists to
@@ -158,75 +255,75 @@ export const DASHBOARD_HTML = `<!doctype html>
      column, which is the honest picture of a campaign that lost nobody. */
   /* حسب الخدمة — a band, not another chip row, because its three fields come from a different
      place than the spreadsheet columns beneath them and must not read as more of the same. */
-  .affin { background: #F8F8F8; border: 1px solid #EDEDED; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+  .affin { background: #F4F6F9; border: 1px solid #E3E9F1; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
   .affin .ah { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
-  .affin .ah .t { font-size: 13px; font-weight: 500; color: #171717; }
-  .affin .ah .s { font-size: 12px; color: #999999; }
+  .affin .ah .t { font-size: 14px; font-weight: 500; color: #212529; }
+  .affin .ah .s { font-size: 12px; color: #536170; }
   .affin .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 11px; }
   .affin .fld { display: flex; align-items: center; gap: 7px; }
-  .affin .fld > span { font-size: 12.5px; color: #7C7C7C; white-space: nowrap; }
-  .affin select { font-family: inherit; height: 32px; border: 1px solid #E2E2E2; border-radius: 6px;
-    background: #fff; color: #383838; font-size: 12.5px; padding: 0 10px; cursor: pointer; max-width: 210px; }
-  .affin select.on { border-color: #1F7A73; color: #1F7A73; background: #E9F7F6; }
-  .excl { font-family: inherit; font-size: 12.5px; font-weight: 500; border-radius: 999px; padding: 7px 14px;
-    cursor: pointer; border: 1px solid #E2E2E2; background: #fff; color: #525252; white-space: nowrap;
+  .affin .fld > span { font-size: 12px; color: #536170; white-space: nowrap; }
+  .affin select { font-family: inherit; height: 32px; border: 1px solid #CBD7E4; border-radius: 6px;
+    background: #fff; color: #212529; font-size: 12px; padding: 0 10px; cursor: pointer; max-width: 210px; }
+  .affin select.on { border-color: #306DB5; color: #306DB5; background: #EAF1F8; }
+  .excl { font-family: inherit; font-size: 12px; font-weight: 500; border-radius: 999px; padding: 7px 14px;
+    cursor: pointer; border: 1px solid #CBD7E4; background: #fff; color: #3A3A3A; white-space: nowrap;
     transition: background .14s ease, border-color .14s ease, color .14s ease; }
-  .excl:hover { background: #F3F3F3; border-color: #C7C7C7; }
-  .excl.on { background: #1F7A73; border-color: #1F7A73; color: #fff; }
-  .affin .why { font-size: 12px; color: #B54708; margin-top: 10px; line-height: 1.7; }
+  .excl:hover { background: #EDF1F7; border-color: #536170; }
+  .excl.on { background: #306DB5; border-color: #306DB5; color: #fff; }
+  .affin .why { font-size: 12px; color: #7A5600; margin-top: 10px; line-height: 1.7; }
   .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
   @media (max-width: 900px) { .chgrid { grid-template-columns: 1fr !important; } }
   .fnl .lg { display: flex; flex-direction: column; gap: 6px; }
   .fnl .lgr { display: flex; align-items: baseline; gap: 8px; height: 44px; }
-  .fnl .lgr .nm { font-size: 12.5px; color: #383838; white-space: nowrap; }
-  .fnl .lgr .vl { font-size: 14px; font-weight: 600; color: #171717; font-variant-numeric: tabular-nums; }
-  .fnl .lgr .dp { font-size: 11.5px; color: #B42318; white-space: nowrap; }
+  .fnl .lgr .nm { font-size: 12px; color: #212529; white-space: nowrap; }
+  .fnl .lgr .vl { font-size: 14px; font-weight: 600; color: #212529; font-variant-numeric: tabular-nums; }
+  .fnl .lgr .dp { font-size: 12px; color: #8E2A27; white-space: nowrap; }
   /* ما يستحق المتابعة الآن. Flush rows on a hairline, not four pastel cards — four tinted fills
      read as four alarms and the eye cannot rank four alarms. Urgency is the dot. */
-  .aq { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid #EDEDED; cursor: pointer; transition: background .14s ease; }
-  .aq:hover { background: #F8F8F8; }
+  .aq { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid #E3E9F1; cursor: pointer; transition: background .14s ease; }
+  .aq:hover { background: #F4F6F9; }
   .aqd { width: 8px; height: 8px; border-radius: 999px; flex: none; }
-  .aqav { width: 32px; height: 32px; flex: none; border-radius: 8px; background: #F3F3F3; color: #525252; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px; }
-  .aqic { background: #F8F8F8; }
+  .aqav { width: 32px; height: 32px; flex: none; border-radius: 8px; background: #EDF1F7; color: #3A3A3A; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 14px; }
+  .aqic { background: #F4F6F9; }
   .aqt { flex: 0 0 min(42%, 360px); min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .aqn { font-size: 13.5px; font-weight: 500; color: #171717; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .aqw { font-size: 12px; color: #7C7C7C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aqn { font-size: 14px; font-weight: 500; color: #212529; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .aqw { font-size: 12px; color: #536170; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .noact .aqa { display: none; }
   .noact .aqt { flex: 1 1 auto; }
-  .aqa { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: #525252; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  .aqa { flex: 1 1 auto; min-width: 0; font-size: 12px; color: #3A3A3A; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .aqgo { flex: none; font-size: 12px; font-weight: 500; color: #3A3A3A; opacity: 0; transition: opacity .14s ease; }
   /* لوحة الفرز rows: the same flush-row grid as every other table here. Five tinted fills read as
      five alert levels; none of these is an alert, so the colour is the group's dot, once. */
   /* معرفة الخدمة rows. SIX cells, six tracks — the arity is stated in both directions here so a
      later column cannot be added on one side only. */
   .kbrow { display: grid; grid-template-columns: minmax(0,1.8fr) 1fr minmax(0,1.4fr) .55fr .7fr 52px;
-    align-items: center; gap: 14px; padding: 12px 20px 12px 12px; border-top: 1px solid #EDEDED;
+    align-items: center; gap: 14px; padding: 12px 20px 12px 12px; border-top: 1px solid #E3E9F1;
     text-decoration: none; transition: background .14s ease; }
   .kbrow:first-of-type { border-top: 0; }
-  a.kbrow:hover { background: #F8F8F8; }
-  .kbrow .nm { font-size: 13.5px; font-weight: 450; color: #171717; display: flex; align-items: center;
+  a.kbrow:hover { background: #F4F6F9; }
+  .kbrow .nm { font-size: 14px; font-weight: 450; color: #212529; display: flex; align-items: center;
     gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .kbrow .st { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #525252; min-width: 0; }
+  .kbrow .st { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #3A3A3A; min-width: 0; }
   .kbrow .st .d { width: 6px; height: 6px; border-radius: 999px; flex: none; }
-  .kbrow .st .fn { direction: ltr; color: #7C7C7C; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .kbrow .fig { font-size: 13px; color: #171717; font-variant-numeric: tabular-nums; }
-  .kbrow .go { font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  .kbrow .st .fn { direction: ltr; color: #536170; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kbrow .fig { font-size: 14px; color: #212529; font-variant-numeric: tabular-nums; }
+  .kbrow .go { font-size: 12px; font-weight: 500; color: #3A3A3A; opacity: 0; transition: opacity .14s ease; }
   a.kbrow:hover .go { opacity: 1; }
   @media (max-width: 860px) {
     .kbrow { grid-template-columns: minmax(0,1fr) auto; row-gap: 5px; }
     .kbrow .st, .kbrow .fig { grid-column: 1 / 3; }
   }
   .oprow { display: grid; grid-template-columns: 28px minmax(0,1.5fr) 1.05fr minmax(0,2fr) 52px;
-    align-items: center; gap: 12px; padding: 11px 20px 11px 12px; border-top: 1px solid #EDEDED;
+    align-items: center; gap: 12px; padding: 11px 20px 11px 12px; border-top: 1px solid #E3E9F1;
     cursor: pointer; transition: background .14s ease; }
   .oprow:first-of-type { border-top: 0; }
-  .oprow:hover { background: #F8F8F8; }
-  .oprow .av { width: 28px; height: 28px; border-radius: 7px; background: #F3F3F3; color: #525252;
+  .oprow:hover { background: #F4F6F9; }
+  .oprow .av { width: 28px; height: 28px; border-radius: 7px; background: #EDF1F7; color: #3A3A3A;
     display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
-  .oprow .nm { font-size: 13.5px; font-weight: 450; color: #171717; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .oprow .ph { font-size: 12.5px; color: #7C7C7C; direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
+  .oprow .nm { font-size: 14px; font-weight: 450; color: #212529; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .oprow .ph { font-size: 12px; color: #536170; direction: ltr; text-align: start; font-variant-numeric: tabular-nums; }
   .oprow .wh { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .oprow .go { font-size: 12px; font-weight: 500; color: #525252; opacity: 0; transition: opacity .14s ease; }
+  .oprow .go { font-size: 12px; font-weight: 500; color: #3A3A3A; opacity: 0; transition: opacity .14s ease; }
   .oprow:hover .go, .oprow:focus-within .go { opacity: 1; }
   @media (max-width: 860px) {
     .oprow { grid-template-columns: 28px minmax(0,1fr) auto; row-gap: 4px; }
@@ -235,144 +332,150 @@ export const DASHBOARD_HTML = `<!doctype html>
   }
   .aq:hover .aqgo, .aq:focus-within .aqgo { opacity: 1; }
   @media (max-width: 860px) { .aqa { display: none; } }
-  .card { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:16px;
+  .card { background:#fff; border:1px solid #E3E9F1; border-radius:10px; padding:16px;
     margin-bottom:16px; }
-  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 700; color: #525252; letter-spacing: 0; }
+  .card h3 { margin: 0 0 16px; font-size: 14px; font-weight: 600; color: #3A3A3A; letter-spacing: 0; }
   .chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:450;
-    border-radius:6px; padding:3px 8px; white-space:nowrap; background:#F8F8F8;
-    border:1px solid #EDEDED; color:#525252; }
+    border-radius:6px; padding:3px 8px; white-space:nowrap; background:#F4F6F9;
+    border:1px solid #E3E9F1; color:#3A3A3A; }
   /* Semantic classes now tint only the TEXT, never the fill. */
-  .c-grey { color:#525252; } .c-blue { color:#2F5F94; }
-  .c-teal { color:#1F7A73; } .c-ok { color:#027A48; }
-  .c-warn { color:#B54708; } .c-bad { color:#B42318; }
+  .c-grey { color:#3A3A3A; } .c-blue { color:#416CAD; }
+  .c-teal { color:#306DB5; } .c-ok { color:#12633F; }
+  .c-warn { color:#7A5600; } .c-bad { color:#8E2A27; }
   /* An assistant reading is not a confirmed tag. Same hue so the level still reads at a
      glance, but hollow with a dashed edge so it can never be mistaken for a recorded fact. */
   .c-read { background: transparent; border-style: dashed; font-weight: 600; }
-  .c-read .rd { font-weight: 700; opacity: .72; font-size: 10px; }
-  .ptab { font-family:inherit; font-size:12px; font-weight:450; border:1px solid #EDEDED;
-    background:#fff; color:#525252; border-radius:6px; padding:6px 12px; cursor:pointer; }
-  .ptab.on { background:#EDEDED; color:#171717; border-color:#EDEDED; }
-  .inp { font-family: inherit; font-size: 13px; color: #171717; border: 1px solid #E2E2E2; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
-  .inp:focus { border-color: #1F7A73; box-shadow: 0 0 0 3px rgba(31,122,115,.15); }
+  .c-read .rd { font-weight: 600; opacity: .72; font-size: 12px; }
+  .ptab { font-family:inherit; font-size:12px; font-weight:450; border:1px solid #E3E9F1;
+    background:#fff; color:#3A3A3A; border-radius:6px; padding:6px 12px; cursor:pointer; }
+  .ptab.on { background:#E3E9F1; color:#212529; border-color:#E3E9F1; }
+  .inp { font-family: inherit; font-size: 14px; color: #212529; border: 1px solid #CBD7E4; border-radius: 12px; padding: 11px 16px; background: #fff; outline: none; }
+  .inp:focus { border-color: #306DB5; box-shadow: 0 0 0 3px rgba(31,122,115,.15); }
   .fun { margin-bottom: 13px; }
   .fun .r1 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-  .fun .l { font-size: 12.5px; font-weight: 600; color: #171717; }
-  .fun .m { font-size: 11.5px; color: #7C7C7C; font-variant-numeric: tabular-nums; }
-  .fun .track { height: 9px; background: #F3F3F3; border-radius: 999px; overflow: hidden; }
+  .fun .l { font-size: 12px; font-weight: 600; color: #212529; }
+  .fun .m { font-size: 12px; color: #536170; font-variant-numeric: tabular-nums; }
+  .fun .track { height: 9px; background: #EDF1F7; border-radius: 999px; overflow: hidden; }
   .fun .fill { height: 100%; border-radius: 999px; min-width: 3%; }
   .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 90px 20px; text-align: center; }
   .empty .ic { width: 64px; height: 64px; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.08); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #E2E2E2; border-radius: 7px; }
-  .empty .t { font-size: 17px; font-weight: 700; color: #171717; }
-  .empty .s { font-size: 13px; color: #7C7C7C; margin-top: 6px; max-width: 380px; line-height: 1.8; }
+  .empty .ic span { width: 26px; height: 26px; border: 2px dashed #CBD7E4; border-radius: 7px; }
+  .empty .t { font-size: 16px; font-weight: 600; color: #212529; }
+  .empty .s { font-size: 14px; color: #536170; margin-top: 6px; max-width: 380px; line-height: 1.8; }
 
   /* tables */
-  .tblwrap { background: #fff; border: 1px solid #EDEDED; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
-  .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #EDEDED; }
-  .cntpill { font-size: 12px; font-weight: 700; color: #1F7A73; background: #E9F7F6; border-radius: 999px; padding: 4px 12px; }
+  .tblwrap { background: #fff; border: 1px solid #E3E9F1; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+  .ttoolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 22px; border-bottom: 1px solid #E3E9F1; }
+  .cntpill { font-size: 12px; font-weight: 600; color: #306DB5; background: #EAF1F8; border-radius: 999px; padding: 4px 12px; }
   /* Sparse-state rule (portal-wide): a screen with few rows must read as DELIBERATE, not
      half-loaded. One line, directly under the controls, that says what is here and where the
      rest is. Real data is still thin on most screens, so this recurs — it lives once. */
-  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #E2E2E2; border-inline-start: 3px solid #1F7A73; border-radius: 12px; background: #fff; font-size: 12.5px; line-height: 1.85; color: #525252; }
-  .sparse b { color: #171717; font-weight: 700; }
-  .sparse .lnk { color: #1F7A73; font-weight: 700; cursor: pointer; text-decoration: none; }
-  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid #EDEDED; background: #F8F8F8; font-size: 12px; color: #7C7C7C; }
+  .sparse { display: flex; align-items: flex-start; gap: 10px; margin: -6px 0 16px; padding: 12px 16px; border: 1px solid #CBD7E4; border-inline-start: 3px solid #306DB5; border-radius: 12px; background: #fff; font-size: 12px; line-height: 1.85; color: #3A3A3A; }
+  .sparse b { color: #212529; font-weight: 600; }
+  .sparse .lnk { color: #306DB5; font-weight: 600; cursor: pointer; text-decoration: none; }
+  .tfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid #E3E9F1; background: #F4F6F9; font-size: 12px; color: #536170; }
   /* Pagination. Every list in this product used to stop at LIST_CAP and tell the reader to narrow
      the search — which at 3,000 rows means rows 61 and beyond are simply unreachable, whatever you
      type. Truncation is not pagination. */
   .pgnav { display: flex; align-items: center; gap: 6px; }
-  .pgnav button, .pgsize { font-family: inherit; font-size: 12px; color: #525252; background: #fff;
-    border: 1px solid #E2E2E2; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
+  .pgnav button, .pgsize { font-family: inherit; font-size: 12px; color: #3A3A3A; background: #fff;
+    border: 1px solid #CBD7E4; border-radius: 6px; height: 28px; padding: 0 10px; cursor: pointer;
     transition: background .14s ease, border-color .14s ease; }
-  .pgnav button:hover:not(:disabled), .pgsize:hover { background: #F3F3F3; border-color: #C7C7C7; }
-  .pgnav button:disabled { color: #C7C7C7; cursor: default; background: #F8F8F8; }
-  .pgnav .at { font-variant-numeric: tabular-nums; color: #383838; padding: 0 4px; white-space: nowrap; }
-  .pgrange { font-variant-numeric: tabular-nums; color: #525252; }
-  .pgrange b { color: #171717; font-weight: 500; }
-  .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #EDEDED; background: #fff; color: #525252; font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-  .pgbtn.on { background: #171717; color: #fff; border-color: #171717; }
-  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #999999; font-size: 17px; cursor: pointer; line-height: 1; }
-  .kebab:hover { background: #F3F3F3; color: #525252; }
-  .swt { width: 38px; height: 22px; border-radius: 999px; background: #EDEDED; position: relative; flex: none; transition: background .18s ease; }
-  .swt.on { background: #1F7A73; }
+  .pgnav button:hover:not(:disabled), .pgsize:hover { background: #EDF1F7; border-color: #536170; }
+  .pgnav button:disabled { color: #536170; cursor: default; background: #F4F6F9; }
+  .pgnav .at { font-variant-numeric: tabular-nums; color: #212529; padding: 0 4px; white-space: nowrap; }
+  .pgrange { font-variant-numeric: tabular-nums; color: #3A3A3A; }
+  .pgrange b { color: #212529; font-weight: 500; }
+  .pgbtn { width: 34px; height: 34px; border-radius: 999px; border: 1px solid #E3E9F1; background: #fff; color: #3A3A3A; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .pgbtn.on { background: #212529; color: #fff; border-color: #212529; }
+  .kebab { width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: #536170; font-size: 16px; cursor: pointer; line-height: 1; }
+  .kebab:hover { background: #EDF1F7; color: #3A3A3A; }
+  .swt { width: 38px; height: 22px; border-radius: 999px; background: #E3E9F1; position: relative; flex: none; transition: background .18s ease; }
+  .swt.on { background: #306DB5; }
   .swt i { position: absolute; top: 3px; inset-inline-start: 3px; width: 16px; height: 16px; border-radius: 999px; background: #fff; transition: inset-inline-start .18s ease; box-shadow: 0 1px 2px rgba(16,24,40,.2); }
   .swt.on i { inset-inline-start: 19px; }
   .thead, .trow { display: grid; grid-template-columns: 1.6fr 1.6fr 1.5fr 1.4fr 0.7fr 0.8fr; gap: 12px; padding: 15px 22px; align-items: center; }
-  .thead { background: #F8F8F8; border-bottom: 1px solid #EDEDED; font-size: 11.5px; font-weight: 700; color: #7C7C7C; }
-  .trow { border-bottom: 1px solid #F3F3F3; cursor: pointer; min-height: 62px; }
-  .trow:hover { background: #F8F8F8; }
+  .thead { background: #F4F6F9; border-bottom: 1px solid #E3E9F1; font-size: 12px; font-weight: 600; color: #536170; }
+  .trow { border-bottom: 1px solid #EDF1F7; cursor: pointer; min-height: 62px; }
+  .trow:hover { background: #F4F6F9; }
   .trow:last-child { border-bottom: none; }
   .cust { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #F3F3F3; display: flex; align-items: center; justify-content: center; color: #525252; font-weight: 700; font-size: 15px; }
-  .cust .nm { font-size: 13.5px; font-weight: 700; color: #171717; }
-  .cust .ph { font-size: 11px; color: #999999; direction: ltr; text-align: right; }
-  .lastm { font-size: 12px; color: #7C7C7C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tm { font-size: 11px; color: #999999; font-variant-numeric: tabular-nums; }
+  .cust .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EDF1F7; display: flex; align-items: center; justify-content: center; color: #3A3A3A; font-weight: 600; font-size: 14px; }
+  .cust .nm { font-size: 14px; font-weight: 600; color: #212529; }
+  .cust .ph { font-size: 12px; color: #536170; direction: ltr; text-align: right; }
+  .lastm { font-size: 12px; color: #536170; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tm { font-size: 12px; color: #536170; font-variant-numeric: tabular-nums; }
   .statgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 18px; }
-  .statc { background:#fff; border:1px solid #EDEDED; border-radius:10px; padding:14px 16px; }
-  .statc .l { font-size: 11.5px; color: #7C7C7C; margin-bottom: 8px; font-weight: 600; }
-  .statc .v { font-size: 24px; font-weight: 700; color: #171717; line-height: 1; font-variant-numeric: tabular-nums; }
-  .statc .p { font-size: 10.5px; color: #2E7D77; font-weight: 700; margin-top: 6px; }
-  .statc .mb { height: 4px; background: #F3F3F3; border-radius: 999px; overflow: hidden; margin-top: 9px; }
+  .statc { background:#fff; border:1px solid #E3E9F1; border-radius:10px; padding:14px 16px; }
+  .statc .l { font-size: 12px; color: #536170; margin-bottom: 8px; font-weight: 600; }
+  .statc .v { font-size: 22px; font-weight: 600; color: #212529; line-height: 1; font-variant-numeric: tabular-nums; }
+  .statc .p { font-size: 12px; color: #306DB5; font-weight: 600; margin-top: 6px; }
+  .statc .mb { height: 4px; background: #EDF1F7; border-radius: 999px; overflow: hidden; margin-top: 9px; }
   .statc .mb i { display: block; height: 100%; border-radius: 999px; }
-  .backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.4); z-index: 69; }
-  .convo { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(430px, 94vw); background: #fff; z-index: 70; display: flex; flex-direction: column; box-shadow: 12px 0 32px rgba(16,24,40,.18); }
-  .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid #EDEDED; }
-  .convo .hd .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #F3F3F3; color: #525252; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; }
+  .backdrop { position: fixed; inset: 0; background: rgba(16,24,40,.4); z-index: var(--z-overlay); }
+  .convo { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(430px, 94vw); background: #fff; z-index: var(--z-modal); display: flex; flex-direction: column; box-shadow: 12px 0 32px rgba(16,24,40,.18); }
+  .convo .hd { flex: none; display: flex; align-items: center; gap: 11px; padding: 14px 18px; border-bottom: 1px solid #E3E9F1; }
+  .convo .hd .av { width: 40px; height: 40px; flex: none; border-radius: 999px; background: #EDF1F7; color: #3A3A3A; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; }
   .convo .msgs { flex: 1; overflow-y: auto; background: #E5DDD4; padding: 16px; }
-  .convo .ft { flex: none; padding: 13px 18px; border-top: 1px solid #EDEDED; }
+  .convo .ft { flex: none; padding: 13px 18px; border-top: 1px solid #E3E9F1; }
   @media (prefers-reduced-motion: no-preference) { .convo { animation: slideIn .18s ease; } @keyframes slideIn { from { transform: translateX(-30px); opacity: .6; } to { transform: none; opacity: 1; } } }
-  .bub { max-width: 76%; border-radius: 12px; padding: 9px 13px; font-size: 12.5px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #171717; }
+  .bub { max-width: 76%; border-radius: 12px; padding: 9px 13px; font-size: 12px; line-height: 1.9; margin-bottom: 9px; box-shadow: 0 1px 1px rgba(0,0,0,.06); white-space: pre-line; color: #212529; }
   .b-a { background: #DCF8C6; border-top-left-radius: 3px; margin-inline-start: auto; }
   .b-c { background: #fff; border-top-right-radius: 3px; margin-inline-end: auto; }
-  .b-s { background: rgba(255,255,255,.65); font-size: 11px; color: #525252; max-width: 100%; text-align: center; }
-  .bt { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 4px; direction: ltr; }
+  .b-s { background: rgba(255,255,255,.65); font-size: 12px; color: #3A3A3A; max-width: 100%; text-align: center; }
+  .bt { font-size: 12px; color: #7d8b6a; text-align: left; margin-top: 4px; direction: ltr; }
 
   /* wizard */
   .step { background: #fff; border-radius: 16px; padding: 26px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04); }
   .step .hd { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-  .step .num { width: 32px; height: 32px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: #2E8F89; color: #fff; }
-  .step .num.done { background: #E9F7F6; color: #2E7D77; }
-  .step .ht { font-size: 15.5px; font-weight: 700; color: #171717; }
-  .step .hs { font-size: 12.5px; color: #7C7C7C; margin-top: 4px; }
+  .step .num { width: 32px; height: 32px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; background: #416CAD; color: #fff; }
+  .step .num.done { background: #EAF1F8; color: #306DB5; }
+  .step .ht { font-size: 14px; font-weight: 600; color: #212529; }
+  .step .hs { font-size: 12px; color: #536170; margin-top: 4px; }
   .prods { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 14px; }
-  .prod { text-align: right; font-family: inherit; background: #fff; border: 1.5px solid #EDEDED; border-radius: 16px; padding: 18px; cursor: pointer; }
-  .prod.on { background: #F6FCFB; border-color: #3FB6B0; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
-  .prod .pn { font-size: 13.5px; font-weight: 700; color: #171717; margin-bottom: 12px; }
-  .prod .sc { font-size: 21px; font-weight: 700; }
-  .prod .scl { font-size: 10.5px; color: #999999; }
-  .prod .bar { height: 6px; background: #F3F3F3; border-radius: 999px; overflow: hidden; margin: 10px 0; }
+  .prod { text-align: right; font-family: inherit; background: #fff; border: 1.5px solid #E3E9F1; border-radius: 16px; padding: 18px; cursor: pointer; }
+  .prod.on { background: #EAF1F8; border-color: #629CCD; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
+  .prod .pn { font-size: 14px; font-weight: 600; color: #212529; margin-bottom: 12px; }
+  .prod .sc { font-size: 22px; font-weight: 600; }
+  .prod .scl { font-size: 12px; color: #536170; }
+  .prod .bar { height: 6px; background: #EDF1F7; border-radius: 999px; overflow: hidden; margin: 10px 0; }
   .prod .bar i { display: block; height: 100%; border-radius: 999px; }
   .wa-prev { background: #E5DDD4; border-radius: 16px; padding: 18px; max-width: 480px; }
-  .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12.5px; color: #171717; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
-  .wa-prev .t { font-size: 9.5px; color: #7d8b6a; text-align: left; margin-top: 6px; }
-  .btn { font-family:inherit; font-size:13px; font-weight:500; border:none; border-radius:6px;
+  .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12px; color: #212529; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
+  .wa-prev .t { font-size: 12px; color: #7d8b6a; text-align: left; margin-top: 6px; }
+  .btn { font-family:inherit; font-size:14px; font-weight:500; border:none; border-radius:6px;
     padding:0 12px; height:32px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-  .btn-teal { color: #fff; background: #1F7A73; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
-  .btn-dark { color: #fff; background: #171717; }
-  .btn-ghost { color: #383838; background: #fff; border: 1px solid #E2E2E2; }
+  .btn-teal { color: #fff; background: #306DB5; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
+  /* A blue ring on the blue button measures 1.00:1 — the most important control on every screen
+     had NO visible keyboard focus. WCAG 2.4.7. The ring inverts to paper on any blue ground, with
+     a blue halo outside it so it reads against the page too. */
+  .btn-teal:focus-visible, .btn-dark:focus-visible {
+    outline: 2px solid var(--paper); outline-offset: -3px;
+    box-shadow: 0 0 0 3px rgba(48,109,181,.45); }
+  .btn-dark { color: #fff; background: #212529; }
+  .btn-ghost { color: #212529; background: #fff; border: 1px solid #CBD7E4; }
   .btn:hover { filter: brightness(.97); }
-  .btn-dis { color: #999999; background: #F3F3F3; cursor: not-allowed; }
-  .note { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #EDEDED;
-    border-inline-start:3px solid #B54708; border-radius:10px; padding:12px 16px; font-size:12px;
-    color:#525252; font-weight:450; margin-top:14px; }
+  .btn-dis { color: #536170; background: #EDF1F7; cursor: not-allowed; }
+  .note { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid #E3E9F1;
+    border-inline-start:3px solid #7A5600; border-radius:10px; padding:12px 16px; font-size:12px;
+    color:#3A3A3A; font-weight:450; margin-top:14px; }
 
   /* kb */
-  .kbrow { display: flex; align-items: center; gap: 14px; padding: 17px 22px; border-bottom: 1px solid #F3F3F3; }
+  .kbrow { display: flex; align-items: center; gap: 14px; padding: 17px 22px; border-bottom: 1px solid #EDF1F7; }
   .kbrow:last-child { border-bottom: none; }
   .kbrow .dt { width: 9px; height: 9px; flex: none; border-radius: 999px; }
   .kbrow .ti { flex: 1; min-width: 0; }
-  .kbrow .t1 { font-size: 13.5px; font-weight: 700; color: #171717; }
-  .kbrow .t2 { font-size: 11.5px; color: #999999; margin-top: 4px; }
-  .kbrow .ct { font-size: 11.5px; color: #999999; }
+  .kbrow .t1 { font-size: 14px; font-weight: 600; color: #212529; }
+  .kbrow .t2 { font-size: 12px; color: #536170; margin-top: 4px; }
+  .kbrow .ct { font-size: 12px; color: #536170; }
   .gate { max-width: 420px; margin: 80px auto; background: #fff; border-radius: 16px; padding: 30px; text-align: center; box-shadow: 0 1px 3px rgba(16,24,40,.08); }
-  .gate input { font-family: inherit; width: 100%; font-size: 13px; border: 1px solid #E2E2E2; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
+  .gate input { font-family: inherit; width: 100%; font-size: 14px; border: 1px solid #CBD7E4; border-radius: 12px; padding: 12px 14px; margin: 14px 0; direction: ltr; }
   .ptitle { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
-  .ptitle h1 { margin:0; font-size:18px; font-weight:600; color:#171717; letter-spacing:0;
+  .ptitle h1 { margin:0; font-size:18px; font-weight:600; color:#212529; letter-spacing:0;
     line-height:1.4; }
-  .ptitle p { margin: 6px 0 0; font-size: 13.5px; color: #7C7C7C; }
+  .ptitle p { margin: 6px 0 0; font-size: 14px; color: #536170; }
   .ptitle .acts { margin-inline-start: auto; display: flex; gap: 10px; align-items: center; }
-  .sec { font-size: 14px; font-weight: 700; color: #525252; margin: 4px 0 14px; }
+  .sec { font-size: 14px; font-weight: 600; color: #3A3A3A; margin: 4px 0 14px; }
   /* motion */
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -387,19 +490,19 @@ export const DASHBOARD_HTML = `<!doctype html>
     .livechip .d { animation: pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
   }
-  .skel { background: linear-gradient(90deg, #F3F3F3 25%, #EDEDED 37%, #F3F3F3 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
-  .sec .meta { font-size: 11.5px; font-weight: 600; color: #999999; margin-inline-start: 8px; }
+  .skel { background: linear-gradient(90deg, #EDF1F7 25%, #E3E9F1 37%, #EDF1F7 63%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 8px; }
+  .sec .meta { font-size: 12px; font-weight: 600; color: #536170; margin-inline-start: 8px; }
   /* The launch bar is docked chrome; on a phone it must not eat the step it sits under. */
   @media (max-width: 430px) {
     .lbar { gap: 8px !important; padding: 12px 14px !important; }
     .lbar .lsub { display: none; }
-    .lbar .btn { padding: 10px 16px !important; font-size: 12.5px !important; }
+    .lbar .btn { padding: 10px 16px !important; font-size: 12px !important; }
   }
   /* The conversation ledger is a side column on desktop; below 900 it must become a block, not an
      orphaned 210px strip with a floating vertical hairline. */
   @media (max-width: 900px) {
     .convled { width: 100% !important; border-inline-start: 0 !important; padding-inline-start: 0 !important;
-               border-top: 1px solid #F3F3F3; padding-top: 14px; }
+               border-top: 1px solid #EDF1F7; padding-top: 14px; }
   }
   /* ===== ملف العميل — the enrichable client record (cycle crm-record; DESIGN.md) =====
      The provenance mark is an 8px SHAPE in a fixed start-side column: shape carries the meaning,
@@ -413,19 +516,19 @@ export const DASHBOARD_HTML = `<!doctype html>
   .crec { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
   .crecmain { display:grid; grid-template-columns:1fr; gap:16px; align-items:start; }
   .pm { width: 8px; height: 8px; flex: none; margin-top: 7px; }
-  .pm-h { background: #1F7A73; border-radius: 2px; }
-  .pm-a { border: 1.5px dashed #B54708; border-radius: 999px; background: transparent; }
-  .pm-i { background: #2F5F94; border-radius: 2px; opacity: .55; }
-  .pm-m { border: 1px dashed #E2E2E2; border-radius: 2px; background: transparent; }
+  .pm-h { background: #306DB5; border-radius: 2px; }
+  .pm-a { border: 1.5px dashed #7A5600; border-radius: 999px; background: transparent; }
+  .pm-i { background: #416CAD; border-radius: 2px; opacity: .55; }
+  .pm-m { border: 1px dashed #CBD7E4; border-radius: 2px; background: transparent; }
   /* EXACT-1: two columns, 35/65, not a stacked pair. min-w-20 = 80px floor on the label. */
-  .frow { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #F3F3F3; position:relative; }
+  .frow { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #EDF1F7; position:relative; }
   .frow:last-child { border-bottom: none; }
   /* the only tinted rows in the panel, and lighter than any chip: a reading never outranks a fact */
   /* A reading is marked by its «قراءة» chip and its dashed provenance dot, not by a cream wash.
      #FFFDF7 was the last tinted surface in the panel and it made the AI's guess the loudest block
      on the record — the opposite of the intended hierarchy. */
   .frow.rdrow { background:#fff; margin:0 -8px; padding:8px; border-radius:8px;
-    border-inline-start:2px solid #EDEDED; }
+    border-inline-start:2px solid #E3E9F1; }
   /* EXACT-1: the field row is two columns, 35/65, with an 80px floor on the label — that split is
      what makes Frappe's panel scan as a form instead of a stack of caption-and-value pairs. */
   .fbody { flex:1; min-width:0; display:grid; grid-template-columns: minmax(80px,35%) minmax(0,65%);
@@ -437,17 +540,17 @@ export const DASHBOARD_HTML = `<!doctype html>
   /* Chips WRAP inside their column. Clipping produced «نية مرتفد» — a word cut in half, which is
      worse than two lines. The panel is 352px and these labels are long by nature. */
   .fbody .chip { max-width:100%; white-space:normal; line-height:1.6; align-items:flex-start; }
-  .flab { font-size:13px; font-weight:450; color:#7C7C7C; letter-spacing:0; line-height:1.5; }
-  .fval { font-size:14px; font-weight:450; color:#171717; line-height:1.5; min-height:28px;
+  .flab { font-size:14px; font-weight:450; color:#536170; letter-spacing:0; line-height:1.5; }
+  .fval { font-size:14px; font-weight:450; color:#212529; line-height:1.5; min-height:28px;
     margin-top:0; }
-  .fval-a { font-size:14px; font-weight:450; color:#525252; }
-  .fval-m { font-size:14px; font-weight:450; color:#999999; margin-top:0; min-height:28px; }
-  .sig { font-size:11px; color:#999999; margin-top:3px; font-weight:450; }
-  .quote { font-size:12px; color:#7C7C7C; margin-top:4px; line-height:1.7; }
-  .ferr { font-size: 11.5px; color: #B42318; font-weight: 700; margin-top: 6px; line-height: 1.7; }
-  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #999999; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
+  .fval-a { font-size:14px; font-weight:450; color:#3A3A3A; }
+  .fval-m { font-size:14px; font-weight:450; color:#536170; margin-top:0; min-height:28px; }
+  .sig { font-size:12px; color:#536170; margin-top:3px; font-weight:450; }
+  .quote { font-size:12px; color:#536170; margin-top:4px; line-height:1.7; }
+  .ferr { font-size: 12px; color: #8E2A27; font-weight: 600; margin-top: 6px; line-height: 1.7; }
+  .pen { position: absolute; inset-inline-end: 0; top: 10px; border: none; background: transparent; color: #536170; cursor: pointer; font-size: 14px; width: 34px; height: 34px; border-radius: 8px; opacity: 0; font-family: inherit; }
   .frow:hover .pen, .frow:focus-within .pen { opacity: 1; }
-  .pen[disabled] { cursor: not-allowed; color: #E2E2E2; }
+  .pen[disabled] { cursor: not-allowed; color: #CBD7E4; }
   @media (hover: none) { .pen { opacity: 1; } }
   /* A FINGER IS NOT A CURSOR. The control primitives are sized for a mouse — .kebab is 32px, the
      filter pills 27px, the tabs content-sized — which measured 16 sub-44px targets on the customers
@@ -465,14 +568,14 @@ export const DASHBOARD_HTML = `<!doctype html>
     input[type="checkbox"] { width: 20px; height: 20px; }
   }
   .cbar { display: flex; gap: 7px; margin-top: 9px; flex-wrap: wrap; }
-  .mini { font-size: 11.5px; font-weight: 700; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
-  .add { font-size: 11.5px; font-weight: 700; color: #1F7A73; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
-  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 10.5px; color: #999999; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #F3F3F3; }
+  .mini { font-size: 12px; font-weight: 600; padding: 8px 15px; border-radius: 999px; min-height: 36px; }
+  .add { font-size: 12px; font-weight: 600; color: #306DB5; background: transparent; border: 1px dashed #C4E8E5; border-radius: 999px; padding: 6px 13px; cursor: pointer; margin-top: 6px; font-family: inherit; display: inline-block; text-decoration: none; }
+  .plgnd { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #536170; font-weight: 600; margin: 8px 0 4px; padding-bottom: 10px; border-bottom: 1px solid #EDF1F7; }
   .plgnd .i { display: inline-flex; gap: 6px; align-items: center; }
-  .crec :focus-visible { outline: 2px solid #1F7A73; outline-offset: 2px; }
+  .crec :focus-visible { outline: 2px solid #306DB5; outline-offset: 2px; }
   @media (prefers-reduced-motion: no-preference) {
     .fsaved { animation: fsaved .14s ease-out; }
-    @keyframes fsaved { from { background: #ECFDF3; } to { background: transparent; } }
+    @keyframes fsaved { from { background: #E4F5EC; } to { background: transparent; } }
   }
   /* one column below 900: ملف العميل comes BEFORE فهم المساعد on purpose — properties beat the
      AI card, and the 372px track would otherwise become an orphaned strip. */
@@ -490,12 +593,15 @@ export const DASHBOARD_HTML = `<!doctype html>
      the switcher keeps its mark, and every remaining target is 44px because a finger is not a
      cursor. NO BACKTICKS IN THIS FILE'S COMMENTS — the CSS is inside a template literal and one
      backtick ends it (ADR-0001, caught by this very cycle's build). */
-  @media (max-width: 900px) { .app { flex-direction: column; } aside { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 6px; padding-inline: 8px; overflow-x: auto; border-inline-end: none; border-block-end: 1px solid #EDEDED; } aside .switcher { width: auto; flex: none; height: 44px; padding: 6px; } aside .switcher > div, aside .switcher .chev { display: none; } aside .navsearch { width: auto; flex: none; min-width: 44px; height: 44px; justify-content: center; padding-inline: 10px; } aside .navsearch .lbl, aside .navsearch kbd { display: none; } aside #nav { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; } aside #nav .grp { display: none; } aside #nav .nv { width: auto; flex: none; height: 44px; white-space: nowrap; margin-bottom: 0; } aside .collapse { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+  @media (max-width: 900px) { .app { flex-direction: column; } aside { width: 100%; height: auto; flex-direction: row; align-items: center; gap: 6px; padding-inline: 8px; overflow-x: auto; border-inline-end: none; border-block-end: 1px solid #E3E9F1; } aside .switcher { width: auto; flex: none; height: 44px; padding: 6px; } aside .switcher > div, aside .switcher .chev { display: none; } aside .navsearch { width: auto; flex: none; min-width: 44px; height: 44px; justify-content: center; padding-inline: 10px; } aside .navsearch .lbl, aside .navsearch kbd { display: none; } aside #nav { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; } aside #nav .grp { display: none; } aside #nav .nv { width: auto; flex: none; height: 44px; white-space: nowrap; margin-bottom: 0; } aside .collapse { display: none; } .thead, .trow:not(.km) { grid-template-columns: 1.5fr 1.4fr 1.1fr .5fr; } .thead div:nth-child(4), .trow:not(.km) > div:nth-child(4), .thead div:nth-child(5), .trow:not(.km) > div:nth-child(5) { display: none; } .trow > div:last-child { font-size: 14px !important; } .hidemob { display: none !important; } }
+${CRM_PRIMITIVES_CSS}
 ${CAMPAIGNS_CRM_CSS}
 ${CUSTOMERS_CRM_CSS}
 ${ACTIVITY_CRM_CSS}
 ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
+${PRODUCTS_CRM_CSS}
+${REPORTS_CRM_CSS}
 ${TARGETS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
@@ -533,7 +639,7 @@ ${PALETTE_CSS}
       <span class="chev">⌄</span>
     </button>
     <button class="navsearch" onclick="palOpenBox()" aria-label="الانتقال السريع">
-      <svg width="15" height="15" style="flex:none;color:#999999"><use href="#i-search"/></svg>
+      <svg width="15" height="15" style="flex:none;color:#536170"><use href="#i-search"/></svg>
       <span class="lbl">الانتقال السريع…</span>
       <kbd>⌘K</kbd>
     </button>
@@ -554,6 +660,9 @@ ${PALETTE_CSS}
       <span class="livechip" id="live" style="display:none"><span class="d"></span> مباشر · <span id="upd">—</span></span>
       <span id="crumbact"></span>
     </header>
+    <!-- Tab strip for the destinations that left the rail when it went from fifteen doors to six.
+         Written by nav() every route change; hidden on doors with a single destination. -->
+    <div class="subnav" id="subnav" style="display:none"></div>
     <div class="body ms-scroll" id="body"></div>
   </main>
 </div>
@@ -654,14 +763,50 @@ let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — s
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
 let campMsg = "في أغلب المنشآت الصحية، إصدار {product} يمر بخطوات ورقية متكررة بين النظام الداخلي والجهات الرسمية.\\n\\nما نقدمه في لِين هو ربط مباشر مع نظام HIS لديكم: الإجراء يُنفَّذ من داخل نظامكم بتوثيق رسمي معتمد، فيقل زمن الإصدار بنسبة تصل إلى ٧٠٪ ويختفي الإدخال المزدوج.\\n\\nأرفقنا ملفًا موجزًا يوضح آلية الربط والخطوات.\\n\\nسؤال واحد لنعرف ما يناسبكم: كم فرعًا لديكم تقريبًا؟";
 
+// SIX DOORS, NOT FIFTEEN. The rule from the design record: what is not an independent noun in the
+// user's work is not a door in the rail. Fifteen items was accumulation, not information
+// architecture — four of them were «قريبًا» placeholders sitting at the same weight as العملاء.
+//
+// NOTHING IS ORPHANED. Every one of the fifteen keeps a destination as a tab under its door, and
+// every old #hash still resolves because not one route handler is touched by this change. That
+// matters more than the tidier rail: a screen you can no longer reach is indistinguishable from a
+// screen that was deleted, and this project has shipped that mistake before.
 const NAV = [
-  { grp: "نظرة عامة" }, { id: "home", l: "الرئيسية", i: "home" },
-  { grp: "دورة البيع" }, { id: "customers", l: "العملاء", i: "users" }, { id: "opps", l: "فرص البيع", i: "target" }, { id: "pipeline", l: "لوحة المتابعة", i: "reply" }, { id: "tasks", l: "المهام", i: "check" }, { id: "notes", l: "الملاحظات", i: "doc" },
-  { grp: "التسويق" }, { id: "aimkt", l: "إنشاء حملة", i: "send" }, { id: "kmon", l: "متابعة الحملات", i: "eye" }, { id: "kb", l: "معرفة الخدمة", i: "book" }, { id: "partners", l: "شركاء المبيعات", i: "spark" },
-  { grp: "التخطيط وقياس الأداء" }, { id: "products", l: "المنتجات", i: "flame" }, { id: "targets", l: "جهات الاستهداف", i: "up" }, { id: "perf", l: "المستهدفات والأداء", i: "chart" }, { id: "reports", l: "التقارير", i: "chart" },
-  { grp: "المنشأة" }, { id: "org", l: "الهيكل التنظيمي", i: "users" },
+  { id: "home",      l: "الرئيسية",  i: "home" },
+  { id: "opps",      l: "فرص البيع", i: "target" },
+  { id: "customers", l: "العملاء",   i: "users" },
+  { id: "products",  l: "المنتجات",  i: "flame" },
+  { id: "kmon",      l: "الحملات",   i: "send" },
+  { id: "reports",   l: "التقارير",  i: "chart" },
 ];
-const PAL_SOON = { partners: 1, products: 1, reports: 1, org: 1 };
+
+// Sub-destinations per door, in tab order. The FIRST entry is the door's own landing route, so a
+// door with one entry renders no tab strip at all.
+//
+// «المهام» and «الملاحظات» sit under العملاء rather than vanishing into the client record: a task
+// with no client and no opportunity attached has nowhere else to live, and dropping the list would
+// hide exactly those rows. «جهات الاستهداف» and «معرفة الخدمة» are campaign INPUTS, so they sit
+// under الحملات. «الهيكل التنظيمي» sits under المنتجات because dept and manager are the same
+// rollup layer as the sector.
+const SUBS = {
+  opps:      [["opps", "الفرص"], ["pipeline", "لوحة المتابعة"]],
+  customers: [["customers", "العملاء"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
+  products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
+  kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
+              ["kb", "معرفة الخدمة"], ["partners", "شركاء المبيعات"]],
+};
+
+// route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
+// a route ends up highlighting no door at all, or two.
+const DOOR_OF = (function () {
+  const m = { customer: "customers" };   // #customer/<phone> is a detail view of العملاء
+  for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
+  for (var j = 0; j < NAV.length; j++) if (!m[NAV[j].id]) m[NAV[j].id] = NAV[j].id;
+  return m;
+})();
+
+// products and reports are REAL screens now; partners and org are still placeholders.
+const PAL_SOON = { partners: 1, org: 1 };
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
@@ -672,8 +817,8 @@ const TITLES = {
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
-  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "ضمن المرحلة القادمة"],
-  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "ضمن المرحلة القادمة"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "الكتالوج وقطاعاته وباقاته — والإنجاز الربعي"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
@@ -715,23 +860,82 @@ function PAL_BADGES() {
   } catch (e) { /* never let a count stop a paint */ }
   return out;
 }
+
+/**
+ * Slide a tab strip's indicator under its active tab.
+ *
+ * transitions.dev's «Tabs sliding». Shared by the door tab strip and the reports tabs so the two
+ * cannot drift. Only transform and width are animated — both composite, so this never enters the
+ * paint path on a 512MB shared-CPU box that is also serving the webhook.
+ *
+ * The first paint sets the position with transition suppressed: there is no previous tab for the
+ * indicator to travel from, and animating in from the inline-start edge reads as a glitch.
+ */
+function moveInd(strip) {
+  if (!strip) return;
+  const ind = strip.querySelector(".ind");
+  const on = strip.querySelector(".sub.on, .rp-tab.on");
+  if (!ind || !on) { if (ind) ind.style.width = "0px"; return; }
+  const first = !ind.dataset.placed;
+  if (first) { ind.classList.add("noanim"); ind.dataset.placed = "1"; }
+  // Logical inline offset: in RTL the strip's inline-start is its RIGHT edge, so measuring with
+  // physical offsetLeft and translating by it would send the indicator the wrong way.
+  const sb = strip.getBoundingClientRect(), ob = on.getBoundingClientRect();
+  const rtl = getComputedStyle(strip).direction === "rtl";
+  const off = rtl ? (sb.right - ob.right) : (ob.left - sb.left);
+  ind.style.width = ob.width + "px";
+  ind.style.transform = "translateX(" + (rtl ? -off : off) + "px)";
+  if (first) requestAnimationFrame(function () { ind.classList.remove("noanim"); });
+}
+window.moveInd = moveInd;
+
 function nav() {
-  // #customer/<phone> is a detail view of العملاء — keep that item highlighted.
+  // Which DOOR is lit. #customer/<phone> is a detail view of العملاء, #tasks now lives under it
+  // too, and DOOR_OF carries both because it is derived from SUBS rather than written twice.
   const raw = (location.hash || "#kmon").slice(1).split("/")[0];
-  const cur = raw === "customer" ? "customers" : raw;
+  const cur = DOOR_OF[raw] || raw;
   // Two badges, both counts of work OWED and both derived from data already in memory — no extra
   // request, and nothing that can be stale in a way the screen behind it is not.
   //   فرص البيع  — appointments confirmed for today: the calls you owe before the day ends.
   //   المهام     — tasks past due, only once the tasks route has actually loaded them; a badge
   //                that guesses «٠» before the fetch is a lie for the whole session.
   const badges = PAL_BADGES();
+  // A door carries the badge of ANY route beneath it, because the count is of work owed and the
+  // work did not move when the rail shrank. Summed, not replaced: المهام sits under العملاء now,
+  // so a door showing only its own landing route's badge would silently drop the overdue count.
+  const doorBadge = (id) => {
+    const subs = SUBS[id] || [[id]];
+    let n = 0, cls = "", tip = [];
+    for (let i = 0; i < subs.length; i++) {
+      const b = badges[subs[i][0]];
+      if (!b) continue;
+      n += Number(String(b[0]).replace(/[^0-9]/g, "")) || 0;
+      cls = cls || b[1];
+      tip.push(b[2]);
+    }
+    return n ? [fmtN(n), cls, tip.join(" · ")] : null;
+  };
   document.getElementById("nav").innerHTML = NAV.map((x) => {
-    if (x.grp) return '<div class="grp">' + x.grp + "</div>";
-    const b = badges[x.id];
-    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'">' +
-      '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#1F7A73" : "#999999") + '</span><span class="lbl">' + x.l + "</span>" +
+    const b = doorBadge(x.id);
+    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'" title="' + (b ? b[2] : x.l) + '">' +
+      '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#306DB5" : "#A9B4C0") + '</span><span class="lbl">' + x.l + "</span>" +
       (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
   }).join("");
+
+  // The tab strip. Rendered only where a door actually has more than one destination, so a single
+  // -destination door does not grow a strip of one tab that looks interactive and does nothing.
+  const subs = SUBS[cur] || [];
+  document.getElementById("subnav").innerHTML = subs.length > 1
+    ? subs.map((sx) => {
+        const sb = badges[sx[0]];
+        return '<button class="sub' + (sx[0] === raw ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
+          (sb ? '<span class="sbdg">' + sb[0] + "</span>" : "") + "</button>";
+      }).join("")
+    : "";
+  const sn = document.getElementById("subnav");
+  if (subs.length > 1) sn.insertAdjacentHTML("beforeend", '<i class="ind"></i>');
+  sn.style.display = subs.length > 1 ? "" : "none";
+  moveInd(sn);
   // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
   // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
   // الاستهداف وأدرها للحملات» — the import list's title — above every CLIENT RECORD, and made
@@ -739,7 +943,10 @@ function nav() {
   const t = TITLES[raw] || TITLES[cur] || TITLES.kmon;
   document.getElementById("pt").textContent = t[0];
   document.getElementById("ps").textContent = t[1];
-  document.getElementById("live").style.display = (cur === "kmon" || cur === "home") ? "" : "none";
+  // ONLY الحملات. «مباشر» is a claim that the numbers on screen are being re-fetched, and after
+  // R14 took #home off the 5s tick that claim became false there — a live badge over a snapshot is
+  // worse than no badge, because it stops the reader from refreshing when they should.
+  document.getElementById("live").style.display = (raw === "kmon") ? "" : "none";
 }
 
 // win scopes the delivery chip to a campaign. On a campaign screen the row chip read «ردّ» from
@@ -764,7 +971,7 @@ function chipRow(c, win) {
   return out.join(" ");
 }
 const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
-const fills = ["#2F5F94", "#2F5F94", "#3FB6B0", "#3FB6B0", "#2E8F89", "#1f8a52"];
+const fills = ["#416CAD", "#416CAD", "#629CCD", "#629CCD", "#416CAD", "#1E9E63"];
 
 function funnelData(d) {
   const cs = d.contacts || []; const n = cs.length;
@@ -856,7 +1063,7 @@ function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 
 /** Arabic-Indic digits, matching every other number on these screens. */
 function fmtN(n) { return Number(n || 0).toLocaleString("ar-SA"); }
 function interestChips(c) {
-  if (!c) return '<span style="color:#E2E2E2;">—</span>';
+  if (!c) return '<span style="color:#CBD7E4;">—</span>';
   const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
   const latest = new Map();
   (c.tags || []).forEach((t) => latest.set(t.product, t));
@@ -884,7 +1091,7 @@ function interestChips(c) {
   if (c.outcome === "handoff") return '<span class="chip c-warn">طلب تواصلًا</span>';
   if (c.outcome === "interested") return '<span class="chip c-ok">مهتم</span>';
   if (c.outcome === "not_interested") return '<span class="chip c-grey">غير مهتم</span>';
-  return '<span style="color:#E2E2E2;">—</span>';
+  return '<span style="color:#CBD7E4;">—</span>';
 }
 function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
 // --- THE APPOINTMENT — one moment, one reader ------------------------------
@@ -923,9 +1130,9 @@ function contactRowsHtml(rows, win) {
       '<div class="cust"><div class="av">' + esc(String(nm).trim().charAt(0)) + '</div><div><div class="nm">' + esc(nm) + '</div><div class="ph">+' + esc(c.phone) + '</div></div></div>' +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c, win) + "</div>" +
       '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + interestChips(c) + "</div>" +
-      '<div class="lastm">' + (ci && ci.next_action ? '<span style="color:#2E7D77;font-weight:600;">← ' + esc(ci.next_action) + "</span>" : esc(last ? last.text : "—")) + "</div>" +
+      '<div class="lastm">' + (ci && ci.next_action ? '<span style="color:#306DB5;font-weight:600;">← ' + esc(ci.next_action) + "</span>" : esc(last ? last.text : "—")) + "</div>" +
       '<div class="tm">' + (last ? fmtT(last.ts) : "") + "</div>" +
-      '<div style="text-align:left;font-size:12px;color:#1F7A73;font-weight:500;" onclick="event.stopPropagation();openConvo(\\'' + esc(c.phone) + '\\')">المحادثة ←</div></div>';
+      '<div style="text-align:left;font-size:12px;color:#306DB5;font-weight:500;" onclick="event.stopPropagation();openConvo(\\'' + esc(c.phone) + '\\')">المحادثة ←</div></div>';
   });
   return h;
 }
@@ -966,10 +1173,10 @@ function renderConvo() {
   el.innerHTML = '<div class="backdrop" onclick="closeConvo()"></div>' +
     '<aside class="convo" role="dialog" aria-label="المحادثة">' +
     '<div class="hd"><div class="av">' + esc(nm.trim().charAt(0)) + '</div>' +
-    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;color:#171717;">' + esc(nm) + '</div>' +
-    '<div style="font-size:11px;color:#999999;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
-    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:700;color:#999999;background:#F3F3F3;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
-    '<div style="padding:9px 16px;border-bottom:1px solid #F3F3F3;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
+    '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:600;color:#212529;">' + esc(nm) + '</div>' +
+    '<div style="font-size:12px;color:#536170;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div></div>" +
+    '<button onclick="closeConvo()" style="font-family:inherit;flex:none;font-size:18px;font-weight:600;color:#536170;background:#EDF1F7;border:none;border-radius:9px;width:32px;height:32px;cursor:pointer;">×</button></div>' +
+    '<div style="padding:9px 16px;border-bottom:1px solid #EDF1F7;display:flex;gap:5px;flex-wrap:wrap;">' + chipRow(c) + " " + interestChips(c) + "</div>" +
     '<div class="msgs" id="convoMsgs">' + (c.transcript || []).map((t) =>
       // Sandbox plumbing is not conversation. The handshake «Proxy massar» and the replies the
       // model produced when it read that as a product name are shown as a muted note, not as the
@@ -977,14 +1184,14 @@ function renderConvo() {
       // required so a genuine network-proxy question during an HIS integration still renders
       // normally. Suppressed at render, never deleted: the ledger keeps what was actually said.
       (/proxy|بروكسي/i.test(t.text) && /massar|مسار/i.test(t.text)
-        ? '<div class="bub b-s" style="opacity:.55;font-size:11.5px;">تفعيل بيئة Gupshup التجريبية — ليست جزءًا من المحادثة<div class="bt">' + fmtT(t.ts) + "</div></div>"
+        ? '<div class="bub b-s" style="opacity:.55;font-size:12px;">تفعيل بيئة Gupshup التجريبية — ليست جزءًا من المحادثة<div class="bt">' + fmtT(t.ts) + "</div></div>"
         : '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>")).join("") + "</div>" +
-    '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12.5px;' +
-    (c.human ? 'color:#fff;background:#2E8F89;' : 'color:#c43d3d;background:#fff;border:1px solid #f0d3d3;') +
+    '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12px;' +
+    (c.human ? 'color:#fff;background:#416CAD;' : 'color:#D9534F;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد" : "إيقاف المساعد") + "</button>" +
-    '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:11.5px;' +
-    (c.test ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;') +
+    '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:12px;' +
+    (c.test ? 'color:#212529;background:#E3E9F1;border:1px solid #E3E9F1;' : 'color:#536170;background:#fff;border:1px solid #CBD7E4;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
     (c.test ? "تجريبي" : "تصنيف كتجريبي") + "</button></div></aside>";
   const m = document.getElementById("convoMsgs");
@@ -1004,8 +1211,8 @@ window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; re
 function campIsTest(cp) { return cp.test === true; }
 function testToggleChip(nTest) {
   if (!nTest) return "";
-  return '<button class="btn" style="padding:5px 12px;font-size:11px;border-radius:999px;' +
-    (showTest ? 'color:#171717;background:#EDEDED;border:1px solid #EDEDED;' : 'color:#999999;background:#fff;border:1px dashed #C7C7C7;') +
+  return '<button class="btn" style="padding:5px 12px;font-size:12px;border-radius:999px;' +
+    (showTest ? 'color:#212529;background:#E3E9F1;border:1px solid #E3E9F1;' : 'color:#536170;background:#fff;border:1px dashed #A9B4C0;') +
     '" onclick="toggleShowTest()">' + (showTest ? "إخفاء التجريبية" : "إظهار التجريبية (" + fmtN(nTest) + ")") + "</button>";
 }
 
@@ -1035,48 +1242,48 @@ function vKmon(d) {
   // Say why the list is short, so a true screen never reads as a failed load.
   const nReal = tabs[1][2], nTest = tabs[2][2];
   if (campTab === "real" && nReal >= 1 && nReal <= 2 && nTest) {
-    h += '<div class="sparse rise">' + ic("eye", 16, "#1F7A73") +
+    h += '<div class="sparse rise">' + ic("eye", 16, "#306DB5") +
       "<div>هذه القائمة تعرض <b>" + fmtN(nReal) + " حملة فعلية</b> فقط، وهي كل ما أُطلق حتى الآن. " +
       "<b>" + fmtN(nTest) + "</b> حملة تجريبية وبروفات محفوظة في تبويب " +
       '<span class="lnk" onclick="setCampTab(\\'test\\')">تجريبية</span>' +
       " ولا تدخل في أرقام الأداء.</div></div>";
   }
   if (!campaigns.length) {
-    h += '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#1F7A73;font-weight:700;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
+    h += '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#306DB5;font-weight:600;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
     return h;
   }
   h += '<div class="tblwrap rise">';
   h += '<div class="ttoolbar"><span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:220px;max-width:380px;">' +
-    '<span style="position:absolute;inset-inline-start:14px;color:#999999;display:flex;">' + ic("search", 18) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:14px;color:#536170;display:flex;">' + ic("search", 18) + "</span>" +
     '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:42px;height:46px;border-radius:999px;"></span>' +
-    '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#383838;">' +
+    '<select onchange="setCampSort(this)" class="inp" style="height:46px;border-radius:999px;font-weight:600;color:#212529;">' +
     '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
     '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
     '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>' +
     '<span style="flex:1"></span><span class="cntpill">' + fmtN(withStAll.length) + " حملة</span></div>";
   h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
-    '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F8F8F8;border-bottom:1px solid #EDEDED;font-size:11.5px;font-weight:700;color:#7C7C7C;">' +
+    '<div style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:14px 22px;background:#F4F6F9;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:600;color:#536170;">' +
     '<div>الحملة</div><div>الخدمة</div><div>الحالة</div><div style="text-align:center;">الجمهور</div><div style="text-align:center;">مشاهدة</div><div style="text-align:center;">ردود</div><div>التقدّم</div><div></div></div>';
   withSt.forEach(({ c, st }, i) => {
     const prog = pct(st.delivered, st.targeted);
     const isTest = campIsTest(c);
     const stChip = isTest
-      ? '<span class="chip c-warn"><span style="width:6px;height:6px;border-radius:999px;background:#B54708;"></span>تجريبية</span>'
+      ? '<span class="chip c-warn"><span style="width:6px;height:6px;border-radius:999px;background:#7A5600;"></span>تجريبية</span>'
       // The old "completed" label claimed a lifecycle the campaigns table has no field for — a
       // reply is not a completed campaign. Both this fallback chip and the kanban column now read
       // the same three states, emitted by campPerfState() in campaigns-crm so they cannot drift.
-      : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#027A48;"></span>فيها ردود</span>'
-        : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#2F5F94;"></span>بلا ردود بعد</span>');
+      : (st.replied ? '<span class="chip c-ok"><span style="width:6px;height:6px;border-radius:999px;background:#12633F;"></span>فيها ردود</span>'
+        : '<span class="chip c-blue"><span style="width:6px;height:6px;border-radius:999px;background:#416CAD;"></span>بلا ردود بعد</span>');
     h += '<div class="trow km" onclick="location.hash=\\'kmon/' + c.id + '\\'" style="display:grid;grid-template-columns:2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;gap:12px;padding:16px 22px;align-items:center;">' +
-      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#E2E2E2" : "#1F7A73") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
-      '<div style="min-width:0;"><div style="font-size:13.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
-      '<div style="font-size:11px;color:#999999;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
-      '<div style="font-size:12.5px;color:#525252;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
+      '<div style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" title="' + (isTest ? "حملة تجريبية (بيئة الاختبار)" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#CBD7E4" : "#306DB5") + ";box-shadow:0 0 0 3px " + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
+      '<div style="min-width:0;"><div style="font-size:14px;font-weight:600;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div>' +
+      '<div style="font-size:12px;color:#536170;margin-top:3px;">' + fmtD(c.created_at) + "</div></div></div>" +
+      '<div style="font-size:12px;color:#3A3A3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.product || "—") + "</div>" +
       "<div>" + stChip + "</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + "</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.seen, st.targeted)) + "٪</div>" +
-      '<div style="text-align:center;font-size:13px;font-weight:700;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.replied, st.targeted)) + "٪</div>" +
-      '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#1F7A73;border-radius:999px;"></i></div><span style="font-size:11.5px;font-weight:700;color:#7C7C7C;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + "٪</span></div>" +
+      '<div style="text-align:center;font-size:14px;font-weight:600;color:#212529;font-variant-numeric:tabular-nums;">' + fmtN(st.targeted) + "</div>" +
+      '<div style="text-align:center;font-size:14px;font-weight:600;color:#212529;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.seen, st.targeted)) + "٪</div>" +
+      '<div style="text-align:center;font-size:14px;font-weight:600;color:#212529;font-variant-numeric:tabular-nums;">' + fmtN(pct(st.replied, st.targeted)) + "٪</div>" +
+      '<div style="display:flex;align-items:center;gap:9px;"><div class="prog" style="flex:1;height:6px;background:#E3E9F1;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#306DB5;border-radius:999px;"></i></div><span style="font-size:12px;font-weight:600;color:#536170;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + "٪</span></div>" +
       '<div style="text-align:center;"><button class="kebab" title="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") + '" aria-label="' + (isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية") +
       '" onclick="event.stopPropagation();setCampClass(' + c.id + "," + (isTest ? "false" : "true") + ')">' + (isTest ? "↩" : "⇥") + "</button></div></div>";
   });
@@ -1084,17 +1291,17 @@ function vKmon(d) {
     // Say which of the two reasons this is: an empty class, or a search that matched nothing.
     // Rendering «لا نتائج مطابقة» beside a «تعرض ٠ حملة فعلية» explainer gave two answers at once.
     h += campQ.trim()
-      ? '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#999999;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
+      ? '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#536170;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
       : (campTab === "real"
-        ? '<div style="padding:44px;text-align:center;color:#7C7C7C;font-size:13px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#1F7A73;font-weight:700;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
-        : '<div style="padding:44px;text-align:center;color:#999999;font-size:13px;">لا حملات في هذا التبويب</div>');
+        ? '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;line-height:1.9;">لم تُطلق أي حملة فعلية بعد.<br><span class="lnk" onclick="setCampTab(\\'test\\')" style="color:#306DB5;font-weight:600;cursor:pointer;">' + fmtN(nTest) + ' حملة تجريبية محفوظة</span>' + (nTest ? "" : "") + '</div>'
+        : '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;">لا حملات في هذا التبويب</div>');
   }
   h += "</div></div>";
   // The page control was hardcoded to «1», so one row sat under a pager implying more pages
   // existed. There is no pagination here — the list is capped and says so. A control that
   // cannot move is worse than no control; a silent truncation is worse still.
   h += '<div class="tfoot"><span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span>' +
-    (nOver ? '<span style="color:#B54708;font-weight:700;">تُعرض أحدث ' + fmtN(LIST_CAP) + " حملة من " + fmtN(withSt.length + nOver) + ". ضيّق بالبحث لرؤية الباقي.</span>" : "") + "</div>";
+    (nOver ? '<span style="color:#7A5600;font-weight:600;">تُعرض أحدث ' + fmtN(LIST_CAP) + " حملة من " + fmtN(withSt.length + nOver) + ". ضيّق بالبحث لرؤية الباقي.</span>" : "") + "</div>";
   h += "</div>";
   return h;
 }
@@ -1131,7 +1338,7 @@ let rQ = "";
 window.rSearch = (el) => { rQ = el.value; clearTimeout(window.__rq); window.__rq = setTimeout(() => render(false), 250); };
 function vKmonDetail(id, d) {
   const camp = campaigns.find((x) => String(x.id) === String(id));
-  if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#2E7D77;font-weight:700;">→ كل الحملات</a></div></div>';
+  if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#306DB5;font-weight:600;">→ كل الحملات</a></div></div>';
   const st = campStats(camp);
   const cwin = campWin(camp);   // every number on this screen is scoped to THIS campaign
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
@@ -1141,21 +1348,21 @@ function vKmonDetail(id, d) {
   const pctTxt = (v) => { const r = pct(v); return r === null ? "—" : fmtN(r) + "٪"; };
   const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
   const yieldPer100 = st.targeted ? Math.round(st.interested / st.targeted * 100) : 0;
-  let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#525252;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
-    '<div class="ptitle rise"><div><h1 style="font-size:26px;">' + esc(camp.name) + "</h1>" +
+  let h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#3A3A3A;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
+    '<div class="ptitle rise"><div><h1 style="font-size:28px;">' + esc(camp.name) + "</h1>" +
     '<p>' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</p></div>" +
     '<div class="acts">' + (campIsTest(camp) ? '<span class="chip c-warn">حملة تجريبية</span>' : '<span class="chip c-ok">جارية</span>') + "</div></div>";
   h += '<div class="card rise" style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
-    '<div style="flex:1;min-width:240px;"><div style="font-size:12px;color:#7C7C7C;font-weight:450;">حكم الحملة</div>' +
-    '<div style="font-size:17px;font-weight:700;margin-top:7px;line-height:1.7;">' +
+    '<div style="flex:1;min-width:240px;"><div style="font-size:12px;color:#536170;font-weight:450;">حكم الحملة</div>' +
+    '<div style="font-size:16px;font-weight:600;margin-top:7px;line-height:1.7;">' +
     (st.replied ? "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" + (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
     [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
-      .map((x) => '<div><div style="font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#7C7C7C;">٪</span></div><div style="font-size:11px;color:#7C7C7C;margin-top:3px;">' + x[0] + "</div></div>").join("") +
+      .map((x) => '<div><div style="font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#536170;">٪</span></div><div style="font-size:12px;color:#536170;margin-top:3px;">' + x[0] + "</div></div>").join("") +
     "</div></div>";
   const cards = [
-    ["جهات الاستهداف", st.targeted, "#2F5F94"], ["أُرسلت", st.sent, "#2F5F94"], ["وصلت", st.delivered, "#3FB6B0"],
-    ["شوهدت", st.seen, "#3FB6B0"], ["ردّوا", st.replied, "#2E8F89"], ["جهات مهتمة", st.interested, "#1f8a52"],
+    ["جهات الاستهداف", st.targeted, "#416CAD"], ["أُرسلت", st.sent, "#416CAD"], ["وصلت", st.delivered, "#629CCD"],
+    ["شوهدت", st.seen, "#629CCD"], ["ردّوا", st.replied, "#416CAD"], ["جهات مهتمة", st.interested, "#1E9E63"],
   ];
   h += '<div class="statgrid">' + cards.map((c, i) =>
     '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + fmtN(c[1]) + "</div>" +
@@ -1173,17 +1380,17 @@ function vKmonDetail(id, d) {
   // Deliberately wider than the «جهات مهتمة» counter above: that one counts confirmed tags and
   // human outcomes, this one also trusts a high-intent reading with no tag yet. Two numbers that
   // legitimately differ must not share a word — the counter says «مهتمة», this says «تستحق المتابعة».
-  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#027A48", "#ECFDF3"]);
-  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#B54708", "#FFFAEB"]);
-  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#B42318", "#FEF3F2"]);
-  if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#2F5F94", "#EFF4FB"]);
+  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#12633F", "#E4F5EC"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#7A5600", "#FFF5D6"]);
+  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#8E2A27", "#FBE7E6"]);
+  if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#416CAD", "#EAF1F8"]);
   if (moves.length) {
-    h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "الخطوة التالية لهذه الحملة</h3>" +
+    h += '<div class="card rise"><div style="display:flex;align-items:center;gap:9px;"><h3 style="margin:0;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#306DB5") + "الخطوة التالية لهذه الحملة</h3>" +
       '<span class="cntpill">' + fmtN(moves.length) + " توصية</span></div>" +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-top:14px;">' +
-      moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #EDEDED;border-radius:13px;padding:14px 16px;">' +
-        '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';">' + esc(m[0]) + "</div>" +
-        '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.8;">' + esc(m[1]) + "</div></div>").join("") + "</div></div>";
+      moves.map((m) => '<div style="background:' + m[3] + ';border:1px solid #E3E9F1;border-radius:13px;padding:14px 16px;">' +
+        '<div style="font-size:14px;font-weight:600;color:' + m[2] + ';">' + esc(m[0]) + "</div>" +
+        '<div style="font-size:12px;color:#3A3A3A;margin-top:5px;line-height:1.8;">' + esc(m[1]) + "</div></div>").join("") + "</div></div>";
   }
   const filters = [
     ["all", "الكل", rows.length, (r) => true],
@@ -1201,18 +1408,18 @@ function vKmonDetail(id, d) {
     label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
     targets: shown.map((r) => ({ phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" })),
   };
-  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #EDEDED;background:#fff;">' +
-    '<span style="font-size:13px;font-weight:700;color:#171717;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:11px;color:#999999;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
+  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #E3E9F1;background:#fff;">' +
+    '<span style="font-size:14px;font-weight:600;color:#212529;flex:none;">جهات الاستهداف</span>' +
+    '<span style="font-size:12px;color:#536170;flex:none;">' + fmtN(shown.length) + " من " + fmtN(rows.length) + "</span>" +
     '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="font-size:12.5px;border-radius:6px;color:#1F7A73;background:#fff;border:1px solid #1F7A73;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
-    filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:11.5px;border-radius:999px;' +
-      (campFilter === f[0] ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
+    (shown.length ? '<button class="btn" style="font-size:12px;border-radius:6px;color:#306DB5;background:#fff;border:1px solid #306DB5;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
+    filters.map((f) => '<button class="btn" style="padding:6px 12px;font-size:12px;border-radius:999px;' +
+      (campFilter === f[0] ? 'color:#306DB5;background:#DDEAF3;border:1px solid #629CCD;' : 'color:#3A3A3A;background:#fff;border:1px solid #E3E9F1;') +
       '" onclick="setCampFilter(\\'' + f[0] + '\\')">' + f[1] + " (" + fmtN(f[2]) + ")</button>").join("") +
-    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:11.5px;border:1px solid #EDEDED;border-radius:999px;padding:7px 13px;background:#F8F8F8;width:130px;">' +
+    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:12px;border:1px solid #E3E9F1;border-radius:999px;padding:7px 13px;background:#F4F6F9;width:130px;">' +
     "</div>" +
     '<div class="thead"><div>العميل</div><div>الحالة</div><div>الاهتمام والجدية</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج</div>') + "</div>";
+    (shown.length ? contactRowsHtml(shown, cwin) : '<div style="padding:30px;text-align:center;color:#536170;font-size:12px;">لا نتائج</div>') + "</div>";
   return h;
 }
 
@@ -1252,7 +1459,7 @@ function vHome(d) {
     '<span class="hd' + (newQual ? "" : " flat") + '">' +
       (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
     '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
-    '<div class="hspark"><div style="font-size:11.5px;color:#999999;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
+    '<div class="hspark"><div style="font-size:12px;color:#536170;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
     sparkArea(series, 320, 62) +
     '<div class="haxis"><span>قبل ١٤ يومًا</span><span>اليوم</span></div></div></div>' +
     '<div class="hside">' + heroSide.map((r) =>
@@ -1262,16 +1469,16 @@ function vHome(d) {
   h += vHomeCharts(cs);
   h += vWinLoss();
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:11.5px;font-weight:700;color:#2E7D77;text-decoration:none;">الكل ←</a></div>' +
+  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:12px;font-weight:600;color:#306DB5;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
-          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #F3F3F3;">' +
-            '<div style="flex:1;min-width:0;"><div style="font-size:12.5px;font-weight:700;color:#171717;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip">تجريبية</span>' : "") + "</div>" +
-            '<div style="font-size:10.5px;color:#999999;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
+          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #EDF1F7;">' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip">تجريبية</span>' : "") + "</div>" +
+            '<div style="font-size:12px;color:#536170;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
-      : '<div style="font-size:12px;color:#999999;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
+      : '<div style="font-size:12px;color:#536170;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
   h += "</div>";
   return h;
 }
@@ -1351,15 +1558,15 @@ function entUses(e, product) {
 // cannot drift from the record it describes — the failure this codebase has fixed repeatedly. It
 // also means «backward» needs no special handling: when the evidence changes, so does the stage.
 var CRM_STAGE = [
-  { key: "new",         pos: 1, type: "open",    label: "مستهدَف",       dot: "#C7C7C7", hint: "في قائمتك، ولم تُرسل له رسالة بعد" },
-  { key: "contacted",   pos: 2, type: "ongoing", label: "تم التواصل",    dot: "#999999", hint: "وصلته رسالة ولم يردّ بعد" },
-  { key: "engaged",     pos: 3, type: "ongoing", label: "متجاوب",        dot: "#2F5F94", hint: "ردّ مرة واحدة على الأقل" },
-  { key: "nurture",     pos: 4, type: "ongoing", label: "مؤجَّل",         dot: "#B54708", hint: "طلب التأجيل صراحةً" },
-  { key: "qualified",   pos: 5, type: "ongoing", label: "مؤهَّل",         dot: "#027A48", hint: "سجّل المساعد اهتمامًا واضحًا" },
-  { key: "meeting",     pos: 6, type: "ongoing", label: "موعد محدَّد",    dot: "#1F7A73", hint: "موعد أكّده إنسان" },
-  { key: "handoff",     pos: 7, type: "won",     label: "مع المندوب",    dot: "#1F7A73", hint: "سُلّم لمندوب المبيعات" },
-  { key: "unqualified", pos: 8, type: "lost",    label: "غير مؤهَّل",     dot: "#7C7C7C", hint: "أعلن عدم اهتمامه، أو أُغلق الملف" },
-  { key: "stopped",     pos: 9, type: "lost",    label: "أوقف التواصل",  dot: "#B42318", hint: "طلب إيقاف الرسائل" },
+  { key: "new",         pos: 1, type: "open",    label: "مستهدَف",       dot: "#A9B4C0", hint: "في قائمتك، ولم تُرسل له رسالة بعد" },
+  { key: "contacted",   pos: 2, type: "ongoing", label: "تم التواصل",    dot: "#A9B4C0", hint: "وصلته رسالة ولم يردّ بعد" },
+  { key: "engaged",     pos: 3, type: "ongoing", label: "متجاوب",        dot: "#416CAD", hint: "ردّ مرة واحدة على الأقل" },
+  { key: "nurture",     pos: 4, type: "ongoing", label: "مؤجَّل",         dot: "#7A5600", hint: "طلب التأجيل صراحةً" },
+  { key: "qualified",   pos: 5, type: "ongoing", label: "مؤهَّل",         dot: "#12633F", hint: "سجّل المساعد اهتمامًا واضحًا" },
+  { key: "meeting",     pos: 6, type: "ongoing", label: "موعد محدَّد",    dot: "#306DB5", hint: "موعد أكّده إنسان" },
+  { key: "handoff",     pos: 7, type: "won",     label: "مع المندوب",    dot: "#306DB5", hint: "سُلّم لمندوب المبيعات" },
+  { key: "unqualified", pos: 8, type: "lost",    label: "غير مؤهَّل",     dot: "#536170", hint: "أعلن عدم اهتمامه، أو أُغلق الملف" },
+  { key: "stopped",     pos: 9, type: "lost",    label: "أوقف التواصل",  dot: "#8E2A27", hint: "طلب إيقاف الرسائل" },
 ];
 function stageByKey(k) { for (var i = 0; i < CRM_STAGE.length; i++) if (CRM_STAGE[i].key === k) return CRM_STAGE[i]; return CRM_STAGE[0]; }
 
@@ -1524,7 +1731,7 @@ function prodChips(e) {
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
-    (on ? 'color:#2E7D77;background:#DCF1EF;border:1px solid #3FB6B0;' : 'color:#525252;background:#fff;border:1px solid #EDEDED;') +
+    (on ? 'color:#306DB5;background:#DDEAF3;border:1px solid #629CCD;' : 'color:#3A3A3A;background:#fff;border:1px solid #E3E9F1;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
 // Indexes only in onclick (Arabic keys/values stay out of attribute strings);
@@ -1680,7 +1887,7 @@ function vSegBuilder() {
   // Presets FILL the rows rather than hiding behind a label — a segment the founder cannot read
   // is a segment he cannot trust, and every benchmarked tool that hides it gets distrusted.
   if (segPresets && segPresets.length) {
-    h += '<div style="font-size:11.5px;color:#7C7C7C;margin-bottom:9px;">اختيار الفئة يملأ الشروط أدناه، ويمكنكم تعديلها.</div>' +
+    h += '<div style="font-size:12px;color:#536170;margin-bottom:9px;">اختيار الفئة يملأ الشروط أدناه، ويمكنكم تعديلها.</div>' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-bottom:18px;">' +
       segPresets.map((p) => {
         const extra = [];
@@ -1688,65 +1895,65 @@ function vSegBuilder() {
         // Forecast rather than excuse: say WHEN the zero becomes a number.
         if (p.tooNew && p.entersInDays > 0) extra.push(fmtN(p.tooNew) + " جهة تدخل نطاق الفحص بعد " + fmtN(p.entersInDays) + (p.entersInDays >= 11 ? " يومًا" : " أيام"));
         else if (p.tooNew) extra.push(fmtN(p.tooNew) + " أحدث من النافذة");
-        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #EDEDED;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
-          '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(p.label) + '</span>' +
+        return '<button class="btn" style="display:block;text-align:start;padding:13px 15px;border:1px solid #E3E9F1;background:#fff;border-radius:13px;height:auto;" onclick="segUsePreset(\\'' + p.id + '\\')">' +
+          '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:12px;font-weight:600;color:#212529;">' + esc(p.label) + '</span>' +
           '<span class="chip ' + (p.matched ? "c-ok" : "c-grey") + '">' + fmtN(p.matched) + "</span></div>" +
-          '<div style="font-size:11px;color:#7C7C7C;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
-          (extra.length ? '<div style="font-size:10.5px;color:#B54708;margin-top:5px;">' + esc(extra.join(" · ")) + "</div>" : "") +
+          '<div style="font-size:12px;color:#536170;margin-top:6px;line-height:1.8;">' + esc(p.hint) + "</div>" +
+          (extra.length ? '<div style="font-size:12px;color:#7A5600;margin-top:5px;">' + esc(extra.join(" · ")) + "</div>" : "") +
           "</button>";
       }).join("") + "</div>";
   }
   h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">' +
-    '<span style="font-size:11.5px;font-weight:700;color:#7C7C7C;">المطابقة:</span>' +
+    '<span style="font-size:12px;font-weight:600;color:#536170;">المطابقة:</span>' +
     chipBtn("تنطبق كل الشروط", !segDef || segDef.match === "all", "segSetMatch(\\'all\\')") +
     chipBtn("ينطبق أي شرط", segDef && segDef.match === "any", "segSetMatch(\\'any\\')") +
-    '<span style="flex:1"></span><span style="font-size:11.5px;font-weight:700;color:#7C7C7C;">النافذة:</span>' +
+    '<span style="flex:1"></span><span style="font-size:12px;font-weight:600;color:#536170;">النافذة:</span>' +
     [3, 5, 7, 14].map((d) => chipBtn(fmtN(d) + (d >= 11 ? " يومًا" : " أيام"), segWindow === d, "segSetWindow(" + d + ")")).join("") + "</div>";
 
   const conds = (segDef && segDef.conditions) || [];
   h += conds.map((c, i) =>
-    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #EDEDED;border-radius:12px;background:#fff;margin-bottom:8px;">' +
-    (i ? '<span class="chip c-grey" style="font-size:10.5px;">' + (segDef.match === "any" ? "أو" : "و") + "</span>" : "") +
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 13px;border:1px solid #E3E9F1;border-radius:12px;background:#fff;margin-bottom:8px;">' +
+    (i ? '<span class="chip c-grey" style="font-size:12px;">' + (segDef.match === "any" ? "أو" : "و") + "</span>" : "") +
     '<select class="inp" style="height:40px;flex:1;min-width:150px;" onchange="segSetField(' + i + ',\\'signal\\',this.value)">' +
       SEG_SIGNALS.map((sg) => '<option value="' + sg[0] + '"' + (c.signal === sg[0] ? " selected" : "") + ">" + sg[1] + "</option>").join("") + "</select>" +
     '<select class="inp" style="height:40px;min-width:110px;" onchange="segSetField(' + i + ',\\'comparator\\',this.value)">' +
       '<option value="happened"' + (c.comparator === "happened" ? " selected" : "") + ">حدث</option>" +
       '<option value="never_happened"' + (c.comparator === "never_happened" ? " selected" : "") + ">لم يحدث</option></select>" +
-    '<span style="font-size:11px;color:#999999;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
-    '<button class="btn" style="height:36px;padding:0 12px;color:#B42318;background:#fff;border:1px solid #F7D4D1;" onclick="segDelCond(' + i + ')">حذف</button></div>').join("");
-  h += '<button class="btn" style="font-size:12px;color:#1F7A73;background:#E9F7F6;border:1px solid #C4E8E5;margin-bottom:14px;" onclick="segAddCond()">+ أضف شرطًا</button>';
+    '<span style="font-size:12px;color:#536170;flex:1;min-width:120px;">' + (c.beforeDays ? "قبل أكثر من " + fmtN(c.beforeDays) + (c.beforeDays >= 11 ? " يومًا" : " أيام") : c.withinDays ? "خلال آخر " + fmtN(c.withinDays) + (c.withinDays >= 11 ? " يومًا" : " أيام") : "طوال الوقت") + "</span>" +
+    '<button class="btn" style="height:36px;padding:0 12px;color:#8E2A27;background:#fff;border:1px solid #F7D4D1;" onclick="segDelCond(' + i + ')">حذف</button></div>').join("");
+  h += '<button class="btn" style="font-size:12px;color:#306DB5;background:#EAF1F8;border:1px solid #C4E8E5;margin-bottom:14px;" onclick="segAddCond()">+ أضف شرطًا</button>';
 
   // The result. Every zero explains itself — that distinction is the whole feature.
-  if (segBusy) h += '<div style="font-size:12.5px;color:#7C7C7C;padding:10px 0;">جارٍ الحساب…</div>';
-  else if (segPreview && segPreview.error) h += '<div class="sparse" style="border-inline-start-color:#B42318;">' + ic("eye", 16, "#B42318") + "<div>" + esc(segPreview.error) + "</div></div>";
+  if (segBusy) h += '<div style="font-size:12px;color:#536170;padding:10px 0;">جارٍ الحساب…</div>';
+  else if (segPreview && segPreview.error) h += '<div class="sparse" style="border-inline-start-color:#8E2A27;">' + ic("eye", 16, "#8E2A27") + "<div>" + esc(segPreview.error) + "</div></div>";
   else if (segPreview) {
     const pv = segPreview;
-    h += '<div style="background:#F4FBFA;border:1px solid #B9E4E0;border-radius:13px;padding:14px 16px;margin-bottom:12px;">' +
-      '<div style="font-size:12.5px;color:#2E7D77;line-height:1.9;">' + esc(pv.describe) + "</div>" +
-      '<div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;"><span style="font-size:24px;font-weight:700;color:#2E7D77;">' + fmtN(pv.matched) + "</span>" +
-      '<span style="font-size:12px;font-weight:600;color:#2E7D77;">جهة تطابق الآن</span>' +
-      '<span style="font-size:11px;color:#7FA9A5;">العضوية تُحدَّث تلقائيًا</span></div>';
+    h += '<div style="background:#EAF1F8;border:1px solid #DDEAF3;border-radius:13px;padding:14px 16px;margin-bottom:12px;">' +
+      '<div style="font-size:12px;color:#306DB5;line-height:1.9;">' + esc(pv.describe) + "</div>" +
+      '<div style="display:flex;align-items:baseline;gap:8px;margin-top:8px;"><span style="font-size:22px;font-weight:600;color:#306DB5;">' + fmtN(pv.matched) + "</span>" +
+      '<span style="font-size:12px;font-weight:600;color:#306DB5;">جهة تطابق الآن</span>' +
+      '<span style="font-size:12px;color:#536170;">العضوية تُحدَّث تلقائيًا</span></div>';
     const notes = [];
     if ((pv.suppressed || []).length) notes.push("مستبعد بالتبريد: " + fmtN(pv.suppressed.length) + " (رُوسلوا حديثًا)");
     if ((pv.tooNew || []).length) notes.push("أحدث من النافذة: " + fmtN(pv.tooNew.length));
     if (pv.scanTruncated) notes.push("فُحصت أحدث " + fmtN(pv.poolSize) + " جهة فقط");
     if (pv.overLaunchCap) notes.push("حد الدفعة الواحدة ٥٠ جهة — سترسل لأول " + fmtN(50) + " والباقي في دفعة تالية");
-    if (notes.length) h += '<div style="font-size:11.5px;color:#B54708;margin-top:8px;line-height:1.9;">' + esc(notes.join(" · ")) + "</div>";
+    if (notes.length) h += '<div style="font-size:12px;color:#7A5600;margin-top:8px;line-height:1.9;">' + esc(notes.join(" · ")) + "</div>";
     h += "</div>";
     // The tenure state: a book younger than the window is a not-yet audience, not an empty one.
     if (!pv.matched && (pv.tooNew || []).length && pv.requiredDays > pv.oldestContactDays) {
-      h += '<div class="sparse" style="border-inline-start-color:#B54708;">' + ic("clock", 16, "#B54708") +
+      h += '<div class="sparse" style="border-inline-start-color:#7A5600;">' + ic("clock", 16, "#7A5600") +
         "<div><b>لا تطابق بعد — البيانات أحدث من النافذة.</b><br>أقدم جهة لديكم مضى عليها " + fmtN(pv.oldestContactDays) +
         " يومًا، والشرط يطلب " + fmtN(pv.requiredDays) + (pv.requiredDays >= 11 ? " يومًا" : " أيام") +
         ". أول تطابق متوقع بعد " + fmtN(Math.max(0, pv.requiredDays - pv.oldestContactDays)) + " أيام. " +
         '<span class="lnk" onclick="segSetWindow(3)">اضبط النافذة إلى ٣ أيام</span></div></div>';
     } else if (!pv.matched && !(pv.suppressed || []).length) {
-      h += '<div class="sparse">' + ic("eye", 16, "#7C7C7C") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
+      h += '<div class="sparse">' + ic("eye", 16, "#536170") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
     }
   }
   // The constraint that makes this different from an email tool.
-  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#F8F8F8;border:1px solid #EDEDED;border-inline-start:3px solid #B54708;border-radius:10px;padding:12px 15px;font-size:12px;color:#525252;line-height:1.9;">' +
-    ic("clock", 16, "#B54708") +
+  h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#F4F6F9;border:1px solid #E3E9F1;border-inline-start:3px solid #7A5600;border-radius:10px;padding:12px 15px;font-size:12px;color:#3A3A3A;line-height:1.9;">' +
+    ic("clock", 16, "#7A5600") +
     "<div><b>الإطلاق من هذه الشريحة غير متاح بعد.</b><br>" +
     "الجهة التي لم تردّ منذ أيام تقع خارج نافذة الـ٢٤ ساعة، ولا يصلها إلا قالب معتمد من Meta. " +
     "مسار الإطلاق الحالي يرسل رسائل جلسة، فلو أُتيح الزر هنا لرفضت واتساب الإرسال. " +
@@ -1822,8 +2029,8 @@ window.confirmLaunch = async () => {
 };
 window.alertBar = (txt, bad) => {
   const el = document.createElement("div");
-  el.style.cssText = "position:fixed;bottom:22px;right:290px;z-index:99;background:" + (bad ? "#FBE9E9" : "#E6F4EC") +
-    ";color:" + (bad ? "#c43d3d" : "#1f8a52") + ";font-weight:700;font-size:13px;border-radius:11px;padding:13px 18px;box-shadow:0 8px 24px rgba(16,38,68,.14);";
+  el.style.cssText = "position:fixed;bottom:22px;right:290px;z-index:var(--z-modal);background:" + (bad ? "#FBE9E9" : "#E6F4EC") +
+    ";color:" + (bad ? "#D9534F" : "#1E9E63") + ";font-weight:600;font-size:14px;border-radius:11px;padding:13px 18px;box-shadow:0 8px 24px rgba(16,38,68,.14);";
   el.textContent = txt;
   document.body.appendChild(el); setTimeout(() => el.remove(), 3800);
 };
@@ -1865,7 +2072,7 @@ function vAffinityBand(selName, matched) {
       '" onclick="excludeOwners()">' +
       (prodFilter.notUses === selName ? "✓ مستبعَد من يستخدم «" : "استبعد من يستخدم «") + esc(clip(selName, 24)) + "» بالفعل" +
       (owners ? " (" + fmtN(owners) + ")" : "") + "</button>" +
-      '<span style="font-size:12px;color:#7C7C7C;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
+      '<span style="font-size:12px;color:#536170;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
   }
   h += '<div class="row">' + tagSel() +
     sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
@@ -1880,7 +2087,7 @@ function vAffinityBand(selName, matched) {
       fmtN(entities.length - known) + " من " + fmtN(entities.length) + " جهة. غياب السجل ليس دليلًا على عدم الاستخدام.</div>";
   }
   if (prodFilterOn()) {
-    h += '<div style="font-size:12.5px;color:#1F7A73;margin-top:10px;">' + fmtN(matched) + " جهة تطابق الفرز الحالي.</div>";
+    h += '<div style="font-size:12px;color:#306DB5;margin-top:10px;">' + fmtN(matched) + " جهة تطابق الفرز الحالي.</div>";
   }
   return h + "</div>";
 }
@@ -1910,53 +2117,53 @@ function vAimkt() {
     }).join("") + "</div></div>";
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
-    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#F4FBFA;border:1px solid #B9E4E0;border-radius:11px;padding:9px 16px;"><span style="font-size:20px;font-weight:700;color:#2E7D77;">' + fmtN(selN) + '</span><span style="font-size:11.5px;color:#2E7D77;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
+    '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#EAF1F8;border:1px solid #DDEAF3;border-radius:11px;padding:9px 16px;"><span style="font-size:18px;font-weight:600;color:#306DB5;">' + fmtN(selN) + '</span><span style="font-size:12px;color:#306DB5;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
   if (!retargetCohort) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
       chipBtn("حسب الملف", audMode === "file", "setAudMode(\\'file\\')") +
       chipBtn("حسب السلوك", audMode === "behaviour", "setAudMode(\\'behaviour\\')") +
-      '<span style="flex:1"></span><span style="font-size:11.5px;color:#999999;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
+      '<span style="flex:1"></span><span style="font-size:12px;color:#536170;align-self:center;">السلوك يبني شريحة حيّة من سجل المحادثات</span></div>';
   }
   if (!retargetCohort && audMode === "behaviour") {
     h += vSegBuilder();
   } else
   if (retargetCohort) {
-    h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid #EDEDED;border-inline-start:3px solid #B54708;background:#fff;border-radius:10px;padding:16px 18px;">' +
+    h += '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px solid #E3E9F1;border-inline-start:3px solid #7A5600;background:#fff;border-radius:10px;padding:16px 18px;">' +
       '<span style="font-size:22px;">⟲</span><div style="flex:1;min-width:220px;">' +
-      '<div style="font-size:13.5px;font-weight:700;color:#171717;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
-      '<div style="font-size:11.5px;color:#7C7C7C;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
-      '<button class="btn" style="font-size:12px;color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
+      '<div style="font-size:14px;font-weight:600;color:#212529;">إعادة استهداف: ' + esc(retargetCohort.label) + " — " + fmtN(retargetCohort.targets.length) + " جهة</div>" +
+      '<div style="font-size:12px;color:#536170;margin-top:5px;">من حملة «' + esc(retargetCohort.campaign) + '» — القائمة مقفلة على هذه الفئة كما رأيتها في صفحة الحملة.</div></div>' +
+      '<button class="btn" style="font-size:12px;color:#536170;background:#fff;border:1px solid #CBD7E4;" onclick="clearRetarget()">مسح والاختيار يدويًا</button></div>';
   } else if (!entities.length) {
-    h += '<div style="border:1.5px dashed #E2E2E2;border-radius:12px;padding:26px;text-align:center;color:#7C7C7C;font-size:13px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2E7D77;font-weight:700;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
+    h += '<div style="border:1.5px dashed #CBD7E4;border-radius:12px;padding:26px;text-align:center;color:#536170;font-size:14px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#306DB5;font-weight:600;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += vAffinityBand(selName, m.length);
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
-      '<span style="font-size:11.5px;font-weight:700;color:#7C7C7C;min-width:52px;">' + esc(g.key) + ":</span>" +
+      '<span style="font-size:12px;font-weight:600;color:#536170;min-width:52px;">' + esc(g.key) + ":</span>" +
       chipBtn("الكل", !entFilters[g.key], "entSetAttr(" + ki + ",-1)") +
       g.values.map(([v, n], vi) => chipBtn(v + " (" + fmtN(n) + ")", entFilters[g.key] === v, "entSetAttr(" + ki + "," + vi + ")")).join("") +
       "</div>").join("");
     h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">' +
-      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12.5px;border:1px solid #EDEDED;border-radius:10px;padding:9px 13px;background:#F8F8F8;">' +
-      '<button class="btn" style="font-size:12px;color:#1F4470;background:#E3ECF8;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
-      (selN ? '<button class="btn" style="font-size:12px;color:#7C7C7C;background:#fff;border:1px solid #E2E2E2;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
+      '<input id="eq" value="' + esc(entQ) + '" oninput="entSearch(this)" placeholder="ابحث بالاسم أو الرقم…" style="font-family:inherit;flex:1;min-width:200px;font-size:12px;border:1px solid #E3E9F1;border-radius:10px;padding:9px 13px;background:#F4F6F9;">' +
+      '<button class="btn" style="font-size:12px;color:#2A5988;background:#DDEAF3;" onclick="entAllMatching()">' + (allOn ? "إلغاء تحديد المطابقين" : "تحديد المطابقين (" + fmtN(m.length) + ")") + '</button>' +
+      (selN ? '<button class="btn" style="font-size:12px;color:#536170;background:#fff;border:1px solid #CBD7E4;" onclick="entClear()">مسح الاختيار</button>' : "") + "</div>";
     const shown = pageSlice("aud", m);
     if (m.length > PAGE_SIZE) {
-      h += '<div style="display:flex;align-items:center;gap:12px;background:#F8F8F8;border:1px solid #EDEDED;border-radius:10px;padding:12px 16px;margin-bottom:10px;">' +
-        '<span style="font-size:18px;font-weight:600;color:#171717;font-variant-numeric:tabular-nums;">' + fmtN(m.length) + "</span>" +
-        '<span style="font-size:12.5px;color:#525252;line-height:1.8;">جهة مطابقة للشرائح الحالية. «تحديد المطابقين» يختارهم <b style="font-weight:500;color:#171717;">جميعًا</b> — والقائمة أدناه تُستعرض صفحةً صفحة إن أردت مراجعتهم.</span></div>';
+      h += '<div style="display:flex;align-items:center;gap:12px;background:#F4F6F9;border:1px solid #E3E9F1;border-radius:10px;padding:12px 16px;margin-bottom:10px;">' +
+        '<span style="font-size:18px;font-weight:600;color:#212529;font-variant-numeric:tabular-nums;">' + fmtN(m.length) + "</span>" +
+        '<span style="font-size:12px;color:#3A3A3A;line-height:1.8;">جهة مطابقة للشرائح الحالية. «تحديد المطابقين» يختارهم <b style="font-weight:500;color:#212529;">جميعًا</b> — والقائمة أدناه تُستعرض صفحةً صفحة إن أردت مراجعتهم.</span></div>';
     }
-    h += '<div style="border:1px solid #EDEDED;border-radius:12px 12px 0 0;overflow:hidden;max-height:420px;overflow-y:auto;" class="ms-scroll">' +
+    h += '<div style="border:1px solid #E3E9F1;border-radius:12px 12px 0 0;overflow:hidden;max-height:420px;overflow-y:auto;" class="ms-scroll">' +
       shown.map((e) => {
         const on = entSel.has(e.id);
-        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #F3F3F3;cursor:pointer;' + (on ? "background:#F4FBFA;" : "") + '">' +
-          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;' + (on ? "background:#2E8F89;" : "border:1.5px solid #E2E2E2;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
-          '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#171717;">' + esc(e.name) + "</span>" +
+        return '<div onclick="entTog(' + e.id + ')" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #EDF1F7;cursor:pointer;' + (on ? "background:#EAF1F8;" : "") + '">' +
+          '<span style="width:17px;height:17px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;' + (on ? "background:#416CAD;" : "border:1.5px solid #CBD7E4;background:#fff;") + '">' + (on ? "✓" : "") + "</span>" +
+          '<span style="flex:1;min-width:0;font-size:14px;font-weight:600;color:#212529;">' + esc(e.name) + "</span>" +
           prodChips(e) + attrChips(e, 2) +
-          '<span style="font-size:11px;color:#999999;direction:ltr;">+' + esc(e.phone) + "</span></div>";
+          '<span style="font-size:12px;color:#536170;direction:ltr;">+' + esc(e.phone) + "</span></div>";
       }).join("") +
-      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#999999;font-size:12.5px;">لا نتائج مطابقة</div>') + "</div>" +
-      (m.length ? '<div class="tfoot" style="border:1px solid #EDEDED;border-top:0;border-radius:0 0 12px 12px;">' + pageBar("aud", m.length, "جهة") + "</div>" : "");
+      (m.length ? "" : '<div style="padding:22px;text-align:center;color:#536170;font-size:12px;">لا نتائج مطابقة</div>') + "</div>" +
+      (m.length ? '<div class="tfoot" style="border:1px solid #E3E9F1;border-top:0;border-radius:0 0 12px 12px;">' + pageBar("aud", m.length, "جهة") + "</div>" : "");
   }
   h += "</div>";
 
@@ -1968,71 +2175,71 @@ function vAimkt() {
       tpls.map((t, i) => {
         const on = tplId === t.id;
         return '<div role="radio" tabindex="0" aria-checked="' + (on ? "true" : "false") +
-          '" onclick="tplPick(' + i + ')" onkeydown="tplKey(event,' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#3FB6B0" : "#EDEDED") +
-          ";background:" + (on ? "#F6FCFB" : "#fff") + ';border-radius:16px;padding:18px;transition:.18s ease;' + (on ? "box-shadow:0 0 0 3px rgba(63,182,176,.12);" : "") + '">' +
+          '" onclick="tplPick(' + i + ')" onkeydown="tplKey(event,' + i + ')" style="cursor:pointer;border:1.5px solid ' + (on ? "#629CCD" : "#E3E9F1") +
+          ";background:" + (on ? "#EAF1F8" : "#fff") + ';border-radius:16px;padding:18px;transition:.18s ease;' + (on ? "box-shadow:0 0 0 3px rgba(63,182,176,.12);" : "") + '">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">' +
-          '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#1F7A73" : "#E2E2E2") +
-          ";background:" + (on ? "#1F7A73" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
-          '<span style="font-size:12.5px;font-weight:700;color:#171717;">' + esc(t.label) + "</span></div>" +
-          '<div style="font-size:11.5px;color:#7C7C7C;line-height:1.75;">' + esc(t.hint) + "</div>" +
-          '<div style="font-size:10.5px;color:#999999;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
+          '<span style="width:15px;height:15px;flex:none;border-radius:50%;border:1.5px solid ' + (on ? "#306DB5" : "#CBD7E4") +
+          ";background:" + (on ? "#306DB5" : "#fff") + ';box-shadow:inset 0 0 0 2.5px #fff;"></span>' +
+          '<span style="font-size:12px;font-weight:600;color:#212529;">' + esc(t.label) + "</span></div>" +
+          '<div style="font-size:12px;color:#536170;line-height:1.75;">' + esc(t.hint) + "</div>" +
+          '<div style="font-size:12px;color:#536170;margin-top:6px;">لِمن: ' + esc(t.audience) + "</div>" +
           '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;">' +
-          t.buttons.map((b) => '<span style="font-size:11.5px;font-weight:700;color:#2F5F94;background:#E3ECF8;border-radius:999px;padding:4px 12px;">' + esc(b) + "</span>").join("") +
+          t.buttons.map((b) => '<span style="font-size:12px;font-weight:600;color:#416CAD;background:#DDEAF3;border-radius:999px;padding:4px 12px;">' + esc(b) + "</span>").join("") +
           "</div></div>";
       }).join("") + "</div>" : "") +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start;">' +
-    '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:11.5px;color:#7C7C7C;font-weight:600;">نص الرسالة</span>' +
-    '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:11.5px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#1F7A73") + "اكتبها بالذكاء الاصطناعي</button></div>" +
-    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12.5px;color:#171717;border:1.5px solid #EDEDED;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
+    '<div><div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:12px;color:#536170;font-weight:600;">نص الرسالة</span>' +
+    '<span style="flex:1"></span><button id="cmpbtn" class="btn btn-ghost" style="font-size:12px;padding:7px 13px;display:inline-flex;align-items:center;gap:6px;" onclick="composeMsg()">' + ic("spark", 15, "#306DB5") + "اكتبها بالذكاء الاصطناعي</button></div>" +
+    '<textarea oninput="campMsgSet(this)" rows="6" style="font-family:inherit;width:100%;font-size:12px;color:#212529;border:1.5px solid #E3E9F1;border-radius:12px;padding:13px;line-height:2;resize:vertical;">' + esc(campMsg) + "</textarea>" +
     "</div>" +
-    '<div><div style="font-size:11.5px;color:#7C7C7C;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
+    '<div><div style="font-size:12px;color:#536170;font-weight:600;margin-bottom:8px;">معاينة واتساب — رسالة واحدة بأزرار، والملف يُرسَل عند طلبه</div>' +
     '<div class="wa-prev">' +
     '<div class="b" style="padding:0;overflow:hidden;">' +
     // The opener no longer carries the file — it offers it, so no attachment is drawn here.
     '<div style="padding:12px 14px;white-space:pre-wrap;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName).replaceAll("{{1}}", selName)) + "</div></div>" +
-    '<div style="font-size:10.5px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
+    '<div style="font-size:12px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
     // The preview draws the buttons that will actually be sent — resolved from the same registry
     // the launch route reads. It used to draw three hardcoded titles that no template used.
-    tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;color:#2F5F94;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
+    tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:600;color:#416CAD;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:10.5px;color:#b5810f;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
+    (selAsset ? "" : '<div style="font-size:12px;color:#B37F00;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
     "</div></div></div>";
 
   const can = selN > 0 && campMsg.trim();
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
-    '<label style="font-size:12.5px;font-weight:700;color:#171717;flex:none;">اسم الحملة</label>' +
-    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:13px;font-weight:600;color:#171717;border:1.5px solid #EDEDED;border-radius:11px;padding:11px 14px;">' +
+    '<label style="font-size:12px;font-weight:600;color:#212529;flex:none;">اسم الحملة</label>' +
+    '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:14px;font-weight:600;color:#212529;border:1.5px solid #E3E9F1;border-radius:11px;padding:11px 14px;">' +
     "</div>";
   // Docked, not floating, and compact on a phone. He reviews on his own device and briefs by
   // screenshot: at 390px this bar was three lines tall, occupied about a quarter of the viewport,
   // and sat directly over the template cards — the feature he asked for, hidden by the chrome.
   // The lbar class (see the stylesheet) drops the padding and the secondary line under 430px.
   // NO BACKTICKS ANYWHERE IN THIS FILE — it is one template literal and a backtick closes it.
-  h += '<div class="step lbar" style="position:sticky;bottom:0;margin-bottom:-56px;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
+  h += '<div class="step lbar" style="position:sticky;bottom:0;margin-bottom:-56px;z-index:var(--z-sticky);display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
     // In behaviour mode there is nothing to launch and the reason is not «you picked nobody» —
     // it is that this audience needs an approved template the send path does not yet use. Saying
     // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
-      ? '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:500;color:#171717;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
-        '<div style="font-size:10.5px;color:#999999;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
-      : '<div style="flex:1;min-width:200px;"><div style="font-size:13px;font-weight:700;color:#171717;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
+      ? '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:500;color:#212529;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
+        '<div style="font-size:12px;color:#536170;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
+      : '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:600;color:#212529;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
     // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
     // State what will actually be sent, next to the button that sends it.
     (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
-        '<div class="lsub" style="font-size:10.5px;color:#999999;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+        '<div class="lsub" style="font-size:12px;color:#536170;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
-      ' style="font-size:14.5px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
+      ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
-  h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:60;align-items:flex-start;justify-content:center;padding:60px 24px;">' +
-    '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #3FB6B0;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
-    '<div style="font-size:17px;font-weight:700;color:#171717;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:13px;color:#525252;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2E7D77;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
-    (selN > 50 ? '<div style="font-size:12px;color:#b5810f;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
+  h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:var(--z-overlay);align-items:flex-start;justify-content:center;padding:60px 24px;">' +
+    '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #629CCD;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
+    '<div style="font-size:16px;font-weight:600;color:#212529;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
+    '<div style="font-size:14px;color:#3A3A3A;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#306DB5;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    (selN > 50 ? '<div style="font-size:12px;color:#B37F00;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
-    '<button class="btn" style="color:#525252;background:#F3F3F3;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
+    '<button class="btn" style="color:#3A3A3A;background:#EDF1F7;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
 }
 
@@ -2040,10 +2247,10 @@ function mdRender(md) {
   return md.split("\\n").map((raw) => {
     const l = raw.trim();
     if (!l) return "";
-    if (l.startsWith("# ")) return '<div style="font-size:15px;font-weight:700;color:#171717;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
-    if (l.startsWith("## ")) return '<div style="font-size:12.5px;font-weight:700;color:#2E7D77;margin:14px 0 6px;">' + esc(l.slice(3)) + "</div>";
-    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#3FB6B0;"></span><span style="font-size:12.5px;color:#525252;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
-    return '<div style="font-size:12.5px;color:#525252;line-height:1.9;">' + esc(l) + "</div>";
+    if (l.startsWith("# ")) return '<div style="font-size:14px;font-weight:600;color:#212529;margin:4px 0 10px;">' + esc(l.slice(2)) + "</div>";
+    if (l.startsWith("## ")) return '<div style="font-size:12px;font-weight:600;color:#306DB5;margin:14px 0 6px;">' + esc(l.slice(3)) + "</div>";
+    if (l.startsWith("- ") || l.startsWith("* ")) return '<div style="display:flex;gap:8px;padding:2px 0;"><span style="width:5px;height:5px;flex:none;margin-top:9px;border-radius:999px;background:#629CCD;"></span><span style="font-size:12px;color:#3A3A3A;line-height:1.9;">' + esc(l.slice(2)) + "</span></div>";
+    return '<div style="font-size:12px;color:#3A3A3A;line-height:1.9;">' + esc(l) + "</div>";
   }).join("");
 }
 window.kbPick = () => document.getElementById("kbfile").click();
@@ -2093,10 +2300,10 @@ function kbRegistry() {
   return reg;
 }
 function uploadZone(scopedProduct) {
-  return '<div onclick="kbPick()" style="border:1.5px dashed #E2E2E2;background:#F8F8F8;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
-    '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#E3ECF8;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #2F5F94;border-radius:4px;"></span></div>' +
-    '<div style="font-size:13.5px;font-weight:700;color:#171717;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
-    '<div style="font-size:11.5px;color:#7C7C7C;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذه الخدمة ويقرأه المساعد فورًا" : "<br>يُستخرج اسم الخدمة من الملف تلقائيًا") + "</div></div>" +
+  return '<div onclick="kbPick()" style="border:1.5px dashed #CBD7E4;background:#F4F6F9;border-radius:14px;padding:26px 20px;text-align:center;cursor:pointer;">' +
+    '<div style="width:44px;height:44px;margin:0 auto 12px;border-radius:12px;background:#DDEAF3;display:flex;align-items:center;justify-content:center;"><span style="width:15px;height:15px;border:2.5px solid #416CAD;border-radius:4px;"></span></div>' +
+    '<div style="font-size:14px;font-weight:600;color:#212529;">' + (scopedProduct ? "ارفع ملف الخدمة — PDF أو Word أو PowerPoint" : "أضف خدمة مع ملفها — PDF أو Word أو PowerPoint") + "</div>" +
+    '<div style="font-size:12px;color:#536170;margin-top:7px;line-height:1.9;">الملفات الرسمية المعتمدة فقط · محرك التحليل: Firecrawl AnyDoc · يُحفظ Markdown في Product Hub' + (scopedProduct ? "<br>يُضاف تحت هذه الخدمة ويقرأه المساعد فورًا" : "<br>يُستخرج اسم الخدمة من الملف تلقائيًا") + "</div></div>" +
     '<input id="kbfile" type="file" accept=".pdf,.docx,.pptx,.xlsx,.rtf,.odt,.epub,.csv" style="display:none" data-product="' + esc(scopedProduct || "") + '" onchange="kbUpload(this)">' +
     '<div id="kbstat" style="margin-top:12px;"></div>';
 }
@@ -2126,27 +2333,27 @@ function vKb() {
     // The AI banner. The treatment is the BRAND's AI accent — the same teal gradient as the logo
     // tile (see .brand), never a borrowed purple-sparkle cliché: a gradient icon tile, a faint
     // teal wash fading into the bar, and the teal primary on the one action.
-    h += '<div class="crmbar rise" style="background:linear-gradient(120deg,#F0FAF9,#fff 55%);border-color:#CFE9E6;">' +
-      '<span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#3FB6B0,#1F7A73);display:flex;align-items:center;justify-content:center;color:#fff;flex:none;">' + ic("spark", 18) + "</span>" +
-      '<span style="flex:1;min-width:220px;font-size:12.5px;color:#525252;line-height:1.8;">' +
-      '<b style="color:#171717;font-weight:700;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
-      ' <span style="direction:ltr;color:#999999;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
+    h += '<div class="crmbar rise" style="background:linear-gradient(120deg,#EAF1F8,#fff 55%);border-color:#CFE9E6;">' +
+      '<span style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#629CCD,#306DB5);display:flex;align-items:center;justify-content:center;color:#fff;flex:none;">' + ic("spark", 18) + "</span>" +
+      '<span style="flex:1;min-width:220px;font-size:12px;color:#3A3A3A;line-height:1.8;">' +
+      '<b style="color:#212529;font-weight:600;">مهارة إنشاء العروض بالذكاء الاصطناعي</b> — حمّلها وأعطها لمساعد ذكاء اصطناعي مع الملف التعريفي للخدمة، فيُنتج لك عرضًا رسميًا (PDF) ترفعه في صفحة كل خدمة.' +
+      ' <span style="direction:ltr;color:#536170;font-size:12px;">' + esc(skill.filename) + "</span></span>" +
       '<a class="btn btn-teal" style="text-decoration:none;" href="/assets/' + esc(skill.public_id) + '" download>تحميل المهارة</a></div>';
   }
   h += '<div class="tblwrap crmflat kbflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
-    '<div class="kbrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EDEDED;font-size:12px;font-weight:500;color:#7C7C7C;cursor:default;">' +
+    '<div class="kbrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;cursor:default;">' +
     "<div>الخدمة</div><div>معرفة المساعد</div><div>الملف التعريفي</div><div>حملات</div><div>جهات مهتمة</div><div></div></div>" +
     '<div class="thead-narrow"><span>الخدمة</span><span style="flex:1"></span><span>الحالة</span></div>';
   h += rows.map((x) =>
     '<a class="kbrow" href="#kb/' + encodeURIComponent(x.r.name) + '">' +
     '<span class="nm">' + esc(x.r.name) + (x.r.seed ? "" : '<span class="chip">مضافة برفع ملف</span>') + "</span>" +
-    '<span class="st"><span class="d" style="background:' + (x.r.hub ? "#027A48" : "#E2E2E2") + ';"></span>' +
+    '<span class="st"><span class="d" style="background:' + (x.r.hub ? "#12633F" : "#CBD7E4") + ';"></span>' +
       (x.r.hub ? "معتمدة" : "لا معرفة بعد") + "</span>" +
     '<span class="st">' + (x.asset
-      ? '<span class="d" style="background:#1F7A73;"></span><span class="fn">' + esc(clip(x.asset.filename, 30)) + "</span>"
-      : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
-    '<span class="fig">' + (x.camps ? fmtN(x.camps) : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
-    '<span class="fig">' + (x.warm ? fmtN(x.warm) : '<span style="color:#C7C7C7;">—</span>') + "</span>" +
+      ? '<span class="d" style="background:#306DB5;"></span><span class="fn">' + esc(clip(x.asset.filename, 30)) + "</span>"
+      : '<span style="color:#536170;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.camps ? fmtN(x.camps) : '<span style="color:#536170;">—</span>') + "</span>" +
+    '<span class="fig">' + (x.warm ? fmtN(x.warm) : '<span style="color:#536170;">—</span>') + "</span>" +
     '<span class="go">افتح ←</span></a>').join("");
   h += '</div></div><div class="tfoot"><span>' + ic("book", 14) + " " + fmtN(rows.length) + " خدمة · " +
     fmtN(rows.filter((x) => x.r.hub).length) + " منها بمعرفة معتمدة</span></div></div>";
@@ -2155,7 +2362,7 @@ function vKb() {
 function vKbProduct(name) {
   const reg = kbRegistry();
   const r = reg.find((x) => x.name === name);
-  if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">الخدمة غير موجودة</div><div class="s"><a href="#kb" style="color:#1F7A73;font-weight:700;">→ كل الخدمات</a></div></div>';
+  if (!r) return '<div class="empty"><div class="ic"><span></span></div><div class="t">الخدمة غير موجودة</div><div class="s"><a href="#kb" style="color:#306DB5;font-weight:600;">→ كل الخدمات</a></div></div>';
   const seedP = PRODUCTS_FULL.find((p) => p.n === name);
   const prodCamps = campaigns.filter((c) => (c.product || "") === name);
   const wlProd = ((winloss && winloss.by_product) || []).find((x) => x.product === name);
@@ -2167,50 +2374,50 @@ function vKbProduct(name) {
   // uploaded». A percentage that can only ever be 0 or 100 is an invented number wearing a gauge.
   // The same two states are already stated in words by the chip beside the title.
 
-  let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#525252;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
+  let h = '<a href="#kb" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#3A3A3A;text-decoration:none;margin-bottom:14px;">→ كل الخدمات</a>';
 
   // ── Hero: identity, readiness ring, and the primary action together ──
   h += '<div class="card rise" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;padding:26px 24px;">' +
-    '<div style="width:44px;height:44px;flex:none;border-radius:10px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;font-weight:500;font-size:18px;">' + esc(name.trim().charAt(0)) + "</div>" +
+    '<div style="width:44px;height:44px;flex:none;border-radius:10px;background:#EDF1F7;display:flex;align-items:center;justify-content:center;color:#3A3A3A;font-weight:500;font-size:18px;">' + esc(name.trim().charAt(0)) + "</div>" +
     '<div style="flex:1;min-width:220px;">' +
-    '<h1 style="margin:0;font-size:19px;font-weight:600;color:#171717;letter-spacing:0;">' + esc(name) + "</h1>" +
+    '<h1 style="margin:0;font-size:18px;font-weight:600;color:#212529;letter-spacing:0;">' + esc(name) + "</h1>" +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;align-items:center;">' +
     (r.hub ? '<span class="chip c-ok">جاهزة للبيع</span>' : '<span class="chip c-warn">بانتظار ملف المعرفة</span>') +
     (pa0 ? '<span class="chip c-teal">ملف تعريفي مرفق</span>' : '<span class="chip c-grey">دون ملف تعريفي</span>') +
-    (r.hub && r.hub.source_filename ? '<span style="font-size:10.5px;color:#999999;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
+    (r.hub && r.hub.source_filename ? '<span style="font-size:12px;color:#536170;direction:ltr;">' + esc(r.hub.source_filename) + "</span>" : "") +
     "</div></div>" +
     '<button class="btn btn-dark" style="flex:none;" data-prod="' + esc(name) + '" onclick="launchWithProduct(this.dataset.prod)">أطلق حملة بهذه الخدمة ←</button>' +
     "</div>";
 
   // ── Performance row: one scoreboard, not scattered chips ──
   const cells = [
-    ["حملات الخدمة", prodCamps.length, "#171717"],
-    ["محققة", (wlProd && wlProd.won) || 0, "#027A48"],
-    ["غير مكتسبة", (wlProd && wlProd.lost) || 0, "#B42318"],
-    ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#2F5F94"],
+    ["حملات الخدمة", prodCamps.length, "#212529"],
+    ["محققة", (wlProd && wlProd.won) || 0, "#12633F"],
+    ["غير مكتسبة", (wlProd && wlProd.lost) || 0, "#8E2A27"],
+    ["قيد التفاوض", (wlProd && wlProd.active) || 0, "#416CAD"],
   ];
   h += '<div class="card rise" style="padding:0;overflow:hidden;">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">' +
-    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #EDEDED;" : "") + '">' +
-      '<div style="font-size:11.5px;color:#7C7C7C;font-weight:600;">' + c[0] + "</div>" +
-      '<div style="font-size:26px;font-weight:700;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + fmtN(c[1]) + "</div></div>").join("") +
+    cells.map((c, i) => '<div style="padding:20px 22px;' + (i ? "border-inline-start:1px solid #E3E9F1;" : "") + '">' +
+      '<div style="font-size:12px;color:#536170;font-weight:600;">' + c[0] + "</div>" +
+      '<div style="font-size:28px;font-weight:600;color:' + c[2] + ';margin-top:6px;font-variant-numeric:tabular-nums;">' + fmtN(c[1]) + "</div></div>").join("") +
     "</div>" +
     (prodCamps.length || prodCauses.length
-      ? '<div style="border-top:1px solid #EDEDED;background:#F8F8F8;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
-        (prodCauses.length ? '<span style="font-size:11.5px;font-weight:700;color:#B42318;">أبرز سبب لعدم الإغلاق: ' + esc(prodCauses[0].cause) + '</span><span style="flex:1"></span>' : '<span style="flex:1"></span>') +
+      ? '<div style="border-top:1px solid #E3E9F1;background:#F4F6F9;padding:14px 22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">' +
+        (prodCauses.length ? '<span style="font-size:12px;font-weight:600;color:#8E2A27;">أبرز سبب لعدم الإغلاق: ' + esc(prodCauses[0].cause) + '</span><span style="flex:1"></span>' : '<span style="flex:1"></span>') +
         prodCamps.slice(0, 3).map((c) => '<a href="#kmon/' + c.id + '" class="chip c-blue" title="' + esc(c.name) + '" style="text-decoration:none;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;">' + esc(c.name) + "</a>").join("") +
         "</div>"
       : "") +
     "</div>";
   const pa = prodAssets.find((a) => a.product === name);
   const fileRow = (title, sub, chip, btnLabel, onclick) =>
-    '<div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #F3F3F3;flex-wrap:wrap;">' +
-    '<div style="width:40px;height:40px;flex:none;border-radius:11px;background:#F3F3F3;display:flex;align-items:center;justify-content:center;color:#525252;">' + ic("doc", 19) + "</div>" +
-    '<div style="flex:1;min-width:200px;"><div style="font-size:13.5px;font-weight:700;color:#171717;">' + title + "</div>" +
-    '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
+    '<div style="display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid #EDF1F7;flex-wrap:wrap;">' +
+    '<div style="width:40px;height:40px;flex:none;border-radius:11px;background:#EDF1F7;display:flex;align-items:center;justify-content:center;color:#3A3A3A;">' + ic("doc", 19) + "</div>" +
+    '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:600;color:#212529;">' + title + "</div>" +
+    '<div style="font-size:12px;color:#536170;margin-top:4px;line-height:1.8;">' + sub + "</div></div>" +
     chip + '<button class="btn btn-ghost" style="font-size:12px;padding:9px 16px;" onclick="' + onclick + '">' + btnLabel + "</button></div>";
   h += '<div class="card" style="padding:0;overflow:hidden;"><div style="padding:18px 22px 0;"><h3 style="margin:0 0 4px;">ملفات الخدمة</h3>' +
-    '<div style="font-size:11.5px;color:#999999;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
+    '<div style="font-size:12px;color:#536170;margin-bottom:14px;">ما يرسله المساعد للعميل، وما يقرأه ليبيع</div></div>' +
     fileRow("الملف التعريفي", "يُرسل مع افتتاحية الحملة وعند طلب العميل للتفاصيل" + (pa ? ' · <span style="direction:ltr;">' + esc(pa.filename) + "</span>" : ""),
       (pa ? '<span class="chip c-ok">مرفق</span>' : '<span class="chip c-grey">غير مرفق</span>'),
       (pa ? "استبدال" : "رفع PDF"), "paPick()") +
@@ -2223,10 +2430,10 @@ function vKbProduct(name) {
   if (r.hub) {
     h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;">' +
       '<h3 style="margin:0;">المعرفة المعتمدة (Product Hub)</h3><span class="chip c-ok">يقرأها المساعد في كل محادثة</span></div>' +
-      '<div style="border-top:1px solid #F3F3F3;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
+      '<div style="border-top:1px solid #EDF1F7;padding-top:12px;">' + mdRender(r.hub.md) + "</div></div>";
   }
   if (seedP) {
-    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;">' +
+    h += '<div class="card"><h3>المعرفة الأساسية المدمجة</h3><div style="border:1px solid #E3E9F1;border-radius:12px;overflow:hidden;">' +
       [["العرض", seedP.pitch], ["الكفاءة", seedP.eff.join(" · ")], ["ملائم لـ", seedP.best.join("، ")], ["التسعير المعتمد", seedP.pricing]]
         .map((x) => '<div class="kbrow"><span class="dt" style="background:#2e9e6b;"></span><div class="ti"><div class="t1">' + esc(x[0]) + '</div><div class="t2">' + esc(x[1]) + "</div></div></div>").join("") + "</div></div>";
   }
@@ -2248,8 +2455,8 @@ function vKbProduct(name) {
     ];
     const done = rows.filter((r) => r[2]).length;
     h += '<div class="card"><h3>جاهزية الخدمة <span class="meta">' + fmtN(done) + " من " + fmtN(rows.length) + " مكتملة</span></h3>" +
-      '<div style="border:1px solid #EDEDED;border-radius:12px;overflow:hidden;">' +
-      rows.map((r) => '<div class="kbrow"><span class="dt" style="background:' + (r[2] ? "#2e9e6b" : "#E2E2E2") + ';"></span>' +
+      '<div style="border:1px solid #E3E9F1;border-radius:12px;overflow:hidden;">' +
+      rows.map((r) => '<div class="kbrow"><span class="dt" style="background:' + (r[2] ? "#2e9e6b" : "#CBD7E4") + ';"></span>' +
         '<div class="ti"><div class="t1">' + esc(r[0]) + '</div><div class="t2">' + r[1] + "</div></div>" +
         '<span class="chip ' + (r[2] ? "c-ok" : "c-grey") + '">' + (r[2] ? "جاهز" : "ناقص") + "</span></div>").join("") +
       "</div></div>";
@@ -2274,7 +2481,7 @@ window.entImport = async () => {
   } catch (e) { st.innerHTML = '<span class="chip c-bad">خطأ</span>'; }
 };
 function manualRowsHtml() {
-  const F = (i, k, ph, w) => '<input class="inp" data-i="' + i + '" data-k="' + k + '" value="' + esc(manualRows[i][k]) + '" oninput="entRowSet(this)" placeholder="' + ph + '" style="flex:' + w + ';min-width:0;font-size:12.5px;padding:10px 13px;">';
+  const F = (i, k, ph, w) => '<input class="inp" data-i="' + i + '" data-k="' + k + '" value="' + esc(manualRows[i][k]) + '" oninput="entRowSet(this)" placeholder="' + ph + '" style="flex:' + w + ';min-width:0;font-size:12px;padding:10px 13px;">';
   return manualRows.map((r, i) =>
     '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">' +
     F(i, "name", "اسم الجهة", "2.2") + F(i, "phone", "الجوال", "1.5") +
@@ -2338,18 +2545,18 @@ window.entFileUpload = async (input) => {
     if (d.updated) msg += '<span class="chip c-teal">حُدّث ' + fmtN(d.updated) + "</span> ";
     if (d.skippedCount) msg += '<span class="chip c-bad">تُخطّي ' + fmtN(d.skippedCount) + "</span> ";
     if (d.tagsCreated) msg += '<span class="chip c-blue">أُنشئ ' + fmtN(d.tagsCreated) + " وسم</span> ";
-    msg += '<div style="font-size:11px;color:#7C7C7C;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
-      ((d.columns.tags || []).length ? ' · وسوم: <b style="color:#2F5F94;">' + d.columns.tags.map(esc).join("، ") + "</b>" : "") +
+    msg += '<div style="font-size:12px;color:#536170;margin-top:8px;line-height:1.9;">الأعمدة المكتشفة — الاسم: <b>' + esc(d.columns.name) + '</b> · الجوال: <b>' + esc(d.columns.phone) + "</b>" +
+      ((d.columns.tags || []).length ? ' · وسوم: <b style="color:#416CAD;">' + d.columns.tags.map(esc).join("، ") + "</b>" : "") +
       (d.columns.attrs.length ? " · شرائح: " + d.columns.attrs.map(esc).join("، ") : " · لا أعمدة شرائح إضافية") + "</div>";
     // The cap fired: say what was refused and why, because the alternative is an import that looks
     // clean while a whole column silently landed nowhere.
     if (d.tagsRefused) {
-      msg += '<div style="font-size:11.5px;color:#B54708;margin-top:6px;line-height:1.9;">عمود الوسوم يحمل ' +
+      msg += '<div style="font-size:12px;color:#7A5600;margin-top:6px;line-height:1.9;">عمود الوسوم يحمل ' +
         fmtN(d.tagsRefused) + ' اسمًا جديدًا — أكثر من أن يكون قائمة وسوم. لم يُنشأ أي وسم، والأسماء غير المعروفة لم تُطبَّق. ' +
         'راجع العمود أو أنشئ الوسوم يدويًا من «الوسوم».</div>';
     }
     if (d.skippedRows && d.skippedRows.length) {
-      msg += '<div style="font-size:11px;color:#c43d3d;margin-top:4px;line-height:1.9;">' +
+      msg += '<div style="font-size:12px;color:#D9534F;margin-top:4px;line-height:1.9;">' +
         d.skippedRows.map((s) => "صف " + fmtN(s.row) + ": " + esc(s.reason)).join(" · ") + "</div>";
     }
     entImportSummary = msg;   // survives the re-render (the status div is rebuilt by vTargetsCrm)
@@ -2384,11 +2591,11 @@ window.entFileUpload = async (input) => {
 function vMorningList() {
   const cs = (cache && cache.contacts || []).filter((c) => showTest || !c.test);
   const GROUPS = [
-    ["scheduled", "موعد محدد", "#027A48", "اتصل بهم اليوم"],
-    ["handoff", "بانتظار المختص", "#B54708", "أجاب المساعد وينتظرون مكالمة"],
-    ["interested", "مهتم بلا موعد", "#2F5F94", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
-    ["later", "مؤجل", "#7C7C7C", "طلبوا التأجيل"],
-    ["stopped", "لا يرغب في التواصل", "#B42318", "توقّف الإرسال إليهم"],
+    ["scheduled", "موعد محدد", "#12633F", "اتصل بهم اليوم"],
+    ["handoff", "بانتظار المختص", "#7A5600", "أجاب المساعد وينتظرون مكالمة"],
+    ["interested", "مهتم بلا موعد", "#416CAD", "أبدوا اهتمامًا ولم يُحدَّد وقت بعد"],
+    ["later", "مؤجل", "#536170", "طلبوا التأجيل"],
+    ["stopped", "لا يرغب في التواصل", "#8E2A27", "توقّف الإرسال إليهم"],
   ];
   // A confirmed day decides the bucket, not c.outcome. An interested clinic whose day the operator
   // typed was rendering «موعد مؤكَّد: الثلاثاء ٢٥ أغسطس» UNDER the heading «مهتم بلا موعد» — the
@@ -2418,10 +2625,10 @@ function vMorningList() {
     label + " (" + fmtN(counts[k]) + ")</button>").join("") +
     '<span style="flex:1"></span>' +
     '<span style="position:relative;display:inline-flex;align-items:center;min-width:190px;max-width:280px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#999999;display:flex;">' + ic("search", 17) + "</span>" +
+    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + "</span>" +
     '<input id="oq" class="inp" value="' + esc(oppQ) + '" oninput="oppSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>' +
-    '<span style="font-size:12px;color:#7C7C7C;">' + fmtN(cs.length) + " جهة في السجل" +
+    '<span style="font-size:12px;color:#536170;">' + fmtN(cs.length) + " جهة في السجل" +
     (unsorted.length ? " · " + fmtN(unsorted.length) + " لم تُفرز بعد" : "") + "</span></div>";
   for (const [key, label, ink, hint] of GROUPS) {
     if (key !== active) continue;
@@ -2431,17 +2638,17 @@ function vMorningList() {
     const rows = of(key).filter(match).sort(key === "scheduled"
       ? (a, b) => { const x = appt(a), y = appt(b); return ((x && x.at) || Infinity) - ((y && y.at) || Infinity); }
       : (a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-    // Group header on the same #F8F8F8 bar as #customers' group view — one grouped-list idiom in
+    // Group header on the same #F4F6F9 bar as #customers' group view — one grouped-list idiom in
     // the product, not one per screen. The five tinted row fills that used to be here are gone:
     // five pastels down one page read as five alert levels, and none of these is an alert.
     h += '<div class="tblwrap crmflat rise" style="margin-bottom:14px;">' +
-      '<div style="display:flex;align-items:center;gap:9px;padding:9px 20px 9px 12px;border-bottom:1px solid #EDEDED;background:#F8F8F8;">' +
+      '<div style="display:flex;align-items:center;gap:9px;padding:9px 20px 9px 12px;border-bottom:1px solid #E3E9F1;background:#F4F6F9;">' +
       '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + ink + ';"></span>' +
-      '<span style="font-size:13px;font-weight:500;color:#171717;">' + label + "</span>" +
+      '<span style="font-size:14px;font-weight:500;color:#212529;">' + label + "</span>" +
       '<span class="cntpill">' + fmtN(rows.length) + "</span>" +
-      '<span style="font-size:12px;color:#999999;">' + hint + "</span></div>";
+      '<span style="font-size:12px;color:#536170;">' + hint + "</span></div>";
     if (!rows.length) {
-      h += '<div style="padding:16px 20px;font-size:12.5px;color:#999999;">' +
+      h += '<div style="padding:16px 20px;font-size:12px;color:#536170;">' +
         (oq ? "لا أحد في هذه المجموعة يطابق «" + esc(oq) + "»." : "لا أحد في هذه المجموعة بعد.") + "</div></div>";
       continue;
     }
@@ -2459,17 +2666,17 @@ function vMorningList() {
         ? esc(fmtDay(ap.at)) + (ap.by ? " · سجّله " + esc(ap.by) : "")
         : "";
       const when = key === "scheduled" && c.scheduledSaid
-        ? '<span style="font-size:12.5px;font-weight:500;color:#171717;">«' + esc(c.scheduledSaid) + "»</span>" +
-          (conf ? '<span style="font-size:12px;color:#027A48;"> · مؤكَّد ' + conf + "</span>"
-            : ap ? '<span style="font-size:12px;color:#999999;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
-                 : '<span style="font-size:12px;color:#999999;"> · لم نقرأ تاريخًا</span>')
+        ? '<span style="font-size:12px;font-weight:500;color:#212529;">«' + esc(c.scheduledSaid) + "»</span>" +
+          (conf ? '<span style="font-size:12px;color:#12633F;"> · مؤكَّد ' + conf + "</span>"
+            : ap ? '<span style="font-size:12px;color:#536170;"> · قراءتنا ' + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد</span>"
+                 : '<span style="font-size:12px;color:#536170;"> · لم نقرأ تاريخًا</span>')
         // A confirmed day answers «متى؟» in EVERY group, not only in موعد محدد: an interested
         // clinic with a day the operator wrote down is exactly what his third question asks for.
         : conf
-          ? '<span style="font-size:12px;color:#027A48;">موعد مؤكَّد: ' + conf + "</span>"
+          ? '<span style="font-size:12px;color:#12633F;">موعد مؤكَّد: ' + conf + "</span>"
           : c.outcomeReason
-            ? '<span style="font-size:12px;color:#7C7C7C;">«' + esc(String(c.outcomeReason).slice(0, 80)) + "»</span>"
-            : '<span style="font-size:12px;color:#C7C7C7;">—</span>';
+            ? '<span style="font-size:12px;color:#536170;">«' + esc(String(c.outcomeReason).slice(0, 80)) + "»</span>"
+            : '<span style="font-size:12px;color:#536170;">—</span>';
       return '<div class="oprow" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
         '<span class="av">' + esc(nm.trim().charAt(0)) + "</span>" +
         '<span class="nm">' + esc(nm) + "</span>" +
@@ -2481,7 +2688,7 @@ function vMorningList() {
       "</div>";
   }
   if (unsorted.length) {
-    h += '<div style="font-size:12.5px;color:#999999;padding:4px 2px 8px;">' +
+    h += '<div style="font-size:12px;color:#536170;padding:4px 2px 8px;">' +
       fmtN(unsorted.length) + " جهة لم تُفرز بعد — لم تُسجَّل لها نتيجة.</div>";
   }
   return h;
@@ -2525,11 +2732,11 @@ function sparkArea(vals, w, hgt) {
   return '<svg dir="ltr" viewBox="0 0 ' + w + " " + hgt + '" preserveAspectRatio="none" ' +
     'style="width:100%;height:' + hgt + 'px;display:block;overflow:visible;" role="img" aria-label="جهات مؤهلة جديدة يوميًا">' +
     '<defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="#1F7A73" stop-opacity=".20"/>' +
-    '<stop offset="100%" stop-color="#1F7A73" stop-opacity="0"/></linearGradient></defs>' +
+    '<stop offset="0%" stop-color="#306DB5" stop-opacity=".20"/>' +
+    '<stop offset="100%" stop-color="#306DB5" stop-opacity="0"/></linearGradient></defs>' +
     '<path d="' + area + '" fill="url(#spg)"/>' +
-    '<path d="' + line + '" fill="none" stroke="#1F7A73" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) + '" r="3" fill="#1F7A73"/></svg>';
+    '<path d="' + line + '" fill="none" stroke="#306DB5" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) + '" r="3" fill="#306DB5"/></svg>';
 }
 // A funnel, drawn as one. Each band's TOP edge is the stage above it and its BOTTOM edge is its own
 // value, so the slope between two bands IS the drop between them — the single thing the six equal
@@ -2539,7 +2746,7 @@ function funnelSvg(rows) {
   const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
   const W = 300, segH = 44, gap = 6;
   const H = rows.length * (segH + gap) - gap;
-  const ramp = ["#1F7A73", "#2A8B84", "#3B9C95", "#5AB0AA", "#84C7C2", "#B2DDD9"];
+  const ramp = ["#306DB5", "#2A8B84", "#3B9C95", "#5AB0AA", "#84C7C2", "#B2DDD9"];
   let shapes = "";
   rows.forEach((r, i) => {
     const wT = Math.max(0.08, (i === 0 ? r[1] : rows[i - 1][1]) / mx) * W;
@@ -2573,23 +2780,23 @@ function ratesStrip(agg) {
   return '<div class="card rise" style="margin:0;padding-bottom:2px;">' +
     '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-bottom:4px;">' +
     '<h3 style="margin:0;">معدلات الأداء</h3>' +
-    '<span style="font-size:10.5px;color:#999999;">كل نسبة ومقامها معها</span></div>' +
-    rows.map((r) => '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #EDEDED;">' +
-      '<span style="flex:0 0 106px;font-size:12.5px;color:#383838;">' + r[0] + "</span>" +
-      '<span style="flex:0 0 52px;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#C7C7C7" : "#171717") +
-        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:11px;color:#999999;font-weight:450;">٪</span>') + "</span>" +
-      '<span style="flex:0 0 88px;font-size:12px;color:#999999;">' + r[2] + "</span>" +
-      '<span style="flex:1;min-width:60px;height:6px;background:#F3F3F3;border-radius:999px;overflow:hidden;">' +
-        (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#1F7A73;border-radius:999px;"></i>') + "</span></div>").join("") + "</div>";
+    '<span style="font-size:12px;color:#536170;">كل نسبة ومقامها معها</span></div>' +
+    rows.map((r) => '<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #E3E9F1;">' +
+      '<span style="flex:0 0 106px;font-size:12px;color:#212529;">' + r[0] + "</span>" +
+      '<span style="flex:0 0 52px;font-size:16px;font-weight:600;color:' + (r[1] === null ? "#A9B4C0" : "#212529") +
+        ';font-variant-numeric:tabular-nums;">' + (r[1] === null ? "—" : fmtN(r[1]) + '<span style="font-size:12px;color:#536170;font-weight:450;">٪</span>') + "</span>" +
+      '<span style="flex:0 0 88px;font-size:12px;color:#536170;">' + r[2] + "</span>" +
+      '<span style="flex:1;min-width:60px;height:6px;background:#EDF1F7;border-radius:999px;overflow:hidden;">' +
+        (r[1] === null ? "" : '<i style="display:block;height:100%;width:' + Math.min(100, r[1]) + '%;background:#306DB5;border-radius:999px;"></i>') + "</span></div>").join("") + "</div>";
 }
 function chartCard(title, sub, inner) {
-  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:10.5px;color:#999999;">' + sub + "</span></div>" + inner + "</div>";
+  return '<div class="card" style="margin:0;"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><h3 style="margin:0;">' + title + '</h3><span style="font-size:12px;color:#536170;">' + sub + "</span></div>" + inner + "</div>";
 }
 function hbarRows(rows, color) {
   const mx = Math.max(1, ...rows.map((r) => r[1]));
   return '<div style="margin-top:12px;display:flex;flex-direction:column;gap:9px;">' + rows.map((r) =>
-    '<div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;"><span style="font-weight:600;color:#383838;">' + esc(String(r[0])) + '</span><span style="font-weight:700;color:#171717;">' + fmtN(r[1]) + "</span></div>" +
-    '<div style="height:8px;background:#EDEDED;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
+    '<div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="font-weight:600;color:#212529;">' + esc(String(r[0])) + '</span><span style="font-weight:600;color:#212529;">' + fmtN(r[1]) + "</span></div>" +
+    '<div style="height:8px;background:#E3E9F1;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;border-radius:999px;width:' + Math.round(r[1] / mx * 100) + "%;background:" + (r[2] || color) + ';"></i></div></div>').join("") + "</div>";
 }
 // نشاط الرسائل — fourteen days, stacked areas. It was 28 grey-and-teal stubs 30px wide with a
 // label under each; at one message a day the bars were 3px tall and the chart said nothing you
@@ -2613,22 +2820,22 @@ function dailyActivitySvg(cs) {
   const path = (get) => days.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(get(d)).toFixed(1)).join(" ");
   const areaOf = (p) => p + " L0," + H + " L" + W + "," + H + " Z";
   const total = days.reduce((a, d) => a + d.inN + d.outN, 0);
-  if (!total) return '<div style="font-size:12px;color:#999999;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
+  if (!total) return '<div style="font-size:12px;color:#536170;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
   const stack = path((d) => d.inN + d.outN), inner = path((d) => d.inN);
   return '<div dir="ltr" style="margin-top:12px;"><svg viewBox="0 0 ' + W + " " + H +
     '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block;" role="img" aria-label="نشاط الرسائل خلال ١٤ يومًا">' +
     '<defs><linearGradient id="agr" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="#1F7A73" stop-opacity=".22"/><stop offset="100%" stop-color="#1F7A73" stop-opacity="0"/></linearGradient></defs>' +
-    '<line x1="0" y1="' + (H - 2) + '" x2="' + W + '" y2="' + (H - 2) + '" stroke="#EDEDED" stroke-width="1"/>' +
-    '<path d="' + areaOf(stack) + '" fill="#F3F3F3"/>' +
-    '<path d="' + stack + '" fill="none" stroke="#C7C7C7" stroke-width="1.2" stroke-linejoin="round"/>' +
+    '<stop offset="0%" stop-color="#306DB5" stop-opacity=".22"/><stop offset="100%" stop-color="#306DB5" stop-opacity="0"/></linearGradient></defs>' +
+    '<line x1="0" y1="' + (H - 2) + '" x2="' + W + '" y2="' + (H - 2) + '" stroke="#E3E9F1" stroke-width="1"/>' +
+    '<path d="' + areaOf(stack) + '" fill="#EDF1F7"/>' +
+    '<path d="' + stack + '" fill="none" stroke="#A9B4C0" stroke-width="1.2" stroke-linejoin="round"/>' +
     '<path d="' + areaOf(inner) + '" fill="url(#agr)"/>' +
-    '<path d="' + inner + '" fill="none" stroke="#1F7A73" stroke-width="1.6" stroke-linejoin="round"/></svg></div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:11px;color:#C7C7C7;margin-top:4px;">' +
+    '<path d="' + inner + '" fill="none" stroke="#306DB5" stroke-width="1.6" stroke-linejoin="round"/></svg></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:12px;color:#536170;margin-top:4px;">' +
     '<span>' + esc(days[0].label) + '</span><span>' + esc(days[days.length - 1].label) + "</span></div>" +
-    '<div style="display:flex;gap:16px;margin-top:9px;font-size:12px;color:#7C7C7C;">' +
-    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#1F7A73;margin-inline-end:6px;"></i>واردة من العملاء</span>' +
-    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#C7C7C7;margin-inline-end:6px;"></i>الإجمالي مع الصادرة</span></div>';
+    '<div style="display:flex;gap:16px;margin-top:9px;font-size:12px;color:#536170;">' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#306DB5;margin-inline-end:6px;"></i>واردة من العملاء</span>' +
+    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#A9B4C0;margin-inline-end:6px;"></i>الإجمالي مع الصادرة</span></div>';
 }
 function vHomeCharts(cs) {
   // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
@@ -2659,7 +2866,7 @@ function vHomeCharts(cs) {
     replied: reached.filter((c) => (c.statusTimes || {}).replied).length,
     interested: reached.filter((c) => interestedOf(c, 0)).length,
   };
-  const funnel = [["جهات الاستهداف", agg.targeted], ["أُرسلت", agg.sent], ["وصلت", agg.delivered], ["شوهدت", agg.seen], ["ردّوا", agg.replied], ["جهات مهتمة", agg.interested]].map((r) => [r[0], r[1], "#1F7A73"]);
+  const funnel = [["جهات الاستهداف", agg.targeted], ["أُرسلت", agg.sent], ["وصلت", agg.delivered], ["شوهدت", agg.seen], ["ردّوا", agg.replied], ["جهات مهتمة", agg.interested]].map((r) => [r[0], r[1], "#306DB5"]);
   const byProd = new Map();
   cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
   const prodRows = [...byProd.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
@@ -2677,7 +2884,7 @@ function vHomeCharts(cs) {
   // ROW A — conversion. The funnel and the rates answer the same question at two resolutions, so
   // they belong side by side; splitting them left the rates as a full-width strip of thin bars.
   h += '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr);gap:16px;align-items:start;margin-bottom:16px;" class="chgrid">';
-  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#999999;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
+  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#536170;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
   h += ratesStrip(agg);
   h += "</div>";
   // ROW B — what is moving, and in which service.
@@ -2686,13 +2893,13 @@ function vHomeCharts(cs) {
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
-  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#1F7A73") : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#306DB5") : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
   h += "</div>";
   const facets = [["المدينة", cityRows], ["الحجم", sizeRows], ["القطاع", secRows]].filter((f) => f[1].length);
   h += chartCard("تركيبة قائمتك", fmtN(entities.length) + " جهة · من أعمدة ملفك", facets.length
     ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:22px;margin-top:4px;">' +
-      facets.map((f) => '<div><div style="font-size:11.5px;font-weight:500;color:#7C7C7C;padding-bottom:2px;">' + f[0] + "</div>" + hbarRows(f[1], "#1F7A73") + "</div>").join("") + "</div>"
-    : '<div style="font-size:12px;color:#999999;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
+      facets.map((f) => '<div><div style="font-size:12px;font-weight:500;color:#536170;padding-bottom:2px;">' + f[0] + "</div>" + hbarRows(f[1], "#306DB5") + "</div>").join("") + "</div>"
+    : '<div style="font-size:12px;color:#536170;margin-top:14px;">تظهر بعد استيراد قائمة فيها أعمدة المدينة أو الحجم أو القطاع.</div>');
   return h;
 }
 // The founder's own wording, and his own note that it must read «محققة», not «محققة محاسبية».
@@ -2701,10 +2908,10 @@ function vHomeCharts(cs) {
 // meeting, NOT for a payment. Massar holds no money field of any kind, so the screen has to say
 // which of the two it means rather than let the reader assume the stronger one.
 const DEAL_META = {
-  won:     ["محققة",      "#027A48", "#ECFDF3", "التزم صراحةً بالاشتراك أو بالاجتماع النهائي"],
-  lost:    ["غير مكتسبة", "#B42318", "#FEF3F2", "رفض نهائيًا أو انسحب"],
-  stalled: ["متوقفة",     "#B54708", "#FFFAEB", "توقف التفاعل بعد اهتمام — صمت يتجاوز يومين"],
-  active:  ["نشطة",       "#2F5F94", "#EFF4FB", "الحوار مستمر طبيعيًا"],
+  won:     ["محققة",      "#12633F", "#E4F5EC", "التزم صراحةً بالاشتراك أو بالاجتماع النهائي"],
+  lost:    ["غير مكتسبة", "#8E2A27", "#FBE7E6", "رفض نهائيًا أو انسحب"],
+  stalled: ["متوقفة",     "#7A5600", "#FFF5D6", "توقف التفاعل بعد اهتمام — صمت يتجاوز يومين"],
+  active:  ["نشطة",       "#416CAD", "#EAF1F8", "الحوار مستمر طبيعيًا"],
 };
 // ---------------------------------------------------------------------------
 // «ما يستحق المتابعة الآن» — the ONE morning list in the product.
@@ -2749,28 +2956,28 @@ function vActionQueue(cs, notifyNumber, nTest) {
   const hrs = (c) => fmtAgo(now - (c.lastEventAt || 0));
   const tagOf = (c) => (c.tags || []).find((t) => t.level === "hot") || (c.tags || [])[0];
   const items = [];
-  hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#B42318", why: "مؤهلة وبلا متابعة منذ " + hrs(c),
+  hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#8E2A27", why: "مؤهلة وبلا متابعة منذ " + hrs(c),
     act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
-  fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#027A48", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
+  fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#12633F", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
     act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
-  if (seenNoReply.size) items.push({ c: null, icon: "eye", dot: "#B54708", name: "شاهدوا الرسالة دون ردّ",
+  if (seenNoReply.size) items.push({ c: null, icon: "eye", dot: "#7A5600", name: "شاهدوا الرسالة دون ردّ",
     why: fmtN(seenNoReply.size) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
   stalled.slice(0, 2).forEach((c) => { const ins = insCache[c.phone] || {};
-    items.push({ c, dot: "#2F5F94", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
+    items.push({ c, dot: "#416CAD", why: "صفقة متوقفة" + (ins.loss_cause ? " · " + ins.loss_cause : ""),
       act: ins.fix_suggestion || "", href: "customer/" + c.phone }); });
 
   const anyAct = items.some((i) => i.act);
   let h = '<div class="card rise' + (anyAct ? "" : " noact") + '" style="margin-bottom:18px;padding-bottom:0;overflow:hidden;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:12px;">' +
     '<div><h3 style="margin:0;">ما يستحق المتابعة الآن</h3>' +
-    '<div style="font-size:11.5px;color:#999999;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
+    '<div style="font-size:12px;color:#536170;margin-top:4px;">قائمة الصباح الوحيدة — مرتَّبة بالأكثر إلحاحًا، وكل سطر يذكر سببه.</div></div>' +
     '<span style="display:inline-flex;gap:6px;align-items:center;">' +
     (items.length ? '<span class="cntpill">' + fmtN(items.length) + " إجراء</span>" : "") + testToggleChip(nTest) + "</span></div>";
   // What the queue is a TOP-OF, stated. Four idle + four fresh + two stalled is a shortlist; the
   // page must not let a shortlist read as a total.
   const pool = hotIdle.length + fresh.length + stalled.length + (seenNoReply.size ? 1 : 0);
   if (!items.length) {
-    h += '<div style="padding:26px 2px 30px;font-size:12.5px;color:#7C7C7C;line-height:1.9;border-top:1px solid #EDEDED;">' +
+    h += '<div style="padding:26px 2px 30px;font-size:12px;color:#536170;line-height:1.9;border-top:1px solid #E3E9F1;">' +
       "لا شيء يستحق التدخل الآن. حين يرصد المساعد فرصة مؤهلة أو محادثة تتوقف، يظهر السطر هنا فورًا — ويصلك تنبيه واتساب.</div>";
   } else {
     h += items.map(function (it) {
@@ -2780,7 +2987,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
       return '<div class="aq" onclick="location.hash=&quot;' + it.href + '&quot;">' +
         '<span class="aqd" style="background:' + it.dot + ';"></span>' +
         (c ? '<span class="aqav">' + esc((c.waName || "؟").trim().charAt(0)) + "</span>"
-           : '<span class="aqav aqic">' + ic(it.icon, 16, "#7C7C7C") + "</span>") +
+           : '<span class="aqav aqic">' + ic(it.icon, 16, "#536170") + "</span>") +
         '<span class="aqt"><span class="aqn">' + esc(nm) +
           (tg ? '<span class="chip ' + (tg.level === "hot" ? "c-bad" : "c-warn") + '">' + esc(clip(tg.product, 26)) +
             (tg.level === "hot" ? " · نية مرتفعة" : " · مهتم") + "</span>" : "") +
@@ -2791,14 +2998,14 @@ function vActionQueue(cs, notifyNumber, nTest) {
     }).join("");
   }
   if (pool > items.length) {
-    h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid #EDEDED;font-size:12.5px;color:#7C7C7C;">' +
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid #E3E9F1;font-size:12px;color:#536170;">' +
       '<span>أهمّ ' + fmtN(items.length) + " من " + fmtN(pool) + " تستحق المتابعة.</span>" +
-      '<a href="#opps" style="color:#1F7A73;font-weight:500;text-decoration:none;">لوحة الفرز الكاملة ←</a></div>';
+      '<a href="#opps" style="color:#306DB5;font-weight:500;text-decoration:none;">لوحة الفرز الكاملة ←</a></div>';
   }
   if (notifyNumber) {
-    h += '<div style="display:flex;align-items:center;gap:8px;padding:11px 2px;border-top:1px solid #EDEDED;font-size:11.5px;color:#7C7C7C;">' +
-      ic("send", 14, "#999999") + '<span>تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج</span>' +
-      '<b style="color:#525252;font-weight:500;direction:ltr;">+' + esc(notifyNumber) + "</b></div>";
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:11px 2px;border-top:1px solid #E3E9F1;font-size:12px;color:#536170;">' +
+      ic("send", 14, "#A9B4C0") + '<span>تنبيهات «عميل جاد» و«طلب تدخّل» تصل واتساب مدير المنتج</span>' +
+      '<b style="color:#3A3A3A;font-weight:500;direction:ltr;">+' + esc(notifyNumber) + "</b></div>";
   }
   return h + "</div>";
 }
@@ -2811,37 +3018,37 @@ function vWinLoss() {
     '<h3 style="margin:0;">كيف صُنّفت المحادثات؟</h3>' +
     '<div style="display:flex;gap:7px;flex-wrap:wrap;">' +
     ["won", "lost", "stalled", "active"].map((k) => '<span class="chip" title="' + DEAL_META[k][3] + '" style="background:' + DEAL_META[k][2] + ';color:' + DEAL_META[k][1] + ';">' + DEAL_META[k][0] + " " + fmtN(t[k] || 0) + "</span>").join("") + "</div></div>" +
-    '<div style="font-size:12px;color:#7C7C7C;margin-top:6px;line-height:1.8;">يحلّل المساعد كل محادثة بناءً على محتواها الفعلي، ويوضّح سبب التصنيف والأدلة الداعمة.</div>';
+    '<div style="font-size:12px;color:#536170;margin-top:6px;line-height:1.8;">يحلّل المساعد كل محادثة بناءً على محتواها الفعلي، ويوضّح سبب التصنيف والأدلة الداعمة.</div>';
   if (!judged && !(t.active || 0)) {
-    h += '<div style="font-size:12.5px;color:#7C7C7C;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثة مصنَّفة — وكل محادثة محققة أو غير مكتسبة ستظهر هنا بسبب تصنيفها.</div></div>';
+    h += '<div style="font-size:12px;color:#536170;margin-top:14px;line-height:1.9;">يتعبأ هذا اللوح مع أول محادثة مصنَّفة — وكل محادثة محققة أو غير مكتسبة ستظهر هنا بسبب تصنيفها.</div></div>';
     return h;
   }
   const nWin = (winloss.win_drivers || []).length, nLoss = (winloss.loss_causes || []).length;
   const cnt = (k) => (k > 1 ? '<span class="chip">×' + fmtN(k) + "</span>" : "");
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:16px;">';
   if (nWin) {
-    h += '<div><div style="font-size:11.5px;font-weight:500;color:#027A48;margin-bottom:9px;">عوامل ساعدت على التقدّم</div>' +
-      winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid #EDEDED;"><span style="flex:1;font-size:12.5px;color:#171717;line-height:1.8;">' + esc(w.driver) + "</span>" + cnt(w.count) + "</div>").join("") + "</div>";
+    h += '<div><div style="font-size:12px;font-weight:500;color:#12633F;margin-bottom:9px;">عوامل ساعدت على التقدّم</div>' +
+      winloss.win_drivers.map((w) => '<div style="display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid #E3E9F1;"><span style="flex:1;font-size:12px;color:#212529;line-height:1.8;">' + esc(w.driver) + "</span>" + cnt(w.count) + "</div>").join("") + "</div>";
   }
   if (nLoss) {
-    h += '<div><div style="font-size:11.5px;font-weight:500;color:#B42318;margin-bottom:9px;">أسباب التوقّف أو عدم الاكتساب</div>' +
-      winloss.loss_causes.map((c) => '<div style="padding:9px 0;border-top:1px solid #EDEDED;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12.5px;font-weight:500;color:#171717;">' + esc(c.cause) + "</span>" + (c.products || []).map((pd) => '<span class="chip">' + esc(clip(pd, 22)) + "</span>").join("") + cnt(c.count) + "</div>" +
-        (c.example ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("") + "</div>";
+    h += '<div><div style="font-size:12px;font-weight:500;color:#8E2A27;margin-bottom:9px;">أسباب التوقّف أو عدم الاكتساب</div>' +
+      winloss.loss_causes.map((c) => '<div style="padding:9px 0;border-top:1px solid #E3E9F1;"><div style="display:flex;align-items:center;gap:9px;"><span style="flex:1;font-size:12px;font-weight:500;color:#212529;">' + esc(c.cause) + "</span>" + (c.products || []).map((pd) => '<span class="chip">' + esc(clip(pd, 22)) + "</span>").join("") + cnt(c.count) + "</div>" +
+        (c.example ? '<div style="font-size:12px;color:#536170;margin-top:4px;line-height:1.8;">« ' + esc(c.example) + ' »</div>' : "") + "</div>").join("") + "</div>";
   }
   h += "</div>";
   if (!nWin || !nLoss) {
-    h += '<div style="font-size:12px;color:#999999;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #EDEDED;" : "10px;") + '">' +
+    h += '<div style="font-size:12px;color:#536170;margin-top:' + (nWin || nLoss ? "14px;padding-top:12px;border-top:1px solid #E3E9F1;" : "10px;") + '">' +
       (!nWin && !nLoss ? "لا عوامل مصنَّفة بعد على أي من الجانبين."
         : !nLoss ? "لا أسباب توقّف مصنَّفة بعد — وهذا خبر جيد." : "لا عوامل تقدّم مصنَّفة بعد.") + "</div>";
   }
   // a bordered block that renders nothing is still a border: decide from the filtered rows, not the raw list
   const judgedProducts = (winloss.by_product || []).filter((pr) => (pr.won || 0) + (pr.lost || 0) > 0).slice(0, 4);
   if (judgedProducts.length) {
-    h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #EDEDED;">' +
+    h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid #E3E9F1;">' +
       judgedProducts.map((pr) => '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px;">' +
-        '<span style="flex:1;min-width:0;color:#383838;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
-        '<span style="color:#027A48;">' + fmtN(pr.won) + ' محققة</span><span style="color:#C7C7C7;">·</span>'  +
-        '<span style="color:#B42318;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
+        '<span style="flex:1;min-width:0;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(pr.product) + "</span>" +
+        '<span style="color:#12633F;">' + fmtN(pr.won) + ' محققة</span><span style="color:#536170;">·</span>'  +
+        '<span style="color:#8E2A27;">' + fmtN(pr.lost) + " غير مكتسبة</span></div>").join("") + "</div>";
   }
   h += "</div>";
   return h;
@@ -2880,11 +3087,11 @@ function vSignalBoard(d) {
   if (!s) return "";
   const ins = d.insights || {};
   // ink, wash — the band's own two colours, so the meter, the number and the word agree.
-  const BAND = { ready: ["#027A48", "#ECFDF3"], serious: ["#1F7A73", "#EAF6F5"], watch: ["#B54708", "#FFFAEB"], cold: ["#7C7C7C", "#F3F3F3"] };
+  const BAND = { ready: ["#12633F", "#E4F5EC"], serious: ["#306DB5", "#EAF6F5"], watch: ["#7A5600", "#FFF5D6"], cold: ["#536170", "#EDF1F7"] };
   const bd = BAND[s.band] || BAND.cold;
   // A mark first and a colour second — «يتصاعد» must survive a greyscale print and a colour-blind
   // reader, which a bare green dot does not.
-  const MOVE = { rising: ["▲", "#027A48"], steady: ["■", "#7C7C7C"], cooling: ["▼", "#B54708"], silent: ["○", "#B42318"], none: ["·", "#C7C7C7"] };
+  const MOVE = { rising: ["▲", "#12633F"], steady: ["■", "#536170"], cooling: ["▼", "#7A5600"], silent: ["○", "#8E2A27"], none: ["·", "#A9B4C0"] };
   const mv = MOVE[s.momentum] || MOVE.none;
 
   // THE METER — ten blocks, not a percentage bar. A continuous bar invites reading 62 against 58
@@ -2892,22 +3099,22 @@ function vSignalBoard(d) {
   let meter = "";
   for (let i = 0; i < 10; i++) {
     meter += '<span style="flex:1;height:8px;border-radius:2px;background:' +
-      (i * 10 < s.score ? bd[0] : "#EDEDED") + ';"></span>';
+      (i * 10 < s.score ? bd[0] : "#E3E9F1") + ';"></span>';
   }
 
   const stat = (label, value, ink) =>
-    '<div style="min-width:96px;"><div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">' + label + "</div>" +
-    '<div style="font-size:14px;font-weight:700;margin-top:3px;color:' + (ink || "#171717") + ';">' + value + "</div></div>";
+    '<div style="min-width:96px;"><div style="font-size:12px;font-weight:600;color:#536170;letter-spacing:0;">' + label + "</div>" +
+    '<div style="font-size:14px;font-weight:600;margin-top:3px;color:' + (ink || "#212529") + ';">' + value + "</div></div>";
 
   // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
   // answer, and arAgo already owns that agreement for the whole portal.
   const speed = s.replyMinutes === null || s.replyMinutes === undefined
-    ? '<span style="color:#999999;font-weight:500;">لم يردّ بعد</span>'
+    ? '<span style="color:#536170;font-weight:500;">لم يردّ بعد</span>'
     : (s.replyMinutes < 1 ? "أقل من دقيقة"
       : s.replyMinutes < 60 ? fmtN(s.replyMinutes) + (s.replyMinutes === 1 ? " دقيقة" : s.replyMinutes === 2 ? " دقيقتين" : s.replyMinutes <= 10 ? " دقائق" : " دقيقة")
       : arAgo(Math.round(s.replyMinutes / 60)));
   const silent = s.daysSilent === null || s.daysSilent === undefined
-    ? '<span style="color:#999999;font-weight:500;">—</span>'
+    ? '<span style="color:#536170;font-weight:500;">—</span>'
     : (s.daysSilent === 0 ? "اليوم" : s.daysSilent === 1 ? "أمس" : fmtN(s.daysSilent) + (s.daysSilent === 2 ? " يومين" : s.daysSilent <= 10 ? " أيام" : " يومًا"));
 
   // THE CHART — 21 days of who spoke. Bars are stacked so one column is one day's total: two
@@ -2927,46 +3134,46 @@ function vSignalBoard(d) {
     const hi = Math.round((inb / peak) * H), ho = Math.round((outb / peak) * H);
     const title = fmtD(a.day) + " · منه " + fmtN(inb) + " · منّا " + fmtN(outb);
     bars += '<span title="' + esc(title) + '" style="flex:1;min-width:4px;display:flex;flex-direction:column;justify-content:flex-end;height:' + fmtN2(H) + 'px;">' +
-      (inb ? '<span style="display:block;height:' + fmtN2(Math.max(hi, 3)) + 'px;background:#1F7A73;border-radius:2px 2px 0 0;"></span>' : "") +
-      (outb ? '<span style="display:block;height:' + fmtN2(Math.max(ho, 2)) + 'px;background:#DCDCDC;border-radius:' + (inb ? "0" : "2px 2px 0 0") + ';"></span>' : "") +
-      (!inb && !outb ? '<span style="display:block;height:2px;background:#F3F3F3;border-radius:2px;"></span>' : "") + "</span>";
+      (inb ? '<span style="display:block;height:' + fmtN2(Math.max(hi, 3)) + 'px;background:#306DB5;border-radius:2px 2px 0 0;"></span>' : "") +
+      (outb ? '<span style="display:block;height:' + fmtN2(Math.max(ho, 2)) + 'px;background:#CBD7E4;border-radius:' + (inb ? "0" : "2px 2px 0 0") + ';"></span>' : "") +
+      (!inb && !outb ? '<span style="display:block;height:2px;background:#EDF1F7;border-radius:2px;"></span>' : "") + "</span>";
   });
 
   // «لماذا هذه القراءة» — native disclosure, closed by default. The itemisation is what makes the
   // number arguable, and a number nobody can argue with is decoration.
   const why = (s.factors || []).length
-    ? '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:11.5px;color:#2E7D77;font-weight:700;list-style:none;">لماذا هذه القراءة؟</summary>' +
+    ? '<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:12px;color:#306DB5;font-weight:600;list-style:none;">لماذا هذه القراءة؟</summary>' +
       '<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
       s.factors.map((f) =>
         '<div style="display:flex;gap:9px;align-items:baseline;font-size:12px;line-height:1.8;">' +
-        '<span style="font-weight:700;min-width:34px;color:' + (f.points < 0 ? "#B42318" : f.points > 0 ? "#027A48" : "#7C7C7C") + ';">' +
+        '<span style="font-weight:600;min-width:34px;color:' + (f.points < 0 ? "#8E2A27" : f.points > 0 ? "#12633F" : "#536170") + ';">' +
         (f.points === 0 ? "·" : (f.points < 0 ? "−" : "+") + fmtN(Math.abs(f.points))) + "</span>" +
-        '<span style="color:#171717;font-weight:600;min-width:96px;">' + esc(f.label) + "</span>" +
-        '<span style="color:#525252;flex:1;min-width:140px;">' + esc(f.evidence) + "</span></div>").join("") +
+        '<span style="color:#212529;font-weight:600;min-width:96px;">' + esc(f.label) + "</span>" +
+        '<span style="color:#3A3A3A;flex:1;min-width:140px;">' + esc(f.evidence) + "</span></div>").join("") +
       "</div></details>"
     : "";
 
   // THE ONE MODEL OUTPUT ON THIS CARD, named as a suggestion and carrying the same heading as the
   // full block inside فهم المساعد — the same claim in its summary position, never a second claim.
   const next = hasWords(ins.next_action)
-    ? '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:11px 14px;">' +
-      '<div style="font-size:10.5px;font-weight:700;color:#2E7D77;margin-bottom:4px;">اقتراح المساعد للخطوة التالية</div>' +
-      '<div style="font-size:13.5px;font-weight:700;color:#171717;line-height:1.85;">' + esc(ins.next_action) + "</div></div>"
+    ? '<div style="margin-top:14px;background:#fff;border:1px solid #DDEAF3;border-inline-start:3px solid #306DB5;border-radius:11px;padding:11px 14px;">' +
+      '<div style="font-size:12px;font-weight:600;color:#306DB5;margin-bottom:4px;">اقتراح المساعد للخطوة التالية</div>' +
+      '<div style="font-size:14px;font-weight:600;color:#212529;line-height:1.85;">' + esc(ins.next_action) + "</div></div>"
     : "";
 
   return '<div class="card" style="margin:2px 0 14px;">' +
     '<div style="display:flex;align-items:center;gap:8px;">' +
-    '<h3 style="margin:0;font-size:15px;font-weight:600;color:#171717;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#1F7A73") + "مؤشرات المحادثة</h3>" +
-    '<span style="font-size:11px;color:#999999;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
+    '<h3 style="margin:0;font-size:14px;font-weight:600;color:#212529;display:flex;align-items:center;gap:8px;">' + ic("spark", 18, "#306DB5") + "مؤشرات المحادثة</h3>" +
+    '<span style="font-size:12px;color:#536170;">محسوبة من السجل — لا من قراءة نموذج</span></div>' +
     '<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px;">' +
     // 1 — the meter
     '<div style="min-width:200px;flex:1;">' +
-    '<div style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">الجدية</div>' +
+    '<div style="font-size:12px;font-weight:600;color:#536170;letter-spacing:0;">الجدية</div>' +
     '<div style="display:flex;align-items:baseline;gap:9px;margin-top:2px;">' +
-    '<span style="font-size:30px;font-weight:700;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
+    '<span style="font-size:28px;font-weight:600;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
     '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
     '<div style="display:flex;gap:3px;margin-top:10px;max-width:230px;">' + meter + "</div>" +
-    '<div style="font-size:10.5px;color:#C7C7C7;margin-top:5px;">من ١٠٠</div></div>' +
+    '<div style="font-size:12px;color:#536170;margin-top:5px;">من ١٠٠</div></div>' +
     // 2 — the three measured stats
     '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">' +
     stat("الزخم", '<span style="color:' + mv[1] + ';">' + mv[0] + "</span> " + esc(s.momentumLabel), null) +
@@ -2977,18 +3184,18 @@ function vSignalBoard(d) {
     // 3 — the chart
     '<div style="margin-top:18px;">' +
     '<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;">' +
-    '<span style="font-size:10.5px;font-weight:700;color:#7C7C7C;letter-spacing:0;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
-    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#1F7A73;margin-inline-end:5px;"></span>رسائله</span>' +
-    '<span style="font-size:11px;color:#7C7C7C;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#DCDCDC;margin-inline-end:5px;"></span>رسائلنا</span></div>' +
+    '<span style="font-size:12px;font-weight:600;color:#536170;letter-spacing:0;">النشاط · ' + esc(arDaysUi(act.length)) + "</span>" +
+    '<span style="font-size:12px;color:#536170;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#306DB5;margin-inline-end:5px;"></span>رسائله</span>' +
+    '<span style="font-size:12px;color:#536170;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#CBD7E4;margin-inline-end:5px;"></span>رسائلنا</span></div>' +
     // No direction override: the portal's other time chart runs oldest at the START edge and today
     // at the END, which in this RTL page means right to left. Two time axes pointing opposite ways
     // on one product is a reading error waiting to happen.
     (total
       ? '<div style="display:flex;align-items:flex-end;gap:3px;margin-top:10px;">' + bars + "</div>" +
-        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10.5px;color:#C7C7C7;">' +
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:#536170;">' +
         '<span>' + esc(act.length ? fmtD(act[0].day) : "") + "</span><span>" +
         esc(act.length ? fmtD(act[act.length - 1].day) : "") + "</span></div>"
-      : '<div style="font-size:12px;color:#999999;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
+      : '<div style="font-size:12px;color:#536170;margin-top:10px;">لا رسائل خلال آخر ' + esc(arDaysUi(act.length)) + ".</div>") +
     "</div>" +
     next + why + "</div>";
 }
@@ -3009,7 +3216,7 @@ function tlDot(kind) {
   // ochre and the retired gold — which taught the reader that colour meant something. It did not:
   // the kind is already written next to the dot. Teal now marks the only turn that is the
   // customer's own words; everything we did sits on the neutral ramp, ordered by weight.
-  return { in: "#1F7A73", out: "#7C7C7C", camp: "#999999", file: "#999999", tag: "#999999", st: "#C7C7C7", sys: "#E2E2E2" }[kind] || "#E2E2E2";
+  return { in: "#306DB5", out: "#536170", camp: "#A9B4C0", file: "#A9B4C0", tag: "#A9B4C0", st: "#A9B4C0", sys: "#CBD7E4" }[kind] || "#CBD7E4";
 }
 // ---------------------------------------------------------------------------
 // ملف العميل — the enrichable client record (cycle crm-record; design plan §3/§4).
@@ -3190,7 +3397,7 @@ function propEditorHtml(key, val, err) {
     const cur = (((profileData || {}).contact || {}).props || {}).nextStep;
     const dv = propEdit && propEdit.due !== undefined ? propEdit.due : (cur && cur.due ? isoDay(cur.due) : "");
     h += '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">' +
-      '<label for="propdue" style="font-size:11.5px;color:#7C7C7C;font-weight:600;">التاريخ (اختياري)</label>' +
+      '<label for="propdue" style="font-size:12px;color:#536170;font-weight:600;">التاريخ (اختياري)</label>' +
       '<input id="propdue" type="date" class="inp" style="padding:8px 10px;direction:ltr;" value="' + esc(dv) + '">' +
       (dv ? '<button class="btn btn-ghost mini" onclick="propClearDue()">امسح التاريخ</button>' : "") + "</div>";
   }
@@ -3207,7 +3414,7 @@ function propRow(o) {
   const open = propEdit && propEdit.key === o.key;
   const reading = st === "reading" && !open;
   let body = '<div class="flab">' + o.label +
-    (o.suffix ? ' <span style="color:#999999;font-weight:450;">' + o.suffix + "</span>" : "") + "</div>";
+    (o.suffix ? ' <span style="color:#536170;font-weight:450;">' + o.suffix + "</span>" : "") + "</div>";
   if (open) {
     body += propEditorHtml(o.key, propEdit.val, propEdit.err);
   } else if (st === "missing") {
@@ -3224,7 +3431,7 @@ function propRow(o) {
     }
     // A refused agent reading is a PASSIVE line, never a competing value: the fact keeps the row.
     if (o.contested) {
-      body += '<div class="quote" style="color:#B54708;">قراءة مختلفة من المساعد: «' + esc(o.contested.value) + "»</div>" +
+      body += '<div class="quote" style="color:#7A5600;">قراءة مختلفة من المساعد: «' + esc(o.contested.value) + "»</div>" +
         (o.writable ? '<div class="cbar"><button class="btn btn-ghost mini" data-k="' + o.key + '" data-use="c" onclick="propConfirm(this)">اعتمدها</button>' +
           '<button class="btn btn-ghost mini" data-k="' + o.key + '" onclick="propConfirm(this)">تجاهل</button></div>' : "");
     }
@@ -3278,11 +3485,11 @@ function vAccountPanel(d) {
       ? '<span class="chip c-teal">نطاق التكامل مكتمل</span>'
       : '<span class="chip c-warn">يعرف ' + fmtN(known) + " من " + fmtN(ACC_LADDER.length) + " من نطاق التكامل</span>") +
     "</div>" +
-    '<div style="font-size:11.5px;color:#7C7C7C;margin:6px 0 4px;line-height:1.8;">' +
+    '<div style="font-size:12px;color:#536170;margin:6px 0 4px;line-height:1.8;">' +
     "ما يظهر هنا يعرفه المساعد ولا يسأل عنه. وما هو ناقص هو وحده ما يجوز أن يسأل عنه." + "</div>";
   if (!e) {
     return h + '<div class="fval-m">لا سجل جهة لهذا الرقم بعد، فلا يستطيع المساعد حفظ ما يقوله العميل عن نظامه. ' +
-      '<a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
+      '<a href="#customers" style="color:#306DB5;font-weight:600;">→ جهات الاستهداف</a></div></div>';
   }
   h += '<div class="plgnd"><span class="i">' + pmSpan("h", "margin:0") + "بخط الفريق</span>" +
     '<span class="i">' + pmSpan("i", "margin:0") + "مستورد</span>" +
@@ -3296,7 +3503,7 @@ function vAccountPanel(d) {
     else body += '<div class="fval' + (v.source === "human" ? "" : " fval-a") + '">' + esc(v.value) + "</div>" +
       '<div class="sig">' + accSig(v) + "</div>" +
       (v.contested
-        ? '<div class="quote" style="color:#B54708;">قراءة مختلفة من المساعد: «' + esc(v.contested.value) + "»</div>"
+        ? '<div class="quote" style="color:#7A5600;">قراءة مختلفة من المساعد: «' + esc(v.contested.value) + "»</div>"
         : "");
     h += '<div class="frow">' + pmSpan(mark, "") + '<div class="fbody">' + body + "</div></div>";
   });
@@ -3319,7 +3526,7 @@ function vFactsPanel(d) {
     // rows agree now without pretending an un-excluded customer is a gap.
     (gaps ? '<span class="chip c-warn">ناقص ' + fmtN(gaps) + " من " + fmtN(GAP_KEYS.length) + " حقول أساسية</span>"
           : '<span class="chip c-teal">الحقول الأساسية مكتملة</span>') + "</div>" +
-    '<div style="font-size:11.5px;color:#7C7C7C;margin:6px 0 4px;line-height:1.8;">ما تكتبه هنا لا يستطيع المساعد تغييره.</div>' +
+    '<div style="font-size:12px;color:#536170;margin:6px 0 4px;line-height:1.8;">ما تكتبه هنا لا يستطيع المساعد تغييره.</div>' +
     '<div class="plgnd"><span class="i">' + pmSpan("h", "margin:0") + "بخط الفريق</span>" +
     '<span class="i">' + pmSpan("a", "margin:0") + "قراءة المساعد</span>" +
     '<span class="i">' + pmSpan("i", "margin:0") + "مستورد</span>" +
@@ -3397,12 +3604,12 @@ function vFactsPanel(d) {
   // would put a time nobody typed under a human's name. The agent's reading keeps its own
   // «قراءتنا: … · لم تُؤكَّد بعد» treatment, unchanged, including the hour it actually parsed.
   const parsed = !ap4
-    ? (s4.state === "reading" ? '<div class="quote" style="color:#B54708;">قراءتنا لم تُؤكَّد بعد.</div>' : "")
+    ? (s4.state === "reading" ? '<div class="quote" style="color:#7A5600;">قراءتنا لم تُؤكَّد بعد.</div>' : "")
     : ap4.confirmed
       ? '<div style="display:flex;gap:8px;align-items:flex-start;margin-top:5px;">' + pmSpan("h", "margin-top:5px") +
-        '<div style="margin:0;font-size:12.5px;font-weight:700;color:#171717;">الموعد: ' + esc(fmtDay(ap4.at)) +
+        '<div style="margin:0;font-size:12px;font-weight:600;color:#212529;">الموعد: ' + esc(fmtDay(ap4.at)) +
         (ap4.by ? " · سجّله " + esc(ap4.by) : "") + "</div></div>"
-      : '<div class="quote" style="color:#B54708;">قراءتنا: ' + fmtD(ap4.at) + " " + fmtT(ap4.at) + " · لم تُؤكَّد بعد</div>";
+      : '<div class="quote" style="color:#7A5600;">قراءتنا: ' + fmtD(ap4.at) + " " + fmtT(ap4.at) + " · لم تُؤكَّد بعد</div>";
   h += propRow({ key: "nextStep", label: "الخطوة التالية", state: s4.state, writable: w,
     html: '<div class="fval' + (s4.state === "fact" ? "" : " fval-a") + '">' + esc(p4 ? p4.value : (c.scheduledSaid || "")) + "</div>",
     support: said + parsed, sig: p4 ? propSig(p4) : "",
@@ -3435,17 +3642,17 @@ function vCustomer(ph) {
   if (profileData.failed) {
     return '<div class="empty"><div class="ic"><span></span></div><div class="t">تعذّر فتح ملف العميل</div>' +
       '<div class="s">استجابة الخادم: ' + esc(String(profileData.status)) + '. ' +
-      '<a href="javascript:void(0)" onclick="reloadProfile()" style="color:#2E7D77;font-weight:700;">إعادة المحاولة</a></div></div>';
+      '<a href="javascript:void(0)" onclick="reloadProfile()" style="color:#306DB5;font-weight:600;">إعادة المحاولة</a></div></div>';
   }
   if (profileData.missing) {
-    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2E7D77;font-weight:700;">→ جهات الاستهداف</a></div></div>';
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#306DB5;font-weight:600;">→ جهات الاستهداف</a></div></div>';
   }
   // «d.context» is NOT read here any more (design plan §5): contextScore is a 0-100 invented
   // score over fields we happen to hold, and it read FULL on a contact whose only sentence was
   // «ماني مهتم». ملف العميل replaces it with a count of named gaps that an operator can close.
   const d = profileData; const c = d.contact; const ins = d.insights || {};
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
-  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12.5px;font-weight:700;color:#171717;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
+  let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12px;font-weight:600;color:#212529;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
     // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
@@ -3454,17 +3661,17 @@ function vCustomer(ph) {
        which the conversation slide-over then covered entirely. */
     '<div style="flex:1;min-width:0;">' +
     '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
-    '<div style="font-size:18px;font-weight:600;color:#171717;">' + esc(nm) + "</div>" +
+    '<div style="font-size:18px;font-weight:600;color:#212529;">' + esc(nm) + "</div>" +
     (function () {
       // ONE vocabulary. This pill held its own private outcome table, so a contact who had replied
       // but carried no recorded outcome read «جديد» here and «متجاوب» on the list — two words for
       // one person on two screens. It reads the ladder now, like every other surface.
       const sg = stageOf(c);
       const since = stageSince(c);
-      return '<span class="chip" style="font-size:12.5px;padding:4px 10px;" title="' + esc(sg.hint) + '">' +
+      return '<span class="chip" style="font-size:12px;padding:4px 10px;" title="' + esc(sg.hint) + '">' +
         '<span style="width:7px;height:7px;border-radius:999px;flex:none;background:' + sg.dot + ';"></span>' +
         sg.label + "</span>" +
-        (since ? '<span style="font-size:12px;color:#999999;">منذ ' + fmtAgo(Date.now() - since) + "</span>" : "");
+        (since ? '<span style="font-size:12px;color:#536170;">منذ ' + fmtAgo(Date.now() - since) + "</span>" : "");
     })() +
     (c.test ? ' <span class="chip">تجريبي</span>' : "") +
     (c.human ? ' <span class="chip c-warn">بيد البشر</span>' : "") + "</div>" +
@@ -3473,10 +3680,10 @@ function vCustomer(ph) {
     // «واتساب ✓» deleted: every contact on this screen arrived by WhatsApp, so the chip carries no
     // information. Designer's call.
     "</div>" +
-    '<div style="font-size:12px;color:#7C7C7C;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
+    '<div style="font-size:12px;color:#536170;margin-top:8px;direction:ltr;text-align:right;">+' + esc(c.phone) + "</div>" +
     // «أول ظهور» deleted — it never changed a decision. Last activity stays: it tells you whether
     // this person is warm right now.
-    '<div style="font-size:11px;color:#999999;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
+    '<div style="font-size:12px;color:#536170;margin-top:4px;">آخر نشاط: ' + fmtT(c.lastEventAt) + "</div>" +
     // PROVENANCE, not analytics. These used to be a row of identical blue chips in arbitrary
     // order, so the founder could not say which campaign started the conversation in front of him.
     // The payload now arrives newest-first with launch times: the most recent is stated as a
@@ -3495,16 +3702,16 @@ function vCustomer(ph) {
       // ONE campaign is named. Everything else is a COUNT, so the line cannot grow — it read as a
       // comma-joined wall of 20+ names on any contact used for testing.
       const others = (scoped ? cps.length : real.length) - 1;
-      return '<div style="margin-top:10px;font-size:12.5px;color:#525252;line-height:1.7;">' +
+      return '<div style="margin-top:10px;font-size:12px;color:#3A3A3A;line-height:1.7;">' +
         (scoped ? "مقصور على حملة: " : "بدأت هذه المحادثة من: ") +
-        '<a href="#customer/' + esc(c.phone) + "/" + first.id + '" style="color:#2E7D77;font-weight:700;text-decoration:none;">' +
+        '<a href="#customer/' + esc(c.phone) + "/" + first.id + '" style="color:#306DB5;font-weight:600;text-decoration:none;">' +
         esc(String(first.name).slice(0, 40)) + "</a>" +
-        (known ? ' <span style="color:#999999;">· ' + esc(when) + "</span>"
-               : ' <span style="color:#999999;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
-        (others > 0 ? ' <span style="color:#999999;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
-        (testN > 0 && showTest ? ' <span style="color:#999999;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
-        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#999999;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
-        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:11.5px;color:#999999;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
+        (known ? ' <span style="color:#536170;">· ' + esc(when) + "</span>"
+               : ' <span style="color:#536170;">· وقت الإطلاق غير مقروء، فلا تُنسب أرقام لهذه الحملة</span>') +
+        (others > 0 ? ' <span style="color:#536170;">· وسبقتها ' + fmtN(others) + " حملة</span>" : "") +
+        (testN > 0 && showTest ? ' <span style="color:#536170;">(+' + fmtN(testN) + " تجريبية)</span>" : "") +
+        (scoped ? ' <a href="#customer/' + esc(c.phone) + '" style="color:#536170;text-decoration:underline;">عرض كل التاريخ</a>' : "") +
+        (!real.length && cps.length ? '<div style="margin-top:5px;font-size:12px;color:#536170;">لا حملة فعلية بعد — الحملات التجريبية مخفية.</div>' : "") +
         "</div>";
     })() : "") +
     "</div></div>" +
@@ -3522,7 +3729,7 @@ function vCustomer(ph) {
       const turn = it.lastSpeaker === "agent" ? "الدور على العميل" : it.lastSpeaker === "customer" ? "الدور على المساعد" : "";
       // «آخر كلام منه» is DELETED from this line: مؤشرات المحادثة states it below under its own
       // label, and one figure printed twice on a screen reads as two measurements that agree.
-      return turn ? '<div style="font-size:11.5px;color:#999999;margin-top:6px;">' + turn + "</div>" : "";
+      return turn ? '<div style="font-size:12px;color:#536170;margin-top:6px;">' + turn + "</div>" : "";
     })() +
     "</div></div>";
   // Was matching «نتيجة موثقة يدويًا» — a string NOTHING writes, so the current-state highlight
@@ -3546,36 +3753,36 @@ function vCustomer(ph) {
   // product_interest inference — the row carried more truth than the record it opened.
   h += (function () {
     const OUT = {
-      scheduled: ["موعد محدد", "#027A48", "#ECFDF3"],
-      interested: ["مهتم", "#2F5F94", "#EFF6FF"],
-      later: ["مؤجل", "#B54708", "#FFFAEB"],
-      stopped: ["لا يرغب في التواصل", "#B42318", "#FEF3F2"],
-      not_interested: ["لا يرغب في التواصل", "#B42318", "#FEF3F2"],
-      handoff: ["بانتظار المختص", "#B54708", "#FFFAEB"],
-      opted_out: ["أوقف الرسائل", "#B42318", "#FEF3F2"],
-      closed: ["مغلق", "#7C7C7C", "#F3F3F3"],
+      scheduled: ["موعد محدد", "#12633F", "#E4F5EC"],
+      interested: ["مهتم", "#416CAD", "#EFF6FF"],
+      later: ["مؤجل", "#7A5600", "#FFF5D6"],
+      stopped: ["لا يرغب في التواصل", "#8E2A27", "#FBE7E6"],
+      not_interested: ["لا يرغب في التواصل", "#8E2A27", "#FBE7E6"],
+      handoff: ["بانتظار المختص", "#7A5600", "#FFF5D6"],
+      opted_out: ["أوقف الرسائل", "#8E2A27", "#FBE7E6"],
+      closed: ["مغلق", "#536170", "#EDF1F7"],
     };
     const o = OUT[c.outcome] || null;
-    const ink = o ? o[1] : "#7C7C7C", bg = o ? o[2] : "#F8F8F8";
+    const ink = o ? o[1] : "#536170", bg = o ? o[2] : "#F4F6F9";
     const row = (label, body) =>
       '<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-top:9px;">' +
-      '<span style="font-size:11px;font-weight:700;letter-spacing:0;color:#7C7C7C;min-width:92px;">' + label + "</span>" +
+      '<span style="font-size:12px;font-weight:600;letter-spacing:0;color:#536170;min-width:92px;">' + label + "</span>" +
       '<span style="flex:1;min-width:180px;">' + body + "</span></div>";
 
     // 1 — OUTCOME
-    let outBody = '<span style="font-size:13px;font-weight:700;color:' + ink + ';">' + (o ? o[0] : "لم يُفرز بعد") + "</span>";
+    let outBody = '<span style="font-size:14px;font-weight:600;color:' + ink + ';">' + (o ? o[0] : "لم يُفرز بعد") + "</span>";
     if (c.outcome === "scheduled" && c.scheduledSaid) {
       // M3 — this line appended «لم تُؤكَّد بعد» UNCONDITIONALLY, so an appointment a human had
       // confirmed 200px below read as unconfirmed forever. It reads the ONE appointment now, and
       // «مؤكَّد» is a state the sentence finally has a form for.
       const ap = appt(c);
-      outBody += '<div style="font-size:13px;font-weight:700;color:#171717;margin-top:3px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
-        '<div style="font-size:11.5px;color:' + (ap && ap.confirmed ? "#027A48;font-weight:700;" : "#7C7C7C;") + '">' +
+      outBody += '<div style="font-size:14px;font-weight:600;color:#212529;margin-top:3px;">قال العميل: «' + esc(c.scheduledSaid) + "»</div>" +
+        '<div style="font-size:12px;color:' + (ap && ap.confirmed ? "#12633F;font-weight:600;" : "#536170;") + '">' +
         (!ap ? "قراءتنا: لم نتمكن من قراءة تاريخ من هذه العبارة — أكّده مع العميل."
           : ap.confirmed ? "مؤكَّد: " + esc(fmtDay(ap.at)) + (ap.by ? " · سجّله " + esc(ap.by) : "")
           : "قراءتنا: " + esc(fmtT(ap.at)) + " · لم تُؤكَّد بعد") + "</div>";
     } else if (c.outcomeEvidence) {
-      outBody += '<div style="font-size:12.5px;color:#525252;margin-top:3px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 130)) + "»</div>";
+      outBody += '<div style="font-size:12px;color:#3A3A3A;margin-top:3px;">لأنه قال: «' + esc(String(c.outcomeEvidence).slice(0, 130)) + "»</div>";
     }
 
     // 2 — INTEREST, one chip PER PRODUCT. Never averaged: two hot products are two deals, not a
@@ -3594,9 +3801,9 @@ function vCustomer(ph) {
     } else if (ins.intent && ins.intent !== "none") {
       const rd = ins.intent === "high" ? ["c-ok", "نية مرتفعة"] : ins.intent === "medium" ? ["c-warn", "اهتمام مبدئي"] : ["c-grey", "فاتر"];
       interestBody = '<span class="chip c-read ' + rd[0] + '"><span class="rd">قراءة</span>' + rd[1] + "</span>" +
-        '<div style="font-size:11.5px;color:#999999;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
+        '<div style="font-size:12px;color:#536170;margin-top:3px;">لا وسم اهتمام مؤكد بعد — هذه قراءة المساعد من نص المحادثة.</div>';
     } else {
-      interestBody = '<span style="color:#999999;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
+      interestBody = '<span style="color:#536170;font-size:12px;">لم يُسجَّل اهتمام بعد.</span>';
     }
 
     // 3 — STAGE, one chip. An unjustified reading renders visibly WEAKER than a justified one:
@@ -3609,15 +3816,15 @@ function vCustomer(ph) {
       stageBody = '<span class="chip ' + (justified ? "c-teal" : "c-grey") + '">' + esc(ins.stage) +
         "</span>" +
         (justified
-          ? '<div style="font-size:12.5px;color:#525252;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
-          : '<div style="font-size:11.5px;color:#999999;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
-            '<a href="javascript:void(0)" onclick="refreshInsights()" style="color:#2E7D77;font-weight:700;">حدّث القراءة</a></div>');
+          ? '<div style="font-size:12px;color:#3A3A3A;margin-top:3px;line-height:1.9;">' + esc(ins.stage_reason) + "</div>"
+          : '<div style="font-size:12px;color:#536170;margin-top:3px;">قراءة المساعد — بلا اقتباس يسندها بعد. ' +
+            '<a href="javascript:void(0)" onclick="refreshInsights()" style="color:#306DB5;font-weight:600;">حدّث القراءة</a></div>');
     } else {
-      stageBody = '<span style="color:#999999;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
+      stageBody = '<span style="color:#536170;font-size:12px;">لم تتحدد المرحلة بعد.</span>';
     }
 
     /* neutral surface: the tint was the last coloured band on this record (DESIGN.md §2) */
-    return '<div style="background:#fff;border:1px solid #EDEDED;border-inline-start:3px solid ' + ink +
+    return '<div style="background:#fff;border:1px solid #E3E9F1;border-inline-start:3px solid ' + ink +
       ';border-radius:10px;padding:13px 16px;margin:2px 0 14px;">' +
       row("الفرز", outBody) + row("درجة الاهتمام", interestBody) + row("مرحلة البيع", stageBody) + "</div>";
   })();
@@ -3626,15 +3833,15 @@ function vCustomer(ph) {
   /* Two groups with a real gap, not eight controls in one row. The outcome buttons are the
      operator's actual job here, so they get their own labelled cluster instead of being squeezed
      against «فتح المحادثة» with the label wedged between them. */
-  h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #EDEDED;border-radius:10px;padding:10px 14px;">' +
+  h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:2px 0 16px;align-items:center;background:#fff;border:1px solid #E3E9F1;border-radius:10px;padding:10px 14px;">' +
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
     /* «فتح المحادثة» is GONE: المحادثة is a tab on this record now, so the slide-over duplicated it
        and covered the status region while doing so. One action, one place. */
     '<button id="insbtn" class="btn btn-ghost" onclick="refreshInsights()">تحديث قراءة المساعد</button></div>' +
     '<span style="flex:1;min-width:8px;"></span>' +
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
-    '<span style="font-size:12px;color:#7C7C7C;white-space:nowrap;">سجّل النتيجة الفعلية</span>' +
-    [["meeting_booked", "اجتماع محجوز", "#027A48"], ["quote_sent", "عرض مُرسَل", "#2F5F94"], ["postponed", "مؤجل", "#B54708"], ["not_a_fit", "غير مناسب", "#7C7C7C"]]
+    '<span style="font-size:12px;color:#536170;white-space:nowrap;">سجّل النتيجة الفعلية</span>' +
+    [["meeting_booked", "اجتماع محجوز", "#12633F"], ["quote_sent", "عرض مُرسَل", "#416CAD"], ["postponed", "مؤجل", "#7A5600"], ["not_a_fit", "غير مناسب", "#536170"]]
       .map((o) => '<button class="ptab' + (activeBtn === o[0] ? " on" : "") + '" data-ph="' + esc(c.phone) + '" data-out="' + o[0] + '" onclick="setOutcome(this)">' + o[1] + "</button>").join("") + "</div></div>";
   // The 6-node sales-path rail is DELETED from the record (design-plan.md section 5): it paints
   // five stages nobody reached and a check mark nobody verified. The stage now appears exactly
@@ -3653,24 +3860,24 @@ function vCustomer(ph) {
   h += '<div class="card rise" style="margin:0;">' +
     // The intent badge is DELETED here: interest already renders in the status strip and, with
     // provenance, in ملف العميل. The hollow .pm-a mark replaces it and says what this card is.
-    '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#171717;font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#1F7A73") + "فهم المساعد</h3></div>" +
-    '<div style="font-size:11px;color:#7C7C7C;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
+    '<div style="display:flex;align-items:center;gap:8px;">' + pmSpan("a", "margin:0") + '<h3 style="margin:0;color:#212529;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;">' + ic("spark", 19, "#306DB5") + "فهم المساعد</h3></div>" +
+    '<div style="font-size:12px;color:#536170;margin-top:6px;">كل ما في هذه البطاقة قراءة، لا حقيقة مسجّلة.</div>';
   if (ins.learning) {
     // S4 — the product_interest badge row is DELETED here too. §5 deleted it from the other branch
     // only, so the third, unsourced rendering of interest survived in the state a brand-new
     // conversation actually lands in. Enumerate STATES, not just screens.
-    h += '<div style="font-size:13px;color:#525252;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
-      '<div style="font-size:11.5px;color:#7C7C7C;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
+    h += '<div style="font-size:14px;color:#3A3A3A;line-height:2;margin-top:12px;">' + esc(ins.summary) + "</div>" +
+      '<div style="font-size:12px;color:#536170;margin-top:12px;line-height:1.9;">كل رسالة جديدة تجعل القراءة أدق — كما في مرحلة «Learning…».</div>';
   } else {
-    h += '<div style="background:#fff;border:1px solid #EDEDED;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
-      '<div style="font-size:10.5px;font-weight:700;color:#1F7A73;margin-bottom:7px;">الخلاصة</div>' +
-      '<div style="font-size:14px;font-weight:700;color:#171717;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
+    h += '<div style="background:#fff;border:1px solid #E3E9F1;border-radius:13px;padding:15px 16px;margin-top:14px;">' +
+      '<div style="font-size:12px;font-weight:600;color:#306DB5;margin-bottom:7px;">الخلاصة</div>' +
+      '<div style="font-size:14px;font-weight:600;color:#212529;line-height:1.95;">' + esc(ins.summary || "") + "</div></div>";
     // DELETED (design plan §5): the 2×2 mcards grid and the product_interest badge row.
     // «القناة المفضّلة: واتساب» is a constant on a WhatsApp-only platform, and «نية الشراء»,
     // «حكم الصفقة» and the interest badges each rendered a THIRD and FOURTH time on this one
     // page — the status strip and ملف العميل already carry them, and carry them with a source.
-    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:11px;font-weight:700;color:#7C7C7C;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#383838;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
-    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#7C7C7C;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
+    if ((ins.signals || []).length) h += '<div style="margin-top:12px;"><div style="font-size:12px;font-weight:600;color:#536170;margin-bottom:6px;">إشارات الشراء</div>' + ins.signals.map((sg) => '<div style="font-size:12px;color:#212529;line-height:1.9;">« ' + esc(sg) + ' »</div>').join("") + "</div>";
+    if ((ins.objections || []).length) h += '<div style="margin-top:10px;"><div style="font-size:12px;font-weight:600;color:#536170;margin-bottom:6px;">اعتراضات</div>' + ins.objections.map((ob) => '<div style="font-size:12px;color:#8a5a2b;line-height:1.9;">· ' + esc(ob) + "</div>").join("") + "</div>";
     const dm = DEAL_META[ins.deal_state || "active"] || DEAL_META.active;
     h += '<div style="display:flex;align-items:center;gap:8px;margin-top:12px;">' +
       '<span class="chip" style="background:' + dm[2] + ';color:' + dm[1] + ';font-size:12px;padding:6px 14px;">حكم الصفقة: ' + dm[0] + "</span>" +
@@ -3681,28 +3888,28 @@ function vCustomer(ph) {
       // guillemet — which rendered as «الدليل: « » »: the assistant's proof of its own verdict was
       // one punctuation mark. A quote with no letters in it is not a quote; hasWords is the floor.
       (hasWords(ins.evidence) && String(ins.evidence).trim() !== String(c.outcomeEvidence || "").trim()
-        ? '<div style="font-size:11.5px;color:#7C7C7C;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
-      (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#B54708;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
-    h += '<div style="margin-top:14px;background:#fff;border:1px solid #B9E4E0;border-inline-start:3px solid #2E7D77;border-radius:11px;padding:13px 15px;">' +
+        ? '<div style="font-size:12px;color:#536170;margin-top:7px;line-height:1.8;">الدليل: « ' + esc(ins.evidence) + ' »</div>' : "") +
+      (ins.fix_suggestion && (ins.deal_state === "lost" || ins.deal_state === "stalled") ? '<div style="font-size:12px;color:#7A5600;margin-top:6px;line-height:1.8;font-weight:600;">ما كان سيرجّح الكسب: ' + esc(ins.fix_suggestion) + "</div>" : "");
+    h += '<div style="margin-top:14px;background:#fff;border:1px solid #DDEAF3;border-inline-start:3px solid #306DB5;border-radius:11px;padding:13px 15px;">' +
       // Renamed: two blocks called الخطوة التالية with different provenance — one a stored fact
       // in ملف العميل, one a model suggestion — is the exact confusion this cycle exists to kill.
-      '<div style="font-size:11px;font-weight:700;color:#2E7D77;margin-bottom:5px;">اقتراح المساعد للخطوة التالية</div>' +
-      '<div style="font-size:13px;font-weight:700;color:#171717;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
-      (ins.why ? '<div style="font-size:11.5px;color:#525252;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
-      (ins.best_time ? '<div style="font-size:11.5px;color:#2E7D77;font-weight:600;margin-top:7px;">وقت التواصل: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
+      '<div style="font-size:12px;font-weight:600;color:#306DB5;margin-bottom:5px;">اقتراح المساعد للخطوة التالية</div>' +
+      '<div style="font-size:14px;font-weight:600;color:#212529;line-height:1.9;">' + esc(ins.next_action || "") + "</div>" +
+      (ins.why ? '<div style="font-size:12px;color:#3A3A3A;margin-top:5px;line-height:1.9;">' + esc(ins.why) + "</div>" : "") +
+      (ins.best_time ? '<div style="font-size:12px;color:#306DB5;font-weight:600;margin-top:7px;">وقت التواصل: ' + esc(ins.best_time) + "</div>" : "") + "</div>";
   }
   h += "</div>";
   // timeline
   h += '<div class="card" style="margin:0;"><h3 style="margin:0 0 4px;">سجل التفاعل</h3>' +
-    '<div style="font-size:11px;color:#999999;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
+    '<div style="font-size:12px;color:#536170;margin-bottom:10px;">كل نقاط التماس — رسائل، حالات تسليم، وسوم، ملفات — الأحدث أولًا</div>' +
     '<div class="ms-scroll" style="max-height:430px;overflow-y:auto;">' +
     ((d.timeline || []).length ? d.timeline.map((ev) =>
       '<div style="display:flex;gap:13px;padding:11px 2px;position:relative;">' +
-      '<span style="position:absolute;inset-inline-start:5px;top:24px;bottom:-11px;width:2px;background:#EDEDED;"></span>' +
-      '<span style="width:12px;height:12px;flex:none;margin-top:5px;border-radius:999px;background:#fff;border:2.5px solid ' + tlDot(ev.kind) + ';position:relative;z-index:1;"></span>' +
-      '<div style="flex:1;min-width:0;"><div style="font-size:10.5px;font-weight:700;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
-      '<div style="font-size:12.5px;color:#171717;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
-      : '<div style="padding:20px;text-align:center;color:#999999;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
+      '<span style="position:absolute;inset-inline-start:5px;top:24px;bottom:-11px;width:2px;background:#E3E9F1;"></span>' +
+      '<span style="width:12px;height:12px;flex:none;margin-top:5px;border-radius:999px;background:#fff;border:2.5px solid ' + tlDot(ev.kind) + ';position:relative;z-index:var(--z-base);"></span>' +
+      '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:' + tlDot(ev.kind) + ';">' + esc(ev.meta || "") + " · " + fmtT(ev.ts) + " · " + fmtD(ev.ts) + "</div>" +
+      '<div style="font-size:12px;color:#212529;line-height:1.8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(ev.title) + "</div></div></div>").join("")
+      : '<div style="padding:20px;text-align:center;color:#536170;font-size:12px;">لا أحداث بعد</div>') + "</div></div>";
   h += "</div></div>";
   return h;
 }
@@ -3713,9 +3920,42 @@ function vPlaceholder(cur) {
 }
 
 function gate(msg) {
-  document.getElementById("body").innerHTML = '<div class="gate"><div style="font-size:16px;font-weight:700;">الدخول إلى مسار</div>' +
+  document.getElementById("body").innerHTML = '<div class="gate"><div style="font-size:16px;font-weight:600;">الدخول إلى مسار</div>' +
     '<input id="tok" placeholder="admin token" dir="ltr"><button class="btn btn-teal" onclick="saveTok()">دخول</button>' +
-    (msg ? '<div style="color:#c43d3d;font-size:12px;margin-top:10px;">' + esc(msg) + "</div>" : "") + "</div>";
+    (msg ? '<div style="color:#D9534F;font-size:12px;margin-top:10px;">' + esc(msg) + "</div>" : "") + "</div>";
+}
+/**
+ * R19 — this dashboard is the ADMIN surface, and it now says so correctly.
+ *
+ * Every /admin route refuses a rep token, so a rep opening this URL got «رمز غير صحيح» — invalid
+ * token. Their token is not invalid. It is valid, it works, and it is for a different door. That
+ * message sends a rep hunting for a typo that does not exist, which is the same failure as any
+ * other screen that reports the wrong cause.
+ *
+ * So: on a 401, ask whether this credential is a working REP credential before naming the problem.
+ * /rep accepts a rep or the admin, which makes it the cheapest possible probe, and it is a read.
+ * Done here rather than by changing 401 to 403 across forty route handlers — same answer for the
+ * reader, one place to get wrong instead of forty.
+ */
+async function gateUnauthorized() {
+  let isRep = false;
+  try {
+    if (TOKEN) {
+      const rr = await fetch("/rep/queue", { headers: { "x-rep-token": TOKEN } });
+      isRep = rr.ok;
+    }
+  } catch (e) { /* offline or blocked: fall back to the generic message, never to a wrong one */ }
+  if (isRep) {
+    document.getElementById("body").innerHTML =
+      '<div class="gate"><div style="font-size:16px;font-weight:600;">هذه الشاشة للمشرف</div>' +
+      '<div style="color:#3A3A3A;font-size:14px;line-height:1.9;margin-top:8px;max-width:44ch;">' +
+      'رمزك صحيح، لكنه رمز مندوب. لوحة المندوب فيها عملاؤك وفرصك وتسجيل نشاطك.</div>' +
+      '<a class="btn btn-teal" href="/rep?token=' + encodeURIComponent(TOKEN) + '" ' +
+      'style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;margin-top:14px;">' +
+      'افتح لوحة المندوب</a></div>';
+    return;
+  }
+  gate("رمز غير صحيح");
 }
 window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN); refresh(); };
 window.reloadProfile = () => { profileData = null; render(false); refresh(); };
@@ -3778,7 +4018,7 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "products" || cur === "reports") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -3792,6 +4032,8 @@ function render(fetchNew) {
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()
+      : cur === "products" ? vProductsCrm()
+      : cur === "reports" ? vReportsCrm()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -3823,7 +4065,7 @@ async function refresh(force) {
       // fall through here: the inner condition was false, nothing returned, every later fetch
       // 401'd, profileData stayed null, and the page sat on «جارٍ تجميع ملف العميل» forever with
       // no login prompt. Measured 2026-08-16 on #customer/966535106365.
-      if (r.status === 401) return gate("رمز غير صحيح");
+      if (r.status === 401) return gateUnauthorized();
       else { cache = await r.json(); }
       if (!showTestDecided && cache && (cache.contacts || []).length) {
         showTestDecided = true;
@@ -4133,6 +4375,8 @@ ${CUSTOMERS_CRM_JS}
 ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
+${PRODUCTS_CRM_JS}
+${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${SALES_DOMAIN_JS}
@@ -4152,7 +4396,12 @@ refresh();
 tplLoad();
 setInterval(async () => {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
-  if (cur === "kmon" || cur === "home") { refresh(); }
+  // R14: #home is OFF the tick. refresh() is a full re-render, and doing it every 5s on the
+  // executive home moved figures under the reader mid-sentence and reset scroll on a screen whose
+  // whole job is to be read. الحملات keeps it because a live campaign genuinely changes while
+  // watched. Home still gets fresh data on the cheap /admin/state path below, it just does not
+  // repaint itself; the «مباشر» chip is hidden there to match.
+  if (cur === "kmon") { refresh(); }
   else if (TOKEN) { try { const r = await fetch("/admin/state", { headers: { "x-admin-token": TOKEN } }); if (r.ok) cache = await r.json(); } catch (e) {} }
 }, 5000);
 </script>

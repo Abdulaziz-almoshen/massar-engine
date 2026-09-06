@@ -21,65 +21,65 @@
 export const SALES_CRM_CSS = `
 .perf-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .perf-per{display:flex;gap:6px;align-items:center}
-.perf-per .q{border:1px solid var(--line,#E2E2E2);background:var(--card,#fff);border-radius:999px;
-  padding:5px 13px;font-size:12.5px;cursor:pointer;color:var(--ink2,#525252);min-height:32px}
-.perf-per .q.on{background:#1F7A73;border-color:#1F7A73;color:#fff;font-weight:700}
-.perf-note{margin-inline-start:auto;font-size:12px;color:var(--muted,#7C7C7C);max-width:46ch;text-align:end}
+.perf-per .q{border:1px solid var(--line,#CBD7E4);background:var(--card,#fff);border-radius:999px;
+  padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#3A3A3A);min-height:32px}
+.perf-per .q.on{background:#306DB5;border-color:#306DB5;color:#fff;font-weight:600}
+.perf-note{margin-inline-start:auto;font-size:12px;color:var(--muted,#536170);max-width:46ch;text-align:end}
 /* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
    four equal cards made it the last of four with no more weight than the rest. */
 .perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
-.perf-kpi.lead{background:#F1F7F6}
-.perf-kpi.lead .v{font-size:30px}
-.perf-kpi{background:var(--strip,#F8F8F8);border-radius:10px;padding:13px 15px}
-.perf-kpi .k{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:600}
-.perf-kpi .v{font-size:21px;font-weight:700;margin-top:3px;letter-spacing:0}
-.perf-kpi .s{font-size:11.5px;color:var(--muted,#7C7C7C);margin-top:2px}
-.perf-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.perf-kpi.lead{background:#EAF1F8}
+.perf-kpi.lead .v{font-size:28px}
+.perf-kpi{background:var(--strip,#F4F6F9);border-radius:10px;padding:13px 15px}
+.perf-kpi .k{font-size:12px;color:var(--muted,#536170);font-weight:600}
+.perf-kpi .v{font-size:22px;font-weight:600;margin-top:3px;letter-spacing:0}
+.perf-kpi .s{font-size:12px;color:var(--muted,#536170);margin-top:2px}
+.perf-tbl{width:100%;border-collapse:collapse;font-size:14px}
 /* Logical properties only, per DESIGN.md: "no left/right, no physical offsets". The physical
    the physical shorthand landed on the correct side ONLY because this document is RTL — it would
    flip the moment anything renders LTR. And rows take border-TOP, which is what invariant 8
    specifies for a flush list. (No backticks in this comment: it lives INSIDE a template literal,
    and one terminates the string. Third time this session.) */
-.perf-tbl th{text-align:start;font-size:11.5px;font-weight:600;color:var(--muted,#7C7C7C);
-  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#E2E2E2);white-space:nowrap}
-.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#EDEDED);height:36px;vertical-align:middle}
-.perf-tbl tr:hover td{background:var(--strip,#F8F8F8)}
+.perf-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted,#536170);
+  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#CBD7E4);white-space:nowrap}
+.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#E3E9F1);height:36px;vertical-align:middle}
+.perf-tbl tr:hover td{background:var(--strip,#F4F6F9)}
 .perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
 .perf-prod{font-weight:600}
-.perf-sec{font-size:11.5px;color:var(--muted,#7C7C7C);font-weight:400}
+.perf-sec{font-size:12px;color:var(--muted,#536170);font-weight:400}
 /* No overflow:hidden — it clipped the pace tick's own overhang, so the "extend past the track so
    it reads as a marker" intent was dead code. The fill clips itself with its own border-radius. */
-.perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#EDEDED);
+.perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#E3E9F1);
   min-width:90px}
 .perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block;
-  background:#1F7A73}
+  background:#306DB5}
 /* Full opacity and the darkest ink: at .45 over the teal fill this was invisible on exactly the
    rows that are AHEAD of pace, which is the only comparison the tick exists to make. The overhang
    above and below the track sits on the page ground, so it reads on both grounds. */
-.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#171717)}
+.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#212529)}
 .perf-rag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
 .perf-rag .dot{width:7px;height:7px;border-radius:999px;flex:none}
 /* The product's shipped status palette, not a fourth one. These three values are the same
    ok/warn/bad used by «فشل الإرسال» and «أوقف الرسائل» two screens away (activity-crm,
    campaigns-crm, customers-crm). A «متعثّر» that is a different red from every other bad state
    in the product teaches the reader that the colour means nothing. */
-.rag-good{color:#027A48} .rag-good .dot{background:#027A48}
-.rag-warn{color:#B54708} .rag-warn .dot{background:#B54708}
-.rag-bad{color:#B42318}  .rag-bad  .dot{background:#B42318}
-.rag-none{color:var(--muted,#7C7C7C)} .rag-none .dot{background:var(--line,#E2E2E2)}
-.perf-set{border:1px solid var(--line,#E2E2E2);background:transparent;border-radius:6px;
-  padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#525252);min-height:30px}
-.perf-set:hover{border-color:#1F7A73;color:#1F7A73}
+.rag-good{color:#12633F} .rag-good .dot{background:#12633F}
+.rag-warn{color:#7A5600} .rag-warn .dot{background:#7A5600}
+.rag-bad{color:#8E2A27}  .rag-bad  .dot{background:#8E2A27}
+.rag-none{color:var(--muted,#536170)} .rag-none .dot{background:var(--line,#CBD7E4)}
+.perf-set{border:1px solid var(--line,#CBD7E4);background:transparent;border-radius:6px;
+  padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#3A3A3A);min-height:30px}
+.perf-set:hover{border-color:#306DB5;color:#306DB5}
 /* Both controls were missing from the product's focus-ring list (campaigns-crm.ts), so the quarter
    chips had outline:none and the target button showed Chromium's default blue — a colour that
    exists nowhere in Massar. Same treatment as every other control here. */
 .perf-per .q:focus, .perf-set:focus{outline:none}
-.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #1F7A73;outline-offset:1px}
-.perf-empty{padding:26px 0;color:var(--muted,#7C7C7C);font-size:13.5px;max-width:56ch;line-height:1.6}
-.perf-empty b{color:var(--ink,#171717);display:block;margin-bottom:5px;font-size:14.5px}
+.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #306DB5;outline-offset:1px}
+.perf-empty{padding:26px 0;color:var(--muted,#536170);font-size:14px;max-width:56ch;line-height:1.6}
+.perf-empty b{color:var(--ink,#212529);display:block;margin-bottom:5px;font-size:14px}
 @media (max-width:820px){
   .perf-kpis{grid-template-columns:repeat(2,1fr)}
-  .perf-kpi.lead .v{font-size:24px}
+  .perf-kpi.lead .v{font-size:22px}
   .perf-sechide{display:none}
 }
 @media (pointer:coarse){
@@ -171,7 +171,7 @@ window.perfSetTarget = async function (product) {
   for (var i = 0; i < rows.length; i++) if (rows[i].product === product) cur = rows[i].target;
   // Digits are typed in Latin because this is an input, not a reading: an Arabic-Indic numeral
   // pasted back into a number field is a parse failure nobody can see.
-  var raw = window.prompt("المستهدف لـ «" + product + "» — الربع " + fmtN(perfState.quarter) + " من " + fmtN(perfState.year) + "\\n(بالريال، أرقام لاتينية)", String(cur || ""));
+  var raw = window.prompt("المستهدف لـ «" + product + "» — الربع " + fmtN(perfState.quarter) + " من " + arYear(perfState.year) + "\\n(بالريال، أرقام لاتينية)", String(cur || ""));
   if (raw === null) return;
   var amount = Number(String(raw).replace(/[^0-9.]/g, ""));
   if (!isFinite(amount) || amount < 0) { alertBar("قيمة غير صالحة", true); return; }
@@ -236,7 +236,7 @@ function vSalesPerf() {
     var why = !d
       ? '<div class="perf-empty">جارٍ حساب الأداء من السجل…</div>'
       : '<div class="perf-empty"><b>تعذّر تحميل الأداء</b>' + esc(String(d.error)) +
-        '<br><span style="font-size:12.5px">أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>';
+        '<br><span style="font-size:12px">أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>';
     return perfShell(perfState.quarter || 0, perfState.year || 0) + perfKpis(null, null, null, null, 0, 0, 0) + why;
   }
 
