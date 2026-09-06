@@ -67,76 +67,88 @@ function pcBar(pct, cap) {
 
 function vProductsCrm() {
   pcLoad(false);
-  /* skeleton-swap, not a spinner: the layout is KNOWN here, so blocks at the shape of the content
-     read as "this is arriving" rather than "something is happening somewhere". */
-  if (!pcCat) return '<div class="crm-kpis">' +
-    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="crm-kpi">' + moSkeleton(2, ["w60", "w80"]) + '</div></div>' +
+  if (typeof opLoad === "function") opLoad(false);
+  if (!pcCat) return '<div class="sh-tiles">' +
+    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
+    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div></div>' +
     '<div style="margin-block-start:20px">' + moSkeleton(5, ["w80", "w60", "w40"]) + '</div>';
 
   var withPkg = pcCat.filter(function (p) { return p.packages && p.packages.length; }).length;
   var noSector = pcCat.filter(function (p) { return !p.sector; }).length;
   var assumed = pcCat.filter(function (p) { return p.sectorAssumed; }).length;
   var pkgCount = pcCat.reduce(function (n, p) { return n + ((p.packages || []).length); }, 0);
+  var h = "";
 
-  var h = '';
-
-  /* ---- the four numbers that describe the catalogue ---- */
-  h += '<div class="crm-kpis">' +
-    '<div class="crm-kpi"><div class="crm-k">المنتجات</div><div class="crm-v">' + fmtN(pcCat.length) + '</div>' +
-      '<div class="crm-s">في سجل الوسوم</div></div>' +
-    '<div class="crm-kpi"><div class="crm-k">لها سعر منشور</div><div class="crm-v">' + fmtN(withPkg) + '</div>' +
-      '<div class="crm-s">' + fmtN(pkgCount) + ' باقة — البقية «يحدده المختص»</div></div>' +
-    '<div class="crm-kpi"><div class="crm-k">قطاع مُستنتَج</div><div class="crm-v">' + fmtN(assumed) + '</div>' +
-      '<div class="crm-s">تصنيف لم يؤكَّد بعد</div></div>' +
-    '<div class="crm-kpi"><div class="crm-k">بلا قطاع</div><div class="crm-v">' + fmtN(noSector) + '</div>' +
-      '<div class="crm-s">لا تدخل في أي مجموع قطاعي</div></div>' +
+  /* ---- tiles: figure at the inline-end, the lead one on a wash ---- */
+  h += '<div class="sh-tiles">' +
+    '<div class="sh-tile lead"><div><div class="k">المنتجات</div>' +
+      '<div class="s">في سجل الوسوم</div></div><div class="v">' + fmtN(pcCat.length) + '</div></div>' +
+    '<div class="sh-tile"><div><div class="k">لها سعر منشور</div>' +
+      '<div class="s">' + fmtN(pkgCount) + ' باقة · البقية «يحدده المختص»</div></div>' +
+      '<div class="v">' + fmtN(withPkg) + '</div></div>' +
+    '<div class="sh-tile"><div><div class="k">قطاع مُستنتَج</div>' +
+      '<div class="s">تصنيف لم يؤكَّد بعد</div></div><div class="v">' + fmtN(assumed) + '</div></div>' +
+    '<div class="sh-tile"><div><div class="k">بلا قطاع</div>' +
+      '<div class="s">لا تدخل في أي مجموع قطاعي</div></div><div class="v">' + fmtN(noSector) + '</div></div>' +
   '</div>';
 
-  /* ---- the sector board ---- */
+  /* ---- sectors: ONE stacked share bar, then a card each ---- */
   if (pcSectors && pcSectors.sectors) {
-    h += '<div class="pc-sec"><div class="pc-h">القطاعات</div>' +
-      '<div class="pc-sub">المحقق والمفتوح لكل قطاع سوقي. «بلا قطاع» صفٌّ صريح لا مرشِّح: منتج بلا تصنيف يظهر بأرقامه هنا بدل أن يسقط من المجموع.</div>';
-    pcSectors.sectors.forEach(function (s) {
-      var cov = s.coveragePct;
-      var cls = s.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
-      h += '<div class="crm-row crm-click" data-go="sector" data-nm="' + esc(s.sector) + '">' +
-        '<span class="crm-nm">' + esc(s.sector) + '</span>' +
-        '<span class="crm-sub">' + esc((s.products || []).join(" · ")) + '</span>' +
-        '<span class="crm-end">' +
-          '<span class="pc-price">' + pcMoney(s.achieved) + ' من ' + pcMoney(s.target) + '</span>' +
-          pcBar(cov === null ? 0 : cov) +
+    var COL = ["#306DB5", "#629CCD", "#416CAD", "#A9B4C0"];
+    var parts = pcSectors.sectors.map(function (sc, i) {
+      return { n: sc.sector, v: (sc.achieved || 0) + (sc.weightedOpen || 0), c: COL[i % COL.length] };
+    }).filter(function (p) { return p.v > 0; });
+
+    h += '<div class="sh-sec"><div class="sh-h">القطاعات</div>' +
+      '<div class="sh-hs">المحقق والمفتوح لكل قطاع سوقي. الشريط واحد لأن المقارنة المطلوبة بين الأجزاء، ' +
+      'وأربعة أشرطة منفصلة تجعلها مقارنةً بالذاكرة. «بلا قطاع» جزءٌ صريح لا مرشِّح.</div>';
+    h += shStack(parts);
+    h += '<div class="sh-cards" style="margin-block-start:var(--s3)">';
+    pcSectors.sectors.forEach(function (sc) {
+      var cov = sc.coveragePct;
+      var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
+      /* data-as-visual: one cell per open opportunity in this sector. */
+      var mine = (typeof oppRows !== "undefined" && oppRows ? oppRows : []).filter(function (o) {
+        return (sc.products || []).indexOf(o.product) >= 0;
+      });
+      var units = mine.map(function (o) {
+        return o.stage === "won" ? "won" : (o.stage === "lost" ? "lost" : "on");
+      });
+      h += '<div class="sh-card' + (sc.isUnclassified ? "" : " go") + '"' +
+        (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
+        '<div><div class="nm">' + esc(sc.sector) + '</div>' +
+          '<div class="sub">' + esc((sc.products || []).join(" · ")) + '</div>' +
+          (units.length ? shUnits(units, 48) : "") + '</div>' +
+        '<div class="end"><span class="money">' + pcMoney(sc.achieved) +
+          (sc.target > 0 ? ' من ' + pcMoney(sc.target) : ' محقق') + '</span>' +
           '<span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span>' +
-        '</span></div>';
+        '</div></div>';
     });
-    h += '</div>';
+    h += '</div></div>';
   }
 
-  /* ---- the four quarters, from ONE query ---- */
+  /* ---- quarters as tiles ---- */
   if (pcQuarters && pcQuarters.quarters) {
-    h += '<div class="pc-sec"><div class="pc-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
-      '<div class="pc-sub">الأربعة معًا، لا ربعًا في كل مرة.</div><div class="pc-q">';
+    h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
+      '<div class="sh-hs">الأربعة معًا، لا ربعًا في كل مرة.</div><div class="sh-tiles">';
     pcQuarters.quarters.forEach(function (q) {
       var isNow = q.quarter === pcQuarters.currentQuarter;
-      h += '<div class="pc-qc' + (isNow ? " now" : "") + '">' +
+      h += '<div class="sh-tile' + (isNow ? " lead" : "") + '"><div>' +
         '<div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
-        '<div class="v">' + pcMoney(q.achieved) + '</div>' +
-        '<div class="t">من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") + '</div>' +
-        pcBar(q.coveragePct === null ? 0 : q.coveragePct, 999) +
-      '</div>';
+        '<div class="s">' + (q.target > 0 ? 'من ' + pcMoney(q.target) +
+          (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : "بلا مستهدف") + '</div></div>' +
+        '<div class="v">' + fmtN(Math.round(q.achieved)) + '</div></div>';
     });
-    h += '</div>';
-    /* The basis is STATED, never implied: reading كامل العقد as سنوي is wrong by the year count. */
-    h += '<div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' + esc(pcQuarters.valueBasis.note) + '</div>';
-    h += '</div>';
+    h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
+      esc(pcQuarters.valueBasis.note) + '</div></div>';
   }
 
-  /* ---- the brief's own grid: product x quarter ---- */
+  /* ---- product x quarter grid ---- */
   if (pcQuarters && pcQuarters.byProduct && pcQuarters.byProduct.length) {
-    h += '<div class="pc-sec"><div class="pc-h">المستهدف والمحقق لكل منتج · ' + arYear(pcQuarters.year) + '</div>' +
-      '<div class="pc-sub">السنوي، وتوزيعه على الأرباع، والمحقق في كل ربع. المنتج بلا مستهدف يظهر بصفّ أصفار — صفٌّ مُرشَّح لا يمكن رؤية غيابه.</div>' +
+    h += '<div class="sh-sec"><div class="sh-h">المستهدف والمحقق لكل منتج · ' + arYear(pcQuarters.year) + '</div>' +
+      '<div class="sh-hs">السنوي، وتوزيعه على الأرباع، والمحقق في كل ربع. المنتج بلا مستهدف يظهر بصفّ أصفار — صفٌّ مُرشَّح لا يمكن رؤية غيابه.</div>' +
       '<div class="crm-scroll"><table class="crm-tbl"><thead><tr><th>المنتج</th><th class="crm-money">السنوي</th>' +
       [1,2,3,4].map(function (q) { return '<th class="crm-money">ر' + fmtN(q) + '</th>'; }).join("") +
       '<th class="crm-money">المحقق</th><th>الإنجاز</th></tr></thead><tbody>';
@@ -147,8 +159,8 @@ function vProductsCrm() {
         '<td class="crm-money">' + (p.annualTarget ? fmtN(p.annualTarget) : "—") + '</td>' +
         p.quarters.map(function (q) {
           var isNow = q.quarter === pcQuarters.currentQuarter;
-          return '<td class="crm-money"' + (isNow ? ' style="background:#EAF1F8"' : '') + '>' +
-            (q.target || q.achieved ? fmtN(q.achieved) + '<div class="pc-pkg">من ' + fmtN(q.target) + '</div>' : "—") + '</td>';
+          return '<td class="crm-money"' + (isNow ? ' style="background:var(--blue-tint)"' : '') + '>' +
+            (q.target || q.achieved ? fmtN(q.achieved) + '<div class="sub">من ' + fmtN(q.target) + '</div>' : "—") + '</td>';
         }).join("") +
         '<td class="crm-money">' + fmtN(p.achieved) + '</td>' +
         '<td><span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></td></tr>';
@@ -156,24 +168,29 @@ function vProductsCrm() {
     h += '</tbody></table></div></div>';
   }
 
-  /* ---- the catalogue itself ---- */
-  h += '<div class="pc-sec"><div class="pc-h">الكتالوج</div>' +
-    '<div class="pc-sub">كل منتج، قطاعه، وسعره المنشور. المنتج الذي لا باقة له يعرض نص التسعير كما هو مكتوب، لا خانة فارغة تُقرأ كبيانات ناقصة.</div>';
-  pcCat.forEach(function (p) {
-    var price = (p.packages && p.packages.length)
-      ? p.packages.map(function (k) {
-          return esc(k.name) + " " + pcMoney(k.listPrice) + (k.scope ? " <span class=\\"pc-pkg\\">(" + esc(k.scope) + ")</span>" : "");
-        }).join(" · ")
-      : '<span class="pc-pkg">' + esc(p.pricingNote || "لا سعر منشور") + '</span>';
-    h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(p.product) + '">' +
-      '<span class="crm-nm">' + esc(p.product) + '</span>' +
-      '<span class="crm-sub">' +
-        (p.sector ? esc(p.sector) : '<span style="color:#7A5600">بلا قطاع</span>') +
-        (p.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج من bestFor في قاعدة معرفة المساعد، ولم يؤكَّد">مُستنتَج</span>' : '') +
-      '</span>' +
-      '<span class="crm-end"><span class="pc-price">' + price + '</span></span>' +
-    '</div>';
-  });
+  /* ---- catalogue as cards ---- */
+  h += '<div class="sh-sec"><div class="sh-h">الكتالوج</div>' +
+    '<div class="sh-hs">كل منتج، قطاعه، وسعره المنشور. المنتج الذي لا باقة له يعرض نص التسعير كما هو مكتوب، لا خانة فارغة تُقرأ كبيانات ناقصة.</div>';
+  if (!pcCat.length) {
+    h += shEmpty("box", "لا منتجات في السجل", "يظهر هنا كل وسم منتج. أضف وسمًا من «جهات الاستهداف» وسيظهر بقطاعه وباقاته.");
+  } else {
+    h += '<div class="sh-cards">';
+    pcCat.forEach(function (p) {
+      var price = (p.packages && p.packages.length)
+        ? p.packages.map(function (k) {
+            return esc(k.name) + " " + pcMoney(k.listPrice) + (k.scope ? " (" + esc(k.scope) + ")" : "");
+          }).join(" · ")
+        : esc(p.pricingNote || "لا سعر منشور");
+      h += '<div class="sh-card go" data-go="product" data-nm="' + esc(p.product) + '">' +
+        '<div><div class="nm">' + esc(p.product) + '</div>' +
+        '<div class="sub">' + (p.sector ? esc(p.sector) : '<span style="color:var(--s-attn-text)">بلا قطاع</span>') +
+          (p.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج ولم يؤكَّد">مُستنتَج</span>' : '') +
+        '</div></div>' +
+        '<div class="end"><span class="money" style="font-weight:450;font-size:var(--t-xs);color:var(--muted);text-align:end">' +
+          price + '</span></div></div>';
+    });
+    h += '</div>';
+  }
   h += '</div>';
   return h;
 }
@@ -323,6 +340,7 @@ window.pcRetire = function (id, name, btn) {
  * #home is off the 5s tick (R14), so this band does not inherit a poll. */
 function vExecBand() {
   pcLoad(false);
+  if (typeof opLoad === "function") opLoad(false);
   if (!pcSectors || !pcQuarters) return "";
 
   var secs = pcSectors.sectors || [];
@@ -332,97 +350,96 @@ function vExecBand() {
   var openTotal = secs.reduce(function (n, x) { return n + (x.weightedOpen || 0); }, 0);
   var openCount = secs.reduce(function (n, x) { return n + (x.openCount || 0); }, 0);
   var wonTotal = secs.reduce(function (n, x) { return n + (x.achieved || 0); }, 0);
+  var COL = ["#306DB5", "#629CCD", "#416CAD", "#A9B4C0"];
 
-  /* NO TARGETS ANYWHERE. Rendering eight rows of «٠ ر.س من ٠ ر.س · بلا مستهدف» is honest and
-     useless — a wall of zeros reads as broken, and DESIGN.md 7.13 asks a page to have a point of
-     view. So the band leads with the figures that DO exist (open pipeline, won, deal counts), says
-     in one line that no target is set, and points at where to set one. The coverage layout returns
-     the moment a target exists. */
+  /* One card per sector, on the same components as المنتجات. This band and that screen render the
+     SAME three sections, and until now they rendered them two different ways — the founder spotted
+     it. Two visual languages for one set of facts is how a product starts feeling assembled. */
+  function sectorCards() {
+    var out = '<div class="sh-cards">';
+    secs.forEach(function (sc) {
+      var cov = sc.coveragePct;
+      var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
+      var mine = (typeof oppRows !== "undefined" && oppRows ? oppRows : []).filter(function (o) {
+        return (sc.products || []).indexOf(o.product) >= 0;
+      });
+      var units = mine.map(function (o) { return o.stage === "won" ? "won" : (o.stage === "lost" ? "lost" : "on"); });
+      out += '<div class="sh-card' + (sc.isUnclassified ? "" : " go") + '"' +
+        (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
+        '<div><div class="nm">' + esc(sc.sector) + '</div>' +
+        '<div class="sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</div>' +
+        (units.length ? shUnits(units, 40) : "") + '</div>' +
+        '<div class="end"><span class="money">' +
+          (sc.target > 0 ? pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) : pcMoney(sc.weightedOpen) + ' مفتوح') +
+        '</span><span class="crm-st ' + cls + '"><i></i>' +
+          (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></div></div>';
+    });
+    return out + '</div>';
+  }
+
+  /* ---- no target anywhere: lead with what exists, say the gap once, offer the fix ---- */
   if (!anyTarget) {
-    var h0 = '<div class="pc-sec">' +
-      '<div class="crm-kpis crm-hasLead">' +
-        '<div class="crm-kpi crm-lead"><div class="crm-k">المتوقع من الفرص المفتوحة</div>' +
-          '<div class="crm-v">' + pcMoney(openTotal) + '</div>' +
-          '<div class="crm-s">' + fmtN(openCount) + ' فرصة · مرجّحة بوزن المرحلة</div></div>' +
-        '<div class="crm-kpi"><div class="crm-k">المحقق</div><div class="crm-v">' + pcMoney(wonTotal) + '</div>' +
-          '<div class="crm-s">في الفترة الحالية</div></div>' +
-        '<div class="crm-kpi"><div class="crm-k">القطاعات</div><div class="crm-v">' + fmtN(secs.filter(function (x) { return !x.isUnclassified; }).length) + '</div>' +
-          '<div class="crm-s">' + fmtN(prods.length) + ' منتجًا</div></div>' +
-        '<div class="crm-kpi"><div class="crm-k">المستهدفات</div><div class="crm-v" style="font-size:var(--t-lg)">لم تُحدَّد</div>' +
-          '<div class="crm-s">لا تغطية بلا مستهدف</div></div>' +
-      '</div>' +
-      '<div class="crm-empty"><b>لا مستهدف محدَّد لهذه السنة</b>' +
-        'التغطية نسبةٌ إلى رقم، وبلا مستهدف لا يوجد رقم تُنسب إليه — فالمعروض أعلاه هو ما في السجل فعلًا: ' +
-        'المفتوح والمحقق. حدِّد المستهدف الربعي من «المستهدفات والأداء» وتعود لوحة التغطية كما هي.' +
-        '<div style="margin-block-start:10px;"><a class="btn btn-teal crm-focusable" href="#perf" ' +
-        'style="text-decoration:none;display:inline-flex;align-items:center;">حدِّد المستهدفات</a></div></div></div>';
-
-    /* Even with no target, WHERE the open pipeline sits is a real answer. */
+    var h0 = '<div class="sh-tiles">' +
+      '<div class="sh-tile lead"><div><div class="k">المتوقع من الفرص المفتوحة</div>' +
+        '<div class="s">' + fmtN(openCount) + ' فرصة · مرجّحة بوزن المرحلة</div></div>' +
+        '<div class="v">' + fmtN(Math.round(openTotal)) + '</div></div>' +
+      '<div class="sh-tile"><div><div class="k">المحقق</div><div class="s">في الفترة الحالية</div></div>' +
+        '<div class="v">' + fmtN(Math.round(wonTotal)) + '</div></div>' +
+      '<div class="sh-tile"><div><div class="k">القطاعات</div><div class="s">' + fmtN(prods.length) + ' منتجًا</div></div>' +
+        '<div class="v">' + fmtN(secs.filter(function (x) { return !x.isUnclassified; }).length) + '</div></div>' +
+      '<div class="sh-tile"><div><div class="k">المستهدفات</div><div class="s">لا تغطية بلا مستهدف</div></div>' +
+        '<div class="v" style="font-size:var(--t-lg)">لم تُحدَّد</div></div></div>';
+    h0 += '<div class="sh-sec">' + shEmpty("chart", "لا مستهدف محدَّد لهذه السنة",
+      "التغطية نسبةٌ إلى رقم، وبلا مستهدف لا يوجد رقم تُنسب إليه — فالمعروض أعلاه هو ما في السجل فعلًا. " +
+      "حدِّد المستهدف الربعي من «المستهدفات والأداء» وتعود لوحة التغطية كما هي.") +
+      '<div style="text-align:center;margin-block-start:var(--s3)">' +
+      '<a class="btn btn-teal crm-focusable" href="#perf" style="text-decoration:none;display:inline-flex;align-items:center;">حدِّد المستهدفات</a></div></div>';
     var withOpen = secs.filter(function (x) { return x.openCount > 0; });
     if (withOpen.length) {
-      var topOpen = withOpen.reduce(function (m, x) { return Math.max(m, x.weightedOpen || 0); }, 0) || 1;
-      h0 += '<div class="pc-sec"><div class="pc-h">أين المفتوح الآن</div>' +
-        '<div class="pc-sub">المتوقع من الفرص المفتوحة لكل قطاع. اضغط قطاعًا للوحته.</div>';
-      withOpen.sort(function (a, b) { return (b.weightedOpen || 0) - (a.weightedOpen || 0); }).forEach(function (sc) {
-        h0 += '<div class="crm-row' + (sc.isUnclassified ? "" : " crm-click") + '"' +
-          (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
-          '<span class="crm-nm">' + esc(sc.sector) + '</span>' +
-          '<span class="crm-sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</span>' +
-          '<span class="crm-end"><span class="pc-price">' + pcMoney(sc.weightedOpen) + '</span>' +
-          '<div class="crm-bar" style="max-width:120px"><i style="width:' +
-            Math.round(((sc.weightedOpen || 0) / topOpen) * 100) + '%"></i></div></span></div>';
-      });
-      h0 += '</div></div>';
+      h0 += '<div class="sh-sec"><div class="sh-h">أين المفتوح الآن</div>' +
+        '<div class="sh-hs">المتوقع من الفرص المفتوحة لكل قطاع. اضغط قطاعًا للوحته.</div>' +
+        shStack(withOpen.map(function (sc, i) { return { n: sc.sector, v: sc.weightedOpen || 0, c: COL[i % COL.length] }; })) +
+        '<div style="margin-block-start:var(--s3)"></div>' + sectorCards() + '</div>';
     }
     return h0;
   }
 
-  /* ---- the coverage layout, for when targets exist ---- */
-  var h = '<div class="pc-sec"><div class="pc-h">القطاعات</div>' +
-    '<div class="pc-sub">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>';
-  secs.forEach(function (sc) {
-    var cov = sc.coveragePct;
-    var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
-    h += '<div class="crm-row' + (sc.isUnclassified ? "" : " crm-click") + '"' +
-      (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
-      '<span class="crm-nm">' + esc(sc.sector) + '</span>' +
-      '<span class="crm-sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</span>' +
-      '<span class="crm-end"><span class="pc-price">' +
-        (sc.target > 0 ? pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) : pcMoney(sc.weightedOpen) + ' مفتوح') +
-      '</span>' +
-      pcBar(cov === null ? 0 : cov) +
-      '<span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></span></div>';
-  });
-  h += '</div>';
+  /* ---- targets exist: the coverage layout, same components ---- */
+  var h = '<div class="sh-sec"><div class="sh-h">القطاعات</div>' +
+    '<div class="sh-hs">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>' +
+    shStack(secs.map(function (sc, i) {
+      return { n: sc.sector, v: (sc.achieved || 0) + (sc.weightedOpen || 0), c: COL[i % COL.length] };
+    }).filter(function (p) { return p.v > 0; })) +
+    '<div style="margin-block-start:var(--s3)"></div>' + sectorCards() + '</div>';
 
-  /* Only products that HAVE a target can be ranked by attainment. Listing five products all reading
-     «بلا مستهدف» is five rows saying one thing once. */
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
   var untargeted = prods.length - targeted.length;
   if (targeted.length) {
-    h += '<div class="pc-sec"><div class="pc-h">المنتجات حسب الإنجاز</div>' +
-      '<div class="pc-sub">الأقل إنجازًا أولًا' +
-      (untargeted ? ' · ' + fmtN(untargeted) + ' منتجًا بلا مستهدف لا تُرتَّب هنا' : '') + '.</div>';
+    h += '<div class="sh-sec"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
+      '<div class="sh-hs">الأقل إنجازًا أولًا' +
+      (untargeted ? ' · ' + fmtN(untargeted) + ' منتجًا بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="sh-cards">';
     targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
       var c = p.coveragePct;
       var cls = c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad");
-      h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(p.product) + '">' +
-        '<span class="crm-nm">' + esc(p.product) + '</span>' +
-        '<span class="crm-end"><span class="pc-price">' + pcMoney(p.achieved) + ' من ' + pcMoney(p.annualTarget) + '</span>' +
-        pcBar(c) + '<span class="crm-st ' + cls + '"><i></i>' + fmtN(c) + '٪</span></span></div>';
+      h += '<div class="sh-card go" data-go="product" data-nm="' + esc(p.product) + '">' +
+        '<div><div class="nm">' + esc(p.product) + '</div>' +
+        '<div class="sub">' + pcMoney(p.achieved) + ' من ' + pcMoney(p.annualTarget) + '</div></div>' +
+        '<div class="end"><span class="crm-st ' + cls + '"><i></i>' + fmtN(c) + '٪</span></div></div>';
     });
-    h += '</div>';
+    h += '</div></div>';
   }
 
-  h += '<div class="pc-sec"><div class="pc-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div><div class="pc-q">';
+  h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div><div class="sh-tiles">';
   pcQuarters.quarters.forEach(function (q) {
     var isNow = q.quarter === pcQuarters.currentQuarter;
-    h += '<div class="pc-qc' + (isNow ? " now" : "") + '"><div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
-      '<div class="v">' + pcMoney(q.achieved) + '</div>' +
-      '<div class="t">' + (q.target > 0 ? 'من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : 'بلا مستهدف') + '</div>' +
-      pcBar(q.coveragePct === null ? 0 : q.coveragePct, 999) + '</div>';
+    h += '<div class="sh-tile' + (isNow ? " lead" : "") + '"><div>' +
+      '<div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
+      '<div class="s">' + (q.target > 0 ? 'من ' + pcMoney(q.target) +
+        (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : "بلا مستهدف") + '</div></div>' +
+      '<div class="v">' + fmtN(Math.round(q.achieved)) + '</div></div>';
   });
-  h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' + esc(pcQuarters.valueBasis.note) + '</div></div>';
+  h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
+    esc(pcQuarters.valueBasis.note) + '</div></div>';
   return h;
 }
 
