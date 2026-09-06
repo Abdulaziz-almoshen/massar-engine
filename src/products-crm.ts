@@ -95,7 +95,7 @@ function vProductsCrm() {
     pcSectors.sectors.forEach(function (s) {
       var cov = s.coveragePct;
       var cls = s.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
-      h += '<div class="crm-row">' +
+      h += '<div class="crm-row crm-click" data-go="sector" data-nm="' + esc(s.sector) + '">' +
         '<span class="crm-nm">' + esc(s.sector) + '</span>' +
         '<span class="crm-sub">' + esc((s.products || []).join(" · ")) + '</span>' +
         '<span class="crm-end">' +
@@ -126,6 +126,29 @@ function vProductsCrm() {
     h += '</div>';
   }
 
+  /* ---- the brief's own grid: product x quarter ---- */
+  if (pcQuarters && pcQuarters.byProduct && pcQuarters.byProduct.length) {
+    h += '<div class="pc-sec"><div class="pc-h">المستهدف والمحقق لكل منتج · ' + arYear(pcQuarters.year) + '</div>' +
+      '<div class="pc-sub">السنوي، وتوزيعه على الأرباع، والمحقق في كل ربع. المنتج بلا مستهدف يظهر بصفّ أصفار — صفٌّ مُرشَّح لا يمكن رؤية غيابه.</div>' +
+      '<div class="crm-scroll"><table class="crm-tbl"><thead><tr><th>المنتج</th><th class="crm-money">السنوي</th>' +
+      [1,2,3,4].map(function (q) { return '<th class="crm-money">ر' + fmtN(q) + '</th>'; }).join("") +
+      '<th class="crm-money">المحقق</th><th>الإنجاز</th></tr></thead><tbody>';
+    pcQuarters.byProduct.forEach(function (p) {
+      var cov = p.coveragePct;
+      var cls = cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad"));
+      h += '<tr><td>' + esc(p.product) + '</td>' +
+        '<td class="crm-money">' + (p.annualTarget ? fmtN(p.annualTarget) : "—") + '</td>' +
+        p.quarters.map(function (q) {
+          var isNow = q.quarter === pcQuarters.currentQuarter;
+          return '<td class="crm-money"' + (isNow ? ' style="background:#EAF1F8"' : '') + '>' +
+            (q.target || q.achieved ? fmtN(q.achieved) + '<div class="pc-pkg">من ' + fmtN(q.target) + '</div>' : "—") + '</td>';
+        }).join("") +
+        '<td class="crm-money">' + fmtN(p.achieved) + '</td>' +
+        '<td><span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
   /* ---- the catalogue itself ---- */
   h += '<div class="pc-sec"><div class="pc-h">الكتالوج</div>' +
     '<div class="pc-sub">كل منتج، قطاعه، وسعره المنشور. المنتج الذي لا باقة له يعرض نص التسعير كما هو مكتوب، لا خانة فارغة تُقرأ كبيانات ناقصة.</div>';
@@ -135,7 +158,7 @@ function vProductsCrm() {
           return esc(k.name) + " " + pcMoney(k.listPrice) + (k.scope ? " <span class=\\"pc-pkg\\">(" + esc(k.scope) + ")</span>" : "");
         }).join(" · ")
       : '<span class="pc-pkg">' + esc(p.pricingNote || "لا سعر منشور") + '</span>';
-    h += '<div class="crm-row">' +
+    h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(p.product) + '">' +
       '<span class="crm-nm">' + esc(p.product) + '</span>' +
       '<span class="crm-sub">' +
         (p.sector ? esc(p.sector) : '<span style="color:#7A5600">بلا قطاع</span>') +
@@ -143,6 +166,159 @@ function vProductsCrm() {
       '</span>' +
       '<span class="crm-end"><span class="pc-price">' + price + '</span></span>' +
     '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+`;
+
+export const PRODUCTS_DRILL_JS = `
+/* ============================ product / sector drill-downs ============================
+   Built entirely from data the products screen and the opportunity board already load — pcCat,
+   pcQuarters and oppRows. No new endpoint: a drill-down that refetches what is already in memory
+   adds a spinner and a failure mode for nothing. */
+
+function pcBack() {
+  return '<a href="#products" style="display:inline-flex;align-items:center;gap:6px;font-size:var(--t-xs);' +
+    'font-weight:600;color:var(--muted);text-decoration:none;margin-block-end:14px;">\u2192 كل المنتجات</a>';
+}
+
+function pcOppsFor(pred) {
+  return (typeof oppRows !== "undefined" && oppRows ? oppRows : []).filter(pred);
+}
+
+/* Value uses the ONE definition, via the same arithmetic the server sums. */
+function pcVal(o) {
+  return Math.round((Number(o.sale_price) || 0) * (Number(o.qty) || 1) * (Number(o.years) || 1) *
+    (1 - (Number(o.discount) || 0) / 100));
+}
+
+function vProductDrill(name) {
+  pcLoad(false);
+  if (typeof opLoad === "function") opLoad(false);
+  if (!pcCat) return pcBack() + '<div class="crm-empty"><b>جارٍ التحميل…</b></div>';
+  var p = pcCat.filter(function (x) { return x.product === name; })[0];
+  if (!p) return pcBack() + '<div class="crm-empty"><b>منتج غير موجود</b>لا يوجد وسم بهذا الاسم في السجل.</div>';
+
+  var mine = pcOppsFor(function (o) { return o.product === name; });
+  var open = mine.filter(function (o) { return o.stage !== "won" && o.stage !== "lost"; });
+  var won  = mine.filter(function (o) { return o.stage === "won"; });
+  var lost = mine.filter(function (o) { return o.stage === "lost"; });
+  var openVal = open.reduce(function (n, o) { return n + pcVal(o); }, 0);
+
+  var h = pcBack();
+  h += '<div class="crm-kpis">' +
+    '<div class="crm-kpi crm-lead"><div class="crm-k">المفتوح</div><div class="crm-v">' + pcMoney(openVal) + '</div>' +
+      '<div class="crm-s">' + fmtN(open.length) + ' فرصة</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">مربوحة</div><div class="crm-v">' + fmtN(won.length) + '</div>' +
+      '<div class="crm-s">' + pcMoney(won.reduce(function (n, o) { return n + pcVal(o); }, 0)) + '</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">خاسرة</div><div class="crm-v">' + fmtN(lost.length) + '</div>' +
+      '<div class="crm-s">' + pcMoney(lost.reduce(function (n, o) { return n + pcVal(o); }, 0)) + '</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">القطاع</div><div class="crm-v" style="font-size:var(--t-lg)">' +
+      (p.sector ? esc(p.sector) : "بلا قطاع") + '</div>' +
+      '<div class="crm-s">' + (p.sectorAssumed ? "مُستنتَج — لم يؤكَّد" : "مؤكَّد") + '</div></div>' +
+  '</div>';
+
+  /* Packages, with the retire control. Retirement is the only exit: a package a deal references
+     cannot be deleted, and the composite FK refuses it at the database. */
+  h += '<div class="pc-sec"><div class="pc-h">الباقات</div>' +
+    '<div class="pc-sub">السعر المنشور لكل باقة. الباقة لا تُحذف — تُتقاعد، لأن صفقة قد تشير إليها والمفتاح الأجنبي يرفض الحذف.</div>';
+  if (!p.packages.length) {
+    h += '<div class="crm-empty"><b>لا باقات منشورة</b>' + esc(p.pricingNote || "لا سعر منشور لهذا المنتج.") + '</div>';
+  } else {
+    p.packages.forEach(function (k) {
+      h += '<div class="crm-row"><span class="crm-nm">' + esc(k.name) + '</span>' +
+        '<span class="crm-sub">' + (k.scope ? esc(k.scope) : "—") + ' · ' + fmtN(k.years) + ' سنة</span>' +
+        '<span class="crm-end"><span class="pc-price">' + pcMoney(k.listPrice) + '</span>' +
+        '<button class="btn btn-ghost mini crm-focusable" onclick="pcRetire(' + k.id + ',' + JSON.stringify(k.name) + ')">تقاعد</button>' +
+        '</span></div>';
+    });
+  }
+  h += '</div>';
+
+  /* Its quarterly row from the same grid the products screen renders. */
+  if (pcQuarters && pcQuarters.byProduct) {
+    var pq = pcQuarters.byProduct.filter(function (x) { return x.product === name; })[0];
+    if (pq) {
+      h += '<div class="pc-sec"><div class="pc-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div><div class="pc-q">';
+      pq.quarters.forEach(function (q) {
+        var isNow = q.quarter === pcQuarters.currentQuarter;
+        h += '<div class="pc-qc' + (isNow ? " now" : "") + '"><div class="k">الربع ' + fmtN(q.quarter) + '</div>' +
+          '<div class="v">' + pcMoney(q.achieved) + '</div>' +
+          '<div class="t">من ' + pcMoney(q.target) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") + '</div>' +
+          pcBar(q.coveragePct === null ? 0 : q.coveragePct, 999) + '</div>';
+      });
+      h += '</div></div>';
+    }
+  }
+
+  h += '<div class="pc-sec"><div class="pc-h">أعلى الفرص المفتوحة</div>';
+  if (!open.length) h += '<div class="crm-empty"><b>لا فرص مفتوحة</b>لا صفقة جارية على هذا المنتج.</div>';
+  else {
+    open.sort(function (a, b) { return pcVal(b) - pcVal(a); }).slice(0, 8).forEach(function (o) {
+      h += '<div class="crm-row"><span class="crm-nm">' + esc(o.account_name || "—") + '</span>' +
+        '<span class="crm-sub">' + esc(rpStage ? rpStage(o.stage) : o.stage) + '</span>' +
+        '<span class="crm-end"><span class="pc-price">' + pcMoney(pcVal(o)) + '</span></span></div>';
+    });
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ONE delegated listener for every drill row. No code in an attribute: JSON.stringify emits double
+   quotes that close a double-quoted attribute, and esc() turns them into &quot; which then has to
+   survive a decode — the exact shape of the stored XSS this project already fixed. A data attribute
+   carries the name as DATA and the handler reads it with getAttribute, which decodes once, safely. */
+document.addEventListener("click", function (ev) {
+  var row = ev.target && ev.target.closest ? ev.target.closest("[data-go]") : null;
+  if (!row) return;
+  var kind = row.getAttribute("data-go"), nm = row.getAttribute("data-nm");
+  if (!kind || !nm) return;
+  location.hash = kind + "/" + encodeURIComponent(nm);
+});
+
+window.pcRetire = function (id, name) {
+  if (!window.confirm("تقاعد الباقة «" + name + "»؟ لن تظهر للبيع، وتبقى الصفقات المرتبطة بها كما هي.")) return;
+  fetch("/admin/packages/" + id + "/retire", { method: "POST", headers: { "x-admin-token": TOKEN } })
+    .then(function (r) { return r.json(); })
+    .then(function () { pcCat = null; pcLoad(true); })
+    .catch(function () { /* the list reloads on the next paint either way */ });
+};
+
+function vSectorDrill(name) {
+  pcLoad(false);
+  if (typeof opLoad === "function") opLoad(false);
+  if (!pcSectors) return pcBack() + '<div class="crm-empty"><b>جارٍ التحميل…</b></div>';
+  var sec = pcSectors.sectors.filter(function (x) { return x.sector === name; })[0];
+  if (!sec) return pcBack() + '<div class="crm-empty"><b>قطاع غير موجود</b></div>';
+
+  var h = pcBack();
+  var cov = sec.coveragePct;
+  h += '<div class="crm-kpis">' +
+    '<div class="crm-kpi crm-lead"><div class="crm-k">المحقق</div><div class="crm-v">' + pcMoney(sec.achieved) + '</div>' +
+      '<div class="crm-s">من ' + pcMoney(sec.target) + '</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">المتوقع من المفتوح</div><div class="crm-v">' + pcMoney(sec.weightedOpen) + '</div>' +
+      '<div class="crm-s">' + fmtN(sec.openCount) + ' فرصة مفتوحة</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">مربوحة</div><div class="crm-v">' + fmtN(sec.wonCount) + '</div>' +
+      '<div class="crm-s">في الفترة</div></div>' +
+    '<div class="crm-kpi"><div class="crm-k">التغطية</div><div class="crm-v">' +
+      (cov === null ? "—" : fmtN(cov) + "٪") + '</div>' +
+      '<div class="crm-s">' + (cov === null ? "بلا مستهدف" : "محقق + متوقع") + '</div></div>' +
+  '</div>';
+
+  h += '<div class="pc-sec"><div class="pc-h">منتجات القطاع حسب الإنجاز</div>' +
+    '<div class="pc-sub">اضغط منتجًا لفتح لوحته.</div>';
+  (sec.products || []).forEach(function (nm) {
+    var pq = (pcQuarters && pcQuarters.byProduct ? pcQuarters.byProduct : []).filter(function (x) { return x.product === nm; })[0];
+    var c = pq ? pq.coveragePct : null;
+    var cls = c === null ? "crm-none" : (c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad"));
+    h += '<div class="crm-row crm-click" data-go="product" data-nm="' + esc(nm) + '">' +
+      '<span class="crm-nm">' + esc(nm) + '</span>' +
+      '<span class="crm-end">' +
+        '<span class="pc-price">' + (pq ? pcMoney(pq.achieved) + " من " + pcMoney(pq.annualTarget) : "—") + '</span>' +
+        pcBar(c === null ? 0 : c) +
+        '<span class="crm-st ' + cls + '"><i></i>' + (c === null ? "بلا مستهدف" : fmtN(c) + "٪") + '</span>' +
+      '</span></div>';
   });
   h += '</div>';
   return h;

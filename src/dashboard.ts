@@ -17,7 +17,7 @@ import { CUSTOMERS_CRM_CSS, CUSTOMERS_CRM_JS } from "./customers-crm.js";
 import { ACTIVITY_CRM_CSS, ACTIVITY_CRM_JS } from "./activity-crm.js";
 import { RECORD_TABS_CSS, RECORD_TABS_JS } from "./record-tabs.js";
 import { TASKS_CRM_CSS, TASKS_CRM_JS } from "./tasks-crm.js";
-import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS } from "./products-crm.js";
+import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS, PRODUCTS_DRILL_JS } from "./products-crm.js";
 import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
 import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
@@ -799,7 +799,9 @@ const SUBS = {
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
 // a route ends up highlighting no door at all, or two.
 const DOOR_OF = (function () {
-  const m = { customer: "customers" };   // #customer/<phone> is a detail view of العملاء
+  const m = { customer: "customers",     // #customer/<phone> is a detail view of العملاء
+              product: "products",       // #product/<name> and #sector/<name> are detail views
+              sector: "products" };      //   of المنتجات — the door stays lit inside a drill
   for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
   for (var j = 0; j < NAV.length; j++) if (!m[NAV[j].id]) m[NAV[j].id] = NAV[j].id;
   return m;
@@ -4018,6 +4020,12 @@ function render(fetchNew) {
     // than a rewrite: vCustomer is 216 lines inside this template literal and ADR-0001 forbids
     // range edits here.
     setTimeout(recApplyTabs, 0);
+  } else if (cur === "product" || cur === "sector") {
+    if (!TOKEN) return gate();
+    // The tail is REJOINED, not [1]: «تكامل الأنظمة (HIS/ERP)» contains a slash, and splitting on
+    // it would look up a product that does not exist. Same shape as #kb.
+    const nm = decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "");
+    b.innerHTML = cur === "product" ? vProductDrill(nm) : vSectorDrill(nm);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "products" || cur === "reports") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
@@ -4376,6 +4384,7 @@ ${ACTIVITY_CRM_JS}
 ${RECORD_TABS_JS}
 ${TASKS_CRM_JS}
 ${PRODUCTS_CRM_JS}
+${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}

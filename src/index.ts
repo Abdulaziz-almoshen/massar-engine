@@ -332,6 +332,24 @@ app.get("/admin/reports/:id", async (req, reply) => {
   };
 });
 
+app.get("/admin/reports/rollups", async (req, reply) => {
+  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
+  const [byDept, byReason] = await Promise.all([db.blockedByDept(), db.lossesByReason()]);
+  // The outcome KEY is a database value; the label a person reads comes from the shipped ladder,
+  // so the screen cannot invent a name for a loss reason the engine does not have.
+  const label = (k: string) => sales.STAGE_OUTCOMES.find((o) => o.key === k)?.label ?? k;
+  return {
+    ok: true,
+    byDept,
+    byReason: byReason.map((r) => ({ ...r, label: label(r.outcomeKey) })),
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
+    empty: {
+      dept: { title: "لا شيء معلّق على أي إدارة", body: "لا إجراء مفتوح مسنَد إلى إدارة." },
+      reason: { title: "لا خسائر مسجّلة", body: "لم تُغلق أي صفقة بنتيجة خسارة." },
+    },
+  };
+});
+
 app.get("/admin/sales/quarters", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const q = (req.query as any) || {};
@@ -351,6 +369,9 @@ app.get("/admin/sales/quarters", async (req, reply) => {
     // words rather than left to invent them.
     valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
     quarters: await db.quarterlyPerformance(year, bounds),
+    // The brief's own grid: every product, its annual target, the split, and what each quarter
+    // actually achieved. Same bounds, same query pass.
+    byProduct: await db.quarterlyByProduct(year, bounds),
   };
 });
 

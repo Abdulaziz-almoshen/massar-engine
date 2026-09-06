@@ -2405,3 +2405,130 @@ export async function quarterlyPerformance(
     };
   });
 }
+
+export type DeptBlock = { dept: string; openCount: number; oldestDays: number; value: number };
+export type LossReason = { outcomeKey: string; count: number; value: number; oldestDays: number };
+
+/**
+ * «أين تتعثّر الصفقات» — open work grouped by the department that owes it.
+ *
+ * The mockup's second report block. Ordered by the OLDEST blockage, not by count: a department
+ * holding one deal for forty days is a worse problem than one holding six for three, and sorting by
+ * count buries exactly the row the screen exists to surface.
+ */
+export async function blockedByDept(): Promise<DeptBlock[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT a.dept,
+            COUNT(*)::int AS open_count,
+            GREATEST(0, FLOOR((EXTRACT(EPOCH FROM now()) * 1000 - MIN(a.created_at)) / 86400000))::int AS oldest_days,
+            COALESCE(SUM(${OPP_VALUE_SQL}), 0) AS value
+       FROM actions a
+       JOIN opportunities o ON o.id = a.opp_id
+      WHERE a.state = 'open' AND a.dept <> ''
+      GROUP BY a.dept
+      ORDER BY oldest_days DESC`);
+  return r.rows.map((x: any) => ({
+    dept: String(x.dept), openCount: Number(x.open_count),
+    oldestDays: Number(x.oldest_days), value: Number(x.value),
+  }));
+}
+
+/**
+ * «الخسائر حسب السبب» — lost deals grouped by the outcome that closed them.
+ *
+ * Reads the ENGAGEMENT's outcome as well as the ledger's, for the reason documented on runReport:
+ * an outcome recorded on a deal that is already lost produces no stage transition and therefore no
+ * ledger row, so a ledger-only query silently misses a whole class of loss.
+ */
+export async function lossesByReason(): Promise<LossReason[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `WITH latest AS (
+       SELECT o.id, o.sale_price, o.qty, o.years, o.discount, src.outcome_key, src.at
+         FROM opportunities o
+         JOIN LATERAL (
+           SELECT k.outcome_key, k.at FROM (
+             SELECT e.outcome_key, e.effective_at AS at FROM track_stage_events e
+              WHERE e.opp_id = o.id AND e.outcome_key IS NOT NULL
+             UNION ALL
+             SELECT en.outcome_key, en.occurred_at AS at FROM engagements en
+              WHERE en.opp_id = o.id AND en.outcome_key IS NOT NULL
+           ) k ORDER BY k.at DESC LIMIT 1
+         ) src ON TRUE
+        WHERE o.stage = 'lost'
+     )
+     SELECT outcome_key,
+            COUNT(*)::int AS n,
+            COALESCE(SUM(ROUND(sale_price * qty * years * (1 - discount / 100.0))), 0) AS value,
+            GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (now() - MIN(at))) / 86400))::int AS oldest_days
+       FROM latest
+      GROUP BY outcome_key
+      ORDER BY value DESC`);
+  return r.rows.map((x: any) => ({
+    outcomeKey: String(x.outcome_key), count: Number(x.n),
+    value: Number(x.value), oldestDays: Number(x.oldest_days),
+  }));
+}
+
+export type ProductQuarter = {
+  product: string; annualTarget: number;
+  quarters: { quarter: number; target: number; achieved: number; coveragePct: number | null }[];
+  achieved: number; coveragePct: number | null;
+};
+
+/**
+ * The brief's own table:每 product, its annual target, the split across four quarters, and what it
+ * achieved in each. ONE query for the whole grid.
+ *
+ * Driven off `tags` so a product with no target still appears as a row of zeros — a product missing
+ * from a targets table reads as "no target set" only if you can see it is missing, and a filtered
+ * row cannot be seen at all.
+ */
+export async function quarterlyByProduct(
+  year: number, bounds: readonly { quarter: number; startMs: number; endMs: number }[],
+): Promise<ProductQuarter[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const vals = bounds.map((_, i) => `($${i * 3 + 1}::int, $${i * 3 + 2}::bigint, $${i * 3 + 3}::bigint)`).join(",");
+  const params = bounds.flatMap((b) => [b.quarter, b.startMs, b.endMs]);
+  const r = await pool.query(
+    `WITH q(quarter, start_ms, end_ms) AS (VALUES ${vals}),
+     grid AS (SELECT t.name AS product, q.quarter, q.start_ms, q.end_ms FROM tags t CROSS JOIN q),
+     won AS (
+       SELECT o.product, q.quarter, COALESCE(SUM(${OPP_VALUE_SQL}), 0) AS achieved
+         FROM q JOIN opportunities o ON o.stage = 'won'
+          AND EXISTS (
+            SELECT 1 FROM LATERAL (
+              SELECT e.effective_at FROM track_stage_events e
+               WHERE e.opp_id = o.id AND e.to_stage = 'won'
+               ORDER BY e.effective_at DESC LIMIT 1) w
+             WHERE w.effective_at >= to_timestamp(q.start_ms / 1000.0)
+               AND w.effective_at <  to_timestamp(q.end_ms / 1000.0))
+        GROUP BY o.product, q.quarter
+     )
+     SELECT g.product, g.quarter,
+            COALESCE(tg.amount, 0) AS target,
+            COALESCE(won.achieved, 0) AS achieved
+       FROM grid g
+       LEFT JOIN targets tg ON tg.product = g.product AND tg.year = $${params.length + 1} AND tg.quarter = g.quarter
+       LEFT JOIN won ON won.product = g.product AND won.quarter = g.quarter
+      ORDER BY g.product, g.quarter`,
+    [...params, year]);
+
+  const by = new Map<string, ProductQuarter>();
+  for (const x of r.rows as any[]) {
+    const p = String(x.product);
+    const row = by.get(p) ?? { product: p, annualTarget: 0, quarters: [], achieved: 0, coveragePct: null };
+    const target = Number(x.target), achieved = Number(x.achieved);
+    row.quarters.push({
+      quarter: Number(x.quarter), target, achieved,
+      // null, not 0 — a quarter with no target has no coverage, which is not 0% coverage.
+      coveragePct: target > 0 ? Math.round((achieved / target) * 100) : null,
+    });
+    row.annualTarget += target; row.achieved += achieved;
+    by.set(p, row);
+  }
+  const out = [...by.values()];
+  for (const r2 of out) r2.coveragePct = r2.annualTarget > 0 ? Math.round((r2.achieved / r2.annualTarget) * 100) : null;
+  return out.sort((a, b) => b.annualTarget - a.annualTarget || a.product.localeCompare(b.product, "ar"));
+}

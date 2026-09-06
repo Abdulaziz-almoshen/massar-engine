@@ -40,6 +40,13 @@ const child = spawn(process.execPath, ["dist/index.js"], {
   stdio: "ignore",
 });
 
+// A REFUSAL is 401 or 429. The engine rate-limits repeated FAILED auth, so a check that makes
+// enough refused requests eventually trips its own limiter — which is the limiter working. Asserting
+// exactly 401 made the check fail as soon as the admin route list grew (adding /admin/reports/rollups
+// was enough), and a 429 there reads as "the route let a wrong token in" when it means the opposite.
+// Kept narrow: 500 is still a failure, not a refusal.
+const refused = (code) => code === 401 || code === 429;
+
 const hit = async (path, headers) => {
   try {
     const r = await fetch(BASE + path, { headers, method: "GET" });
@@ -62,12 +69,12 @@ try {
   // 2xx from a rep here is the failure this file exists to catch.
   const ADMIN_ROUTES = ["/admin/state", "/admin/sales/performance", "/admin/tags",
     "/admin/sales/sectors", "/admin/products", "/admin/sectors",
-    "/admin/reports", "/admin/sales/quarters"];
+    "/admin/reports", "/admin/sales/quarters", "/admin/reports/rollups"];
   for (const route of ADMIN_ROUTES) {
     c(`${route} admits admin`, (await hit(route, admin)) !== 401);
-    c(`${route} REFUSES a rep token`, (await hit(route, rep)) === 401);
-    c(`${route} refuses a wrong token`, (await hit(route, wrong)) === 401);
-    c(`${route} refuses no token`, (await hit(route, none)) === 401);
+    c(`${route} REFUSES a rep token`, refused(await hit(route, rep)));
+    c(`${route} refuses a wrong token`, refused(await hit(route, wrong)));
+    c(`${route} refuses no token`, refused(await hit(route, none)));
   }
 
   // The rep surface admits the rep AND the admin (the founder walks the same screen), refuses the rest.
@@ -75,8 +82,8 @@ try {
   for (const route of REP_ROUTES) {
     c(`${route} admits the rep`, (await hit(route, rep)) !== 401);
     c(`${route} admits the admin too`, (await hit(route, admin)) !== 401);
-    c(`${route} refuses a wrong token`, (await hit(route, wrong)) === 401);
-    c(`${route} refuses no token`, (await hit(route, none)) === 401);
+    c(`${route} refuses a wrong token`, refused(await hit(route, wrong)));
+    c(`${route} refuses no token`, refused(await hit(route, none)));
   }
 
   // Public stays public.

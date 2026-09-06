@@ -32,7 +32,7 @@ export const REPORTS_CRM_CSS = `
 
 export const REPORTS_CRM_JS = `
 /* ============================ reports-crm (client) ============================ */
-var rpList = null, rpPick = null, rpData = {}, rpLoading = false;
+var rpList = null, rpPick = null, rpData = {}, rpLoading = false, rpRoll = null;
 
 function rpLoad() {
   if (rpLoading || rpList) return;
@@ -46,6 +46,15 @@ function rpLoad() {
       else render(false);
     })
     .catch(function () { rpList = []; rpLoading = false; render(false); });
+}
+
+function rpRollLoad() {
+  if (rpRoll) return;
+  rpRoll = "loading";
+  fetch("/admin/reports/rollups", { headers: { "x-admin-token": TOKEN } })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { rpRoll = j; render(false); })
+    .catch(function () { rpRoll = { byDept: [], byReason: [], failed: true }; render(false); });
 }
 
 function rpOpen(id) {
@@ -118,11 +127,55 @@ function vReportsCrm() {
   });
   h += '</tbody></table></div>';
 
+  h += vReportRollups();
+
   /* Same words as «المنتجات». The accounting basis is undecided and the screen says so rather than
      letting the reader assume one. */
   if (cur.valueBasis) {
     h += '<div class="rp-basis"><b>' + esc(cur.valueBasis.label) + '</b><br>' + esc(cur.valueBasis.note) + '</div>';
   }
+  return h;
+}
+
+/* The mockup's other two report blocks. «أين تتعثّر الصفقات» answers a different question from the
+   four named reports: not WHICH deals, but WHO is holding them. Ordered by the OLDEST blockage, not
+   by count — a department sitting on one deal for forty days is a worse problem than one holding six
+   for three, and sorting by count buries the row the block exists to surface. */
+function vReportRollups() {
+  rpRollLoad();
+  if (!rpRoll || rpRoll === "loading") return '<div class="rp-sec"><div class="crm-empty">جارٍ حساب التجميعات…</div></div>';
+
+  var h = '<div class="rp-sec"><div class="rp-h">أين تتعثّر الصفقات</div>' +
+    '<div class="rp-hs">الإجراءات المفتوحة حسب الإدارة المسؤولة، مرتّبة بالأقدم توقّفًا لا بالأكثر عددًا.</div>';
+  if (!rpRoll.byDept.length) {
+    h += '<div class="crm-empty"><b>' + esc(rpRoll.empty.dept.title) + '</b>' + esc(rpRoll.empty.dept.body) + '</div>';
+  } else {
+    rpRoll.byDept.forEach(function (d) {
+      h += '<div class="crm-row"><span class="crm-nm">' + esc(d.dept) + '</span>' +
+        '<span class="crm-sub">' + fmtN(d.openCount) + ' إجراء مفتوح</span>' +
+        '<span class="crm-end"><span class="rp-tot" style="margin:0">' + fmtN(Math.round(d.value)) + ' ر.س</span>' +
+        rpAge(d.oldestDays) + '</span></div>';
+    });
+  }
+  h += '</div>';
+
+  h += '<div class="rp-sec"><div class="rp-h">الخسائر حسب السبب</div>' +
+    '<div class="rp-hs">كل صفقة مغلقة خسارةً، حسب النتيجة التي أغلقتها. النتيجة تُقرأ من السجل ومن النشاط معًا: نتيجة تُسجَّل على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل السجل.</div>';
+  if (!rpRoll.byReason.length) {
+    h += '<div class="crm-empty"><b>' + esc(rpRoll.empty.reason.title) + '</b>' + esc(rpRoll.empty.reason.body) + '</div>';
+  } else {
+    var top = rpRoll.byReason[0].value || 1;
+    rpRoll.byReason.forEach(function (r) {
+      var pct = Math.round((r.value / top) * 100);
+      h += '<div class="crm-row"><span class="crm-nm">' + esc(r.label) + '</span>' +
+        '<span class="crm-sub">' + fmtN(r.count) + ' صفقة</span>' +
+        '<span class="crm-end">' +
+          '<div class="crm-bar" style="max-width:120px"><i style="width:' + pct + '%"></i></div>' +
+          '<span class="rp-tot" style="margin:0">' + fmtN(Math.round(r.value)) + ' ر.س</span>' +
+        '</span></div>';
+    });
+  }
+  h += '</div>';
   return h;
 }
 `;
