@@ -77,6 +77,52 @@ export const SEHA_CSS = `
 .sh-h{font-size:var(--t-md);font-weight:600;color:var(--ink);margin-block-end:3px}
 .sh-hs{font-size:var(--t-xs);color:var(--muted);margin-block-end:var(--s3);max-width:70ch;line-height:1.7}
 
+/* ---- RETROFIT: the older screens, brought onto the system's surfaces without rewriting their
+       render logic. Each already has the right STRUCTURE for its job — a KPI block, a list row, a
+       selectable data table — so what was missing is the surface: this system puts objects on
+       elevated --paper cards, where the previous one used tinted strips and hairlines.
+       The four DATA TABLES (#customers #opps #pipeline #targets) stay tabular on purpose. They
+       carry selection checkboxes and aligned columns; turning a selectable table into cards loses
+       column scanning and bulk select, and the approved system keeps dense data tabular too. ---- */
+
+/* #perf — the KPI block takes the tile shape: elevated, figure at the inline-end. */
+.perf-kpi{background:var(--paper);box-shadow:var(--sh-1);border-radius:var(--r-md);
+  padding:var(--s3) var(--s4);display:grid;grid-template-columns:1fr auto;
+  grid-template-areas:"k v" "s v";align-items:center;gap:0 var(--s3)}
+.perf-kpi .k{grid-area:k}
+.perf-kpi .s{grid-area:s}
+.perf-kpi .v{grid-area:v;justify-self:end;font-size:var(--t-2xl);line-height:1}
+.perf-kpi.lead{background:linear-gradient(180deg,var(--blue-tint),var(--paper))}
+.perf-kpi.lead .v{color:var(--blue);font-size:var(--t-3xl)}
+
+/* #kb — the service rows become cards. */
+.kbrow{background:var(--paper);box-shadow:var(--sh-1);border-radius:var(--r-md);
+  padding:var(--s3) var(--s4);margin-block-end:var(--s2);border:1px solid transparent;
+  transition:box-shadow var(--base) var(--ease),transform var(--base) var(--ease),border-color var(--base) var(--ease)}
+.kbrow:hover{box-shadow:var(--sh-3);transform:translateY(-2px);border-color:var(--blue-wash)}
+
+/* #notes — already card-shaped; given the system's elevation instead of a border. */
+.ncard{background:var(--paper);box-shadow:var(--sh-1);border-radius:var(--r-md);
+  border:1px solid transparent;padding:var(--s3) var(--s4)}
+
+/* #aimkt — the product picker takes the tile surface. */
+.prod{box-shadow:var(--sh-1);border-color:transparent!important}
+.prod:hover{box-shadow:var(--sh-3);transform:translateY(-2px)}
+.prod.on{border-color:var(--blue)!important;box-shadow:var(--sh-2)}
+
+/* The four data tables: the TABLE is the object, so the surface goes around it, not around each
+   row. Sticky header, because a table you scroll loses its column names otherwise. */
+.sh-table{background:var(--paper);border-radius:var(--r-md);box-shadow:var(--sh-1);
+  overflow:hidden;margin-block-end:var(--s4)}
+.sh-table table{width:100%;border-collapse:collapse}
+.sh-table thead th{position:sticky;inset-block-start:0;background:var(--surface);z-index:var(--z-sticky);
+  font-size:var(--t-xs);font-weight:600;color:var(--muted);text-align:start;
+  padding:10px var(--s3);border-block-end:1px solid var(--line)}
+.sh-table tbody tr{transition:background var(--fast) var(--ease)}
+.sh-table tbody tr:hover{background:var(--blue-tint)}
+.sh-table tbody td{padding:10px var(--s3);border-block-start:1px solid var(--line-soft);
+  font-size:var(--t-sm)}
+
 @media (max-width:560px){
   .sh-tiles{grid-template-columns:repeat(2,1fr)}
   .sh-card,.sh-tile{grid-template-columns:1fr}

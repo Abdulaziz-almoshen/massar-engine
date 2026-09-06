@@ -171,11 +171,20 @@ export const CAMPAIGNS_CRM_CSS = `
      layout was unreachable without !important until this moved here. .c-fig uses display:contents
      on the wide layout so its three children act as grid items, and becomes a flex line on the
      phone: ONE dom for both, never a parallel mobile row. */
-  /* Flush list, Frappe-style: no card, no radius, no shadow — rows separated by a hairline.
-     Scoped to .crmflat so the other modules' .tblwrap cards are untouched until their own cycle. */
-  .crmflat { background:#fff; border:0; border-radius:0; box-shadow:none; margin-bottom:18px; }
-  .crmflat .crow { border-top:1px solid #E3E9F1; }
+  /* THE TABLE IS THE OBJECT. This rule used to strip the card entirely — flush, no radius, no
+     shadow — which was the PREVIOUS design system's invariant. The approved Seha system puts
+     objects on elevated --paper surfaces, so the surface goes back, once, around the whole table
+     rather than around each row: these four screens carry selection checkboxes and aligned columns,
+     and turning a selectable table into cards would cost column scanning and bulk select for
+     nothing. Its own comment said "until their own cycle" — this is that cycle.
+     One rule, five screens: العملاء · لوحة المتابعة · المهام · جهات الاستهداف · الحملات. */
+  .crmflat { background:var(--paper); border:0; border-radius:var(--r-md);
+             box-shadow:var(--sh-1); overflow:hidden; margin-bottom:var(--s4); }
+  .crmflat .crow { border-top:1px solid var(--line-soft); transition:background var(--fast) var(--ease); }
   .crmflat .crow:first-of-type { border-top:0; }
+  /* A table you scroll loses its column names without this. */
+  .crmflat .thead { position:sticky; inset-block-start:0; background:var(--surface);
+                    z-index:var(--z-sticky); border-block-end:1px solid var(--line); }
   /* targets table: seven cells, seven tracks */
   .tgtrow { grid-template-columns: 40px 1.8fr 1fr 1.9fr 1.5fr .55fr .85fr; border-top:1px solid #E3E9F1; }
   /* every cell clips: an interest chip wider than its track was overlapping آخر رسالة */
