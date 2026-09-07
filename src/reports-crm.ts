@@ -11,9 +11,9 @@ export const REPORTS_CRM_CSS = `
 .rp-tabs{position:relative;display:flex;gap:2px;flex-wrap:wrap;margin-block-end:18px;
   border-block-end:1px solid var(--line-soft)}
 .rp-tab{appearance:none;background:transparent;border:0;border-radius:0;cursor:pointer;font-family:inherit;
-  font-size:14px;font-weight:450;color:var(--muted,#536170);letter-spacing:0;padding:8px 11px;
+  font-size:14px;font-weight:450;color:var(--muted,#6B6880);letter-spacing:0;padding:8px 11px;
   border-block-end:2px solid transparent;margin-block-end:-1px;display:inline-flex;align-items:center;gap:7px}
-.rp-tab:hover{color:var(--ink,#212529)}
+.rp-tab:hover{color:var(--ink,#16151F)}
 .rp-tab.on{color:var(--ink);font-weight:600}
 /* Same sliding indicator as the door tabs, from the same moveInd helper — one pattern, one
    implementation. Two strips that slide differently is how a product starts feeling assembled. */
@@ -21,13 +21,13 @@ export const REPORTS_CRM_CSS = `
   border-radius:var(--r-pill) var(--r-pill) 0 0;width:0;transform:translateX(0);
   transition:transform var(--base) var(--ease),width var(--base) var(--ease);pointer-events:none}
 .rp-tabs .ind.noanim{transition:none}
-.rp-tab .n{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted,#536170)}
-.rp-tab.on .n{color:var(--teal,#306DB5)}
-.rp-q{font-size:12px;color:var(--ink2,#3A3A3A);margin-block-end:4px}
-.rp-tot{font-size:12px;color:var(--muted,#536170);margin-block-end:14px;font-variant-numeric:tabular-nums}
+.rp-tab .n{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted,#6B6880)}
+.rp-tab.on .n{color:var(--teal,#6C5CE7)}
+.rp-q{font-size:12px;color:var(--ink2,#35333F);margin-block-end:4px}
+.rp-tot{font-size:12px;color:var(--muted,#6B6880);margin-block-end:14px;font-variant-numeric:tabular-nums}
 .rp-days{font-variant-numeric:tabular-nums;font-weight:600}
-.rp-basis{font-size:12px;color:var(--muted,#536170);margin-block-start:18px;line-height:1.7;
-  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#CBD7E4);max-width:66ch}
+.rp-basis{font-size:12px;color:var(--muted,#6B6880);margin-block-start:18px;line-height:1.7;
+  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#D6D1E8);max-width:66ch}
 `;
 
 export const REPORTS_CRM_JS = `
@@ -164,7 +164,7 @@ function vReportRollups() {
     var top = rpRoll.byReason[0].value || 1;
     /* One stacked bar over the reasons, then a card each — the same treatment the sector board
        gets, because the question is identical in shape: which part is biggest. */
-    var COLR = ["#D9534F", "#B37F00", "#416CAD", "#8C959F", "#629CCD"];
+    var COLR = ["#D9534F", "#B37F00", "#5A4BD6", "#7F8595", "#8B7BF5"];
     h += shStack(rpRoll.byReason.map(function (r, i) {
       return { n: r.label, v: r.value || 0, c: COLR[i % COLR.length] }; }));
     h += '<div class="sh-cards" style="margin-block-start:var(--s3)">';

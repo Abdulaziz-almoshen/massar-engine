@@ -25,11 +25,11 @@ BASE = os.environ.get("SMOKE_BASE") or os.environ.get("BASE") or "https://massar
 # route → a landmark that must exist if the view actually rendered
 ROUTES = [
     ("#home", "مركز القيادة"),
-    ("#kmon", "الحملات"),
+    ("#kmon", "كانبان"),
     # #customers became the العملاء LIST this cycle; the importer moved to #targets, which
     # is why both routes are asserted now — the old landmark would still pass on the wrong screen.
-    ("#customers", "العملاء"),
-    ("#targets", "جهات الاستهداف"),
+    ("#customers", "تجميع"),
+    ("#targets", "الشرائح"),
     # فرص البيع is the opportunity board (cycle opps-board): account cards over stored product
     # lines. Repointed from «جهة في السجل», which now renders only under its SECOND tab («فرز
     # الردود») — a landmark on a tab the route does not open would go red on a page that works.
@@ -41,14 +41,14 @@ ROUTES = [
     # distinction the #opps landmark was chosen for. A landmark inside the table would go red
     # whenever the catalogue is empty, which is a legitimate state, not a failure.
     ("#perf", "المتوقع من الفرص المفتوحة"),
-    ("#pipeline", "لوحة المتابعة"),
+    ("#pipeline", "إخفاقات"),
     # «المنتجات» and «التقارير» stopped being «قريبًا» placeholders. Both landmarks render from the
     # data, so they go red if the endpoint behind the screen breaks — which is the whole reason
     # these two screens exist.
     ("#products", "الكتالوج"),
     ("#reports", "الخسائر بسبب التكامل"),
-    ("#tasks", "المهام"),
-    ("#notes", "الملاحظات"),
+    ("#tasks", "الأولوية"),
+    ("#notes", "ملاحظة"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
@@ -210,8 +210,16 @@ def main() -> int:
             is_honest_empty = bool(empty_marker) and empty_marker in text
             if body_len < MIN_CHARS and not is_honest_empty:
                 failures.append(f"{route}: rendered only {body_len} chars (threshold {MIN_CHARS})")
-            if landmark not in text and not is_honest_empty:
-                failures.append(f"{route}: landmark «{landmark}» missing")
+            # SCOPED TO #body ON PURPOSE. Until 2026-09-07 this searched the whole page, so five
+            # routes were asserting a landmark that also appears in the nav rail or the breadcrumb
+            # — «الحملات», «العملاء», «جهات الاستهداف», «لوحة المتابعة», «المهام». Every one of
+            # them was green on a screen that rendered nothing, because the chrome always renders.
+            # A skeleton makes that worse, not better: it clears the char threshold too, so this
+            # assertion is now the only thing standing between a stuck fetch and a green deploy.
+            body_text = page.evaluate(
+                "() => (document.getElementById('body') || {}).innerText || ''")
+            if landmark not in body_text and not is_honest_empty:
+                failures.append(f"{route}: landmark «{landmark}» missing from #body")
             if errors:
                 failures.append(f"{route}: {len(errors)} runtime error(s) — {errors[0]}")
 

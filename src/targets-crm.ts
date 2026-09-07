@@ -24,23 +24,23 @@ export const TARGETS_CRM_CSS = `
      the same number in both directions — the arity bug class that wrapped three earlier tables. */
   .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.2fr 1.1fr 1fr 128px; padding-inline:20px 12px; }
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
-  .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#EDF1F7;
-    color:#3A3A3A; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
-  .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#212529; overflow:hidden;
+  .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#E9E6F4;
+    color:#35333F; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
+  .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#16151F; overflow:hidden;
     text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .t-seg { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; min-width:0; }
-  .tgtflat .crow .t-ph { font-size:12px; color:#536170; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
-  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#3A3A3A; min-width:0; }
+  .tgtflat .crow .t-ph { font-size:12px; color:#6B6880; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
+  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#35333F; min-width:0; }
   .tgtflat .crow .t-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
   .tgtflat .crow .t-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .tgtflat .crow .c-act { display:flex; justify-content:flex-end; }
-  .tgtdel { font-family:inherit; font-size:12px; color:#536170; background:transparent; border:1px solid #E3E9F1;
+  .tgtdel { font-family:inherit; font-size:12px; color:#6B6880; background:transparent; border:1px solid #EFEDF7;
     border-radius:6px; height:26px; padding:0 8px; cursor:pointer; white-space:nowrap; }
   .tgtdel:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
   .tgtdel.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; opacity:1 !important; }
-  .tgtopp { font-family:inherit; font-size:12px; color:#306DB5; background:#fff; border:1px solid #E3E9F1;
+  .tgtopp { font-family:inherit; font-size:12px; color:#6C5CE7; background:#fff; border:1px solid #EFEDF7;
     border-radius:6px; height:26px; padding:0 9px; cursor:pointer; white-space:nowrap; }
-  .tgtopp:hover { border-color:#629CCD; background:#EAF1F8; }
+  .tgtopp:hover { border-color:#8B7BF5; background:#EDEAFD; }
   /* The shared .crow rule hides the ENTIRE action cell until hover, which is right for a delete and
      wrong for the one thing this screen is asked for: «I onboarded leads, I called one, now what».
      An affordance you must already know about to discover is not an answer to that question. So the
@@ -57,18 +57,18 @@ export const TARGETS_CRM_CSS = `
   /* إدارة الوسوم */
   .tagsheet { position:fixed; inset:0; z-index:var(--z-toast); background:rgba(23,23,23,.32);
     display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
-  .tagsheet .sheet { background:#fff; border:1px solid #E3E9F1; border-radius:14px; width:100%;
+  .tagsheet .sheet { background:#fff; border:1px solid #EFEDF7; border-radius:14px; width:100%;
     max-width:520px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
   .tagsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#212529; }
-  .tagsheet .hint { font-size:12px; color:#536170; line-height:1.8; margin-top:6px; }
+  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#16151F; }
+  .tagsheet .hint { font-size:12px; color:#6B6880; line-height:1.8; margin-top:6px; }
   .tagsheet .mk { display:flex; gap:8px; margin:14px 0 4px; }
   .tagsheet .mk input { flex:1; min-width:0; height:34px; }
   .tagsheet .tlist { margin-top:6px; max-height:52vh; overflow-y:auto; }
-  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #E3E9F1; }
-  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:14px; color:#212529;
+  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #EFEDF7; }
+  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:14px; color:#16151F;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tagsheet .trow2 .ct { font-size:12px; color:#536170; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .tagsheet .trow2 .ct { font-size:12px; color:#6B6880; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
   .tagsheet .trow2 .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
   @media (max-width: 939px) {
@@ -125,13 +125,13 @@ function tgtFacetBar() {
   var groups = segGroups();
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:190px;max-width:300px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#6B6880;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tq" class="inp" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   groups.forEach(function (g, ki) {
     var on = Boolean(tgtFilters[g.key]);
     h += '<select class="crmsel' + (on ? " on" : "") + '" onchange="tgtSetAttr(' + ki + ', Number(this.value))"' +
-      (on ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + '>' +
+      (on ? ' style="border-color:#8B7BF5;color:#6C5CE7;background:#DDD6F7;"' : "") + '>' +
       '<option value="-1">' + esc(g.key) + ": الكل</option>" +
       g.values.map(function (v, vi) {
         return '<option value="' + vi + '"' + (tgtFilters[g.key] === v[0] ? " selected" : "") + '>' +
@@ -141,7 +141,7 @@ function tgtFacetBar() {
   var withProd = affinityProducts().filter(function (p) { return p.uses > 0 || p.name === tgtProd; });
   if (withProd.length) {
     h += '<select class="crmsel' + (tgtProd ? " on" : "") + '" onchange="tgtSetProd(this.value)"' +
-      (tgtProd ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + '>' +
+      (tgtProd ? ' style="border-color:#8B7BF5;color:#6C5CE7;background:#DDD6F7;"' : "") + '>' +
       '<option value="">الخدمة المستخدمة: الكل</option>' +
       withProd.map(function (p) {
         return '<option value="' + esc(p.name) + '"' + (tgtProd === p.name ? " selected" : "") + '>' +
@@ -158,7 +158,7 @@ function tgtFacetBar() {
 }
 
 function tgtHeader(allOn) {
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
+  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EFEDF7;font-size:12px;font-weight:500;color:#6B6880;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
       (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></div>' +
     "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>المرحلة</div><div></div></div>" +
@@ -185,7 +185,7 @@ function tgtRow(e) {
     '<div class="t-seg">' + (function () {
       var pc = prodChips(e);
       var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
-      return pc + attrChips(e, budget) || '<span style="color:#536170;font-size:12px;">—</span>';
+      return pc + attrChips(e, budget) || '<span style="color:#6B6880;font-size:12px;">—</span>';
     })() + "</div>" +
     '<div class="t-ph">+' + esc(e.phone) + "</div>" +
     '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
@@ -193,19 +193,23 @@ function tgtRow(e) {
        leads, I called one, now what» — the act belongs on the lead, not on a form three screens
        away that makes you retype its name. It is hover-revealed and neutral like the delete beside
        it; nothing here writes on one click — it opens a prefilled form the operator still submits. */
-    '<div class="c-act">' + (armed
-      ? '<button class="tgtdel arm" onclick="event.stopPropagation();entDel(' + e.id + ')">تأكيد الحذف</button>' +
-        '<button class="tgtdel armx" style="margin-inline-start:6px;" onclick="event.stopPropagation();tgtArmDel(0)">تراجع</button>'
-      : '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' +
-        '<button class="tgtdel" style="margin-inline-start:6px;" title="حذف الجهة" onclick="event.stopPropagation();tgtArmDel(' + e.id + ')">حذف</button>') + "</div>" +
+    // hold-to-confirm (DESIGN.md 8.5). The armed/تراجع pair is gone: the gesture IS the
+    // confirmation, and releasing early is the undo. Keyboard still arms in two steps.
+    '<div class="c-act">' +
+      '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' +
+      '<button class="rv-hold rv-hold-sm" style="margin-inline-start:6px;" data-do="entDel" data-arg="' + e.id + '"' +
+        ' data-idle="حذف" data-holding="استمر…" data-armed="اضغط مرة أخرى" aria-pressed="false"' +
+        ' title="اضغط مع الاستمرار لحذف الجهة" onclick="event.stopPropagation();">' +
+        '<span class="rv-fill"></span><span class="rv-lbl">حذف</span></button>' +
+    "</div>" +
     "</div>";
 }
 
 function tgtImportBox() {
   return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
-    'style="background:#fff;border:1px solid #E3E9F1;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
-    '<summary style="font-size:12px;color:#3A3A3A;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
-    '<div style="font-size:12px;color:#536170;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
+    'style="background:#fff;border:1px solid #EFEDF7;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
+    '<summary style="font-size:12px;color:#35333F;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
+    '<div style="font-size:12px;color:#6B6880;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-dark" onclick="entManualSave()">حفظ الجهات ←</button>' +
@@ -213,7 +217,7 @@ function tgtImportBox() {
     '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
     '<button class="btn btn-ghost" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
     '<div id="pastebox" style="display:none;margin-top:12px;">' +
-    '<div style="font-size:12px;color:#536170;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#212529;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
+    '<div style="font-size:12px;color:#6B6880;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#16151F;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
     '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12px;line-height:2;resize:vertical;"></textarea>' +
     '<button class="btn btn-ghost" style="margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
     "</details>";
@@ -243,7 +247,7 @@ function vTargetsCrm() {
   h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
   shown.forEach(function (e) { h += tgtRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;">لا جهة تطابق هذا الفرز.</div>';
+    h += '<div style="padding:44px;text-align:center;color:#6B6880;font-size:14px;">لا جهة تطابق هذا الفرز.</div>';
   }
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
@@ -271,7 +275,7 @@ function tgtBulkBar() {
   }
   return '<div class="bulkbar"><div>' +
     '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#212529;border-radius:999px;">' +
+    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#16151F;border-radius:999px;">' +
     tags.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(clip(t.name, 30)) + "</option>"; }).join("") +
     "</select>" +
     '<button class="pri"' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(true)">' +

@@ -46,12 +46,12 @@ export type SalesStage = {
 };
 
 export const SALES_STAGES: readonly SalesStage[] = [
-  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, dot: "#A9B4C0", stalls: false, terminal: null,   exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
-  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, dot: "#536170", stalls: false, terminal: null,   exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
-  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, dot: "#416CAD", stalls: false, terminal: null,   exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
+  { key: "contact",   label: "تواصل أولي",        weightPct: 10,  position: 1, dot: "#A9AEBE", stalls: false, terminal: null,   exitCriterion: "وصلنا لصاحب القرار وأبدى اهتمامًا مبدئيًا" },
+  { key: "discover",  label: "اكتشاف الحاجة",      weightPct: 25,  position: 2, dot: "#6B6880", stalls: false, terminal: null,   exitCriterion: "تأكدت الحاجة والحجم وصاحب القرار والميزانية" },
+  { key: "present",   label: "عرض المنتج",         weightPct: 45,  position: 3, dot: "#5A4BD6", stalls: false, terminal: null,   exitCriterion: "تم تقديم المنتج وقبول العميل للقيمة" },
   { key: "tech",      label: "التقييم التقني",      weightPct: 65,  position: 4, dot: "#7A5CC4", stalls: true,  terminal: null,   exitCriterion: "اجتاز التكامل مع صحة/صحتي ومتطلبات الأمن" },
-  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, dot: "#3A3A3A", stalls: false, terminal: null,   exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
-  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, dot: "#306DB5", stalls: true,  terminal: null,   exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
+  { key: "quote",     label: "عرض السعر",          weightPct: 80,  position: 5, dot: "#35333F", stalls: false, terminal: null,   exitCriterion: "تم إرسال عرض سعر مقبول مبدئيًا" },
+  { key: "negotiate", label: "التفاوض والاعتماد",   weightPct: 90,  position: 6, dot: "#6C5CE7", stalls: true,  terminal: null,   exitCriterion: "توافق على الشروط ودخول التعاقد/المشتريات" },
   { key: "won",       label: "إغلاق – ربح",        weightPct: 100, position: 7, dot: "#12633F", stalls: false, terminal: "won",  exitCriterion: "تم التوقيع والاعتماد" },
   { key: "lost",      label: "إغلاق – خسارة",      weightPct: 0,   position: 8, dot: "#8E2A27", stalls: false, terminal: "lost", exitCriterion: "اعتذر العميل (سجّل السبب)" },
 ];

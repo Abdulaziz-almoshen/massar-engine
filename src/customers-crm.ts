@@ -42,22 +42,22 @@ var cusSel = {};
    outcome reads «جديد», not a guessed state. */
 var CUS_OUTCOME = [
   { key: "interested",     label: "مهتم",           dot: "#12633F" },
-  { key: "scheduled",      label: "موعد محدَّد",     dot: "#306DB5" },
-  { key: "handoff",        label: "تحويل لمندوب",   dot: "#416CAD" },
+  { key: "scheduled",      label: "موعد محدَّد",     dot: "#6C5CE7" },
+  { key: "handoff",        label: "تحويل لمندوب",   dot: "#5A4BD6" },
   { key: "later",          label: "لاحقًا",          dot: "#7A5600" },
-  { key: "not_interested", label: "غير مهتم",       dot: "#536170" },
-  { key: "closed",         label: "مغلق",           dot: "#536170" },
+  { key: "not_interested", label: "غير مهتم",       dot: "#6B6880" },
+  { key: "closed",         label: "مغلق",           dot: "#6B6880" },
   { key: "stopped",        label: "أوقف الرسائل",   dot: "#8E2A27" },
   { key: "opted_out",      label: "ألغى الاشتراك",  dot: "#8E2A27" }
 ];
 function cusOutcome(c) {
   if (c.optedOut) return { key: "opted_out", label: "ألغى الاشتراك", dot: "#8E2A27" };
   for (var i = 0; i < CUS_OUTCOME.length; i++) if (CUS_OUTCOME[i].key === c.outcome) return CUS_OUTCOME[i];
-  return { key: "new", label: "جديد", dot: "#A9B4C0" };
+  return { key: "new", label: "جديد", dot: "#A9AEBE" };
 }
 /* Interest is the STRONGEST tag the assistant recorded, with its product. Tags are the assistant's
    reading, so the level is shown with its own word and never merged into the outcome column. */
-var CUS_LVL = { hot: { label: "نية مرتفعة", dot: "#12633F" }, warm: { label: "اهتمام", dot: "#7A5600" }, cold: { label: "فاتر", dot: "#A9B4C0" } };
+var CUS_LVL = { hot: { label: "نية مرتفعة", dot: "#12633F" }, warm: { label: "اهتمام", dot: "#7A5600" }, cold: { label: "فاتر", dot: "#A9AEBE" } };
 function cusTopTag(c) {
   var tags = c.tags || [], best = null;
   var rank = { hot: 3, warm: 2, cold: 1 };
@@ -111,37 +111,37 @@ function cusRow(c) {
     ' onkeydown="if(event.key===&quot;Enter&quot;){location.hash=&quot;customer/' + esc(c.phone) + '&quot;}">' +
     '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(nm) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();cusToggle(&quot;' + esc(c.phone) + '&quot;)"></div>' +
     '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;">' +
-      '<span role="img" aria-label="' + (c.test ? "جهة تجريبية" : "جهة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (c.test ? "#CBD7E4" : "#306DB5") + ';"></span>' +
-      '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#212529;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</div></div>' +
+      '<span role="img" aria-label="' + (c.test ? "جهة تجريبية" : "جهة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (c.test ? "#D6D1E8" : "#6C5CE7") + ';"></span>' +
+      '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#16151F;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</div></div>' +
       /* only show the phone as a SECOND line when the name is not already the phone — a nameless
          contact was rendering the same number twice, at two different weights. */
-      (c.waName ? '<span style="font-size:12px;color:#536170;flex:none;direction:ltr;">' + esc(c.phone) + '</span>' : "") + '</div>' +
+      (c.waName ? '<span style="font-size:12px;color:#6B6880;flex:none;direction:ltr;">' + esc(c.phone) + '</span>' : "") + '</div>' +
     '<div class="c-meta">' +
-      '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:14px;color:#3A3A3A;">' + oc.label + '</span></div>' +
+      '<div class="c-prod taglvl" title="' + esc(oc.hint) + '"><span class="d" style="background:' + oc.dot + ';"></span><span style="font-size:14px;color:#35333F;">' + oc.label + '</span></div>' +
       '<div class="c-state">' + (c.human ? '<span style="font-size:12px;color:#7A5600;">تدخّل بشري</span>' :
-        (since ? '<span style="font-size:12px;color:#536170;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
+        (since ? '<span style="font-size:12px;color:#6B6880;">منذ ' + fmtAgo(Date.now() - since) + '</span>' : "")) + '</div>' +
     '</div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num" style="text-align:start;">' + (lvl
-        ? '<span class="taglvl"><span class="d" style="background:' + lvl.dot + ';"></span><span style="font-size:14px;color:#3A3A3A;">' + lvl.label + '</span></span>' +
-          '<span style="font-size:12px;color:#536170;"> · ' + esc(tag.product) + '</span>'
-        : '<span style="font-size:14px;color:#536170;">—</span>') + '</div>' +
+        ? '<span class="taglvl"><span class="d" style="background:' + lvl.dot + ';"></span><span style="font-size:14px;color:#35333F;">' + lvl.label + '</span></span>' +
+          '<span style="font-size:12px;color:#6B6880;"> · ' + esc(tag.product) + '</span>'
+        : '<span style="font-size:14px;color:#6B6880;">—</span>') + '</div>' +
       '<div class="c-num">' + fmtN(msgs) + '</div>' +
-      '<div class="c-num" style="text-align:start;font-weight:450;color:#536170;font-size:12px;">' + (c.lastEventAt ? fmtD(c.lastEventAt) : "—") + '</div>' +
+      '<div class="c-num" style="text-align:start;font-weight:450;color:#6B6880;font-size:12px;">' + (c.lastEventAt ? fmtD(c.lastEventAt) : "—") + '</div>' +
     '</div>' +
-    '<div class="c-act" style="text-align:center;"><span style="color:#536170;font-size:14px;">‹</span></div>' +
+    '<div class="c-act" style="text-align:center;"><span style="color:#6B6880;font-size:14px;">‹</span></div>' +
   '</div>';
 }
 
 function cusHeader(allOn) {
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #E3E9F1;font-size:12px;font-weight:500;color:#536170;">' +
+  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #EFEDF7;font-size:12px;font-weight:500;color:#6B6880;">' +
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="cusTogglePage()"></div>' +
     '<div>العميل</div>' +
     '<div class="c-meta"><div>المرحلة</div><div></div></div>' +
     '<div class="c-fig fig">' +
-      '<div class="c-num" style="text-align:start;color:#536170;font-size:12px;">اهتمام المساعد</div>' +
-      '<div class="c-num" style="color:#536170;font-size:12px;">الرسائل</div>' +
-      '<div class="c-num" style="text-align:start;color:#536170;font-size:12px;">آخر نشاط</div>' +
+      '<div class="c-num" style="text-align:start;color:#6B6880;font-size:12px;">اهتمام المساعد</div>' +
+      '<div class="c-num" style="color:#6B6880;font-size:12px;">الرسائل</div>' +
+      '<div class="c-num" style="text-align:start;color:#6B6880;font-size:12px;">آخر نشاط</div>' +
     '</div>' +
     '<div></div></div>' +
     /* Below 940px .thead-wide is hidden, so without this the list had NO header at all on phone and
@@ -162,7 +162,7 @@ function cusControlBar(nTotal) {
   ];
   var h = '<div class="crmbar rise">';
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#536170;display:flex;">' + ic("search", 17) + '</span>' +
+    '<span style="position:absolute;inset-inline-start:13px;color:#6B6880;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="cusq" class="inp" value="' + esc(cusQ) + '" oninput="cusSearch(this)" placeholder="ابحث بالاسم أو الرقم أو الخدمة…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
   h += '<span class="vtog">' + [["list", "قائمة"], ["group", "تجميع"]].map(function (v) {
       return '<button class="' + (cusView === v[0] ? "on" : "") + '" onclick="cusSetView(&quot;' + v[0] + '&quot;)">' + v[1] + '</button>';
@@ -186,7 +186,7 @@ function cusControlBar(nTotal) {
   var tags = tagList();
   if (tags.length) {
     h += '<select onchange="cusSetTag(this.value)" class="crmsel"' +
-      (cusTagF ? ' style="border-color:#629CCD;color:#306DB5;background:#DDEAF3;"' : "") + '>' +
+      (cusTagF ? ' style="border-color:#8B7BF5;color:#6C5CE7;background:#DDD6F7;"' : "") + '>' +
       '<option value="">الوسم: الكل</option>' +
       tags.map(function (t) {
         return '<option value="' + esc(t.name) + '"' + (cusTagF === t.name ? " selected" : "") + '>' +
@@ -205,7 +205,7 @@ function cusListView(rows) {
   var h = '<div class="tblwrap crmflat cusflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + cusHeader(allOn);
   shown.forEach(function (c) { h += cusRow(c); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#536170;font-size:14px;line-height:1.9;">' +
+    h += '<div style="padding:44px;text-align:center;color:#6B6880;font-size:14px;line-height:1.9;">' +
       (cusQ.trim() ? 'لا جهة تطابق «' + esc(cusQ.trim()) + '».' : 'لا جهات في هذا التبويب.') + '</div>';
   }
   h += '</div></div>';
@@ -234,16 +234,16 @@ function cusGroupView(rows) {
     order.sort(function (a, b) { return (pos[a] || 99) - (pos[b] || 99); });
   }
   if (order.length <= 1) {
-    return '<div class="sparse rise">' + ic("eye", 16, "#306DB5") +
+    return '<div class="sparse rise">' + ic("eye", 16, "#6C5CE7") +
       '<div>كل الجهات في مجموعة واحدة — التجميع لا يضيف شيئًا هنا. ' +
-      '<span class="lnk" onclick="cusSetView(&quot;list&quot;)" style="color:#306DB5;font-weight:500;cursor:pointer;">→ عد إلى القائمة</span></div></div>' + cusListView(rows);
+      '<span class="lnk" onclick="cusSetView(&quot;list&quot;)" style="color:#6C5CE7;font-weight:500;cursor:pointer;">→ عد إلى القائمة</span></div></div>' + cusListView(rows);
   }
   var h = "";
   order.forEach(function (k) {
     var g = by[k].slice(0, LIST_CAP);   /* per-group preview; the flat list paginates */
     h += '<div class="tblwrap crmflat cusflat rise" style="margin-bottom:14px;">' +
-      '<div style="display:flex;align-items:center;gap:9px;padding:8px 20px 8px 12px;border-bottom:1px solid #E3E9F1;background:#F4F6F9;">' +
-      '<span style="font-size:14px;font-weight:500;color:#212529;">' + esc(k) + '</span>' +
+      '<div style="display:flex;align-items:center;gap:9px;padding:8px 20px 8px 12px;border-bottom:1px solid #EFEDF7;background:#F0EEF9;">' +
+      '<span style="font-size:14px;font-weight:500;color:#16151F;">' + esc(k) + '</span>' +
       '<span class="cntpill">' + fmtN(by[k].length) + '</span></div>' +
       '<div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + cusHeader(false);
     g.forEach(function (c) { h += cusRow(c); });
@@ -270,7 +270,7 @@ function vCustomersCrm() {
   if (!((cache && cache.contacts) || []).length) {
     return '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div>' +
       '<div class="t">لا جهات بعد</div><div class="s">ارفع ملف جهات الاستهداف من ' +
-      '<a href="#targets" style="color:#306DB5;font-weight:500;">جهات الاستهداف</a> — كل جهة تظهر هنا بعد أول رسالة.</div></div>';
+      '<a href="#targets" style="color:#6C5CE7;font-weight:500;">جهات الاستهداف</a> — كل جهة تظهر هنا بعد أول رسالة.</div></div>';
   }
   var h = cusControlBar(rows.length);
   h += cusView === "group" ? cusGroupView(rows) : cusListView(rows);
@@ -284,7 +284,7 @@ function cusPaintCrumb() {
   if (act) {
     act.innerHTML = '<a href="#targets" class="btn" style="text-decoration:none;display:inline-flex;' +
       'align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;font-size:14px;' +
-      'font-weight:500;color:#fff;background:#306DB5;border:none;">' + ic("up", 15, "#fff") + ' استيراد جهات</a>';
+      'font-weight:500;color:#fff;background:#6C5CE7;border:none;">' + ic("up", 15, "#fff") + ' استيراد جهات</a>';
   }
 }
 

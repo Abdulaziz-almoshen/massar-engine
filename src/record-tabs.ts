@@ -16,11 +16,11 @@
 export const RECORD_TABS_CSS = `
   /* EXACT-1: tab list min-height 45px, gap-7.5 = 30px, px-5 */
   .rtabs { display:flex; gap:30px; min-height:45px; align-items:center; padding-inline:20px;
-    border-bottom:1px solid #E3E9F1; margin-bottom:14px; flex-wrap:wrap; }
-  .rtabs button { font-family:inherit; font-size:14px; font-weight:500; color:#536170; background:none;
+    border-bottom:1px solid #EFEDF7; margin-bottom:14px; flex-wrap:wrap; }
+  .rtabs button { font-family:inherit; font-size:14px; font-weight:500; color:#6B6880; background:none;
     border:none; border-bottom:2px solid transparent; padding:0 0 10px; cursor:pointer; white-space:nowrap; }
-  .rtabs button.on { color:#306DB5; border-bottom-color:#306DB5; }
-  .rtabs button:focus-visible { outline:2px solid #306DB5; outline-offset:2px; }
+  .rtabs button.on { color:#6C5CE7; border-bottom-color:#6C5CE7; }
+  .rtabs button:focus-visible { outline:2px solid #6C5CE7; outline-offset:2px; }
   /* the tabbed card drops its own frame — the tab bar already bounds it */
   .rpanel > .card { margin:0; border:0; padding:0; }
   .rpanel > .card > h3, .rpanel > .card > div > h3 { display:none; }
@@ -30,43 +30,43 @@ export const RECORD_TABS_CSS = `
      ran 800px per line — three times a comfortable measure and genuinely hard to read. The thread
      is capped at 640px and sits on a wallpaper, the way every messaging client does it. */
   .rconv { display:flex; flex-direction:column; gap:8px; max-height:560px; overflow-y:auto;
-    padding:16px; background:#F4F6F9; border:1px solid #E3E9F1; border-radius:10px; }
+    padding:16px; background:#F0EEF9; border:1px solid #EFEDF7; border-radius:10px; }
   .rconv .b { max-width:min(78%, 460px); padding:8px 11px; border-radius:10px; font-size:14px;
     line-height:1.75; white-space:pre-wrap; word-break:break-word; position:relative;
     box-shadow:0 1px 1px rgba(0,0,0,.04); }
   /* Arabic WhatsApp: OUR outgoing sits at the end (left) in green, THEIR incoming at the start
      (right) in white. Both were inverted before — the customer's words were green on the left. */
-  .rconv .b.ag { align-self:flex-end;   background:#DCF8C6; color:#212529; border-end-end-radius:3px; }
-  .rconv .b.cu { align-self:flex-start; background:#fff;    color:#212529; border:1px solid #E3E9F1;
+  .rconv .b.ag { align-self:flex-end;   background:#DCF8C6; color:#16151F; border-end-end-radius:3px; }
+  .rconv .b.cu { align-self:flex-start; background:#fff;    color:#16151F; border:1px solid #EFEDF7;
     border-end-start-radius:3px; }
-  .rconv .b.sy { align-self:center; background:transparent; border:0; color:#536170; font-size:12px;
+  .rconv .b.sy { align-self:center; background:transparent; border:0; color:#6B6880; font-size:12px;
     box-shadow:none; text-align:center; max-width:80%; }
   /* no min-width: «نعم» should be a small bubble, not a 150px box with the word pushed to one edge */
-  .rconv .t { font-size:12px; color:#536170; margin-top:3px; text-align:end; }
+  .rconv .t { font-size:12px; color:#6B6880; margin-top:3px; text-align:end; }
   .rconv .b.sy .t { display:none; }
 
   /* Frappe's side panel sections collapse. The rail was 856px beside a 456px main. */
   .rsec > h3, .rsec > div > h3 { cursor:pointer; user-select:none; }
   .rsec.shut > *:not(h3):not(.rsechd) { display:none; }
   .rsechd { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
-    font-size:14px; font-weight:600; color:#212529; }
-  .rsechd .cv { margin-inline-start:auto; color:#536170; font-size:12px; transition:transform .12s; }
+    font-size:14px; font-weight:600; color:#16151F; }
+  .rsechd .cv { margin-inline-start:auto; color:#6B6880; font-size:12px; transition:transform .12s; }
   .rsec.shut .rsechd .cv { transform:rotate(-90deg); }
 
   /* tasks + notes */
-  .rtask { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-top:1px solid #E3E9F1; }
+  .rtask { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-top:1px solid #EFEDF7; }
   .rtask:first-of-type { border-top:0; }
-  .rtask .cb { width:16px; height:16px; accent-color:#306DB5; margin-top:2px; flex:none; cursor:pointer; }
-  .rtask .ti { font-size:14px; font-weight:450; color:#212529; }
-  .rtask.done .ti { color:#536170; text-decoration:line-through; }
-  .rtask .mt { font-size:12px; color:#536170; margin-top:3px; display:flex; gap:10px; flex-wrap:wrap; }
-  .rnote { border:1px solid #E3E9F1; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
-  .rnote .nt { font-size:14px; font-weight:500; color:#212529; }
-  .rnote .nc { font-size:14px; color:#3A3A3A; line-height:1.8; margin-top:5px; white-space:pre-wrap; }
-  .rnote .nm { font-size:12px; color:#536170; margin-top:6px; }
+  .rtask .cb { width:16px; height:16px; accent-color:#6C5CE7; margin-top:2px; flex:none; cursor:pointer; }
+  .rtask .ti { font-size:14px; font-weight:450; color:#16151F; }
+  .rtask.done .ti { color:#6B6880; text-decoration:line-through; }
+  .rtask .mt { font-size:12px; color:#6B6880; margin-top:3px; display:flex; gap:10px; flex-wrap:wrap; }
+  .rnote { border:1px solid #EFEDF7; border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .rnote .nt { font-size:14px; font-weight:500; color:#16151F; }
+  .rnote .nc { font-size:14px; color:#35333F; line-height:1.8; margin-top:5px; white-space:pre-wrap; }
+  .rnote .nm { font-size:12px; color:#6B6880; margin-top:6px; }
   .radd { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
-  .radd input, .radd select { font-family:inherit; font-size:14px; height:32px; border:1px solid #E3E9F1;
-    border-radius:6px; padding:0 10px; background:#fff; color:#212529; }
+  .radd input, .radd select { font-family:inherit; font-size:14px; height:32px; border:1px solid #EFEDF7;
+    border-radius:6px; padding:0 10px; background:#fff; color:#16151F; }
   .radd input { flex:1; min-width:180px; }
 `;
 
@@ -199,7 +199,7 @@ function recEntityPanel(kind) {
   }
   var btn = document.createElement("button");
   btn.className = "btn";
-  btn.style.cssText = "color:#fff;background:#306DB5;";
+  btn.style.cssText = "color:#fff;background:#6C5CE7;";
   btn.textContent = "إضافة";
   add.appendChild(btn);
   wrap.appendChild(add);
@@ -244,7 +244,7 @@ function recLoadEntities(kind, ph, list) {
       list.removeAttribute("aria-busy");
       if (!rows.length) {
         list.textContent = kind === "tasks" ? "لا مهام على هذا العميل." : "لا ملاحظات على هذا العميل.";
-        list.style.color = "#536170";
+        list.style.color = "#6B6880";
         return;
       }
       list.style.color = "";

@@ -28,17 +28,18 @@ const ratio = (a, b) => {
 };
 
 // Tokens that may never be a text colour, with their measured ratio on --paper.
-const NEVER_TEXT = { "#A9B4C0": "--s-off (2.10:1)", "#CBD7E4": "--line (1.46:1)",
-                     "#E3E9F1": "--line-soft (1.22:1)", "#EEF1F4": "--s-off-soft" };
+const NEVER_TEXT = { "#A9AEBE": "--s-off (2.21:1)", "#D6D1E8": "--line (1.48:1)",
+                     "#EFEDF7": "--line-soft (1.16:1)", "#EFEEF5": "--s-off-soft" };
 // Status BASE values that have a -mark variant; the base is a fill, the mark is a dot.
 const NEEDS_MARK = { "#D99A00": "--s-attn -> --s-attn-mark #B37F00",
-                     "#629CCD": "--s-sched -> --s-sched-mark #4A7FB0" };
+                     "#8B7BF5": "--s-sched -> --s-sched-mark #7A6BEE" };
 
 // Every colour DESIGN.md section 2 defines. A text colour outside this set is unmeasured.
-const TOKENS = new Set(["#306DB5","#416CAD","#629CCD","#EAF1F8","#DDEAF3","#FFFFFF","#F4F6F9",
-  "#EDF1F7","#CBD7E4","#E3E9F1","#212529","#3A3A3A","#536170","#1E9E63","#E4F5EC","#12633F",
-  "#D99A00","#FFF5D6","#7A5600","#B37F00","#D9534F","#FBE7E6","#8E2A27","#E8F0F8","#2A5988",
-  "#E9EEF7","#2C4A78","#EAF1F8","#255490","#A9B4C0","#EEF1F4","#4A5560","#4A7FB0","#8C959F",
+const TOKENS = new Set(["#6C5CE7","#5A4BD6","#8B7BF5","#EDEAFD","#DDD6F7","#FFFFFF","#F0EEF9",
+  "#E9E6F4","#D6D1E8","#EFEDF7","#16151F","#35333F","#6B6880","#1E9E63","#E4F5EC","#12633F",
+  "#D99A00","#FFF5D6","#7A5600","#B37F00","#D9534F","#FBE7E6","#8E2A27","#E9E6F9","#4B3FBF",
+  "#EAE7F7","#453A9E","#A9AEBE","#EFEEF5","#4A5560","#7A6BEE","#7F8595",
+  "#F7F6FC","#F4F2FD",
   "#DCF8C6","#E5DDD4",
   // Text ON the quoted WhatsApp bubble ground (#DCF8C6), not on --paper. Measuring these
   // against the page would be measuring the wrong pair.
@@ -46,16 +47,26 @@ const TOKENS = new Set(["#306DB5","#416CAD","#629CCD","#EAF1F8","#DDEAF3","#FFFF
 
 // Re-derived on every run so the table in DESIGN.md 3.0 cannot drift from reality.
 const TOKEN_RATIOS = [
-  ["--muted on --paper", "#536170", "#FFFFFF", 4.5],
-  ["--blue on --paper", "#306DB5", "#FFFFFF", 4.5],
-  ["white on --blue", "#FFFFFF", "#306DB5", 4.5],
+  ["--muted on --paper", "#6B6880", "#FFFFFF", 4.5],
+  ["--muted on --surface", "#6B6880", "#F0EEF9", 4.5],
+  ["--accent on --paper", "#6C5CE7", "#FFFFFF", 4.5],
+  ["white on --accent", "#FFFFFF", "#6C5CE7", 4.5],
+  // Both stops of --grad, because white labels sit on it.
+  ["white on --grad dark stop", "#FFFFFF", "#4B3FBF", 4.5],
+  ["white on --grad light stop", "#FFFFFF", "#6C5CE7", 4.5],
   ["--s-issued-text on soft", "#12633F", "#E4F5EC", 4.5],
   ["--s-attn-text on soft", "#7A5600", "#FFF5D6", 4.5],
   ["--s-fail-text on soft", "#8E2A27", "#FBE7E6", 4.5],
-  ["--s-sched-text on soft", "#2A5988", "#E8F0F8", 4.5],
+  ["--s-sched-text on soft", "#4B3FBF", "#E9E6F9", 4.5],
+  ["--s-review-text on soft", "#453A9E", "#EAE7F7", 4.5],
+  ["--s-attend-text on soft", "#4B3FBF", "#EDEAFD", 4.5],
+  ["--s-off-text on soft", "#4A5560", "#EFEEF5", 4.5],
   ["--s-attn-mark as a mark", "#B37F00", "#FFFFFF", 3.0],
-  ["--s-sched-mark as a mark", "#4A7FB0", "#FFFFFF", 3.0],
-  ["--s-off-mark as a mark", "#8C959F", "#FFFFFF", 3.0],
+  ["--s-sched-mark as a mark", "#7A6BEE", "#FFFFFF", 3.0],
+  ["--s-off-mark as a mark", "#7F8595", "#FFFFFF", 3.0],
+  // The accent mark must clear 3:1 on the TINTED row ground too, not just paper — that is the
+  // ground the old --s-sched failed on at 2.93:1.
+  ["--accent-mark on --surface", "#7A6BEE", "#F0EEF9", 3.0],
 ];
 
 const findings = { textOnForbidden: [], untokenisedText: [], intZIndex: [], offLadderType: [] };

@@ -26,13 +26,13 @@ export const REP_PAGE_HTML: string = `<!doctype html>
      the DESIGN.md 2 names, with the three old names kept as aliases so existing var() calls in
      this file keep resolving. A second token vocabulary is how two surfaces of one product start
      looking like two products. */
-  :root{ --paper:#FFFFFF; --surface:#F4F6F9; --line:#CBD7E4; --line-soft:#E3E9F1;
-         --ink:#212529; --ink-2:#3A3A3A; --muted:#536170; --blue:#306DB5;
+  :root{ --paper:#FFFFFF; --surface:#F0EEF9; --line:#D6D1E8; --line-soft:#EFEDF7;
+         --ink:#16151F; --ink-2:#35333F; --muted:#6B6880; --blue:#6C5CE7;
          --z-base:0; --z-sticky:100; --z-dropdown:200; --z-overlay:300;
          --z-modal:310; --z-toast:400; --z-tooltip:500;
          --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
          /* aliases, pre-rebrand names still referenced in this file */
-         --ink2:#3A3A3A; --line2:#E3E9F1; --strip:#F4F6F9; --card:#FFFFFF; --teal:#306DB5; }
+         --ink2:#35333F; --line2:#EFEDF7; --strip:#F0EEF9; --card:#FFFFFF; --teal:#6C5CE7; }
   *{box-sizing:border-box}
   body{margin:0;background:var(--strip);color:var(--ink);
        font-family:Cairo,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:450;font-size:14px;

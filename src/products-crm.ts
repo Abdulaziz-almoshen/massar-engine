@@ -12,19 +12,19 @@
 
 export const PRODUCTS_CRM_CSS = `
 .pc-sec{margin-block-end:26px}
-.pc-h{font-size:14px;font-weight:600;color:var(--ink,#212529);margin-block-end:3px}
-.pc-sub{font-size:12px;color:var(--muted,#536170);margin-block-end:12px;max-width:70ch;line-height:1.7}
-.pc-note{font-size:12px;color:var(--muted,#536170);margin-block-start:8px;line-height:1.7;
-  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#CBD7E4);max-width:66ch}
+.pc-h{font-size:14px;font-weight:600;color:var(--ink,#16151F);margin-block-end:3px}
+.pc-sub{font-size:12px;color:var(--muted,#6B6880);margin-block-end:12px;max-width:70ch;line-height:1.7}
+.pc-note{font-size:12px;color:var(--muted,#6B6880);margin-block-start:8px;line-height:1.7;
+  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#D6D1E8);max-width:66ch}
 .pc-assumed{font-size:12px;font-weight:600;color:#7A5600;margin-inline-start:5px}
-.pc-price{font-size:12px;color:var(--ink2,#3A3A3A);font-variant-numeric:tabular-nums}
-.pc-pkg{font-size:12px;color:var(--muted,#536170)}
+.pc-price{font-size:12px;color:var(--ink2,#35333F);font-variant-numeric:tabular-nums}
+.pc-pkg{font-size:12px;color:var(--muted,#6B6880)}
 .pc-q{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.pc-qc{background:var(--strip,#F4F6F9);border-radius:10px;padding:12px 14px}
-.pc-qc .k{font-size:12px;color:var(--muted,#536170);font-weight:600}
+.pc-qc{background:var(--strip,#F0EEF9);border-radius:10px;padding:12px 14px}
+.pc-qc .k{font-size:12px;color:var(--muted,#6B6880);font-weight:600}
 .pc-qc .v{font-size:16px;font-weight:600;margin-block:4px 2px;font-variant-numeric:tabular-nums}
-.pc-qc .t{font-size:12px;color:var(--muted,#536170);font-variant-numeric:tabular-nums}
-.pc-qc.now{background:#EAF1F8}
+.pc-qc .t{font-size:12px;color:var(--muted,#6B6880);font-variant-numeric:tabular-nums}
+.pc-qc.now{background:#EDEAFD}
 /* Four quarters at 84px each on a phone is four unreadable columns. Two rows of two. 560 = --bp-sm
    (DESIGN.md 2); a media query cannot read a custom property. */
 @media (max-width:560px){
@@ -96,7 +96,7 @@ function vProductsCrm() {
 
   /* ---- sectors: ONE stacked share bar, then a card each ---- */
   if (pcSectors && pcSectors.sectors) {
-    var COL = ["#306DB5", "#629CCD", "#416CAD", "#A9B4C0"];
+    var COL = ["#6C5CE7", "#8B7BF5", "#5A4BD6", "#A9AEBE"];
     var parts = pcSectors.sectors.map(function (sc, i) {
       return { n: sc.sector, v: (sc.achieved || 0) + (sc.weightedOpen || 0), c: COL[i % COL.length] };
     }).filter(function (p) { return p.v > 0; });
@@ -360,7 +360,7 @@ function vExecBand() {
   var openTotal = secs.reduce(function (n, x) { return n + (x.weightedOpen || 0); }, 0);
   var openCount = secs.reduce(function (n, x) { return n + (x.openCount || 0); }, 0);
   var wonTotal = secs.reduce(function (n, x) { return n + (x.achieved || 0); }, 0);
-  var COL = ["#306DB5", "#629CCD", "#416CAD", "#A9B4C0"];
+  var COL = ["#6C5CE7", "#8B7BF5", "#5A4BD6", "#A9AEBE"];
 
   /* One card per sector, on the same components as المنتجات. This band and that screen render the
      SAME three sections, and until now they rendered them two different ways — the founder spotted
