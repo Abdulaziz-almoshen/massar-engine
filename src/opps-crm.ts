@@ -95,7 +95,10 @@ export const OPPS_CRM_CSS = `
   .opedit .dngr.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; }
 
   /* ===== the LIST — seven tracks, seven cells; the arity rule that wrapped three earlier tables ===== */
-  .opflat .crow { grid-template-columns: 40px 1.7fr 1.5fr 1.15fr .85fr .7fr 1.5fr; padding-inline:20px 12px; }
+  /* المسؤول is its own column now (founder, 2026-09-08). Narrow and fixed: it holds one avatar,
+     and giving it a fraction would let it stretch and pull the step column below a readable
+     measure on a laptop. */
+  .opflat .crow { grid-template-columns: 40px 1.7fr 1.45fr 1.1fr .8fr .65fr 74px 1.35fr; padding-inline:20px 12px; }
   .opflat .crow .o-ac { display:flex; align-items:center; gap:10px; min-width:0; }
   .opflat .crow .o-ac .av { width:26px; height:26px; flex:none; border-radius:7px; background:#E5E8EE;
     color:#33373E; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
@@ -105,16 +108,37 @@ export const OPPS_CRM_CSS = `
   .opflat .crow .o-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
   .opflat .crow .o-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .opflat .crow .o-vl { font-size:14px; font-weight:500; color:#2563EB; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .opflat .crow .o-nx { font-size:12px; color:#656B76; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-ow { min-width:0; display:flex; align-items:center; }
+  .opflat .crow .o-nx { font-size:12px; color:#656B76; min-width:0;
+    display:flex; align-items:center; }
+  .nx-body { min-width:0; display:flex; flex-direction:column; gap:2px; }
+  /* 26px is the visual mark. The ROW is the tap target and it is already 62px tall, so this does
+     not need its own 44px hit area — it is not separately clickable. */
+  .nx-av { width:26px; height:26px; border-radius:999px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    background:#EAF1FE; color:#1A47BE; font-size:12px; font-weight:600; }
+  .nx-av.none { background:transparent; border:1.5px dashed #767D89; }
+  .nx-step { color:#14161A; font-weight:500; max-width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* A slot, not a sentence. Dashed underline says fillable; the row click opens the editor. */
+  .nx-add { color:#656B76; border-block-end:1px dashed #A2A9B4; align-self:flex-start; }
+  .opflat .crow:hover .nx-add { color:#1A47BE; border-block-end-color:#2563EB; }
+  /* Age is neutral until the line is actually stalled. A column where every row is coloured
+     ranks nothing. */
+  .nx-age { color:#656B76; white-space:nowrap; }
+  .nx-age.bad { color:#8E2A27; font-weight:600; }
   .opexp { padding:0 20px 4px; background:#EFF1F5; border-bottom:1px solid #ECEEF2; }
   @media (max-width: 1100px) {
     .opflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
-    .opflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
+    /* 1/6, not 1/5: the stacked card is FIVE rows, so the checkbox was centring itself across
+       the first four and sitting visibly high against the last one. */
+    .opflat .crow .selcell { grid-row:1 / 6; grid-column:1; align-self:center; }
     .opflat .crow .o-ac { grid-row:1; grid-column:2; }
     .opflat .crow .o-vl { grid-row:1; grid-column:3; text-align:end; }
     .opflat .crow .o-pr { grid-row:2; grid-column:2 / 4; }
     .opflat .crow .o-st { grid-row:3; grid-column:2 / 4; }
     .opflat .crow .o-sr { grid-row:4; grid-column:2; }
+    .opflat .crow .o-ow { grid-row:4; grid-column:3; justify-content:flex-end; }
     .opflat .crow .o-nx { grid-row:5; grid-column:2 / 4; }
   }
 
@@ -183,7 +207,7 @@ export const OPPS_CRM_JS = `
 /* ============================ opps-crm (client) ============================ */
 /* Own state, own names. oppTab/oppQ belong to «فرز الردود» (vMorningList) and are NOT reused: two
    screens sharing one search box is how a filter typed on one silently narrows the other. */
-var oppRows = null, oppLoading = false, oppBusy = false;
+var oppRows = null, oppLoading = false, oppBusy = false, oppFailed = false;
 /* THE TAB, and inside it THE VIEW. «فرص» is the board; «فرز الردود» is the WhatsApp triage this
    board feeds off. The board itself has the product's three-view control — قائمة · كانبان · بطاقات
    — the same one #kmon carries, because a card grid answers «show me these six deals» and nothing
@@ -265,13 +289,35 @@ function opMoney(v) {
    visit with no number groups by its name. Never by both, or one client would open two cards. */
 function opKey(o) { return accountKey(o.account_name, o.phone); }
 
+/* The assignee chip. A filled circle carries the owner's first letter and a title with the full
+   name; an unassigned line gets a dashed circle, which reads as a slot rather than as an absence.
+   The letter is decorative — the accessible name is on the wrapper — so it never has to clear the
+   text contrast floor on its own. */
+function opAvatar(owner) {
+  var nm = String(owner || "").trim();
+  if (!nm) {
+    return '<span class="nx-av none" role="img" aria-label="غير مُسندة" title="غير مُسندة"></span>';
+  }
+  return '<span class="nx-av" role="img" aria-label="المسؤول ' + esc(nm) + '" title="' + esc(nm) + '">' +
+    '<span aria-hidden="true">' + esc(nm.slice(0, 1)) + "</span></span>";
+}
+
 function opLoad(force) {
+  // A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY LEDGER. The catch used to set oppRows = [], and an
+  // empty array is TRUTHY, so the guard below then refused to ever retry: one transient failure
+  // left «لا فرص مسجّلة بعد» on a board with six live opportunities until a hard reload. Observed
+  // against production on 2026-09-08 with /admin/opps returning 6 rows the whole time. The failure
+  // now stays null so the next render retries, and it is SAID rather than disguised as emptiness
+  // (DESIGN.md 4: a blank table and a broken query must never look alike).
   if (oppLoading || (oppRows && !force)) return;
-  oppLoading = true;
+  oppLoading = true; oppFailed = false;
   fetch("/admin/opps", { headers: { "x-admin-token": TOKEN } })
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
     .then(function (j) { oppRows = j.opps || []; oppLoading = false; render(false); })
-    .catch(function () { oppRows = []; oppLoading = false; render(false); });
+    .catch(function () { oppRows = null; oppFailed = true; oppLoading = false; render(false); });
 }
 
 /* ---- grouping ---- */
@@ -568,12 +614,19 @@ function opListView() {
     '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
     (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
     "<div>الجهة</div><div>الخدمة</div><div>المرحلة</div><div>القيمة</div><div>المصدر</div>" +
-    "<div>المسؤول والخطوة التالية</div></div>" +
+    "<div>المسؤول</div><div>الخطوة التالية</div></div>" +
     '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
     (allOn ? " checked" : "") + ' onclick="opTogglePage()"></span><span>الفرصة</span><span style="flex:1"></span><span>المرحلة</span></div>';
   if (!page.length) {
+    // FOUR distinct states, said in words. oppRows is null while loading AND after a failure, so
+    // reading .length on it here would throw; and «لا فرص مسجّلة بعد» over a broken fetch is the
+    // exact lie DESIGN.md 4 forbids.
     h += '<div style="padding:26px 20px;text-align:center;font-size:12px;color:#656B76;">' +
-      (oppRows.length ? "لا بند يطابق ما اخترته." : "لا فرص مسجّلة بعد.") + "</div>";
+      (oppFailed
+        ? 'تعذّر تحميل الفرص. <button class="btn btn-ghost" style="height:30px;padding:0 12px;font-size:12px;margin-inline-start:8px;" onclick="event.stopPropagation();opRetry()">أعد المحاولة</button>'
+        : oppRows === null ? "جارٍ التحميل…"
+        : oppRows.length ? "لا بند يطابق ما اخترته."
+        : "لا فرص مسجّلة بعد.") + "</div>";
   }
   page.forEach(function (l) {
     var st = opStage(l.stage);
@@ -589,8 +642,26 @@ function opListView() {
       '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#656B76;font-weight:450;"') + ">" +
         (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>" +
       '<div class="o-sr"><span class="opsrc">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span></div>" +
-      '<div class="o-nx">' + (l.owner ? '<b style="font-weight:500;color:#33373E;">' + esc(clip(l.owner, 18)) + "</b> · " : "") +
-        (l.next_step ? esc(clip(l.next_step, 46)) : '<span style="color:#656B76;">لم تُحدَّد خطوة</span>') + "</div>" +
+      // THE ABSENCE IS THE SIGNAL. This cell used to render owner and step on one line joined by a
+      // dot, at the same weight, and «لم تُحدَّد خطوة» in grey — so the single most important state
+      // on the board (a line nobody owes an action on) was the quietest thing in the row, repeated
+      // down the column as dead text. Now the absence is a badge in the attention channel and it
+      // carries its AGE, which is the part you can act on: «بلا خطوة» alone is a label, «بلا خطوة ·
+      // ٩ أيام» is a queue. It escalates to the failure channel once the line is stalled, reusing
+      // opStalled rather than inventing a second threshold.
+      // ClickUp's list grammar: the ASSIGNEE is an avatar, not a name in prose, and an empty slot
+      // is a dashed placeholder you can see is fillable rather than a sentence saying it is empty.
+      // Urgency lives on the step's age, coloured only once the line is genuinely stalled — a
+      // column where every row shouts ranks nothing.
+      '<div class="o-ow">' + opAvatar(l.owner) + "</div>" +
+      '<div class="o-nx"><span class="nx-body">' +
+        (l.next_step
+          ? '<span class="nx-step">' + esc(clip(l.next_step, 40)) + "</span>"
+          : '<span class="nx-add">حدِّد الخطوة</span>') +
+        (opDays(l) > 0
+          ? '<span class="nx-age' + (opStalled(l) ? " bad" : "") + '">' + opNDay(opDays(l)) + "</span>"
+          : "") +
+      "</span></div>" +
       "</div>";
     if (opOpen === l.id) h += '<div class="opexp">' + opLineEditor(l) + "</div>";
   });
@@ -848,6 +919,7 @@ window.opSetView = function (v) { opView = v; opOpen = 0; opArm = 0; render(fals
 /* PAGE is reset on every control that changes WHAT is listed: a filter that shrinks 34 pages to 1
    must not strand the reader on an empty page 34. Selection is cleared with it — a checkbox the
    reader can no longer see is a write they did not authorise. */
+window.opRetry = function () { oppFailed = false; oppRows = null; opLoad(true); render(false); };
 window.opSetMode = function (v) { opMode = v; opOpen = 0; opArm = 0; PAGE.opps = 1; render(false); };
 window.opSetSort = function (v) { opSort = v; PAGE.opps = 1; render(false); };
 window.opSetStg = function (v) { opStg = opStg === v && v !== "all" ? "all" : v; PAGE.opps = 1; opSel = {}; render(false); };

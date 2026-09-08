@@ -293,13 +293,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .excl:hover { background: #E5E8EE; border-color: #656B76; }
   .excl.on { background: #2563EB; border-color: #2563EB; color: #fff; }
   .affin .why { font-size: 12px; color: #7A5600; margin-top: 10px; line-height: 1.7; }
-  .fnl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; margin-top: 14px; }
-  @media (max-width: 900px) { .chgrid { grid-template-columns: 1fr !important; } }
-  .fnl .lg { display: flex; flex-direction: column; gap: 6px; }
-  .fnl .lgr { display: flex; align-items: baseline; gap: 8px; height: 44px; }
-  .fnl .lgr .nm { font-size: 12px; color: #14161A; white-space: nowrap; }
-  .fnl .lgr .vl { font-size: 14px; font-weight: 600; color: #14161A; font-variant-numeric: tabular-nums; }
-  .fnl .lgr .dp { font-size: 12px; color: #8E2A27; white-space: nowrap; }
+  /* .fnl / .lgr went with «مسار التحويل التسويقي» (founder, 2026-09-08) — they styled nothing else.
+     .chgrid's media query went with them: the two-column row it collapsed no longer exists. */
   /* ما يستحق المتابعة الآن. Flush rows on a hairline, not four pastel cards — four tinted fills
      read as four alarms and the eye cannot rank four alarms. Urgency is the dot. */
   .aq { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-top: 1px solid #ECEEF2; cursor: pointer; transition: background .14s ease; }
@@ -2797,31 +2792,6 @@ function sparkArea(vals, w, hgt) {
 // value, so the slope between two bands IS the drop between them — the single thing the six equal
 // bars this replaces could not show. The teal ramp encodes depth, which is the stage order and
 // nothing else; it is not a second meaning smuggled in as colour.
-function funnelSvg(rows) {
-  const mx = Math.max(1, rows[0] ? rows[0][1] : 1);
-  const W = 300, segH = 44, gap = 6;
-  const H = rows.length * (segH + gap) - gap;
-  const ramp = ["#2563EB", "#2A8B84", "#3B9C95", "#5AB0AA", "#84C7C2", "#B2DDD9"];
-  let shapes = "";
-  rows.forEach((r, i) => {
-    const wT = Math.max(0.08, (i === 0 ? r[1] : rows[i - 1][1]) / mx) * W;
-    const wB = Math.max(0.08, r[1] / mx) * W;
-    const y = i * (segH + gap);
-    shapes += '<path d="M' + ((W - wT) / 2).toFixed(1) + "," + y + " L" + ((W + wT) / 2).toFixed(1) + "," + y +
-      " L" + ((W + wB) / 2).toFixed(1) + "," + (y + segH) + " L" + ((W - wB) / 2).toFixed(1) + "," + (y + segH) +
-      ' Z" fill="' + ramp[i % ramp.length] + '"/>';
-  });
-  const legend = rows.map((r, i) => {
-    const prev = i > 0 ? rows[i - 1][1] : r[1];
-    const drop = i > 0 && prev > 0 ? Math.round((1 - r[1] / prev) * 100) : 0;
-    return '<div class="lgr"><span class="vl">' + fmtN(r[1]) + "</span>" +
-      '<span class="nm">' + esc(r[0]) + "</span>" +
-      (drop > 0 ? '<span class="dp">−' + fmtN(drop) + "٪</span>" : "") + "</div>";
-  }).join("");
-  return '<div class="fnl"><div dir="ltr" style="min-width:0;"><svg viewBox="0 0 ' + W + " " + H +
-    '" style="width:100%;height:auto;display:block;" role="img" aria-label="مسار التحويل التسويقي">' + shapes + "</svg></div>" +
-    '<div class="lg">' + legend + "</div></div>";
-}
 function ratesStrip(agg) {
   // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
   // stops «٠٪ من جهات الاستهداف» appearing under a hero that honestly reads «—».
@@ -2921,7 +2891,6 @@ function vHomeCharts(cs) {
     replied: reached.filter((c) => (c.statusTimes || {}).replied).length,
     interested: reached.filter((c) => interestedOf(c, 0)).length,
   };
-  const funnel = [["جهات الاستهداف", agg.targeted], ["أُرسلت", agg.sent], ["وصلت", agg.delivered], ["شوهدت", agg.seen], ["ردّوا", agg.replied], ["جهات مهتمة", agg.interested]].map((r) => [r[0], r[1], "#2563EB"]);
   const byProd = new Map();
   cs.forEach((c) => { const seen = new Set(); (c.tags || []).forEach((t) => { if (!seen.has(t.product)) { seen.add(t.product); byProd.set(t.product, (byProd.get(t.product) || 0) + 1); } }); });
   const prodRows = [...byProd.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => [k, v]);
@@ -2936,14 +2905,13 @@ function vHomeCharts(cs) {
   const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
-  // ROW A — conversion. The funnel and the rates answer the same question at two resolutions, so
-  // they belong side by side; splitting them left the rates as a full-width strip of thin bars.
-  h += '<div style="display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,1fr);gap:16px;align-items:start;margin-bottom:16px;" class="chgrid">';
-  h += chartCard("مسار التحويل التسويقي", fmtN(camps.length) + " حملة", agg.targeted ? funnelSvg(funnel) : '<div style="font-size:12px;color:#656B76;margin-top:14px;line-height:1.9;">لا حملات ' + (showTest ? "" : "فعلية ") + 'بعد — القمع يتعبأ مع أول إطلاق.</div>');
-  h += ratesStrip(agg);
-  h += "</div>";
-  // ROW B — what is moving, and in which service.
+  // «مسار التحويل التسويقي» removed on the founder's instruction (2026-09-08). ROW A went with it:
+  // the rates were the only thing left in a two-column grid, which would have parked them in one
+  // half of an otherwise empty row. They move into the row below instead of going full width —
+  // a full-width strip of thin bars is exactly the state the funnel was paired with them to avoid,
+  // and that reasoning outlives the funnel.
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
+  h += ratesStrip(agg);
   h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
