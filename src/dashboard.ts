@@ -258,10 +258,74 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hnote { font-size: 12px; color: #656B76; margin-top: 8px; line-height: 1.7; }
   .hero .hspark { margin-top: auto; padding-top: 14px; }
   .hero .haxis { display: flex; justify-content: space-between; font-size: 12px; color: #656B76; margin-top: 4px; }
+  /* ---- the activity board: the page's one wide chart ---- */
+  .hboard { display: flex; flex-direction: column; }
+  .hbhead { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .hbsub { font-size: 12px; color: #656B76; margin-top: 3px; }
+  .hbctl { margin-inline-start: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* The segmented metric toggle. The active segment is a filled pill, and it is a real <button>
+     so the whole control is keyboard-reachable. */
+  .hsegs { display: flex; gap: 4px; background: #EFF1F5; border-radius: 999px; padding: 3px; }
+  .hseg { font-family: inherit; font-size: 12px; font-weight: 600; color: #656B76;
+    background: transparent; border: 0; border-radius: 999px; padding: 7px 13px; cursor: pointer;
+    white-space: nowrap; transition: background .15s ease, color .15s ease; }
+  .hseg:hover { color: #14161A; }
+  .hseg.on { background: #fff; color: #1A47BE; }
+  .hseg:focus-visible { outline: 2px solid #2563EB; outline-offset: 2px; }
+  .hbsel { font-family: inherit; font-size: 12px; font-weight: 600; color: #14161A;
+    background: #fff; border: 1px solid #D8DCE3; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+  .hbsel:focus-visible { outline: 2px solid #2563EB; outline-offset: 2px; }
+  @media (pointer:coarse) { .hseg, .hbsel { min-height: 44px; } }
+
+  /* The plot. align-items:flex-end so every column grows from one baseline; each column reserves
+     its label row so a day with no messages does not shift the axis. */
+  .hbplot { display: flex; align-items: flex-end; gap: 6px; height: 210px; margin-top: 18px; }
+  .hbcol { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; gap: 6px; height: 100%; }
+  .hbval { font-size: 12px; color: #656B76; font-variant-numeric: tabular-nums; min-height: 16px;
+    white-space: nowrap; }
+  .hbcol.last .hbval { color: #14161A; font-weight: 600; }
+  .hbstack { flex: 1; width: 100%; max-width: 44px; display: flex; flex-direction: column;
+    justify-content: flex-end; gap: 2px; }
+  .hbstack i { display: block; width: 100%; border-radius: 4px; }
+  .seg-in { background: #5B8DEF; }
+  .seg-out { background: #D8DCE3; }
+  /* The period you are standing in reads darkest — the reference's own emphasis. */
+  .hbcol.last .seg-in { background: #2563EB; }
+  .hbcol.last .seg-out { background: #A2A9B4; }
+  .hblab { font-size: 12px; color: #656B76; white-space: nowrap; min-height: 16px; }
+  .hbcol.last .hblab { color: #14161A; font-weight: 600; }
+  .hblg { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; color: #656B76; }
+  .hblg span { display: inline-flex; align-items: center; gap: 7px; }
+  .hblg i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .hblg .s-in { background: #2563EB; }
+  .hblg .s-out { background: #A2A9B4; }
+  @media (max-width: 900px) { .hbplot { height: 170px; gap: 3px; } .hbval { font-size: 12px; } }
+
+  /* ---- the win/loss board: gain above the axis, loss below ---- */
+  .wlplot { display: flex; align-items: stretch; gap: 8px; height: 190px; margin-top: 16px; }
+  .wlcol { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .wlv { font-size: 12px; font-variant-numeric: tabular-nums; min-height: 15px; }
+  .wlv.up { color: #12633F; font-weight: 600; }
+  .wlv.dn { color: #8E2A27; font-weight: 600; }
+  /* Two mirrored halves so both magnitudes read off the SAME baseline — the axis is the zero. */
+  .wlbar { flex: 1; width: 100%; max-width: 34px; display: flex; }
+  .wlbar.up { align-items: flex-end; }
+  .wlbar.dn { align-items: flex-start; }
+  .wlbar i { display: block; width: 100%; }
+  .wlbar.up i { background: #1E9E63; border-radius: 4px 4px 0 0; }
+  .wlbar.dn i { background: #D9534F; border-radius: 0 0 4px 4px; }
+  .wlax { width: 100%; height: 1px; background: #D8DCE3; flex: none; }
+  .hblg .s-win { background: #1E9E63; }
+  .hblg .s-lose { background: #D9534F; }
+
   /* ---- the statistics strip ----
      Five compact reports across the top, the way a board reads: label, figure, movement, shape.
      auto-fit rather than a fixed five, so it reflows to 3 and 2 instead of squeezing five columns
      of Arabic labels into a laptop. */
+  .kshead { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .kshead h2 { margin: 0; font-size: 16px; font-weight: 600; color: #14161A; }
+  .kshead .hbsel { margin-inline-start: auto; }
   .kstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
     gap: 16px; margin-bottom: 16px; }
   .kcard { background: #fff; border: 1px solid #D8DCE3; border-radius: 12px; padding: 14px 16px 12px; }
@@ -790,6 +854,12 @@ function pageBar(key, total, unit) {
 window.pageGo = (key, p) => { PAGE[key] = p; render(false); const b = document.getElementById("body"); if (b) b.scrollIntoView({ block: "start" }); };
 window.pageSetSize = (n) => { PAGE_SIZE = Number(n); PAGE = {}; render(false); };
 let kbDocs = []; let prodAssets = []; let launching = false; let campaigns = []; let campFilter = "all"; let campName = "";
+// The activity board's two controls. Both re-render from the SAME stored transcript timestamps —
+// the period widens the window, the metric picks which count is drawn. No cached series, so a
+// toggle can never show a number the ledger does not still hold.
+let hmMetric = "in";          // in | out | all
+let kpiDays = 7;              // the statistics strip's comparison window: 7 | 30 | 90
+let hmDays = 14;              // one of hmDaysList()
 let showTest = false;         // sandbox separation: test traffic hidden from real views by default
 // Opens on «فعلية»: rehearsals and duplicate launches are one click away under «تجريبية»,
 // not the first thing on the screen. Defaulting to «الكل» made the list read as clutter.
@@ -1249,6 +1319,9 @@ window.campSearchFn = (el) => { campQ = el.value; clearTimeout(window.__cq2); wi
 window.setCampTab = (t) => { campTab = t; render(false); };
 window.setCampSort = (el) => { campSortKey = el.value; render(false); };
 window.toggleShowTest = () => { showTest = !showTest; showTestDecided = true; render(false); };
+window.hmSetMetric = (v) => { hmMetric = v; render(false); };
+window.hmSetDays = (n) => { hmDays = Number(n) || 14; render(false); };
+window.kpiSetDays = (n) => { kpiDays = Number(n) || 7; render(false); };
 // A launch is a rehearsal because we say it is — not because of who it happened to reach.
 // The old derived rule («every target is a sandbox contact») filed a real campaign aimed at
 // seeded demo contacts as sandbox, while four genuine rehearsals aimed at real numbers sat in
@@ -1507,7 +1580,11 @@ function vHome(d) {
   // Every series below is a real daily count off a stored timestamp. «جهات في قوائمك» gets NEITHER
   // a sparkline nor a delta, because an imported entity carries no per-row timestamp on the client
   // — the honest answer to "no series" is no chart, not a flat line that implies measurement.
-  const WEEK_AGO = Date.now() - WEEK;
+  // The strip's comparison window is a control now. WEEK stays for the hero, which asks a
+  // different question and says «خلال ٧ أيام» in its own words.
+  const KWIN = kpiDays * 864e5;
+  const KWORD = kpiDays === 7 ? "هذا الأسبوع" : "خلال " + fmtN(kpiDays) + " يومًا";
+  const WEEK_AGO = Date.now() - KWIN;
   const delivTs = (c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read || 0;
   const replTs = (c) => (c.statusTimes || {}).replied || 0;
   const sDeliv = daySeries(cs, delivTs, 14);
@@ -1515,11 +1592,17 @@ function vHome(d) {
   const sCamp = daySeries(realCampaigns, (cp) => cp.created_at || 0, 14);
   const newDeliv = cs.filter((c) => delivTs(c) >= WEEK_AGO).length;
   const newCamp = realCampaigns.filter((cp) => (cp.created_at || 0) >= WEEK_AGO).length;
-  const kstrip = '<div class="kstrip rise">' +
-    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), newQual, "هذا الأسبوع", series) +
-    kpiCard("ردّوا", fmtN(replied), newReplied, "هذا الأسبوع", sRepl) +
-    kpiCard("وصلت الرسائل", fmtN(delivered), newDeliv, "هذا الأسبوع", sDeliv) +
-    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), newCamp, "هذا الأسبوع", sCamp) +
+  const kNewQual = cs.filter((c) => interestedOf(c, Date.now() - KWIN)).length;
+  const kNewRepl = cs.filter((c) => replTs(c) >= WEEK_AGO).length;
+  const kOpts = [7, 30, 90].map((n) =>
+    '<option value="' + n + '"' + (kpiDays === n ? " selected" : "") + ">آخر " + fmtN(n) + " يومًا</option>").join("");
+  const kstrip = '<div class="kshead"><h2>الإحصاءات</h2>' +
+    '<select class="hbsel" onchange="kpiSetDays(this.value)" aria-label="مدة المقارنة">' + kOpts + "</select></div>" +
+    '<div class="kstrip rise">' +
+    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kNewQual, KWORD, series) +
+    kpiCard("ردّوا", fmtN(replied), kNewRepl, KWORD, sRepl) +
+    kpiCard("وصلت الرسائل", fmtN(delivered), newDeliv, KWORD, sDeliv) +
+    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), newCamp, KWORD, sCamp) +
     kpiCard("جهات في قوائمك", fmtN(entities.length), null, "", null) +
     "</div>";
   // The exec band leads, before «مركز القيادة». DESIGN.md §7.13: a page must have a point of view,
@@ -2890,40 +2973,152 @@ function hbarRows(rows, color) {
 // label under each; at one message a day the bars were 3px tall and the chart said nothing you
 // could not have read from a sentence. An area shows the SHAPE of a fortnight, which is the only
 // question this card is asked: is it picking up or dying down.
-function dailyActivitySvg(cs) {
-  const days = []; const now = new Date(); now.setHours(0, 0, 0, 0);
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(now.getTime() - i * 864e5);
-    days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0,
-      label: i === 0 ? "اليوم" : d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) });
+/* THE ACTIVITY BOARD — the reference's big chart, with its control layer.
+   It was a 14-day area with no labels, no controls and a fixed window: you could see a shape and
+   not a single number. Now it is labelled stacked columns with two real toggles.
+
+   BOTH TOGGLES READ THE LEDGER. The period changes the window over the same stored transcript
+   timestamps; the metric picks which of the two counts is drawn. Nothing here is a projection and
+   nothing is smoothed — a column is the count of messages on that day.
+
+   The newest column is emphasised, the way the reference marks the period you are standing in. */
+function hmDaysList() { return [14, 30, 90]; }
+
+/* THE WIN/LOSS BOARD — the reference's diverging gain/loss chart, on the only honestly SIGNED
+   series in this product. Opportunities carry stage_at, the moment they entered their current
+   stage, so a won line is dated at its win and a lost one at its loss. Won draws above the axis,
+   lost below, six months across.
+
+   Nothing else on this page qualifies. Opt-outs would have been the other candidate and were
+   rejected: c.optedOut is a boolean with no timestamp, so a monthly opt-out series would have had
+   to be invented (DESIGN.md 4). */
+function winLossBoard() {
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : null;
+  var months = [];
+  var now = new Date(); now.setDate(1); now.setHours(0, 0, 0, 0);
+  for (var i = 5; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ t0: d.getTime(), t1: new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(),
+      won: 0, lost: 0, label: d.toLocaleDateString("ar-SA-u-ca-gregory", { month: "short" }) });
   }
-  cs.forEach((c) => (c.transcript || []).forEach((t) => {
-    const d = days.find((x) => t.ts >= x.t0 && t.ts < x.t1);
-    if (d) { if (t.role === "customer") d.inN++; else if (t.role === "agent") d.outN++; }
-  }));
-  const mx = Math.max(1, ...days.map((d) => d.inN + d.outN));
-  const W = 320, H = 96, n = days.length;
-  const x = (i) => W - (i / (n - 1)) * W;   /* mirrored: oldest at the start edge, today at the end */
-  const y = (v) => H - (v / mx) * (H - 8) - 2;
-  const path = (get) => days.map((d, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(get(d)).toFixed(1)).join(" ");
-  const areaOf = (p) => p + " L0," + H + " L" + W + "," + H + " Z";
-  const total = days.reduce((a, d) => a + d.inN + d.outN, 0);
-  if (!total) return '<div style="font-size:12px;color:#656B76;margin-top:14px;">لا رسائل خلال آخر ١٤ يومًا.</div>';
-  const stack = path((d) => d.inN + d.outN), inner = path((d) => d.inN);
-  return '<div dir="ltr" style="margin-top:12px;"><svg viewBox="0 0 ' + W + " " + H +
-    '" preserveAspectRatio="none" style="width:100%;height:' + H + 'px;display:block;" role="img" aria-label="نشاط الرسائل خلال ١٤ يومًا">' +
-    '<defs><linearGradient id="agr" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="#2563EB" stop-opacity=".22"/><stop offset="100%" stop-color="#2563EB" stop-opacity="0"/></linearGradient></defs>' +
-    '<line x1="0" y1="' + (H - 2) + '" x2="' + W + '" y2="' + (H - 2) + '" stroke="#ECEEF2" stroke-width="1"/>' +
-    '<path d="' + areaOf(stack) + '" fill="#E5E8EE"/>' +
-    '<path d="' + stack + '" fill="none" stroke="#A2A9B4" stroke-width="1.2" stroke-linejoin="round"/>' +
-    '<path d="' + areaOf(inner) + '" fill="url(#agr)"/>' +
-    '<path d="' + inner + '" fill="none" stroke="#2563EB" stroke-width="1.6" stroke-linejoin="round"/></svg></div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:12px;color:#656B76;margin-top:4px;">' +
-    '<span>' + esc(days[0].label) + '</span><span>' + esc(days[days.length - 1].label) + "</span></div>" +
-    '<div style="display:flex;gap:16px;margin-top:9px;font-size:12px;color:#656B76;">' +
-    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#2563EB;margin-inline-end:6px;"></i>واردة من العملاء</span>' +
-    '<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#A2A9B4;margin-inline-end:6px;"></i>الإجمالي مع الصادرة</span></div>';
+  if (rows) {
+    rows.forEach(function (o) {
+      var ts = Number(o.stage_at || o.updated_at || 0);
+      if (!ts) return;
+      var won = o.stage === "won", lost = o.stage === "lost";
+      if (!won && !lost) return;
+      for (var k = 0; k < months.length; k++) {
+        if (ts >= months[k].t0 && ts < months[k].t1) { if (won) months[k].won++; else months[k].lost++; return; }
+      }
+    });
+  }
+  var mx = Math.max(1, Math.max.apply(null, months.map(function (m) { return Math.max(m.won, m.lost); })));
+  var any = months.some(function (m) { return m.won || m.lost; });
+  var head = '<div class="hbhead"><div><h3 style="margin:0;">الصفقات: ربح وخسارة</h3>' +
+    '<div class="hbsub">آخر ٦ أشهر · بتاريخ دخول المرحلة</div></div>' +
+    '<div class="hblg" style="margin:0"><span><i class="s-win"></i>ربح</span><span><i class="s-lose"></i>خسارة</span></div></div>';
+  if (rows === null) {
+    return '<div class="card" style="margin:0;">' + head + moSkeleton(3, ["w80", "w60", "w40"]) + "</div>";
+  }
+  if (!any) {
+    return '<div class="card" style="margin:0;">' + head +
+      '<div class="crm-empty" style="margin-block-start:var(--s3)"><b>لا صفقة مغلقة بعد</b>' +
+      '<div>تظهر هنا أول ما تُنقل فرصة إلى «إغلاق – ربح» أو «إغلاق – خسارة».</div></div></div>';
+  }
+  var cols = months.map(function (m) {
+    return '<div class="wlcol">' +
+      '<span class="wlv up">' + (m.won ? fmtN(m.won) : "") + "</span>" +
+      '<span class="wlbar up"><i style="height:' + Math.round(m.won / mx * 100) + '%"></i></span>' +
+      '<span class="wlax"></span>' +
+      '<span class="wlbar dn"><i style="height:' + Math.round(m.lost / mx * 100) + '%"></i></span>' +
+      '<span class="wlv dn">' + (m.lost ? fmtN(m.lost) : "") + "</span>" +
+      '<span class="hblab">' + esc(m.label) + "</span></div>";
+  }).join("");
+  return '<div class="card" style="margin:0;">' + head + '<div class="wlplot">' + cols + "</div></div>";
+}
+function activityBoard(cs) {
+  var days = [];
+  var now = new Date(); now.setHours(0, 0, 0, 0);
+  var N = hmDays;
+  for (var i = N - 1; i >= 0; i--) {
+    var d = new Date(now.getTime() - i * 864e5);
+    days.push({ t0: d.getTime(), t1: d.getTime() + 864e5, inN: 0, outN: 0, d: d });
+  }
+  cs.forEach(function (c) {
+    (c.transcript || []).forEach(function (t) {
+      for (var k = 0; k < days.length; k++) {
+        if (t.ts >= days[k].t0 && t.ts < days[k].t1) {
+          if (t.role === "customer") days[k].inN++; else if (t.role === "agent") days[k].outN++;
+          return;
+        }
+      }
+    });
+  });
+  var valOf = function (d) {
+    return hmMetric === "in" ? d.inN : (hmMetric === "out" ? d.outN : d.inN + d.outN);
+  };
+  var total = days.reduce(function (a, d) { return a + valOf(d); }, 0);
+  var mx = Math.max(1, Math.max.apply(null, days.map(valOf)));
+
+  // Controls first, so an empty window still lets you widen it instead of stranding you.
+  var METRICS = [["in", "واردة من العملاء"], ["out", "صادرة من المساعد"], ["all", "الإجمالي"]];
+  var seg = METRICS.map(function (m) {
+    return '<button class="hseg' + (hmMetric === m[0] ? " on" : "") + '" onclick="hmSetMetric(&quot;' + m[0] + '&quot;)">' + m[1] + "</button>";
+  }).join("");
+  var per = hmDaysList().map(function (n) {
+    return '<option value="' + n + '"' + (hmDays === n ? " selected" : "") + ">آخر " + fmtN(n) + " يومًا</option>";
+  }).join("");
+  var head = '<div class="hbhead"><div><h3 style="margin:0;">نشاط الرسائل</h3>' +
+    '<div class="hbsub">آخر ' + fmtN(hmDays) + " يومًا · " + fmtN(total) + " رسالة</div></div>" +
+    '<div class="hbctl"><div class="hsegs">' + seg + "</div>" +
+    '<select class="hbsel" onchange="hmSetDays(this.value)" aria-label="المدة">' + per + "</select></div></div>";
+
+  if (!total) {
+    // AN EMPTY WINDOW SHOULD SAY WHEN, NOT JUST THAT. «لا رسائل» over a ledger that simply went
+    // quiet three weeks ago reads as a broken chart; naming the last message turns it into a fact
+    // the reader can act on, and tells them which wider window would show something.
+    var lastTs = 0;
+    cs.forEach(function (c) {
+      (c.transcript || []).forEach(function (t) { if (t.ts > lastTs) lastTs = t.ts; });
+    });
+    var gap = lastTs ? Math.floor((Date.now() - lastTs) / 864e5) : 0;
+    var when = lastTs
+      ? "آخر رسالة في السجل قبل " + arDaysUi(gap) + "، خارج هذه المدة."
+      : "لا رسائل في السجل بعد.";
+    var wider = lastTs && gap < 90 ? " اختر آخر " + fmtN(gap < 30 ? 30 : 90) + " يومًا لرؤيتها." : "";
+    return '<div class="card hboard" style="margin:0;">' + head +
+      '<div class="crm-empty" style="margin-block-start:var(--s3)"><b>لا رسائل في آخر ' + fmtN(hmDays) + ' يومًا</b>' +
+      "<div>" + when + wider + "</div></div></div>";
+  }
+
+  // A label over every column only while they are readable; past ~30 the axis thins to the ends.
+  var showEvery = N <= 14 ? 1 : (N <= 30 ? 3 : 10);
+  var cols = days.map(function (d, i) {
+    var v = valOf(d);
+    var isLast = i === days.length - 1;
+    var h = Math.round(v / mx * 100);
+    var bars;
+    if (hmMetric === "all") {
+      var inH = Math.round(d.inN / mx * 100), outH = Math.round(d.outN / mx * 100);
+      bars = '<i class="seg-out" style="height:' + outH + '%"></i>' +
+             '<i class="seg-in" style="height:' + inH + '%"></i>';
+    } else {
+      bars = '<i class="seg-in" style="height:' + Math.max(h, v > 0 ? 2 : 0) + '%"></i>';
+    }
+    var lab = (i % showEvery === 0 || isLast)
+      ? d.d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) : "";
+    return '<div class="hbcol' + (isLast ? " last" : "") + '">' +
+      '<span class="hbval">' + (v > 0 ? fmtN(v) : "") + "</span>" +
+      '<span class="hbstack">' + bars + "</span>" +
+      '<span class="hblab">' + esc(isLast ? "اليوم" : lab) + "</span></div>";
+  }).join("");
+
+  var lg = hmMetric === "all"
+    ? '<span><i class="s-in"></i>واردة من العملاء</span><span><i class="s-out"></i>صادرة من المساعد</span>'
+    : '<span><i class="s-in"></i>' + (hmMetric === "in" ? "واردة من العملاء" : "صادرة من المساعد") + "</span>";
+  return '<div class="card hboard" style="margin:0;">' + head +
+    '<div class="hbplot">' + cols + "</div>" +
+    '<div class="hblg">' + lg + "</div></div>";
 }
 function vHomeCharts(cs) {
   // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
@@ -2973,13 +3168,18 @@ function vHomeCharts(cs) {
   // half of an otherwise empty row. They move into the row below instead of going full width —
   // a full-width strip of thin bars is exactly the state the funnel was paired with them to avoid,
   // and that reasoning outlives the funnel.
+  // The activity board spans the row on its own. Fourteen labelled columns do not fit a third of
+  // the width, and a value label you cannot read is the reason the old version had none. The
+  // three-per-row standard governs the rows of small reports; the board is the page's one wide
+  // chart, exactly as the reference lays it out.
+  h += '<div style="margin-bottom:16px;">' + activityBoard(cs) + "</div>";
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
   h += ratesStrip(agg);
-  h += chartCard("نشاط الرسائل", "آخر ١٤ يومًا", dailyActivitySvg(cs));
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
   h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2563EB") : '<div style="font-size:12px;color:#656B76;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  h += winLossBoard();
   h += "</div>";
   // «تركيبة قائمتك» removed on the founder's instruction (2026-09-06). The other three charts on
   // this row stay. cityRows/sizeRows/secRows are still computed above and still feed #targets.
