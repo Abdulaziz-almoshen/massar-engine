@@ -11,6 +11,31 @@
 // ends it. That has happened four times on this project.
 
 export const PRODUCTS_CRM_CSS = `
+/* ---- THE REPORT GRID: three per row ----
+   The house layout for a board of reports. Three at the design target, two at --bp-lg and one at
+   --bp-sm: three columns of Arabic labels below 1280px stops being readable, and a rule that
+   produces an unreadable third column is not a standard, it is a shape. align-items:stretch so the
+   three cards in a row share a baseline and an edge; the content inside each decides its own
+   height. */
+.pc-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);
+  align-items:stretch;margin-block-end:var(--s4)}
+.pc-g3 .sh-sec.card3{margin-block-end:0;background:var(--paper,#fff);
+  border:1px solid var(--line,#D8DCE3);border-radius:var(--r-lg,12px);
+  padding:var(--s3) var(--s4) var(--s4);display:flex;flex-direction:column;min-width:0}
+/* The note is the card's footer, so it sits at the bottom however tall the chart above it is. */
+.pc-g3 .sh-sec.card3 .pc-note{margin-block-start:auto;padding-block-start:var(--s3)}
+/* Inside a third of the width these two lose their long-form room. */
+.pc-g3 .sh-hs{margin-block-end:var(--s3);max-width:none}
+.pc-g3 .pcq{height:132px}
+.pc-g3 .pcq .sub2{display:none}
+.pc-g3 .sh-cards{gap:var(--s2)}
+/* 1024, not 1280. The breakpoint is on the VIEWPORT but the grid lives in the CONTENT column,
+   which is ~244px of rail plus padding narrower — so a 1280px laptop has ~980px here and fits
+   three ~310px reports comfortably. Breaking at 1280 handed two columns to almost every laptop,
+   which is not the standard that was asked for. */
+@media (max-width:1023px){ .pc-g3{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:560px){ .pc-g3{grid-template-columns:minmax(0,1fr)} }
+
 /* ---- the sector chart ----
    Horizontal bars, not columns. Sector names are long Arabic phrases, and DESIGN.md 6.5 is blunt
    about it: a label you truncate is a label you did not draw, so if the category name does not fit
@@ -479,15 +504,20 @@ function vExecBand() {
   }
 
   /* ---- targets exist: the coverage layout, same components ---- */
-  var h = '<div class="sh-sec"><div class="sh-h">القطاعات</div>' +
-    '<div class="sh-hs">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>' +
+  // THREE REPORTS PER ROW (founder, 2026-09-08). The band was a vertical stack of full-width
+  // sections, so a 1440px screen showed one report and a lot of margin. Three per row is the
+  // standard now; the grid drops to two at --bp-lg and one at --bp-sm, because three columns of
+  // Arabic labels below 1280px stops being readable.
+  var h = '<div class="pc-g3">';
+  h += '<div class="sh-sec card3"><div class="sh-h">القطاعات</div>' +
+    '<div class="sh-hs">اضغط قطاعًا للوحته.</div>' +
     pcSectorChart(secs) +
     '<div style="margin-block-start:var(--s3)"></div>' + sectorCards() + '</div>';
 
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
   var untargeted = prods.length - targeted.length;
   if (targeted.length) {
-    h += '<div class="sh-sec"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
+    h += '<div class="sh-sec card3"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
       '<div class="sh-hs">الأقل إنجازًا أولًا' +
       (untargeted ? ' · ' + fmtN(untargeted) + ' منتجًا بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="sh-cards">';
     targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
@@ -501,10 +531,11 @@ function vExecBand() {
     h += '</div></div>';
   }
 
-  h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div>' +
+  h += '<div class="sh-sec card3"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
     pcQuarterChart(pcQuarters) +
     '<div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
     esc(pcQuarters.valueBasis.note) + '</div></div>';
+  h += '</div>';
   return h;
 }
 
