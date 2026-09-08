@@ -100,14 +100,23 @@ export const OPPS_CRM_CSS = `
      measure on a laptop. */
   .opflat .crow { grid-template-columns: 40px 1.7fr 1.45fr 1.1fr .8fr .65fr 74px 1.35fr; padding-inline:20px 12px; }
   .opflat .crow .o-ac { display:flex; align-items:center; gap:10px; min-width:0; }
-  .opflat .crow .o-ac .av { width:26px; height:26px; flex:none; border-radius:7px; background:#E5E8EE;
-    color:#33373E; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
-  .opflat .crow .o-ac .lb { font-size:14px; color:#14161A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-pr { font-size:12px; color:#33373E; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* A round, accent-tinted initial instead of a grey square — the same chip the owner column uses,
+     so one identity idiom serves the whole row. */
+  .opflat .crow .o-ac .av { width:30px; height:30px; flex:none; border-radius:999px; background:#EAF1FE;
+    color:#1A47BE; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; }
+  .opflat .crow .o-ac .lb { font-size:14px; font-weight:600; color:#14161A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .opflat .crow .o-pr { font-size:12px; color:#33373E; min-width:0;
+    display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
+  .opflat .crow .o-pr .pnm { max-width:100%; display:-webkit-box; -webkit-line-clamp:2;
+    -webkit-box-orient:vertical; overflow:hidden; line-height:1.4; }
   .opflat .crow .o-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#33373E; min-width:0; }
-  .opflat .crow .o-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
+  /* 8px, and it carries the stage's own colour. At 6px the pipeline ramp was invisible and every
+     row read the same shade of grey. */
+  .opflat .crow .o-st .d { width:8px; height:8px; border-radius:999px; flex:none; }
   .opflat .crow .o-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-vl { font-size:14px; font-weight:500; color:#2563EB; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  /* MONEY IS THE ROW'S ANCHOR. It was 14px in accent blue beside eleven other 12px greys, so the
+     eye had nothing to land on. Ink and 16px: the figure leads, the accent is spent on state. */
+  .opflat .crow .o-vl { font-size:16px; font-weight:600; color:#14161A; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .opflat .crow .o-ow { min-width:0; display:flex; align-items:center; }
   .opflat .crow .o-nx { font-size:12px; color:#656B76; min-width:0;
     display:flex; align-items:center; }
@@ -145,14 +154,32 @@ export const OPPS_CRM_CSS = `
   /* ===== the stage strip — the pipeline in one line, and the stage filter ===== */
   .opstrip { display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
   .opstrip .opsc { font-family:inherit; flex:1; min-width:118px; text-align:start; cursor:pointer;
-    background:#fff; border:1px solid #ECEEF2; border-radius:12px; padding:10px 13px;
-    display:flex; flex-direction:column; gap:3px; }
-  .opstrip .opsc:hover { border-color:#656B76; }
-  .opstrip .opsc.on { border-color:#5B8DEF; background:#EAF1FE; }
+    background:#fff; border:1px solid #D8DCE3; border-radius:12px; padding:11px 13px 10px;
+    display:flex; flex-direction:column; gap:3px; position:relative; overflow:hidden;
+    transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+  /* The stage's own colour, as a rule on the inline-start edge. It is the only place the pipeline
+     ramp appears on this screen, and it is what makes eight boxes read as eight STAGES. */
+  .opstrip .opsc::before { content:""; position:absolute; inset-block:0; inset-inline-start:0;
+    width:3px; background:var(--stg, transparent); }
+  .opstrip .opsc:hover { border-color:#A2A9B4; box-shadow:0 1px 3px rgba(16,24,40,.08); transform:translateY(-1px); }
+  .opstrip .opsc.on { border-color:#2563EB; background:#EAF1FE; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+  .opstrip .opsc:focus-visible { outline:2px solid #2563EB; outline-offset:2px; }
+  /* An empty stage is still a filter, but it stops competing for attention. */
+  .opstrip .opsc.empty { background:#F6F7F9; border-color:#ECEEF2; }
+  .opstrip .opsc.empty::before { opacity:.35; }
+  /* Recede via the GROUND and the weight, never via unreadable text. --s-off is 2.37:1 and
+     DESIGN.md 3.4 forbids it as a text colour — the gate caught exactly that here. --muted at
+     5.36:1 is the lightest legal ink, and the tinted card plus a lighter weight does the rest. */
+  .opstrip .opsc.empty .n { color:#656B76; font-weight:450; }
+  .opstrip .opsc.empty .t, .opstrip .opsc.empty .v { color:#656B76; }
+  /* The share of the board sitting in this stage — the pipeline shape, drawn. */
+  .opstrip .opsc .sh { display:block; height:3px; border-radius:999px; background:#ECEEF2;
+    margin-block-start:7px; overflow:hidden; }
+  .opstrip .opsc .sh i { display:block; height:100%; border-radius:999px; background:var(--stg,#2563EB); }
   .opstrip .opsc .t { font-size:12px; color:#656B76; display:flex; align-items:center; gap:6px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opstrip .opsc .t .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .opstrip .opsc .n { font-size:18px; font-weight:600; color:#14161A; font-variant-numeric:tabular-nums; line-height:1.2; }
+  .opstrip .opsc .t .d { width:8px; height:8px; border-radius:999px; flex:none; background:var(--stg,#A2A9B4); }
+  .opstrip .opsc .n { font-size:22px; font-weight:600; color:#14161A; font-variant-numeric:tabular-nums; line-height:1.2; }
   .opstrip .opsc .v { font-size:12px; color:#2563EB; font-variant-numeric:tabular-nums;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .opstrip .opsc .u { color:#7A5600; margin-inline-start:6px; }
@@ -448,13 +475,24 @@ function opStageStrip() {
     /* mixed = this cell spans more than one stage, so the money rule applies */
     var val = mixed ? opSumLive(ls) : ls.reduce(function (a, l) { return a + opValue(l); }, 0);
     var unpriced = ls.filter(function (l) { return !opPriced(l); }).length;
-    return '<button class="opsc' + (opStg === key ? " on" : "") + '" onclick="opSetStg(&quot;' + key + '&quot;)">' +
-      '<span class="t">' + (dot ? '<span class="d" style="background:' + dot + ';"></span>' : "") + label + "</span>" +
+    // A stage with nothing in it RECEDES. Eight equal boxes, seven of them showing «·» and «—»,
+    // is why this strip read as dead: the empty stages were shouting as loudly as the full ones and
+    // the eye had nowhere to land. The stage's own colour now rides an inline-start rule, the share
+    // bar shows how much of the board sits here, and an empty stage keeps its filter without
+    // pretending to hold anything.
+    var share = rows.length ? Math.round(ls.length / rows.length * 100) : 0;
+    var empty = ls.length === 0;
+    return '<button class="opsc' + (opStg === key ? " on" : "") + (empty ? " empty" : "") + '"' +
+      (dot ? ' style="--stg:' + dot + '"' : "") +
+      ' onclick="opSetStg(&quot;' + key + '&quot;)">' +
+      '<span class="t">' + (dot ? '<span class="d"></span>' : "") + label + "</span>" +
       '<span class="n">' + fmtN(ls.length) + "</span>" +
       '<span class="v">' + (val ? opMoney(val) : "—") +
       (mixed && opHasLost(ls) ? '<span class="u2">دون الخسارة</span>' : "") +
       (unpriced ? '<span class="u" title="بند بلا سعر — لا يدخل في أي مجموع">' + fmtN(unpriced) + " بلا تسعير</span>" : "") +
-      "</span></button>";
+      "</span>" +
+      (key === "all" || empty ? "" : '<span class="sh"><i style="width:' + share + '%"></i></span>') +
+      "</button>";
   };
   var h = '<div class="opstrip rise">' + cell("all", "الكل", "", rows, true);
   OPP_ST.forEach(function (st) {
@@ -635,7 +673,9 @@ function opListView() {
         (opSel[l.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(l.product) + '" onclick="opToggleSel(' + l.id + ')"></div>' +
       '<div class="o-ac"><span class="av">' + esc(String(l.account_name).trim().charAt(0)) + "</span>" +
         '<span class="lb">' + esc(l.account_name) + "</span></div>" +
-      '<div class="o-pr">' + esc(l.product) +
+      // The badge sits BELOW the name, not inline after it. Inline, the two-line clamp cut through
+      // the chip and rendered half a pill — it read as a broken glyph, not as a badge.
+      '<div class="o-pr"><span class="pnm">' + esc(l.product) + "</span>" +
         (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
       '<div class="o-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span>" +
         (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") + "</div>" +
