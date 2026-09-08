@@ -46,7 +46,9 @@ export const PRODUCTS_CRM_CSS = `
   gap:var(--s3);align-items:center;font-family:inherit;text-align:start;
   background:none;border:none;padding:0;width:100%}
 .pcs .r.go{cursor:pointer}
-.pcs .nm{font-size:12px;font-weight:600;color:var(--ink,#14161A);white-space:nowrap}
+.pcs .nm{font-size:12px;font-weight:600;color:var(--ink,#14161A);white-space:nowrap;
+  display:flex;flex-direction:column;gap:2px}
+.pcs .nm em{font-style:normal;font-weight:450;color:var(--muted,#656B76)}
 .pcs .bar{height:22px;border-radius:var(--r-sm,6px);background:var(--surface,#EFF1F5);
   overflow:hidden;display:flex}
 .pcs .bar i{display:block;height:100%;border-radius:var(--r-sm,6px)}
@@ -508,11 +510,14 @@ function vExecBand() {
   // sections, so a 1440px screen showed one report and a lot of margin. Three per row is the
   // standard now; the grid drops to two at --bp-lg and one at --bp-sm, because three columns of
   // Arabic labels below 1280px stops being readable.
+  // The card list under the chart repeated all three sector names and all three figures — the
+  // page-duplication audit found each one printed twice. The chart rows are already buttons to the
+  // same drill-down, so the list is gone and its one extra fact, the open count, moved onto the
+  // chart row itself.
   var h = '<div class="pc-g3">';
   h += '<div class="sh-sec card3"><div class="sh-h">القطاعات</div>' +
     '<div class="sh-hs">اضغط قطاعًا للوحته.</div>' +
-    pcSectorChart(secs) +
-    '<div style="margin-block-start:var(--s3)"></div>' + sectorCards() + '</div>';
+    pcSectorChart(secs) + '</div>';
 
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
   var untargeted = prods.length - targeted.length;
@@ -568,8 +573,10 @@ function pcSectorChart(secs) {
     var oPct = Math.round(v.open / mx * 100);
     var bars = (v.won > 0 ? '<i class="won" style="width:' + Math.max(wPct, 1) + '%"></i>' : "") +
                (v.open > 0 ? '<i class="open" style="width:' + Math.max(oPct, 1) + '%"></i>' : "");
+    var opens = Number(v.sc.openCount) || 0;
     return '<button class="r go" data-go="sector" data-nm="' + esc(v.sc.sector) + '">' +
-      '<span class="nm">' + esc(v.sc.sector) + "</span>" +
+      '<span class="nm">' + esc(v.sc.sector) +
+        '<em>' + (opens ? fmtN(opens) + " فرصة مفتوحة" : "بلا فرص مفتوحة") + "</em></span>" +
       '<span class="bar">' + bars + "</span>" +
       '<span class="fig' + (total > 0 ? "" : " none") + '">' +
         (total > 0 ? pcMoney(total) : "—") + "</span></button>";

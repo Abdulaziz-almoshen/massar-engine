@@ -240,24 +240,15 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kpi .dl { font-size: 12px; font-weight: 450; color: #656B76; }
   .kpi .v small { font-size: 12px; font-weight: 450; color: #656B76; }
 
-  /* ===== the hero band =====
+  /* ===== the hero band — RETIRED 2026-09-08 =====
+     Its rules were deleted with it; the statistics strip carries the leading figure now.
      Five identical white boxes is a spreadsheet, not a command centre: every figure carries the
      same weight, so the eye has nowhere to land and the page opens with no point of view. One
      figure leads — the pipeline the operator is actually judged on — with its own seven-day
      movement and a fourteen-day shape behind it; everything else supports it at a smaller size. */
-  .hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(230px, .65fr); gap: 0;
     background: #fff; border: 1px solid #ECEEF2; border-radius: 12px; overflow: hidden; margin-bottom: 18px; }
-  .hero .hmain { padding: 22px 24px 16px; min-width: 0; display: flex; flex-direction: column; }
-  .hero .hlab { font-size: 12px; color: #656B76; }
-  .hero .hrow { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
-  .hero .hfig { font-size: 44px; line-height: 1; font-weight: 700; color: #14161A;
     font-variant-numeric: tabular-nums; letter-spacing: 0; }
-  .hero .hd { font-size: 14px; font-weight: 500; color: #12633F; background: #E4F5EC;
     border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
-  .hero .hd.flat { color: #656B76; background: #E5E8EE; }
-  .hero .hnote { font-size: 12px; color: #656B76; margin-top: 8px; line-height: 1.7; }
-  .hero .hspark { margin-top: auto; padding-top: 14px; }
-  .hero .haxis { display: flex; justify-content: space-between; font-size: 12px; color: #656B76; margin-top: 4px; }
   /* ---- the activity board: the page's one wide chart ---- */
   .hboard { display: flex; flex-direction: column; }
   .hbhead { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
@@ -326,6 +317,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kshead { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
   .kshead h2 { margin: 0; font-size: 16px; font-weight: 600; color: #14161A; }
   .kshead .hbsel { margin-inline-start: auto; }
+  .kshead .ksflat { font-size: 12px; font-weight: 600; color: #464C56;
+    background: #EEF0F3; border-radius: 999px; padding: 5px 12px; }
   .kstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
     gap: 16px; margin-bottom: 16px; }
   .kcard { background: #fff; border: 1px solid #D8DCE3; border-radius: 12px; padding: 14px 16px 12px; }
@@ -340,19 +333,9 @@ export const DASHBOARD_HTML = `<!doctype html>
     font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
   .kcard .kd.up { background: #E4F5EC; color: #12633F; }
   .kcard .kd.flat { background: #EEF0F3; color: #464C56; }
-  .hero.solo { grid-template-columns: minmax(0, 1fr); }
-  .hero .hside { border-inline-start: 1px solid #ECEEF2; background: #FCFCFC; display: flex; flex-direction: column; }
-  .hero .hs { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 20px; border-top: 1px solid #ECEEF2; }
-  .hero .hs:first-child { border-top: 0; }
-  .hero .hs .k { font-size: 12px; color: #656B76; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .hero .hs .k em { font-style: normal; font-size: 12px; color: #656B76; }
-  .hero .hs .v { font-size: 18px; font-weight: 600; color: #14161A; font-variant-numeric: tabular-nums; }
 
   @media (max-width: 900px) {
-    .hero { grid-template-columns: 1fr; }
-    .hero .hside { border-inline-start: 0; border-top: 1px solid #ECEEF2; }
-    .hero .hfig { font-size: 40px; }
   }
 
   /* The funnel is drawn as a funnel. Six equal-length bars encode the ONE thing a funnel exists to
@@ -1570,18 +1553,15 @@ function vHome(d) {
   const interestedList = cs.filter((c) => interestedOf(c, 0) || c.outcome === "handoff");
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
-  // The hero. One figure leads with its own seven-day movement and a fourteen-day shape; the rest
+  // The leading figure and its fourteen-day series, now carried by the first card of the strip.
   // support it. «+٢٤ خلال ٧ أيام» is a COUNT of contacts newly qualified inside that window — not a
   // percentage change against a period nobody chose, and not a projection.
   const WEEK = 7 * 864e5;
-  const newQual = cs.filter((c) => interestedOf(c, Date.now() - WEEK)).length;
-  const newReplied = cs.filter((c) => ((c.statusTimes || {}).replied || 0) >= Date.now() - WEEK).length;
   const series = qualSeries(cs, 14);
   // Every series below is a real daily count off a stored timestamp. «جهات في قوائمك» gets NEITHER
   // a sparkline nor a delta, because an imported entity carries no per-row timestamp on the client
   // — the honest answer to "no series" is no chart, not a flat line that implies measurement.
-  // The strip's comparison window is a control now. WEEK stays for the hero, which asks a
-  // different question and says «خلال ٧ أيام» in its own words.
+  // The strip's comparison window is a control now, so the delta word follows kpiDays.
   const KWIN = kpiDays * 864e5;
   const KWORD = kpiDays === 7 ? "هذا الأسبوع" : "خلال " + fmtN(kpiDays) + " يومًا";
   const WEEK_AGO = Date.now() - KWIN;
@@ -1596,13 +1576,22 @@ function vHome(d) {
   const kNewRepl = cs.filter((c) => replTs(c) >= WEEK_AGO).length;
   const kOpts = [7, 30, 90].map((n) =>
     '<option value="' + n + '"' + (kpiDays === n ? " selected" : "") + ">آخر " + fmtN(n) + " يومًا</option>").join("");
-  const kstrip = '<div class="kshead"><h2>الإحصاءات</h2>' +
+  const kDeltas = [kNewQual, kNewRepl, newDeliv, newCamp];
+  const allFlat = kDeltas.every((v) => !v);
+  // When NOTHING moved, the fact belongs in the header once. Five identical grey pills is the same
+  // defect as a column of «لم تُحدَّد خطوة»: text that repeats down a page ranks nothing, and the
+  // reader stops seeing all five.
+  const kflat = allFlat
+    ? '<span class="ksflat">لا تغيّر خلال ' + (kpiDays === 7 ? "آخر ٧ أيام" : "آخر " + fmtN(kpiDays) + " يومًا") + "</span>"
+    : "";
+  const kd = (v) => (allFlat ? null : v);
+  const kstrip = '<div class="kshead"><h2>الإحصاءات</h2>' + kflat +
     '<select class="hbsel" onchange="kpiSetDays(this.value)" aria-label="مدة المقارنة">' + kOpts + "</select></div>" +
     '<div class="kstrip rise">' +
-    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kNewQual, KWORD, series) +
-    kpiCard("ردّوا", fmtN(replied), kNewRepl, KWORD, sRepl) +
-    kpiCard("وصلت الرسائل", fmtN(delivered), newDeliv, KWORD, sDeliv) +
-    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), newCamp, KWORD, sCamp) +
+    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kd(kNewQual), KWORD, series) +
+    kpiCard("ردّوا", fmtN(replied), kd(kNewRepl), KWORD, sRepl) +
+    kpiCard("وصلت الرسائل", fmtN(delivered), kd(newDeliv), KWORD, sDeliv) +
+    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), kd(newCamp), KWORD, sCamp) +
     kpiCard("جهات في قوائمك", fmtN(entities.length), null, "", null) +
     "</div>";
   // The exec band leads, before «مركز القيادة». DESIGN.md §7.13: a page must have a point of view,
@@ -1615,19 +1604,11 @@ function vHome(d) {
   // «جهات في قوائمك» is deliberately NOT called «جهات الاستهداف»: the funnel below uses that label
   // for the people a campaign actually reached, while this counts the whole imported book. One
   // label over two different numbers on one screen is the contradiction that rule exists to stop.
+  // THE HERO IS GONE. The statistics strip carries the same label, the same figure, the same delta
+  // and the same fourteen-day series — the audit found «جهات مهتمة ومؤهلة» printed twice on one
+  // page. Two cards saying one thing is not emphasis, it is repetition, and the strip says it
+  // better because it says it beside its four peers.
   h += kstrip;
-  h += '<div class="hero rise solo"><div class="hmain">' +
-    '<div class="hlab">جهات مهتمة ومؤهلة</div>' +
-    '<div class="hrow"><span class="hfig">' + fmtN(interestedList.length) + "</span>" +
-    '<span class="hd' + (newQual ? "" : " flat") + '">' +
-      (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
-    '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
-    '<div class="hspark"><div style="font-size:12px;color:#656B76;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا' +
-      (series.some((v) => v > 0) ? "" : ' · <b style="font-weight:600;color:#14161A;">لا تأهيل جديد في هذه الفترة</b>') +
-    "</div>" +
-    sparkArea(series, 320, 62) +
-    '<div class="haxis"><span>قبل ١٤ يومًا</span><span>اليوم</span></div></div></div>' +
-    "</div>";
   // «ما يستحق المتابعة الآن» removed from الرئيسية on the founder's instruction (2026-09-06).
   // vActionQueue is left defined and #opps still carries «لوحة الفرز الكاملة», which was already
   // the link this card pointed at — the ranking is not lost, only its second home on this page.
@@ -2940,7 +2921,7 @@ function sparkArea(vals, w, hgt) {
 // nothing else; it is not a second meaning smuggled in as colour.
 function ratesStrip(agg) {
   // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
-  // stops «٠٪ من جهات الاستهداف» appearing under a hero that honestly reads «—».
+  // stops «٠٪ من جهات الاستهداف» appearing beside a figure that honestly reads «—».
   const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
   const rows = [
     ["نسبة الوصول", pct(agg.delivered, agg.sent || agg.targeted), "من التي أُرسلت"],
