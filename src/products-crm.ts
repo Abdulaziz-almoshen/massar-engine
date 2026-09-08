@@ -64,6 +64,13 @@ export const PRODUCTS_CRM_CSS = `
 .pcs-lg i{width:10px;height:10px;border-radius:3px;flex:none}
 .pcs-lg .s-won{background:var(--accent,#2563EB)}
 .pcs-lg .s-open{background:var(--blue-light,#5B8DEF)}
+/* The merged catalogue row: clickable like the cards it replaced, and the price column wraps
+   instead of truncating — a package name you cannot read is a package you did not list. */
+.pcrow{cursor:pointer}
+.pcrow:hover{background:var(--accent-wash,#F2F6FE)}
+.pcrow td b{font-weight:600;color:var(--ink,#14161A)}
+.pcrow .sub{font-size:12px;color:var(--muted,#656B76);margin-block-start:2px}
+.pcprice{font-size:12px;color:var(--muted,#656B76);line-height:1.7;min-width:180px;white-space:normal}
 @media (max-width:560px){ .pcs .r{grid-template-columns:1fr auto;row-gap:6px}
   .pcs .bar{grid-column:1 / 3} }
 
@@ -185,102 +192,69 @@ function vProductsCrm() {
       '<div class="s">لا تدخل في أي مجموع قطاعي</div></div><div class="v">' + fmtN(noSector) + '</div></div>' +
   '</div>';
 
-  /* ---- sectors: ONE stacked share bar, then a card each ---- */
-  if (pcSectors && pcSectors.sectors) {
-    var COL = ["#2563EB", "#5B8DEF", "#1E5FCC", "#A2A9B4"];
-    var parts = pcSectors.sectors.map(function (sc, i) {
-      return { n: sc.sector, v: (sc.achieved || 0) + (sc.weightedOpen || 0), c: COL[i % COL.length] };
-    }).filter(function (p) { return p.v > 0; });
-
-    h += '<div class="sh-sec"><div class="sh-h">القطاعات</div>' +
-      '<div class="sh-hs">المحقق والمفتوح لكل قطاع سوقي. الشريط واحد لأن المقارنة المطلوبة بين الأجزاء، ' +
-      'وأربعة أشرطة منفصلة تجعلها مقارنةً بالذاكرة. «بلا قطاع» جزءٌ صريح لا مرشِّح.</div>';
-    h += shStack(parts);
-    h += '<div class="sh-cards" style="margin-block-start:var(--s3)">';
-    pcSectors.sectors.forEach(function (sc) {
-      var cov = sc.coveragePct;
-      var cls = sc.isUnclassified ? "crm-none" : (cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad")));
-      /* data-as-visual: one cell per open opportunity in this sector. */
-      var mine = (typeof oppRows !== "undefined" && oppRows ? oppRows : []).filter(function (o) {
-        return (sc.products || []).indexOf(o.product) >= 0;
-      });
-      var units = mine.map(function (o) {
-        return o.stage === "won" ? "won" : (o.stage === "lost" ? "lost" : "on");
-      });
-      h += '<div class="sh-card' + (sc.isUnclassified ? "" : " go") + '"' +
-        (sc.isUnclassified ? "" : ' data-go="sector" data-nm="' + esc(sc.sector) + '"') + '>' +
-        '<div><div class="nm">' + esc(sc.sector) + '</div>' +
-          '<div class="sub">' + esc((sc.products || []).join(" · ")) + '</div>' +
-          (units.length ? shUnits(units, 48) : "") + '</div>' +
-        '<div class="end"><span class="money">' + pcMoney(sc.achieved) +
-          (sc.target > 0 ? ' من ' + pcMoney(sc.target) : ' محقق') + '</span>' +
-          '<span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span>' +
-        '</div></div>';
-    });
-    h += '</div></div>';
-  }
-
-  /* ---- quarters as tiles ---- */
-  if (pcQuarters && pcQuarters.quarters) {
-    h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
-      '<div class="sh-hs">الأربعة معًا، لا ربعًا في كل مرة.</div><div class="sh-tiles">';
-    pcQuarters.quarters.forEach(function (q) {
-      var isNow = q.quarter === pcQuarters.currentQuarter;
-      h += '<div class="sh-tile' + (isNow ? " lead" : "") + '"><div>' +
-        '<div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
-        '<div class="s">' + (q.target > 0 ? 'من ' + pcMoney(q.target) +
-          (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : "بلا مستهدف") + '</div></div>' +
-        '<div class="v">' + fmtN(Math.round(q.achieved)) + '</div></div>';
-    });
-    h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
-      esc(pcQuarters.valueBasis.note) + '</div></div>';
-  }
+  /* NO SECTOR / QUARTER / ATTAINMENT REPORTS HERE. They were added on 2026-09-08 and removed the
+     same day on the founder's instruction, and he was right: they are the SAME three reports
+     الرئيسية already carries, so this page had stopped being about products and become a second
+     copy of the home board. #products answers «what do we sell and at what price» — the catalogue
+     and the per-product target grid below. The company-level roll-ups belong on الرئيسية, once. */
 
   /* ---- product x quarter grid ---- */
-  if (pcQuarters && pcQuarters.byProduct && pcQuarters.byProduct.length) {
-    h += '<div class="sh-sec"><div class="sh-h">المستهدف والمحقق لكل منتج · ' + arYear(pcQuarters.year) + '</div>' +
-      '<div class="sh-hs">السنوي، وتوزيعه على الأرباع، والمحقق في كل ربع. المنتج بلا مستهدف يظهر بصفّ أصفار — صفٌّ مُرشَّح لا يمكن رؤية غيابه.</div>' +
-      '<div class="crm-scroll"><table class="crm-tbl"><thead><tr><th>المنتج</th><th class="crm-money">السنوي</th>' +
-      [1,2,3,4].map(function (q) { return '<th class="crm-money">ر' + fmtN(q) + '</th>'; }).join("") +
-      '<th class="crm-money">المحقق</th><th>الإنجاز</th></tr></thead><tbody>';
-    pcQuarters.byProduct.forEach(function (p) {
-      var cov = p.coveragePct;
-      var cls = cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad"));
-      h += '<tr><td>' + esc(p.product) + '</td>' +
-        '<td class="crm-money">' + (p.annualTarget ? fmtN(p.annualTarget) : "—") + '</td>' +
-        p.quarters.map(function (q) {
-          var isNow = q.quarter === pcQuarters.currentQuarter;
-          return '<td class="crm-money"' + (isNow ? ' style="background:var(--blue-tint)"' : '') + '>' +
-            (q.target || q.achieved ? fmtN(q.achieved) + '<div class="sub">من ' + fmtN(q.target) + '</div>' : "—") + '</td>';
-        }).join("") +
-        '<td class="crm-money">' + fmtN(p.achieved) + '</td>' +
-        '<td><span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></td></tr>';
-    });
-    h += '</tbody></table></div></div>';
-  }
+  /* ---- ONE TABLE: the catalogue AND its targets ----
+     These were two sections listing the same products, one saying what each costs and the other
+     saying what each is meant to earn — so answering «is the thing we sell at 18,000 actually
+     hitting its number» meant scrolling between two tables and matching names by eye.
 
-  /* ---- catalogue as cards ---- */
-  h += '<div class="sh-sec"><div class="sh-h">الكتالوج</div>' +
-    '<div class="sh-hs">كل منتج، قطاعه، وسعره المنشور. المنتج الذي لا باقة له يعرض نص التسعير كما هو مكتوب، لا خانة فارغة تُقرأ كبيانات ناقصة.</div>';
-  if (!pcCat.length) {
+     The join is the product NAME and it is a UNION, deliberately. A product priced but untargeted
+     keeps its row with «—» in the target columns; a product targeted but absent from the catalogue
+     keeps its row with its pricing note. Inner-joining would have silently dropped exactly the
+     products worth looking at — the ones set up in one place and not the other. */
+  var byName = {};
+  var order = [];
+  (pcCat || []).forEach(function (p) {
+    byName[p.product] = { product: p.product, cat: p, q: null };
+    order.push(p.product);
+  });
+  ((pcQuarters && pcQuarters.byProduct) || []).forEach(function (p) {
+    if (!byName[p.product]) { byName[p.product] = { product: p.product, cat: null, q: null }; order.push(p.product); }
+    byName[p.product].q = p;
+  });
+
+  h += '<div class="sh-sec"><div class="sh-h">الكتالوج والمستهدف' +
+    (pcQuarters ? " · " + arYear(pcQuarters.year) : "") + '</div>' +
+    '<div class="sh-hs">كل منتج، قطاعه، سعره المنشور، ومستهدفه السنوي. اضغط منتجًا لأرباعه وفرصه وباقاته. ' +
+    'المنتج بلا سعر يعرض نص التسعير كما هو مكتوب، والمنتج بلا مستهدف يعرض «—» لا صفر.</div>';
+  if (!order.length) {
     h += shEmpty("box", "لا منتجات في السجل", "يظهر هنا كل وسم منتج. أضف وسمًا من «جهات الاستهداف» وسيظهر بقطاعه وباقاته.");
   } else {
-    h += '<div class="sh-cards">';
-    pcCat.forEach(function (p) {
-      var price = (p.packages && p.packages.length)
-        ? p.packages.map(function (k) {
+    // NO QUARTER COLUMNS HERE. The product record already owns the quarterly breakdown, and
+    // carrying ر١-ر٤ on the list as well printed the same eight target/achieved figures on two
+    // screens. The list answers «what do we sell, and is it hitting its number»; the record
+    // answers «why». Six columns also fit without a horizontal scroll, which nine never did.
+    h += '<div class="crm-scroll"><table class="crm-tbl"><thead><tr>' +
+      "<th>المنتج</th><th>السعر المنشور</th>" +
+      '<th class="crm-money">المستهدف السنوي</th>' +
+      '<th class="crm-money">المحقق</th><th>الإنجاز</th></tr></thead><tbody>';
+    order.forEach(function (nm) {
+      var row = byName[nm], c = row.cat, q = row.q;
+      var price = c && c.packages && c.packages.length
+        ? c.packages.map(function (k) {
             return esc(k.name) + " " + pcMoney(k.listPrice) + (k.scope ? " (" + esc(k.scope) + ")" : "");
           }).join(" · ")
-        : esc(p.pricingNote || "لا سعر منشور");
-      h += '<div class="sh-card go" data-go="product" data-nm="' + esc(p.product) + '">' +
-        '<div><div class="nm">' + esc(p.product) + '</div>' +
-        '<div class="sub">' + (p.sector ? esc(p.sector) : '<span style="color:var(--s-attn-text)">بلا قطاع</span>') +
-          (p.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج ولم يؤكَّد">مُستنتَج</span>' : '') +
-        '</div></div>' +
-        '<div class="end"><span class="money" style="font-weight:450;font-size:var(--t-xs);color:var(--muted);text-align:end">' +
-          price + '</span></div></div>';
+        : esc((c && c.pricingNote) || "لا سعر منشور");
+      var cov = q ? q.coveragePct : null;
+      var cls = cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad"));
+      var sector = c
+        ? (c.sector ? esc(c.sector) : '<span style="color:var(--s-attn-text)">بلا قطاع</span>') +
+          (c.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج ولم يؤكَّد">مُستنتَج</span>' : "")
+        : '<span style="color:var(--muted)">خارج الكتالوج</span>';
+      h += '<tr class="pcrow" data-go="product" data-nm="' + esc(nm) + '">' +
+        '<td><b>' + esc(nm) + '</b><div class="sub">' + sector + '</div></td>' +
+        '<td class="pcprice">' + price + "</td>" +
+        '<td class="crm-money">' + (q && q.annualTarget ? fmtN(q.annualTarget) : "—") + "</td>" +
+        '<td class="crm-money">' + (q ? fmtN(q.achieved) : "—") + "</td>" +
+        '<td><span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + "</span></td></tr>";
     });
-    h += '</div>';
+    h += "</tbody></table></div>";
   }
   h += '</div>';
   return h;
