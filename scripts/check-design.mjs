@@ -69,6 +69,56 @@ const TOKEN_RATIOS = [
   ["--accent-mark on --surface", "#7A6BEE", "#F0EEF9", 3.0],
 ];
 
+// ---- DESIGN.md must document what the code actually ships ----
+//
+// WHY THIS EXISTS. On 2026-09-07 the accent was remapped across 1,164 sites and the TOKENS set in
+// this file was updated with it — so the gate went green while DESIGN.md, the token AUTHORITY,
+// still documented fifteen values that had not shipped since the day before: the whole
+// --s-attend / --s-review / --s-sched / --s-off family and both skeleton tokens. A checker and a
+// document holding the same values with nothing comparing them is the same defect class as a table
+// with a reader and no writer. Nobody notices, because each side is internally consistent.
+//
+// The rep page is checked too: it is a SEPARATE document with its own :root, so it is a second
+// copy of the palette and a second place to drift.
+const readRoot = (file) => {
+  const src = fs.readFileSync(new URL(file, SRC), "utf8");
+  const block = src.match(/:root\s*\{([\s\S]*?)\n\s*\}/);
+  if (!block) return {};
+  const out = {};
+  for (const m of block[1].matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9A-Fa-f]{6})/g)) {
+    out[m[1]] = m[2].toUpperCase();
+  }
+  return out;
+};
+const shipped = readRoot("dashboard.ts");
+const repRoot = readRoot("rep-page.ts");
+// DESIGN.md lives in the PARENT repo, not in massar-engine. The first version of this check
+// pointed at ../DESIGN.md, read nothing, and reported "agrees on all 0 documented tokens" — a
+// guard that passes because it found no data is the empty-table failure this codebase has shipped
+// four times. So the path is asserted and a zero parse is a hard failure, never a pass.
+const DESIGN_MD = new URL("../../DESIGN.md", import.meta.url);
+const documented = {};
+if (!fs.existsSync(DESIGN_MD)) {
+  console.log("FAIL DESIGN.md not found at " + DESIGN_MD.pathname + " — the authority check cannot run");
+  process.exit(1);
+}
+{
+  const md = fs.readFileSync(DESIGN_MD, "utf8");
+  for (const m of md.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9A-Fa-f]{6})/g)) {
+    documented[m[1]] = m[2].toUpperCase();
+  }
+}
+if (Object.keys(documented).length < 20) {
+  console.log(`FAIL DESIGN.md parsed only ${Object.keys(documented).length} tokens — the format changed and this check went blind`);
+  process.exit(1);
+}
+const docDrift = Object.entries(documented)
+  .filter(([k, v]) => shipped[k] && shipped[k] !== v)
+  .map(([k, v]) => `${k}: DESIGN.md says ${v}, src ships ${shipped[k]}`);
+const repDrift = Object.entries(repRoot)
+  .filter(([k, v]) => shipped[k] && shipped[k] !== v)
+  .map(([k, v]) => `${k}: rep-page.ts has ${v}, dashboard.ts has ${shipped[k]}`);
+
 const findings = { textOnForbidden: [], untokenisedText: [], intZIndex: [], offLadderType: [] };
 const LADDER = new Set([12, 14, 16, 18, 22, 28, 40, 44]);
 
@@ -139,5 +189,22 @@ if (process.env.DESIGN_BASELINE_WRITE === "1") {
   console.log("\nbaseline rewritten:", JSON.stringify(counts));
   process.exit(0);
 }
+// Drift is NOT baselined. It must be zero: a value the authority documents and the product does
+// not ship is a wrong answer to anybody who reads the file, on the first day it happens.
+if (docDrift.length) {
+  bad++;
+  console.log(`FAIL DESIGN.md documents ${docDrift.length} token(s) the code does not ship:`);
+  docDrift.slice(0, 12).forEach((x) => console.log(`       ${x}`));
+} else {
+  console.log(`ok   DESIGN.md agrees with src/ on all ${Object.keys(documented).length} documented tokens`);
+}
+if (repDrift.length) {
+  bad++;
+  console.log(`FAIL rep-page.ts has ${repDrift.length} token(s) that disagree with dashboard.ts:`);
+  repDrift.slice(0, 12).forEach((x) => console.log(`       ${x}`));
+} else {
+  console.log(`ok   rep-page.ts agrees with dashboard.ts on every shared token`);
+}
+
 console.log(bad ? `\ndesign system: ${bad} category FAILED` : "\ndesign system: all green (ratchet holds)");
 process.exit(bad || tokenBad ? 1 : 0);
