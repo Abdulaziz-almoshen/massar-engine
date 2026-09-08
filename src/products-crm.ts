@@ -11,6 +11,70 @@
 // ends it. That has happened four times on this project.
 
 export const PRODUCTS_CRM_CSS = `
+/* ---- the sector chart ----
+   Horizontal bars, not columns. Sector names are long Arabic phrases, and DESIGN.md 6.5 is blunt
+   about it: a label you truncate is a label you did not draw, so if the category name does not fit
+   across, the chart is the wrong orientation. Each bar is direct-labelled with its name and its
+   figure, which also removes the need for a colour-only legend (6.4). */
+.pcs{display:flex;flex-direction:column;gap:var(--s3);padding:var(--s2) 0 var(--s1)}
+.pcs .r{display:grid;grid-template-columns:minmax(96px,auto) 1fr minmax(72px,auto);
+  gap:var(--s3);align-items:center;font-family:inherit;text-align:start;
+  background:none;border:none;padding:0;width:100%}
+.pcs .r.go{cursor:pointer}
+.pcs .nm{font-size:12px;font-weight:600;color:var(--ink,#14161A);white-space:nowrap}
+.pcs .bar{height:22px;border-radius:var(--r-sm,6px);background:var(--surface,#EFF1F5);
+  overflow:hidden;display:flex}
+.pcs .bar i{display:block;height:100%;border-radius:var(--r-sm,6px)}
+.pcs .bar .won{background:var(--accent,#2563EB)}
+.pcs .bar .open{background:var(--blue-light,#5B8DEF)}
+.pcs .fig{font-size:12px;font-weight:600;color:var(--ink,#14161A);
+  font-variant-numeric:tabular-nums;white-space:nowrap;text-align:end}
+.pcs .fig.none{color:var(--muted,#656B76);font-weight:450}
+.pcs .r.go:hover .nm{color:var(--accent-deep,#1A47BE)}
+.pcs-lg{display:flex;gap:var(--s4);flex-wrap:wrap;padding-block-start:var(--s2);
+  font-size:12px;color:var(--muted,#656B76)}
+.pcs-lg span{display:inline-flex;align-items:center;gap:7px}
+.pcs-lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.pcs-lg .s-won{background:var(--accent,#2563EB)}
+.pcs-lg .s-open{background:var(--blue-light,#5B8DEF)}
+@media (max-width:560px){ .pcs .r{grid-template-columns:1fr auto;row-gap:6px}
+  .pcs .bar{grid-column:1 / 3} }
+
+/* ---- the quarter chart ----
+   Columns, not tiles. A tile gives every quarter the same area regardless of what it holds; a
+   column's HEIGHT is the number, which is the whole point (DESIGN.md 6.1). */
+.pcq{display:flex;align-items:stretch;gap:var(--s3);height:148px;padding:var(--s1) var(--s1) 0}
+.pcq .col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:var(--s1)}
+.pcq .val{font-size:12px;font-weight:600;color:var(--ink,#14161A);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+/* The plotting area. Both bars sit on the same baseline and share one scale, so their heights are
+   directly comparable — a bullet column rather than a stack. */
+.pcq .plot{flex:1;width:100%;position:relative;display:flex;align-items:flex-end;justify-content:center}
+.pcq .tgt{position:absolute;inset-inline:0;inset-block-end:0;background:var(--surface-2,#E5E8EE);
+  border-start-start-radius:var(--r-sm,6px);border-start-end-radius:var(--r-sm,6px)}
+.pcq .ach{position:relative;width:56%;background:var(--blue-light,#5B8DEF);
+  border-start-start-radius:var(--r-sm,6px);border-start-end-radius:var(--r-sm,6px)}
+.pcq .col.now .ach{background:var(--accent,#2563EB)}
+/* No target is not a zero bar. Hatching is the product's texture channel for NOT YET, so the
+   absence reads even in greyscale. */
+.pcq .notgt{position:absolute;inset-inline:0;inset-block-end:0;height:6px;border-radius:var(--r-pill,999px);
+  background-color:var(--surface,#EFF1F5);
+  background-image:repeating-linear-gradient(115deg,var(--surface-2,#E5E8EE) 0 3px,transparent 3px 7px)}
+.pcq .lbl{font-size:12px;color:var(--muted,#656B76);white-space:nowrap}
+.pcq .col.now .lbl{color:var(--ink,#14161A);font-weight:600}
+.pcq .sub2{font-size:12px;color:var(--muted,#656B76);text-align:center;line-height:1.5}
+.pcq-lg{display:flex;gap:var(--s4);flex-wrap:wrap;padding:var(--s3) var(--s1) 0;
+  font-size:12px;color:var(--muted,#656B76)}
+.pcq-lg span{display:inline-flex;align-items:center;gap:7px}
+.pcq-lg i{width:10px;height:10px;border-radius:3px;flex:none}
+.pcq-lg .s-ach{background:var(--accent,#2563EB)}
+.pcq-lg .s-tgt{background:var(--surface-2,#E5E8EE)}
+.pcq-lg .s-no{background-color:var(--surface,#EFF1F5);
+  background-image:repeating-linear-gradient(115deg,var(--surface-2,#E5E8EE) 0 3px,transparent 3px 7px)}
+@media (max-width:560px){
+  .pcq{height:132px;gap:var(--s2)}
+  .pcq .sub2{display:none}
+}
 .pc-sec{margin-block-end:26px}
 .pc-h{font-size:14px;font-weight:600;color:var(--ink,#14161A);margin-block-end:3px}
 .pc-sub{font-size:12px;color:var(--muted,#656B76);margin-block-end:12px;max-width:70ch;line-height:1.7}
@@ -417,9 +481,7 @@ function vExecBand() {
   /* ---- targets exist: the coverage layout, same components ---- */
   var h = '<div class="sh-sec"><div class="sh-h">القطاعات</div>' +
     '<div class="sh-hs">اضغط قطاعًا للوحته، أو منتجًا للوحة منتجه.</div>' +
-    shStack(secs.map(function (sc, i) {
-      return { n: sc.sector, v: (sc.achieved || 0) + (sc.weightedOpen || 0), c: COL[i % COL.length] };
-    }).filter(function (p) { return p.v > 0; })) +
+    pcSectorChart(secs) +
     '<div style="margin-block-start:var(--s3)"></div>' + sectorCards() + '</div>';
 
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
@@ -439,18 +501,113 @@ function vExecBand() {
     h += '</div></div>';
   }
 
-  h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div><div class="sh-tiles">';
-  pcQuarters.quarters.forEach(function (q) {
-    var isNow = q.quarter === pcQuarters.currentQuarter;
-    h += '<div class="sh-tile' + (isNow ? " lead" : "") + '"><div>' +
-      '<div class="k">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + '</div>' +
-      '<div class="s">' + (q.target > 0 ? 'من ' + pcMoney(q.target) +
-        (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : "بلا مستهدف") + '</div></div>' +
-      '<div class="v">' + fmtN(Math.round(q.achieved)) + '</div></div>';
-  });
-  h += '</div><div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
+  h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي الإجمالي · ' + arYear(pcQuarters.year) + '</div>' +
+    pcQuarterChart(pcQuarters) +
+    '<div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
     esc(pcQuarters.valueBasis.note) + '</div></div>';
   return h;
+}
+
+/* THE SECTOR CHART. Replaces a single stacked share bar, which answered «what proportion of the
+   book is each sector» and nothing else — at three sectors that is a question nobody asks, and the
+   colour key was the only way to read it.
+
+   One horizontal bar per sector instead, split into MEACHIEVED and WEIGHTED-OPEN. Horizontal
+   because sector names are long Arabic phrases: DESIGN.md 6.5 says a label you truncate is a label
+   you did not draw, so a column chart here would either clip every name or turn them sideways.
+   Each row is direct-labelled with its name and figure, so the colour key supports the reading
+   rather than carrying it (6.4).
+
+   A sector with nothing in it still gets a row, at «—». Dropping empty sectors would quietly
+   change the denominator of what the reader thinks they are looking at. */
+function pcSectorChart(secs) {
+  var list = (secs || []).filter(function (sc) { return !sc.isUnclassified; });
+  if (!list.length) return "";
+  var vals = list.map(function (sc) {
+    return { sc: sc, won: Number(sc.achieved) || 0, open: Number(sc.weightedOpen) || 0 };
+  });
+  var mx = 1;
+  vals.forEach(function (v) { mx = Math.max(mx, v.won + v.open); });
+  var anyOpen = vals.some(function (v) { return v.open > 0; });
+  var anyWon = vals.some(function (v) { return v.won > 0; });
+
+  var rows = vals.map(function (v) {
+    var total = v.won + v.open;
+    var wPct = Math.round(v.won / mx * 100);
+    var oPct = Math.round(v.open / mx * 100);
+    var bars = (v.won > 0 ? '<i class="won" style="width:' + Math.max(wPct, 1) + '%"></i>' : "") +
+               (v.open > 0 ? '<i class="open" style="width:' + Math.max(oPct, 1) + '%"></i>' : "");
+    return '<button class="r go" data-go="sector" data-nm="' + esc(v.sc.sector) + '">' +
+      '<span class="nm">' + esc(v.sc.sector) + "</span>" +
+      '<span class="bar">' + bars + "</span>" +
+      '<span class="fig' + (total > 0 ? "" : " none") + '">' +
+        (total > 0 ? pcMoney(total) : "—") + "</span></button>";
+  }).join("");
+
+  return '<div class="pcs">' + rows + "</div>" +
+    (anyWon || anyOpen
+      ? '<div class="pcs-lg">' +
+          (anyWon ? '<span><i class="s-won"></i>المحقق</span>' : "") +
+          (anyOpen ? '<span><i class="s-open"></i>المتوقع من المفتوح</span>' : "") +
+        "</div>"
+      : "");
+}
+
+/* THE QUARTER CHART. Four tiles side by side made every quarter the same size on screen no matter
+   what it held, so the year had no shape: a quarter at 0 looked exactly like a quarter at target.
+   This draws it, and the geometry IS the data (DESIGN.md 6.1) — a wide light bar is the TARGET and
+   a narrower solid bar in front of it is the ACHIEVED, both scaled against the same maximum, so
+   the gap between them is the shortfall at a glance.
+
+   A quarter with NO target does not get a zero bar. A zero bar is a claim that nothing was
+   achieved against something; no target means the question was never asked (DESIGN.md 4), so it
+   draws a hatched baseline and says so in words.
+
+   Time runs right to left, like the language (DESIGN.md 6.3): quarters render in order and the
+   RTL row places الربع ١ at the inline-start, which is the right. */
+function pcQuarterChart(qs) {
+  var list = qs.quarters || [];
+  var mx = 1;
+  list.forEach(function (q) {
+    mx = Math.max(mx, Number(q.target) || 0, Number(q.achieved) || 0);
+  });
+  var anyTarget = list.some(function (q) { return (Number(q.target) || 0) > 0; });
+  var anyValue = list.some(function (q) { return (Number(q.achieved) || 0) > 0; });
+
+  var cols = list.map(function (q) {
+    var isNow = q.quarter === qs.currentQuarter;
+    var tgt = Number(q.target) || 0, ach = Number(q.achieved) || 0;
+    var tPct = Math.round(tgt / mx * 100);
+    var aPct = Math.round(ach / mx * 100);
+    var bars = tgt > 0
+      ? '<span class="tgt" style="height:' + Math.max(tPct, 2) + '%"></span>' +
+        (ach > 0 ? '<span class="ach" style="height:' + Math.max(aPct, 2) + '%"></span>' : "")
+      : '<span class="notgt"></span>';
+    // The figure above the column is the ACHIEVED. Zero achieved against a real target is a true
+    // «٠»; no target at all is «—», because there is no denominator to be zero against.
+    var top = tgt > 0 ? pcMoney(ach) : "—";
+    var sub = tgt > 0
+      ? "من " + pcMoney(tgt) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪")
+      : "بلا مستهدف";
+    return '<div class="col' + (isNow ? " now" : "") + '">' +
+      '<div class="val">' + top + "</div>" +
+      '<div class="plot">' + bars + "</div>" +
+      '<div class="lbl">الربع ' + fmtN(q.quarter) + (isNow ? " · الحالي" : "") + "</div>" +
+      '<div class="sub2">' + sub + "</div></div>";
+  }).join("");
+
+  if (!anyTarget && !anyValue) {
+    return '<div class="crm-empty" style="margin-block-end:var(--s3)"><b>لا مستهدف ولا محقق لهذه السنة</b>' +
+      '<div>حدِّد المستهدف الربعي من «المستهدفات والأداء» وتظهر الأرباع هنا مرسومة.</div></div>';
+  }
+  // A colour-only legend is banned (DESIGN.md 6.4): each key carries its swatch AND its word.
+  return '<div class="pcq">' + cols + "</div>" +
+    '<div class="pcq-lg">' +
+      '<span><i class="s-ach"></i>المحقق</span>' +
+      '<span><i class="s-tgt"></i>المستهدف</span>' +
+      (anyTarget && list.some(function (q) { return !(Number(q.target) > 0); })
+        ? '<span><i class="s-no"></i>بلا مستهدف</span>' : "") +
+    "</div>";
 }
 
 function vSectorDrill(name) {
