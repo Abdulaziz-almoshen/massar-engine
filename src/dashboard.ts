@@ -258,6 +258,25 @@ export const DASHBOARD_HTML = `<!doctype html>
   .hero .hnote { font-size: 12px; color: #656B76; margin-top: 8px; line-height: 1.7; }
   .hero .hspark { margin-top: auto; padding-top: 14px; }
   .hero .haxis { display: flex; justify-content: space-between; font-size: 12px; color: #656B76; margin-top: 4px; }
+  /* ---- the statistics strip ----
+     Five compact reports across the top, the way a board reads: label, figure, movement, shape.
+     auto-fit rather than a fixed five, so it reflows to 3 and 2 instead of squeezing five columns
+     of Arabic labels into a laptop. */
+  .kstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 16px; margin-bottom: 16px; }
+  .kcard { background: #fff; border: 1px solid #D8DCE3; border-radius: 12px; padding: 14px 16px 12px; }
+  .kcard .ktop { display: flex; align-items: flex-start; gap: 8px; }
+  .kcard .kk { font-size: 12px; color: #656B76; font-weight: 600; flex: 1; min-width: 0; }
+  .kcard .ksp { flex: none; width: 92px; height: 30px; opacity: .9; }
+  .kcard .kv { font-size: 28px; font-weight: 600; color: #14161A; line-height: 1.2;
+    font-variant-numeric: tabular-nums; margin-top: 6px; }
+  /* Arrow + word + colour. Never colour alone (DESIGN.md 3.0b), and a still week says so in the
+     off channel rather than showing a green «+٠». */
+  .kcard .kd { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
+    font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+  .kcard .kd.up { background: #E4F5EC; color: #12633F; }
+  .kcard .kd.flat { background: #EEF0F3; color: #464C56; }
+  .hero.solo { grid-template-columns: minmax(0, 1fr); }
   .hero .hside { border-inline-start: 1px solid #ECEEF2; background: #FCFCFC; display: flex; flex-direction: column; }
   .hero .hs { display: flex; align-items: center; justify-content: space-between; gap: 10px;
     padding: 12px 20px; border-top: 1px solid #ECEEF2; }
@@ -1485,33 +1504,47 @@ function vHome(d) {
   const newQual = cs.filter((c) => interestedOf(c, Date.now() - WEEK)).length;
   const newReplied = cs.filter((c) => ((c.statusTimes || {}).replied || 0) >= Date.now() - WEEK).length;
   const series = qualSeries(cs, 14);
-  const heroSide = [
-    ["الحملات الفعلية", fmtN(realCampaigns.length),
-      campaigns.length > realCampaigns.length ? "و" + fmtN(campaigns.length - realCampaigns.length) + " تجريبية" : ""],
-    ["جهات في قوائمك", fmtN(entities.length), ""],
-    ["وصلت الرسائل", fmtN(delivered), ""],
-    ["ردّوا", fmtN(replied), newReplied ? "+" + fmtN(newReplied) + " هذا الأسبوع" : ""],
-  ];
+  // Every series below is a real daily count off a stored timestamp. «جهات في قوائمك» gets NEITHER
+  // a sparkline nor a delta, because an imported entity carries no per-row timestamp on the client
+  // — the honest answer to "no series" is no chart, not a flat line that implies measurement.
+  const WEEK_AGO = Date.now() - WEEK;
+  const delivTs = (c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read || 0;
+  const replTs = (c) => (c.statusTimes || {}).replied || 0;
+  const sDeliv = daySeries(cs, delivTs, 14);
+  const sRepl = daySeries(cs, replTs, 14);
+  const sCamp = daySeries(realCampaigns, (cp) => cp.created_at || 0, 14);
+  const newDeliv = cs.filter((c) => delivTs(c) >= WEEK_AGO).length;
+  const newCamp = realCampaigns.filter((cp) => (cp.created_at || 0) >= WEEK_AGO).length;
+  const kstrip = '<div class="kstrip rise">' +
+    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), newQual, "هذا الأسبوع", series) +
+    kpiCard("ردّوا", fmtN(replied), newReplied, "هذا الأسبوع", sRepl) +
+    kpiCard("وصلت الرسائل", fmtN(delivered), newDeliv, "هذا الأسبوع", sDeliv) +
+    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), newCamp, "هذا الأسبوع", sCamp) +
+    kpiCard("جهات في قوائمك", fmtN(entities.length), null, "", null) +
+    "</div>";
   // The exec band leads, before «مركز القيادة». DESIGN.md §7.13: a page must have a point of view,
   // and the first question this screen answers for a founder is «أين نحن من المستهدف».
-  let h = execBand + '<div class="ptitle rise"><div><h1>مركز القيادة</h1><p>ما الذي يحدث الآن في السوق — ومن يستحق اتصالك اليوم</p></div>' +
-    '<div class="acts"><a href="#customers" class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("up", 17) + " استيراد جهات الاستهداف</a>" +
-    '<a href="#aimkt" class="btn btn-dark" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">' + ic("send", 17) + " إنشاء حملة</a></div></div>";
+  // «استيراد جهات الاستهداف» and «إنشاء حملة» removed from الرئيسية on the founder's instruction
+  // (2026-09-08). NOTHING IS ORPHANED: #customers is a nav door of its own and #aimkt is a tab
+  // under الحملات, so both screens keep a route and a way to be clicked. This page also carried
+  // the only two primary-weight buttons on it, against DESIGN.md 3.7's one-primary rule.
+  let h = execBand + '<div class="ptitle rise"><div><h1>مركز القيادة</h1></div></div>';
   // «جهات في قوائمك» is deliberately NOT called «جهات الاستهداف»: the funnel below uses that label
   // for the people a campaign actually reached, while this counts the whole imported book. One
   // label over two different numbers on one screen is the contradiction that rule exists to stop.
-  h += '<div class="hero rise"><div class="hmain">' +
+  h += kstrip;
+  h += '<div class="hero rise solo"><div class="hmain">' +
     '<div class="hlab">جهات مهتمة ومؤهلة</div>' +
     '<div class="hrow"><span class="hfig">' + fmtN(interestedList.length) + "</span>" +
     '<span class="hd' + (newQual ? "" : " flat") + '">' +
       (newQual ? "+" + fmtN(newQual) + " خلال ٧ أيام" : "بلا جديد هذا الأسبوع") + "</span></div>" +
     '<div class="hnote">من ' + fmtN(cs.length) + " جهة تحدّث معها المساعد · " + fmtN(replied) + " ردّوا</div>" +
-    '<div class="hspark"><div style="font-size:12px;color:#656B76;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا</div>' +
+    '<div class="hspark"><div style="font-size:12px;color:#656B76;margin-bottom:4px;">مؤهلون جدد يوميًا · آخر ١٤ يومًا' +
+      (series.some((v) => v > 0) ? "" : ' · <b style="font-weight:600;color:#14161A;">لا تأهيل جديد في هذه الفترة</b>') +
+    "</div>" +
     sparkArea(series, 320, 62) +
     '<div class="haxis"><span>قبل ١٤ يومًا</span><span>اليوم</span></div></div></div>' +
-    '<div class="hside">' + heroSide.map((r) =>
-      '<div class="hs"><span class="k">' + r[0] + (r[2] ? "<em>" + r[2] + "</em>" : "") + "</span>" +
-      '<span class="v">' + r[1] + "</span></div>").join("") + "</div></div>";
+    "</div>";
   // «ما يستحق المتابعة الآن» removed from الرئيسية on the founder's instruction (2026-09-06).
   // vActionQueue is left defined and #opps still carries «لوحة الفرز الكاملة», which was already
   // the link this card pointed at — the ranking is not lost, only its second home on this page.
@@ -2754,6 +2787,36 @@ window.entDel = async (id) => {
 // Fourteen days of newly-qualified contacts. Every point is a COUNT OF PEOPLE whose first hot or
 // warm reading landed that day — not a smoothed curve, not a projection, and zero days are drawn
 // as zero rather than skipped, so a quiet week looks quiet.
+/* A daily count from any timestamp accessor, same shape and same window as qualSeries. Exists so
+   a KPI card can carry a REAL fourteen-day series instead of a decorative squiggle: every sparkline
+   on this page is drawn from the ledger, and a card whose number has no series simply does not get
+   one (DESIGN.md 4 — no invented values). */
+function daySeries(items, tsOf, days) {
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const start = d0.getTime() - (days - 1) * 864e5;
+  const out = new Array(days).fill(0);
+  (items || []).forEach((it) => {
+    const ts = tsOf(it);
+    if (!ts || ts < start) return;
+    const i = Math.floor((ts - start) / 864e5);
+    if (i >= 0 && i < days) out[i]++;
+  });
+  return out;
+}
+/* One KPI card: label, figure, a delta chip, and a sparkline when there is a real series.
+   The chip is an ARROW plus a WORD plus colour, never colour alone (DESIGN.md 3.0b), and a week
+   with no movement says so in the off channel rather than showing a green «+٠». */
+function kpiCard(label, value, delta, unitWord, series) {
+  const spark = series && series.some((v) => v > 0)
+    ? '<div class="ksp">' + sparkArea(series, 92, 30) + "</div>" : "";
+  const chip = delta === null
+    ? ""
+    : delta > 0
+      ? '<span class="kd up">↑ ' + fmtN(delta) + " " + unitWord + "</span>"
+      : '<span class="kd flat">بلا جديد هذا الأسبوع</span>';
+  return '<div class="kcard"><div class="ktop"><span class="kk">' + label + "</span>" + spark + "</div>" +
+    '<div class="kv">' + value + "</div>" + chip + "</div>";
+}
 function qualSeries(cs, days) {
   const d0 = new Date(); d0.setHours(0, 0, 0, 0);
   const start = d0.getTime() - (days - 1) * 864e5;
