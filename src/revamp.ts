@@ -331,12 +331,82 @@ header.crumb .sep { color: var(--line); }
 .crm-bar { border-radius: var(--r-pill); }
 .crm-empty { border-radius: var(--r-lg); }
 
-/* An input is a filled field now, not a bordered box. The border was the admin-panel tell. */
+/* ---- FIELDS ----
+   The first pass made .inp a filled --surface box with no border. That works on white and
+   DISAPPEARS on a tinted panel: .opexp is --surface too, so on the opportunity editor the fields
+   were invisible — four bare numbers floating with no affordance at all. A field must be visible
+   on EVERY ground it can land on, so it carries its own ring rather than borrowing contrast from
+   the page. --s-off-mark is 3.69:1 on paper, which clears the 3:1 non-text floor a control border
+   has to meet; --line at 1.48:1 does not and is why the ring is not drawn in it. */
 .inp {
-  border: none; background: var(--surface); border-radius: var(--r-md);
+  background: var(--paper);
+  border: none;
+  box-shadow: inset 0 0 0 1px var(--s-off-mark);
+  border-radius: var(--r-md);
   min-height: 40px; padding-inline: 12px;
+  color: var(--ink);
+  transition: box-shadow var(--fast) var(--ease);
 }
-.inp:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.inp::placeholder { color: var(--muted); }
+.inp:hover { box-shadow: inset 0 0 0 1px var(--ink-2); }
+.inp:focus, .inp:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint);
+}
+
+/* ---- the opportunity line editor ----
+   It was full-bleed on the expanded row, so a four-field grid stretched across the whole viewport
+   and the labels ended up a screen away from their inputs. It is a contained card now, and the
+   fields sit at a readable measure instead of filling whatever width exists. */
+.opedit {
+  background: var(--paper);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-0);
+  border-bottom: none;
+  padding: var(--s3) var(--s4) var(--s4);
+  margin-block: var(--s2) var(--s3);
+}
+.opedit .lb { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 var(--s2); }
+
+/* The rail WRAPS. Scrolling it clipped «إغلاق – خسارة» mid-word with nothing to say more existed,
+   and a horizontal scroller with no visible cue is a control the reader does not know they have.
+   Eight stages wrap to two tidy rows inside a contained card, and nothing is hidden. */
+.opedit .rail {
+  flex-wrap: wrap; overflow: visible; gap: var(--s2);
+  margin-block-end: var(--s4);
+}
+.opedit .rung {
+  border: none; background: var(--surface); color: var(--ink-2);
+  min-height: 36px; padding: 8px 14px; font-weight: 600;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.opedit .rung:hover { background: var(--accent-wash); }
+.opedit .rung.on { background: var(--accent-tint); color: var(--accent-deep); border-color: transparent; }
+.opedit .rung:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Labelled fields, at a measure a person can read across. */
+.opfields {
+  display: flex; flex-wrap: wrap; gap: var(--s3);
+  margin-block-end: var(--s4); align-items: end;
+}
+.opf { display: flex; flex-direction: column; gap: 6px; flex: 0 1 150px; min-width: 0; }
+.opf.wide { flex: 1 1 320px; max-width: 460px; }
+.opf.num { flex: 0 0 120px; }
+.opf-l { font-size: 12px; font-weight: 600; color: var(--muted); }
+/* A number you type is Latin because the platform's number input is; align it to the inline-end
+   and make it tabular so the four boxes read as a row of figures rather than four loose strings. */
+.opf.num .inp { text-align: end; font-variant-numeric: tabular-nums; }
+
+.opedit .acts { margin-top: var(--s3); gap: 10px; }
+.opedit .acts .btn { height: 36px; padding: 0 16px; font-size: 12px; line-height: normal; }
+/* The delete control matches the row of actions it sits in; it was 40px beside 30px buttons. */
+.opedit .acts .rv-hold { height: 36px; padding-inline: 16px; font-size: 12px; }
+/* Quiet until wanted: destructive actions do not advertise themselves in a resting row. */
+.opedit .acts .rv-hold:not(.holding):not(.armed) { background: var(--surface); color: var(--s-fail-text); }
+.opedit .acts .rv-hold:hover { background: var(--s-fail-soft); }
+
+/* The expanded row's ground stays tinted so the editor card reads as sitting ON the row. */
+.opexp { padding: 0 var(--s4) var(--s2); }
 
 /* ---- truncation is not layout ----
    DESIGN.md 6.5 says a label you truncate is a label you did not draw, and the campaign list was

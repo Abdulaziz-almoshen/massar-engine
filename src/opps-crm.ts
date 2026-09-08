@@ -496,23 +496,42 @@ function opCard(g) {
 /* The prototype's detail screen, as the six controls that actually change something. Every field
    writes through PATCH /admin/opps/:id, so what the card shows next paint is what the ledger
    stored — never a local optimism that a failed request would leave standing. */
+/* One labelled field. The label is a real <label for>, not a .lb heading floating above a grid,
+   so clicking it focuses the input and a screen reader gets the pairing. Number ranges stay on the
+   element that enforces them. */
+function opField(l, key, label, type, ph, val, mod) {
+  var id = "opf_" + key + "_" + l.id;
+  var rng = key === "years" ? ' min="1" max="20"'
+          : key === "discount" ? ' min="0" max="100"'
+          : key === "qty" ? ' min="1"'
+          : key === "sale_price" ? ' min="0"' : "";
+  return '<div class="opf ' + mod + '">' +
+    '<label class="opf-l" for="' + id + '">' + esc(label) + "</label>" +
+    '<input class="inp" id="' + id + '" type="' + type + '"' + rng +
+      (ph ? ' placeholder="' + esc(ph) + '"' : "") +
+      ' value="' + esc(val == null ? "" : val) + '"' +
+      ' onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"></div>';
+}
+
 function opLineEditor(l) {
   var h = '<div class="opedit" onclick="event.stopPropagation()">';
   h += '<div class="lb">المرحلة</div><div class="rail">' + OPP_ST.map(function (s) {
     return '<button class="rung' + (s.key === l.stage ? " on" : "") + '" onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)">' +
       '<span class="d" style="background:' + s.dot + ';"></span>' + s.label + "</button>";
   }).join("") + "</div>";
-  h += '<div class="lb">الخطوة التالية · المسؤول</div>' +
-    '<div class="grid" style="grid-template-columns:2fr 1fr;">' +
-    '<input class="inp" id="opns_' + l.id + '" value="' + esc(l.next_step || "") + '" placeholder="ما الذي يجب فعله بعد؟" ' +
-      'onchange="opSaveField(' + l.id + ',&quot;next_step&quot;,this.value)">' +
-    '<input class="inp" id="opow_' + l.id + '" value="' + esc(l.owner || "") + '" placeholder="المسؤول" ' +
-      'onchange="opSaveField(' + l.id + ',&quot;owner&quot;,this.value)"></div>';
-  h += '<div class="lb">السعر السنوي · السنوات · الكمية · الخصم ٪</div><div class="grid">' +
-    '<input class="inp" type="number" min="0" value="' + esc(l.sale_price) + '" onchange="opSaveField(' + l.id + ',&quot;sale_price&quot;,this.value)">' +
-    '<input class="inp" type="number" min="1" max="20" value="' + esc(l.years) + '" onchange="opSaveField(' + l.id + ',&quot;years&quot;,this.value)">' +
-    '<input class="inp" type="number" min="1" value="' + esc(l.qty) + '" onchange="opSaveField(' + l.id + ',&quot;qty&quot;,this.value)">' +
-    '<input class="inp" type="number" min="0" max="100" value="' + esc(l.discount) + '" onchange="opSaveField(' + l.id + ',&quot;discount&quot;,this.value)"></div>';
+  // EVERY FIELD CARRIES ITS OWN LABEL. One combined label over four number boxes left a screen
+  // reader announcing four unlabelled inputs, and left a sighted reader counting positions to work
+  // out which box is الخصم. A placeholder is not a label — it disappears the moment you type.
+  h += '<div class="opfields">' +
+    opField(l, "next_step", "الخطوة التالية", "text", "ما الذي يجب فعله بعد؟", l.next_step || "", "wide") +
+    opField(l, "owner", "المسؤول", "text", "غير مُسند", l.owner || "", "") +
+  "</div>";
+  h += '<div class="opfields">' +
+    opField(l, "sale_price", "السعر السنوي", "number", "", l.sale_price, "num") +
+    opField(l, "years", "السنوات", "number", "", l.years, "num") +
+    opField(l, "qty", "الكمية", "number", "", l.qty, "num") +
+    opField(l, "discount", "الخصم ٪", "number", "", l.discount, "num") +
+  "</div>";
   h += '<div class="acts"><span style="font-size:12px;color:#6B6880;">' +
     "مصدرها " + esc(OPP_SRC[l.source] || OPP_SRC.other) +
     (l.source === "whatsapp" && l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
