@@ -21,41 +21,41 @@
 export const SALES_CRM_CSS = `
 .perf-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .perf-per{display:flex;gap:6px;align-items:center}
-.perf-per .q{border:1px solid var(--line,#D6D1E8);background:var(--card,#fff);border-radius:999px;
-  padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#35333F);min-height:32px}
-.perf-per .q.on{background:#6C5CE7;border-color:#6C5CE7;color:#fff;font-weight:600}
+.perf-per .q{border:1px solid var(--line,#D8DCE3);background:var(--card,#fff);border-radius:999px;
+  padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#33373E);min-height:32px}
+.perf-per .q.on{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600}
 /* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
    four equal cards made it the last of four with no more weight than the rest. */
 .perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
-.perf-kpi.lead{background:#EDEAFD}
+.perf-kpi.lead{background:#EAF1FE}
 .perf-kpi.lead .v{font-size:28px}
-.perf-kpi{background:var(--strip,#F0EEF9);border-radius:10px;padding:13px 15px}
-.perf-kpi .k{font-size:12px;color:var(--muted,#6B6880);font-weight:600}
+.perf-kpi{background:var(--strip,#EFF1F5);border-radius:10px;padding:13px 15px}
+.perf-kpi .k{font-size:12px;color:var(--muted,#656B76);font-weight:600}
 .perf-kpi .v{font-size:22px;font-weight:600;margin-top:3px;letter-spacing:0}
-.perf-kpi .s{font-size:12px;color:var(--muted,#6B6880);margin-top:2px}
+.perf-kpi .s{font-size:12px;color:var(--muted,#656B76);margin-top:2px}
 .perf-tbl{width:100%;border-collapse:collapse;font-size:14px}
 /* Logical properties only, per DESIGN.md: "no left/right, no physical offsets". The physical
    the physical shorthand landed on the correct side ONLY because this document is RTL — it would
    flip the moment anything renders LTR. And rows take border-TOP, which is what invariant 8
    specifies for a flush list. (No backticks in this comment: it lives INSIDE a template literal,
    and one terminates the string. Third time this session.) */
-.perf-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted,#6B6880);
-  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#D6D1E8);white-space:nowrap}
-.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#EFEDF7);height:36px;vertical-align:middle}
-.perf-tbl tr:hover td{background:var(--strip,#F0EEF9)}
+.perf-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted,#656B76);
+  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#D8DCE3);white-space:nowrap}
+.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#ECEEF2);height:36px;vertical-align:middle}
+.perf-tbl tr:hover td{background:var(--strip,#EFF1F5)}
 .perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
 .perf-prod{font-weight:600}
-.perf-sec{font-size:12px;color:var(--muted,#6B6880);font-weight:400}
+.perf-sec{font-size:12px;color:var(--muted,#656B76);font-weight:400}
 /* No overflow:hidden — it clipped the pace tick's own overhang, so the "extend past the track so
    it reads as a marker" intent was dead code. The fill clips itself with its own border-radius. */
-.perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#EFEDF7);
+.perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#ECEEF2);
   min-width:90px}
 .perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block;
-  background:#6C5CE7}
+  background:#2563EB}
 /* Full opacity and the darkest ink: at .45 over the teal fill this was invisible on exactly the
    rows that are AHEAD of pace, which is the only comparison the tick exists to make. The overhang
    above and below the track sits on the page ground, so it reads on both grounds. */
-.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#16151F)}
+.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#14161A)}
 .perf-rag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
 .perf-rag .dot{width:7px;height:7px;border-radius:999px;flex:none}
 /* The product's shipped status palette, not a fourth one. These three values are the same
@@ -65,17 +65,17 @@ export const SALES_CRM_CSS = `
 .rag-good{color:#12633F} .rag-good .dot{background:#12633F}
 .rag-warn{color:#7A5600} .rag-warn .dot{background:#7A5600}
 .rag-bad{color:#8E2A27}  .rag-bad  .dot{background:#8E2A27}
-.rag-none{color:var(--muted,#6B6880)} .rag-none .dot{background:var(--line,#D6D1E8)}
-.perf-set{border:1px solid var(--line,#D6D1E8);background:transparent;border-radius:6px;
-  padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#35333F);min-height:30px}
-.perf-set:hover{border-color:#6C5CE7;color:#6C5CE7}
+.rag-none{color:var(--muted,#656B76)} .rag-none .dot{background:var(--line,#D8DCE3)}
+.perf-set{border:1px solid var(--line,#D8DCE3);background:transparent;border-radius:6px;
+  padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#33373E);min-height:30px}
+.perf-set:hover{border-color:#2563EB;color:#2563EB}
 /* Both controls were missing from the product's focus-ring list (campaigns-crm.ts), so the quarter
    chips had outline:none and the target button showed Chromium's default blue — a colour that
    exists nowhere in Massar. Same treatment as every other control here. */
 .perf-per .q:focus, .perf-set:focus{outline:none}
-.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #6C5CE7;outline-offset:1px}
-.perf-empty{padding:26px 0;color:var(--muted,#6B6880);font-size:14px;max-width:56ch;line-height:1.6}
-.perf-empty b{color:var(--ink,#16151F);display:block;margin-bottom:5px;font-size:14px}
+.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #2563EB;outline-offset:1px}
+.perf-empty{padding:26px 0;color:var(--muted,#656B76);font-size:14px;max-width:56ch;line-height:1.6}
+.perf-empty b{color:var(--ink,#14161A);display:block;margin-bottom:5px;font-size:14px}
 @media (max-width:820px){
   .perf-kpis{grid-template-columns:repeat(2,1fr)}
   .perf-kpi.lead .v{font-size:22px}

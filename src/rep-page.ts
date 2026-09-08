@@ -26,27 +26,27 @@ export const REP_PAGE_HTML: string = `<!doctype html>
      the DESIGN.md 2 names, with the three old names kept as aliases so existing var() calls in
      this file keep resolving. A second token vocabulary is how two surfaces of one product start
      looking like two products. */
-  :root{ --paper:#FFFFFF; --canvas:#F7F6FC; --surface:#F0EEF9; --surface-2:#E9E6F4;
-         --line:#D6D1E8; --line-soft:#EFEDF7;
-         --ink:#16151F; --ink-2:#35333F; --muted:#6B6880;
-         --accent:#6C5CE7; --accent-deep:#4B3FBF; --accent-press:#5A4BD6;
-         --accent-mark:#7A6BEE; --accent-tint:#EDEAFD; --accent-wash:#F4F2FD;
-         --grad:linear-gradient(270deg,#4B3FBF,#6C5CE7);
+  :root{ --paper:#FFFFFF; --canvas:#F6F7F9; --surface:#EFF1F5; --surface-2:#E5E8EE;
+         --line:#D8DCE3; --line-soft:#ECEEF2;
+         --ink:#14161A; --ink-2:#33373E; --muted:#656B76;
+         --accent:#2563EB; --accent-deep:#1A47BE; --accent-press:#1E5FCC;
+         --accent-mark:#4A7BE8; --accent-tint:#EAF1FE; --accent-wash:#F2F6FE;
+         --grad:linear-gradient(270deg,#1A47BE,#2563EB);
          --s-issued:#1E9E63; --s-issued-soft:#E4F5EC; --s-issued-text:#12633F;
          --s-attn-mark:#B37F00; --s-attn-soft:#FFF5D6; --s-attn-text:#7A5600;
          --s-fail:#D9534F; --s-fail-soft:#FBE7E6; --s-fail-text:#8E2A27;
-         --s-off-mark:#7F8595; --s-off-soft:#EFEEF5; --s-off-text:#4A5560;
-         --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:26px; --r-pill:999px;
-         --sh-0:0 1px 2px rgba(41,35,80,.05);
-         --sh-1:0 2px 8px rgba(41,35,80,.06);
-         --sh-2:0 8px 24px rgba(41,35,80,.08);
+         --s-off-mark:#767D89; --s-off-soft:#EEF0F3; --s-off-text:#464C56;
+         --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px; --r-pill:999px;
+         --sh-0:0 1px 2px rgba(16,24,40,.04);
+         --sh-1:0 1px 3px rgba(16,24,40,.08);
+         --sh-2:0 6px 20px rgba(16,24,40,.10);
          --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:32px;
          --z-base:0; --z-sticky:100; --z-dropdown:200; --z-overlay:300;
          --z-modal:310; --z-toast:400; --z-tooltip:500;
          --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
          /* aliases, pre-rebrand names still referenced in this file */
-         --blue:#6C5CE7; --ink2:#35333F; --line2:#EFEDF7; --strip:#F7F6FC;
-         --card:#FFFFFF; --teal:#6C5CE7; }
+         --blue:#2563EB; --ink2:#33373E; --line2:#ECEEF2; --strip:#F6F7F9;
+         --card:#FFFFFF; --teal:#2563EB; }
   *{box-sizing:border-box}
   /* SAFE AREA. viewport-fit=cover has been set since this page shipped and nothing consumed the
      insets, so on a notched iPhone the pending bar sat under the home indicator and the header
@@ -66,8 +66,8 @@ export const REP_PAGE_HTML: string = `<!doctype html>
 
   /* The one gradient surface. On a phone the leading figure is not money, it is HOW MANY CALLS
      ARE OWED — that is the number the rep acts on, and the money supports it. */
-  .lead{margin:0 16px 16px;background:var(--grad);color:var(--paper);
-        border-radius:var(--r-lg);padding:18px 18px 16px;box-shadow:var(--sh-2)}
+  .lead{margin:0 16px 16px;background:var(--accent);color:var(--paper);
+        border-radius:var(--r-lg);padding:18px 18px 16px;box-shadow:none}
   .lead .k{font-size:12px;font-weight:600;opacity:.88}
   .lead .v{font-size:40px;font-weight:700;line-height:1.1;margin-block-start:4px;
            font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
@@ -78,8 +78,8 @@ export const REP_PAGE_HTML: string = `<!doctype html>
   /* A rep queue is short and every row is a thing you act on, so DESIGN.md 3.6 (amended) puts it
      under the 12-row ceiling where a row may be a card. At this width a table is not an option
      anyway. */
-  .row{background:var(--paper);border-block-start:none;border-radius:var(--r-lg);
-       box-shadow:var(--sh-0);padding:16px;margin-block-end:12px}
+  .row{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);
+       box-shadow:none;padding:16px;margin-block-end:12px}
   .row:first-child{border-block-start:0}
   .acct{font-weight:700;font-size:16px;line-height:1.35}
   .meta{font-size:12px;color:var(--muted);margin-block-start:4px}
@@ -106,10 +106,12 @@ export const REP_PAGE_HTML: string = `<!doctype html>
   .acts{margin-block-start:14px;display:flex;gap:10px;flex-wrap:wrap}
   .acts a{text-decoration:none;flex:1}
   .acts button{width:100%}
-  button{font-family:inherit;font-weight:600;font-size:14px;border-radius:var(--r-pill);cursor:pointer;
-         min-height:48px;padding-inline:18px;border:none;background:var(--surface);color:var(--ink);
+  /* Square-ish and compact, like the reference. 48px stays because this surface is touch-only —
+     the rep is holding a phone in a corridor, which is exactly the case DESIGN.md 3.10 raises. */
+  button{font-family:inherit;font-weight:600;font-size:14px;border-radius:var(--r-sm);cursor:pointer;
+         min-height:48px;padding-inline:18px;border:1px solid var(--line);background:var(--paper);color:var(--ink);
          transition:background var(--fast) var(--ease)}
-  button.primary{background:var(--accent);color:#fff;flex:1}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;flex:1}
   button.primary:active{background:var(--accent-press)}
   /* A control whose ONLY signal of unavailability is being dimmed violates DESIGN.md 3.0b, so a
      disabled button here also loses its fill and says so through its ground. */
@@ -119,9 +121,10 @@ export const REP_PAGE_HTML: string = `<!doctype html>
      requires, and this page had shipped the invisible version. */
   button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   button.primary:focus-visible{outline:2px solid var(--paper);outline-offset:2px;
-                               box-shadow:0 0 0 4px rgba(108,92,231,.35)}
+                               box-shadow:0 0 0 4px rgba(37,99,235,.35)}
   .empty{padding:56px 22px;text-align:center;color:var(--muted);line-height:1.7;max-width:44ch;
-         margin:16px auto;background:var(--paper);border-radius:var(--r-lg);box-shadow:var(--sh-0)}
+         margin:16px auto;background:var(--paper);border:1px solid var(--line);
+         border-radius:var(--r-lg);box-shadow:none}
   .empty b{display:block;color:var(--ink);font-size:18px;font-weight:700;margin-block-end:6px}
 
   .sheet{position:fixed;inset:0;background:rgba(22,21,31,.4);display:flex;align-items:flex-end;

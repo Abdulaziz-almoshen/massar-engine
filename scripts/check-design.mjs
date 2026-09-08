@@ -28,18 +28,18 @@ const ratio = (a, b) => {
 };
 
 // Tokens that may never be a text colour, with their measured ratio on --paper.
-const NEVER_TEXT = { "#A9AEBE": "--s-off (2.21:1)", "#D6D1E8": "--line (1.48:1)",
-                     "#EFEDF7": "--line-soft (1.16:1)", "#EFEEF5": "--s-off-soft" };
+const NEVER_TEXT = { "#A2A9B4": "--s-off (2.37:1)", "#D8DCE3": "--line (1.38:1)",
+                     "#ECEEF2": "--line-soft (1.16:1)", "#EEF0F3": "--s-off-soft" };
 // Status BASE values that have a -mark variant; the base is a fill, the mark is a dot.
 const NEEDS_MARK = { "#D99A00": "--s-attn -> --s-attn-mark #B37F00",
-                     "#8B7BF5": "--s-sched -> --s-sched-mark #7A6BEE" };
+                     "#5B8DEF": "--s-sched -> --s-sched-mark #4A7BE8" };
 
 // Every colour DESIGN.md section 2 defines. A text colour outside this set is unmeasured.
-const TOKENS = new Set(["#6C5CE7","#5A4BD6","#8B7BF5","#EDEAFD","#DDD6F7","#FFFFFF","#F0EEF9",
-  "#E9E6F4","#D6D1E8","#EFEDF7","#16151F","#35333F","#6B6880","#1E9E63","#E4F5EC","#12633F",
-  "#D99A00","#FFF5D6","#7A5600","#B37F00","#D9534F","#FBE7E6","#8E2A27","#E9E6F9","#4B3FBF",
-  "#EAE7F7","#453A9E","#A9AEBE","#EFEEF5","#4A5560","#7A6BEE","#7F8595",
-  "#F7F6FC","#F4F2FD",
+const TOKENS = new Set(["#2563EB","#1E5FCC","#5B8DEF","#EAF1FE","#DCE8FC","#FFFFFF","#EFF1F5",
+  "#E5E8EE","#D8DCE3","#ECEEF2","#14161A","#33373E","#656B76","#1E9E63","#E4F5EC","#12633F",
+  "#D99A00","#FFF5D6","#7A5600","#B37F00","#D9534F","#FBE7E6","#8E2A27","#E9F0FE","#1A47BE",
+  "#E7EEFB","#173FA8","#A2A9B4","#EEF0F3","#464C56","#4A7BE8","#767D89",
+  "#F6F7F9","#F2F6FE",
   "#DCF8C6","#E5DDD4",
   // Text ON the quoted WhatsApp bubble ground (#DCF8C6), not on --paper. Measuring these
   // against the page would be measuring the wrong pair.
@@ -47,26 +47,30 @@ const TOKENS = new Set(["#6C5CE7","#5A4BD6","#8B7BF5","#EDEAFD","#DDD6F7","#FFFF
 
 // Re-derived on every run so the table in DESIGN.md 3.0 cannot drift from reality.
 const TOKEN_RATIOS = [
-  ["--muted on --paper", "#6B6880", "#FFFFFF", 4.5],
-  ["--muted on --surface", "#6B6880", "#F0EEF9", 4.5],
-  ["--accent on --paper", "#6C5CE7", "#FFFFFF", 4.5],
-  ["white on --accent", "#FFFFFF", "#6C5CE7", 4.5],
+  ["--muted on --paper", "#656B76", "#FFFFFF", 4.5],
+  ["--muted on --surface", "#656B76", "#EFF1F5", 4.5],
+  ["--muted on --canvas", "#656B76", "#F6F7F9", 4.5],
+  ["--accent on --paper", "#2563EB", "#FFFFFF", 4.5],
+  ["white on --accent", "#FFFFFF", "#2563EB", 4.5],
   // Both stops of --grad, because white labels sit on it.
-  ["white on --grad dark stop", "#FFFFFF", "#4B3FBF", 4.5],
-  ["white on --grad light stop", "#FFFFFF", "#6C5CE7", 4.5],
+  ["white on --grad dark stop", "#FFFFFF", "#1A47BE", 4.5],
+  ["white on --grad light stop", "#FFFFFF", "#2563EB", 4.5],
+  ["--accent-deep on --accent-tint", "#1A47BE", "#EAF1FE", 4.5],
   ["--s-issued-text on soft", "#12633F", "#E4F5EC", 4.5],
   ["--s-attn-text on soft", "#7A5600", "#FFF5D6", 4.5],
   ["--s-fail-text on soft", "#8E2A27", "#FBE7E6", 4.5],
-  ["--s-sched-text on soft", "#4B3FBF", "#E9E6F9", 4.5],
-  ["--s-review-text on soft", "#453A9E", "#EAE7F7", 4.5],
-  ["--s-attend-text on soft", "#4B3FBF", "#EDEAFD", 4.5],
-  ["--s-off-text on soft", "#4A5560", "#EFEEF5", 4.5],
+  ["--s-sched-text on soft", "#1A47BE", "#E9F0FE", 4.5],
+  ["--s-review-text on soft", "#173FA8", "#E7EEFB", 4.5],
+  ["--s-attend-text on soft", "#1A47BE", "#EAF1FE", 4.5],
+  ["--s-off-text on soft", "#464C56", "#EEF0F3", 4.5],
   ["--s-attn-mark as a mark", "#B37F00", "#FFFFFF", 3.0],
-  ["--s-sched-mark as a mark", "#7A6BEE", "#FFFFFF", 3.0],
-  ["--s-off-mark as a mark", "#7F8595", "#FFFFFF", 3.0],
+  ["--s-sched-mark as a mark", "#4A7BE8", "#FFFFFF", 3.0],
+  ["--s-off-mark as a mark", "#767D89", "#FFFFFF", 3.0],
   // The accent mark must clear 3:1 on the TINTED row ground too, not just paper — that is the
   // ground the old --s-sched failed on at 2.93:1.
-  ["--accent-mark on --surface", "#7A6BEE", "#F0EEF9", 3.0],
+  ["--accent-mark on --surface", "#4A7BE8", "#EFF1F5", 3.0],
+  // A FIELD ring is a control boundary, so it meets the same non-text floor. DESIGN.md 5, Field.
+  ["--s-off-mark as a field ring", "#767D89", "#FFFFFF", 3.0],
 ];
 
 // ---- DESIGN.md must document what the code actually ships ----
@@ -115,6 +119,13 @@ if (Object.keys(documented).length < 20) {
 const docDrift = Object.entries(documented)
   .filter(([k, v]) => shipped[k] && shipped[k] !== v)
   .map(([k, v]) => `${k}: DESIGN.md says ${v}, src ships ${shipped[k]}`);
+// A token in :root that DESIGN.md never mentions is undocumented, and the drift check above
+// cannot see it — it only compares keys present on BOTH sides. That hole let --accent-bar ship
+// undocumented on the first run of this very check. A value the authority does not carry is a
+// value the next reader will invent a second time.
+const undocumented = Object.keys(shipped)
+  .filter((k) => !(k in documented))
+  .map((k) => `${k}: ${shipped[k]} is in :root but not in DESIGN.md §2`);
 const repDrift = Object.entries(repRoot)
   .filter(([k, v]) => shipped[k] && shipped[k] !== v)
   .map(([k, v]) => `${k}: rep-page.ts has ${v}, dashboard.ts has ${shipped[k]}`);
@@ -197,6 +208,13 @@ if (docDrift.length) {
   docDrift.slice(0, 12).forEach((x) => console.log(`       ${x}`));
 } else {
   console.log(`ok   DESIGN.md agrees with src/ on all ${Object.keys(documented).length} documented tokens`);
+}
+if (undocumented.length) {
+  bad++;
+  console.log(`FAIL ${undocumented.length} token(s) ship without being documented in DESIGN.md:`);
+  undocumented.slice(0, 12).forEach((x) => console.log(`       ${x}`));
+} else {
+  console.log(`ok   every token in :root is documented in DESIGN.md`);
 }
 if (repDrift.length) {
   bad++;

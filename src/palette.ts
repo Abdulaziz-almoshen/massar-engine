@@ -19,12 +19,12 @@
 export const PALETTE_CSS = `
   /* the rail's search affordance — advertises the shortcut rather than hiding it */
   .navsearch { display:flex; align-items:center; gap:9px; width:calc(100% - 16px); margin:8px;
-    height:32px; padding-inline:10px; font-family:inherit; font-size:14px; color:#6B6880;
-    background:#fff; border:1px solid #EFEDF7; border-radius:6px; cursor:pointer; text-align:start;
+    height:32px; padding-inline:10px; font-family:inherit; font-size:14px; color:#656B76;
+    background:#fff; border:1px solid #ECEEF2; border-radius:6px; cursor:pointer; text-align:start;
     transition:border-color .14s ease, color .14s ease; }
-  .navsearch:hover { border-color:#6B6880; color:#35333F; }
+  .navsearch:hover { border-color:#656B76; color:#33373E; }
   .navsearch .lbl { flex:1; min-width:0; }
-  .navsearch kbd { font-family:inherit; font-size:12px; color:#6B6880; background:#E9E6F4;
+  .navsearch kbd { font-family:inherit; font-size:12px; color:#656B76; background:#E5E8EE;
     border-radius:4px; padding:2px 6px; flex:none; letter-spacing:.02em;
     direction:ltr; unicode-bidi:isolate; }
   aside.mini .navsearch .lbl, aside.mini .navsearch kbd { display:none; }
@@ -32,9 +32,9 @@ export const PALETTE_CSS = `
 
   /* «قريبًا»: the four routes that open onto a placeholder do not get to sit at the same weight as
      the ten that work. A menu that offers a door onto «coming soon» is a menu that lies. */
-  .nv.soon { color:#6B6880; }
+  .nv.soon { color:#656B76; }
   .nv.soon .lbl { opacity:.75; }
-  .nv.soon::after { content:"قريبًا"; font-size:12px; color:#6B6880; flex:none; }
+  .nv.soon::after { content:"قريبًا"; font-size:12px; color:#656B76; flex:none; }
   aside.mini .nv.soon::after { display:none; }
 
   /* ===== the palette ===== */
@@ -42,36 +42,36 @@ export const PALETTE_CSS = `
   .palwrap.on { display:block; }
   .palwrap .scrim { position:absolute; inset:0; background:rgba(23,23,23,.34); }
   .palbox { position:relative; margin:14vh auto 0; width:min(560px, calc(100vw - 32px));
-    background:#fff; border:1px solid #D6D1E8; border-radius:14px; overflow:hidden;
+    background:#fff; border:1px solid #D8DCE3; border-radius:14px; overflow:hidden;
     box-shadow:0 24px 64px rgba(16,24,40,.26); display:flex; flex-direction:column; max-height:66vh; }
   @media (prefers-reduced-motion: no-preference) {
     .palwrap.on .palbox { animation: palin .16s ease-out; }
     @keyframes palin { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
   }
-  .palbox .top { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #EFEDF7; }
-  .palbox input { flex:1; min-width:0; font-family:inherit; font-size:14px; color:#16151F;
+  .palbox .top { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid #ECEEF2; }
+  .palbox input { flex:1; min-width:0; font-family:inherit; font-size:14px; color:#14161A;
     border:none; outline:none; background:transparent; }
-  .palbox input::placeholder { color:#6B6880; }
-  .palbox .esc { font-size:12px; color:#6B6880; background:#E9E6F4; border-radius:4px; padding:3px 7px; flex:none; }
+  .palbox input::placeholder { color:#656B76; }
+  .palbox .esc { font-size:12px; color:#656B76; background:#E5E8EE; border-radius:4px; padding:3px 7px; flex:none; }
   .palbody { overflow-y:auto; padding:6px 0 4px; }
   .palgrp { display:flex; align-items:baseline; gap:7px; padding:9px 16px 4px; }
-  .palgrp .g { font-size:12px; font-weight:500; color:#6B6880; }
-  .palgrp .n { font-size:12px; color:#6B6880; font-variant-numeric:tabular-nums; }
+  .palgrp .g { font-size:12px; font-weight:500; color:#656B76; }
+  .palgrp .n { font-size:12px; color:#656B76; font-variant-numeric:tabular-nums; }
   .palrow { display:flex; align-items:center; gap:11px; padding:8px 16px; cursor:pointer; }
-  .palrow.on { background:#E9E6F4; }
-  .palrow .ic { width:26px; height:26px; flex:none; border-radius:7px; background:#E9E6F4;
-    display:flex; align-items:center; justify-content:center; color:#35333F; font-size:12px; font-weight:500; }
+  .palrow.on { background:#E5E8EE; }
+  .palrow .ic { width:26px; height:26px; flex:none; border-radius:7px; background:#E5E8EE;
+    display:flex; align-items:center; justify-content:center; color:#33373E; font-size:12px; font-weight:500; }
   .palrow.on .ic { background:#fff; }
   .palrow .tx { flex:1; min-width:0; }
-  .palrow .t1 { display:block; font-size:14px; color:#16151F; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .palrow .t2 { display:block; font-size:12px; color:#6B6880; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .palrow .st { display:flex; align-items:center; gap:6px; flex:none; font-size:12px; color:#6B6880; }
+  .palrow .t1 { display:block; font-size:14px; color:#14161A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .palrow .t2 { display:block; font-size:12px; color:#656B76; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .palrow .st { display:flex; align-items:center; gap:6px; flex:none; font-size:12px; color:#656B76; }
   .palrow .st .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .palrow .ph { flex:none; font-size:12px; color:#6B6880; direction:ltr; font-variant-numeric:tabular-nums; }
-  .palnone { padding:30px 16px; text-align:center; color:#6B6880; font-size:14px; line-height:1.9; }
-  .palfoot { display:flex; align-items:center; gap:14px; padding:9px 16px; border-top:1px solid #EFEDF7;
-    background:#F0EEF9; font-size:12px; color:#6B6880; }
-  .palfoot b { font-weight:450; color:#6B6880; background:#fff; border:1px solid #EFEDF7;
+  .palrow .ph { flex:none; font-size:12px; color:#656B76; direction:ltr; font-variant-numeric:tabular-nums; }
+  .palnone { padding:30px 16px; text-align:center; color:#656B76; font-size:14px; line-height:1.9; }
+  .palfoot { display:flex; align-items:center; gap:14px; padding:9px 16px; border-top:1px solid #ECEEF2;
+    background:#EFF1F5; font-size:12px; color:#656B76; }
+  .palfoot b { font-weight:450; color:#656B76; background:#fff; border:1px solid #ECEEF2;
     border-radius:4px; padding:1px 5px; margin-inline-end:4px; }
 `;
 
@@ -153,8 +153,8 @@ function palPaint() {
       g.rows.map(function (r) {
         i++;
         var lead = '<span class="ic">' + (
-          r.kind === "route" ? ic(r.icon, 15, "#35333F")
-          : r.kind === "camp" ? ic("send", 14, "#6B6880")
+          r.kind === "route" ? ic(r.icon, 15, "#33373E")
+          : r.kind === "camp" ? ic("send", 14, "#656B76")
           : r.kind === "tag" ? "◆"
           : esc(String(r.label || "؟").trim().charAt(0))) + "</span>";
         var tail = "";
@@ -217,7 +217,7 @@ function palInstall() {
   host.innerHTML =
     '<div class="scrim" onclick="palClose()"></div>' +
     '<div class="palbox" role="dialog" aria-label="الانتقال السريع" aria-modal="true">' +
-    '<div class="top">' + ic("search", 18, "#A9AEBE") +
+    '<div class="top">' + ic("search", 18, "#A2A9B4") +
       '<input id="palq" autocomplete="off" spellcheck="false" placeholder="اذهب إلى… شاشة، عميل، رقم، حملة، وسم" oninput="palInput(this)">' +
       '<span class="esc">esc</span></div>' +
     '<div class="palbody"></div>' +

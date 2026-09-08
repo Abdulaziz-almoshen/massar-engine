@@ -30,9 +30,9 @@ body { background: var(--canvas); }
 aside {
   width: 244px;
   background: var(--paper);
-  border-inline-end: none;
-  border-radius: var(--r-xl);
-  box-shadow: var(--sh-0);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: none;
   overflow: hidden;
 }
 
@@ -89,9 +89,9 @@ header.crumb .sep { color: var(--line); }
   padding: 0 var(--s1) var(--s3); gap: var(--s2);
 }
 .subnav .sub {
-  height: 38px; padding-inline: 16px; border-radius: var(--r-pill);
+  height: 36px; padding-inline: 14px; border-radius: var(--r-sm);
   background: var(--paper); color: var(--muted); font-weight: 600;
-  box-shadow: var(--sh-0);
+  border: 1px solid var(--line);
   transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
 .subnav .sub:hover { background: var(--accent-wash); color: var(--ink); }
@@ -105,10 +105,10 @@ header.crumb .sep { color: var(--line); }
    Every bordered box becomes a shadowed card on the canvas. The border is what made the old build
    read as an admin panel; --line at 1.48:1 was never carrying information anyway. */
 .card, .kpi, .hero, .panel {
-  border: none;
+  border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--paper);
-  box-shadow: var(--sh-0);
+  box-shadow: none;
 }
 .card { padding: var(--s4); }
 .kpis { gap: var(--s3); margin-bottom: var(--s3); }
@@ -140,9 +140,9 @@ header.crumb .sep { color: var(--line); }
    4.86:1) — the reference's own lighter ramp does not, which is why ours is darkened. */
 .hero { background: var(--paper); box-shadow: var(--sh-0); }
 .rv-hero {
-  background: var(--grad); color: var(--paper);
+  background: var(--accent); color: var(--paper);
   border-radius: var(--r-lg); padding: var(--s4);
-  box-shadow: var(--sh-2);
+  box-shadow: none;
   display: flex; flex-direction: column;
 }
 .rv-hero .k { font-size: 12px; font-weight: 600; color: var(--paper); opacity: .88; }
@@ -192,7 +192,8 @@ header.crumb .sep { color: var(--line); }
 
 /* The panel that wraps a table: the radius belongs to the wrapper, never to the row. */
 .rv-panel {
-  background: var(--paper); border-radius: var(--r-lg); box-shadow: var(--sh-0); overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--r-lg); box-shadow: none; overflow: hidden;
 }
 .rv-panel .rv-ph {
   display: flex; align-items: center; gap: 10px; padding: var(--s3) var(--s4) 14px;
@@ -269,15 +270,16 @@ header.crumb .sep { color: var(--line); }
 
 /* ============================ 5. CONTROLS ============================ */
 .btn {
-  border-radius: var(--r-pill); height: 44px; padding-inline: 20px;
+  border-radius: var(--r-sm); height: 38px; padding-inline: 16px;
   font-weight: 600; box-shadow: none;
   transition: background var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
 }
-.btn-teal { background: var(--accent); box-shadow: var(--sh-0); }
+@media (pointer:coarse) { .btn { min-height: 44px; } }
+.btn-teal { background: var(--accent); box-shadow: none; }
 .btn-teal:hover { background: var(--accent-press); filter: none; }
 .btn-dark { background: var(--ink); }
 .btn-dark:hover { filter: none; background: var(--ink-2); }
-.btn-ghost { background: var(--paper); border: none; box-shadow: var(--sh-0); color: var(--ink); }
+.btn-ghost { background: var(--paper); border: 1px solid var(--line); box-shadow: none; color: var(--ink); }
 .btn-ghost:hover { background: var(--accent-wash); filter: none; }
 .btn-dis { background: var(--s-off-soft); color: var(--s-off-text); box-shadow: none; }
 /* DESIGN.md 3.8, measured: an accent ring on the accent button is 1.00:1 — invisible. On any
@@ -285,7 +287,7 @@ header.crumb .sep { color: var(--line); }
    previous system shipped wrong for three weeks. */
 .btn-teal:focus-visible, .btn-dark:focus-visible {
   outline: 2px solid var(--paper); outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(108,92,231,.35);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.35);
 }
 .btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -296,15 +298,15 @@ header.crumb .sep { color: var(--line); }
    revamp reach every screen at once instead of screen by screen. */
 
 .sh-tiles { gap: var(--s3); }
-.sh-tile { border-radius: var(--r-lg); box-shadow: var(--sh-0); border: none; padding: var(--s3) var(--s4); }
+.sh-tile { border-radius: var(--r-lg); box-shadow: none; border: 1px solid var(--line); padding: var(--s3) var(--s4); }
 .sh-tile.go:hover { box-shadow: var(--sh-1); border-color: transparent; }
 
 /* THE hero. One gradient surface per screen, and it is the tile carrying the leading figure —
    which is exactly what .lead already means, so the marker did not have to be invented. */
 .sh-tile.lead {
-  background: var(--grad);
-  box-shadow: var(--sh-2);
-  border: none;
+  background: var(--accent);
+  box-shadow: none;
+  border: 1px solid var(--accent);
 }
 /* The lead tile STACKS. .sh-tile is a two-column grid (label | figure), which is right for a
    28px supporting figure and wrong for a 44px leading one: the figure gets squeezed and the label
@@ -316,7 +318,7 @@ header.crumb .sep { color: var(--line); }
 }
 .sh-tile.lead.go:hover { box-shadow: var(--sh-3); }
 
-.sh-card { border-radius: var(--r-md); box-shadow: var(--sh-0); border: none; padding: var(--s3) var(--s4); }
+.sh-card { border-radius: var(--r-md); box-shadow: none; border: 1px solid var(--line); padding: var(--s3) var(--s4); }
 .sh-card.go:hover { box-shadow: var(--sh-1); border-color: transparent; transform: translateY(-1px); }
 .sh-sec { border-radius: var(--r-lg); }
 .sh-empty { border-radius: var(--r-lg); }
@@ -324,8 +326,8 @@ header.crumb .sep { color: var(--line); }
 
 /* The CRM primitives: same treatment, so the list screens match the boards. */
 .crm-kpis { gap: var(--s3); }
-.crm-kpi { border: none; border-radius: var(--r-lg); box-shadow: var(--sh-0); }
-.crm-tbl { border: none; border-radius: var(--r-lg); box-shadow: var(--sh-0); overflow: hidden; }
+.crm-kpi { border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: none; }
+.crm-tbl { border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: none; overflow: hidden; }
 .crm-row { border-bottom: 1px solid var(--line-soft); }
 .crm-row:hover { background: var(--accent-wash); }
 .crm-bar { border-radius: var(--r-pill); }
@@ -342,8 +344,8 @@ header.crumb .sep { color: var(--line); }
   background: var(--paper);
   border: none;
   box-shadow: inset 0 0 0 1px var(--s-off-mark);
-  border-radius: var(--r-md);
-  min-height: 40px; padding-inline: 12px;
+  border-radius: var(--r-sm);
+  min-height: 38px; padding-inline: 12px;
   color: var(--ink);
   transition: box-shadow var(--fast) var(--ease);
 }
@@ -361,8 +363,8 @@ header.crumb .sep { color: var(--line); }
 .opedit {
   background: var(--paper);
   border-radius: var(--r-lg);
-  box-shadow: var(--sh-0);
-  border-bottom: none;
+  box-shadow: none;
+  border: 1px solid var(--line);
   padding: var(--s3) var(--s4) var(--s4);
   margin-block: var(--s2) var(--s3);
 }
@@ -425,6 +427,59 @@ header.crumb .sep { color: var(--line); }
   overflow: hidden;
   line-height: 1.35;
 }
+
+/* ---- the ACTION ROW ----
+   The most distinctive control in the reference: a full-width bar on --accent-tint carrying an
+   accent-coloured label and icon. It sits between a primary button (too loud, and there is only
+   one per screen) and a text link (too quiet for an action that adds a thing). Used for
+   add/manage: «إضافة موقع», «إضافة خدمة», «إدارة الطلب».
+   The label measures 6.88:1 on its own bar, so it is a legal text ground, not decoration. */
+.rv-actionrow {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 40px; padding: 10px 14px;
+  background: var(--accent-bar); color: var(--accent-deep);
+  border: none; border-radius: var(--r-sm);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer; text-decoration: none;
+  transition: background var(--fast) var(--ease);
+}
+.rv-actionrow:hover { background: var(--accent-bar-hover); }
+.rv-actionrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-actionrow[disabled], .rv-actionrow.dis {
+  background: var(--s-off-soft); color: var(--s-off-text); cursor: not-allowed;
+}
+/* A destructive action never gets the accent bar. It is a text action in the failure colour, with
+   a glyph, so colour is not the only channel (DESIGN.md 3.0b). */
+.rv-actionrow.dngr { background: var(--s-fail-soft); color: var(--s-fail-text); }
+.rv-actionrow.dngr:hover { background: var(--s-fail-soft); filter: brightness(.97); }
+@media (pointer:coarse) { .rv-actionrow { min-height: 44px; } }
+
+/* ---- collapsible section header ----
+   The reference groups a long record into named sections that collapse. The chevron rotates rather
+   than swapping glyphs, so the control never changes size (DESIGN.md 8.1 failure 1), and the body
+   animates on grid-template-rows like every other accordion in this product (motion.ts, .mo-acc). */
+.rv-sec { border-block-start: 1px solid var(--line-soft); }
+.rv-sec:first-child { border-block-start: none; }
+.rv-sechead {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 14px 0 12px; background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 16px; font-weight: 700; color: var(--ink);
+  text-align: start;
+}
+.rv-sechead .cv {
+  margin-inline-start: auto; color: var(--muted); flex: none;
+  transition: transform var(--base) var(--ease);
+}
+.rv-sechead[aria-expanded="false"] .cv { transform: rotate(-90deg); }
+[dir="ltr"] .rv-sechead[aria-expanded="false"] .cv { transform: rotate(90deg); }
+.rv-sechead:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rv-secbody { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--base) var(--ease); }
+.rv-secbody > div { overflow: hidden; min-height: 0; }
+.rv-sec.closed .rv-secbody { grid-template-rows: 0fr; }
+
+/* ---- the field label, matching the reference's stacked form ---- */
+.rv-field { display: flex; flex-direction: column; gap: 6px; margin-block-end: var(--s3); }
+.rv-field > label { font-size: 12px; font-weight: 600; color: var(--muted); }
 
 /* ============================ 6. RESPONSIVE ============================
    Not "stacked on mobile". Each viewport gets a decision. */
