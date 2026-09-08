@@ -69,6 +69,11 @@ export const DASHBOARD_HTML = `<!doctype html>
     --paper:#FFFFFF; --surface:#EFF1F5; --surface-2:#E5E8EE;
     --line:#D8DCE3; --line-soft:#ECEEF2;
     --ink:#14161A; --ink-2:#33373E; --muted:#656B76;
+    /* --muted is the lightest legal ink on --paper (5.36), --canvas (5.00) and --surface (4.74),
+       and it FAILS on --surface-2 at 4.37. That ground is a control track — the view toggle sits
+       on it — so sixteen inactive segment labels across six screens were below the floor. This is
+       the same shape as the -mark tokens: one value that exists for the harder ground. 5.64:1. */
+    --muted-2:#545A66;
 
     --s-issued:#1E9E63; --s-issued-soft:#E4F5EC; --s-issued-text:#12633F;
     --s-attn:#D99A00;   --s-attn-soft:#FFF5D6;   --s-attn-text:#7A5600; --s-attn-deep:#B37F00;
@@ -506,7 +511,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .b-a { background: #DCF8C6; border-top-left-radius: 3px; margin-inline-start: auto; }
   .b-c { background: #fff; border-top-right-radius: 3px; margin-inline-end: auto; }
   .b-s { background: rgba(255,255,255,.65); font-size: 12px; color: #33373E; max-width: 100%; text-align: center; }
-  .bt { font-size: 12px; color: #7d8b6a; text-align: left; margin-top: 4px; direction: ltr; }
+  .bt { font-size: 12px; color: #54594B; text-align: left; margin-top: 4px; direction: ltr; }
 
   /* wizard */
   .step { background: #fff; border-radius: 16px; padding: 26px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04); }
@@ -528,7 +533,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .prod .bar i { display: block; height: 100%; border-radius: 999px; }
   .wa-prev { background: #E5DDD4; border-radius: 16px; padding: 18px; max-width: 480px; }
   .wa-prev .b { background: #DCF8C6; border-radius: 12px; border-top-left-radius: 3px; padding: 12px 14px; font-size: 12px; color: #14161A; line-height: 2; white-space: pre-line; box-shadow: 0 1px 1px rgba(0,0,0,.08); }
-  .wa-prev .t { font-size: 12px; color: #7d8b6a; text-align: left; margin-top: 6px; }
+  .wa-prev .t { font-size: 12px; color: #54594B; text-align: left; margin-top: 6px; }
   .btn { font-family:inherit; font-size:14px; font-weight:500; border:none; border-radius:6px;
     padding:0 12px; height:32px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .btn-teal { color: #fff; background: #2563EB; box-shadow: 0 1px 2px rgba(16,24,40,.1); }
@@ -1878,7 +1883,7 @@ function prodChips(e) {
 }
 function chipBtn(label, on, fn) {
   return '<button class="btn" style="padding:8px 14px;font-size:12px;border-radius:999px;' +
-    (on ? 'color:#2563EB;background:#DCE8FC;border:1px solid #5B8DEF;' : 'color:#33373E;background:#fff;border:1px solid #ECEEF2;') +
+    (on ? 'color:#1A47BE;background:#DCE8FC;border:1px solid #5B8DEF;' : 'color:#33373E;background:#fff;border:1px solid #ECEEF2;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
 // Indexes only in onclick (Arabic keys/values stay out of attribute strings);
@@ -2344,7 +2349,7 @@ function vAimkt() {
     '<div class="b" style="padding:0;overflow:hidden;">' +
     // The opener no longer carries the file — it offers it, so no attachment is drawn here.
     '<div style="padding:12px 14px;white-space:pre-wrap;">' + esc(campMsg.replaceAll("{name}", (firstSel ? firstSel.name : "مجمع النور الطبي")).replaceAll("{product}", selName).replaceAll("{{1}}", selName)) + "</div></div>" +
-    '<div style="font-size:12px;color:#5b6b52;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
+    '<div style="font-size:12px;color:#54594B;padding:0 4px;margin-top:6px;">حلول تكامل للقطاع الصحي</div>' +
     '<div class="t">رسالة واحدة · الآن ✓✓</div>' +
     '<div style="display:flex;flex-direction:column;gap:5px;margin-top:9px;">' +
     // The preview draws the buttons that will actually be sent — resolved from the same registry

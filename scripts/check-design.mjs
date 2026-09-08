@@ -39,17 +39,29 @@ const TOKENS = new Set(["#2563EB","#1E5FCC","#5B8DEF","#EAF1FE","#DCE8FC","#FFFF
   "#E5E8EE","#D8DCE3","#ECEEF2","#14161A","#33373E","#656B76","#1E9E63","#E4F5EC","#12633F",
   "#D99A00","#FFF5D6","#7A5600","#B37F00","#D9534F","#FBE7E6","#8E2A27","#E9F0FE","#1A47BE",
   "#E7EEFB","#173FA8","#A2A9B4","#EEF0F3","#464C56","#4A7BE8","#767D89",
-  "#F6F7F9","#F2F6FE",
+  "#F6F7F9","#F2F6FE","#545A66",
   "#DCF8C6","#E5DDD4",
-  // Text ON the quoted WhatsApp bubble ground (#DCF8C6), not on --paper. Measuring these
-  // against the page would be measuring the wrong pair.
-  "#7D8B6A","#5B6B52"]);
+  // Text on the quoted WhatsApp surfaces. ONE value, and it clears 4.5 on BOTH of them —
+  // 5.37 on the #E5DDD4 wallpaper and 6.29 on the #DCF8C6 bubble. The two it replaces were
+  // exempted as "measured against the bubble", but #7D8B6A was 3.17 even there and both were
+  // actually rendering on the WALLPAPER, at 2.71 and 4.26. An exemption is only as good as the
+  // ground it names.
+  "#54594B"]);
 
 // Re-derived on every run so the table in DESIGN.md 3.0 cannot drift from reality.
 const TOKEN_RATIOS = [
   ["--muted on --paper", "#656B76", "#FFFFFF", 4.5],
   ["--muted on --surface", "#656B76", "#EFF1F5", 4.5],
   ["--muted on --canvas", "#656B76", "#F6F7F9", 4.5],
+  // --muted FAILS on --surface-2 (4.37) and that ground is a control track. --muted-2 exists for it.
+  ["--muted-2 on --surface-2", "#545A66", "#E5E8EE", 4.5],
+  ["--muted-2 on --paper", "#545A66", "#FFFFFF", 4.5],
+  // The SELECTED filter chip: --accent on --blue-wash measured 4.18, so the chip a person had just
+  // clicked was the least readable thing in the row. --accent-deep is 6.32.
+  ["--accent-deep on --blue-wash", "#1A47BE", "#DCE8FC", 4.5],
+  // The quoted WhatsApp preview, on BOTH of its grounds.
+  ["wa ink on the chat wallpaper", "#54594B", "#E5DDD4", 4.5],
+  ["wa ink on the bubble", "#54594B", "#DCF8C6", 4.5],
   ["--accent on --paper", "#2563EB", "#FFFFFF", 4.5],
   ["white on --accent", "#FFFFFF", "#2563EB", 4.5],
   // Both stops of --grad, because white labels sit on it.

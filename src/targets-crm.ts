@@ -26,8 +26,11 @@ export const TARGETS_CRM_CSS = `
   .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
   .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#E5E8EE;
     color:#33373E; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
+  /* Two lines, then clamp — an entity name is the only thing identifying its row, and
+     «مجمع النور الطبي (مثال — امسح هذا الصف)» was being cut mid-parenthesis. DESIGN.md 6.5. */
   .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#14161A; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    white-space:normal; line-height:1.4; }
   .tgtflat .crow .t-seg { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; min-width:0; }
   .tgtflat .crow .t-ph { font-size:12px; color:#656B76; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
   .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#33373E; min-width:0; }

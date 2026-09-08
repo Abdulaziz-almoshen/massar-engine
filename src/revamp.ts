@@ -481,6 +481,48 @@ header.crumb .sep { color: var(--line); }
 .rv-field { display: flex; flex-direction: column; gap: 6px; margin-block-end: var(--s3); }
 .rv-field > label { font-size: 12px; font-weight: 600; color: var(--muted); }
 
+/* ---- inline text links reach the 24px floor ----
+   The audit found «الكل ←» at 37x17 and a note title at 39x17. DESIGN.md 3.10's 24px applies to
+   EVERY pointer, not just touch, and an inline link is still a target. Padding grows the hit area;
+   the type is untouched. */
+a[href]:not(.btn):not(.rv-actionrow):not(.nv):not(.sub) {
+  display: inline-flex; align-items: center; min-height: 24px;
+}
+
+/* ---- CHECKBOXES: a drawn control with a real hit area ----
+   The audit measured 32 interactive elements under the 24x24 floor DESIGN.md 3.10 sets for EVERY
+   pointer, across six screens. Almost all were native 16x16 checkboxes in list rows.
+
+   A native checkbox cannot be padded reliably (it is a replaced element), so the box is drawn:
+   the input becomes a 24x24 transparent target and its ::before paints a 17px mark inside. The
+   VISUAL size is unchanged — DESIGN.md 3.10 is explicit that the hit area grows, not the mark —
+   and the control finally answers to the accent instead of the browser's default blue. */
+input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 24px; height: 24px; margin: 0; flex: none;
+  display: inline-grid; place-content: center;
+  background: transparent; border: none; cursor: pointer;
+}
+input[type="checkbox"]::before {
+  content: ""; width: 17px; height: 17px; border-radius: 5px;
+  background: var(--paper); box-shadow: inset 0 0 0 1.5px var(--s-off-mark);
+  transition: background var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+input[type="checkbox"]:hover::before { box-shadow: inset 0 0 0 1.5px var(--ink-2); }
+input[type="checkbox"]:checked::before {
+  background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent);
+  /* The tick is drawn, not a glyph: a font that lacks it would render a box. */
+  background-image: linear-gradient(45deg, transparent 42%, var(--paper) 42%, var(--paper) 52%, transparent 52%),
+                    linear-gradient(-45deg, transparent 58%, var(--paper) 58%, var(--paper) 68%, transparent 68%);
+  background-size: 100% 100%;
+}
+input[type="checkbox"]:focus-visible { outline: none; }
+input[type="checkbox"]:focus-visible::before {
+  box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--accent-tint);
+}
+/* The cell the box sits in stops being a 22px strip. */
+.selcell { min-height: 24px; display: flex; align-items: center; }
+
 /* ============================ 6. RESPONSIVE ============================
    Not "stacked on mobile". Each viewport gets a decision. */
 @media (max-width: 900px) {

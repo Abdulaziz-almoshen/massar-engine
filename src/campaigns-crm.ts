@@ -34,12 +34,14 @@ export const CAMPAIGNS_CRM_CSS = `
     background:#fff; border:1px solid #ECEEF2; border-radius:13px; margin-bottom:14px; }
   .crmbar .hair { width:1px; height:22px; background:#ECEEF2; flex:none; }
   .vtog { display:inline-flex; background:#E5E8EE; border-radius:999px; padding:3px; flex:none; }
-  .vtog button { font-family:inherit; font-size:12px; font-weight:600; color:#656B76; background:transparent;
+  .vtog button { font-family:inherit; font-size:12px; font-weight:600; color:#545A66; background:transparent;
     border:none; border-radius:999px; padding:7px 15px; cursor:pointer; white-space:nowrap; }
   .vtog button.on { background:#fff; color:#2563EB; box-shadow:0 1px 3px rgba(16,24,40,.10); }
   .qpill { font-family:inherit; font-size:12px; font-weight:600; border-radius:999px; padding:7px 13px;
     cursor:pointer; white-space:nowrap; color:#33373E; background:#fff; border:1px solid #ECEEF2; }
-  .qpill.on { color:#2563EB; background:#DCE8FC; border-color:#5B8DEF; }
+  /* --accent on --blue-wash is 4.18 — below the floor, and this is the SELECTED state, so the
+     chip a person just clicked was the least readable one on the row. --accent-deep is 6.32. */
+  .qpill.on { color:#1A47BE; background:#DCE8FC; border-color:#5B8DEF; }
   .crmsel { font-family:inherit; height:38px; border:1px solid #ECEEF2; border-radius:999px;
     background:#EFF1F5; color:#14161A; font-size:12px; font-weight:600; padding:0 12px; cursor:pointer; }
 
