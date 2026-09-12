@@ -149,7 +149,9 @@ export const OPPS_CRM_CSS = `
     background:transparent; border:none; border-radius:var(--r-sm); height:32px; padding-inline:10px;
     display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .ox-seg button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
-  .ox-add.btn { height:36px; padding-inline:14px; font-size:var(--t-sm); gap:6px; }
+  /* flex:none + nowrap: beside a crowded filter strip the primary was squeezed until its label
+     broke onto two lines. The strip scrolls; the primary action never gives up width. */
+  .ox-add.btn { height:36px; padding-inline:14px; font-size:var(--t-sm); gap:6px; flex:none; white-space:nowrap; }
   .ox-add[aria-disabled="true"] { pointer-events:none; }
   .ox-selc { font-size:var(--t-sm); font-weight:600; color:var(--accent-deep); background:var(--accent-tint);
     border-radius:var(--r-sm); min-height:36px; padding-inline:12px; display:inline-flex; align-items:center; gap:6px; }
