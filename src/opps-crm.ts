@@ -427,6 +427,9 @@ var OPP_KCAP = 50;
 function opPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function opNProd(n) { return opPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function opNLine(n) { return opPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
+/* opNOpp is read by sales-crm.ts («المستهدفات والأداء»), not by this page. The V5 rewrite dropped it and
+   smoke caught #perf rendering blank on the first deploy; it stays for that caller. */
+function opNOpp(n) { return opPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
 function opNEnt(n) { return opPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
 function opNDay(n) { return opPl(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
 function opNYear(n) { return opPl(n, "سنة واحدة", "سنتان", "سنوات", "سنة"); }
