@@ -126,11 +126,11 @@ export const OPPS_CRM_CSS = `
   .ox-filt { display:flex; align-items:center; gap:var(--s2); flex:1 1 0; min-width:0; flex-wrap:wrap; }
   .ox-filt > * { flex:none; }
   .ox-brk { display:none; }
-  .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 280px; min-width:180px; }
+  .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 232px; min-width:180px; }
   .ox-srch .ox-si { position:absolute; inset-inline-start:12px; color:var(--muted); display:flex; pointer-events:none; }
   .ox-srch .inp { width:100%; min-height:36px; height:36px; padding-inline-start:36px; font-size:var(--t-sm); }
   .ox-f { position:relative; display:inline-flex; align-items:center; }
-  .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px; max-width:170px;
+  .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px; max-width:140px;
     font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
     border:none; box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-sm);
     padding-inline:12px 32px; cursor:pointer; text-overflow:ellipsis;
@@ -143,11 +143,15 @@ export const OPPS_CRM_CSS = `
   .ox-fw select { width:100%; max-width:none; height:38px; box-shadow:inset 0 0 0 1px var(--s-off-mark); color:var(--ink); font-weight:450; }
   .ox-fw select[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
   .ox-clear { font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--accent-deep);
-    background:transparent; border:none; cursor:pointer; min-height:36px; padding-inline:8px; border-radius:var(--r-sm); }
+    background:transparent; border:none; cursor:pointer; min-height:36px; padding-inline:6px; border-radius:var(--r-sm);
+    display:inline-flex; align-items:center; gap:4px; flex:none; }
+  .ox-clear .ox-ico { width:14px; height:14px; }
   .ox-clear:hover { background:var(--accent-wash); }
   .ox-seg { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; flex:none; }
+  /* Icon-only, as in the reference tables: the pressed state carries the mode, the accessible name
+     and the tooltip carry the word. Labels cost ~70px that the filters need at 1440. */
   .ox-seg button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--muted-2);
-    background:transparent; border:none; border-radius:var(--r-sm); height:32px; padding-inline:10px;
+    background:transparent; border:none; border-radius:var(--r-sm); height:32px; width:36px; padding-inline:0; justify-content:center;
     display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .ox-seg button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
   /* flex:none + nowrap: beside a crowded filter strip the primary was squeezed until its label
@@ -264,7 +268,7 @@ export const OPPS_CRM_CSS = `
     .ox-brk { display:block; order:3; flex-basis:100%; height:0; }
     .ox-filt { order:4; flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow-x:auto; padding:3px; margin:-3px; scrollbar-width:none; }
     .ox-seg { order:5; margin-inline-start:0; }
-    .ox-seg button { padding-inline:8px; }
+    .ox-seg button { width:40px; }
     .ox-hr { display:none; }
     .ox-r { grid-template-columns:36px minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s3); }
     .ox-r .ox-c-chk { grid-row:1 / 5; grid-column:1; align-self:start; padding-top:2px; }
@@ -726,9 +730,13 @@ function opSelect(id, label, value, opts, on, handler) {
       return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
     }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
 }
+/* The selection bar takes the resting toolbar's MEASURED height. When the filters wrap to a second
+   row the resting bar is taller than the one-row selection bar, and selecting a row made the whole
+   table jump ~34px (final Claude sign-off). The height is read after each resting paint. */
+var opTbH = 0;
 function opToolbar() {
   var sel = opSelIds();
-  var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص">';
+  var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص"' + (sel.length && opTbH ? ' style="min-height:' + opTbH + 'px"' : "") + ">";
   if (sel.length) {
     var all = opLines();
     h += '<span class="ox-selc">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
@@ -758,13 +766,13 @@ function opToolbar() {
     h += opSelect("oxf_sort", opMode === "kanban" ? "ترتيب البطاقات داخل كل مرحلة" : "ترتيب", opSort,
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
-  if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()">مسح التصفية</button>';
+  if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()" aria-label="مسح التصفية" title="مسح التصفية">' + opIco("x") + "مسح</button>";
   h += "</span>";
   /* The view switch sits OUTSIDE the scrolling filter strip, so it can never be scrolled out of
      sight. */
   h += '<span class="ox-seg" role="group" aria-label="طريقة العرض">' +
-    '<button aria-pressed="' + (opMode === "list") + '" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "قائمة</button>" +
-    '<button aria-pressed="' + (opMode === "kanban") + '" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "كانبان</button></span>";
+    '<button aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
+    '<button aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
   h += opSheet
     ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
@@ -1084,8 +1092,11 @@ function opCreateDrawer() {
   return opDrawerShell("oxdrt", head, b, foot);
 }
 
-/* After every paint: play the drawer entrance once, restore its scroll, move focus in. */
+/* After every paint: remember the resting toolbar height; play the drawer entrance once, restore
+   its scroll, move focus in. */
 function opAfterRender() {
+  var tb = document.querySelector(".ox-tb");
+  if (tb && !opSelIds().length) opTbH = Math.round(tb.getBoundingClientRect().height);
   var dr = document.querySelector(".ox-dr");
   if (!dr) return;
   var db = document.getElementById("oxdb");
