@@ -750,7 +750,14 @@ export async function init(): Promise<void> {
     return;
   }
   try {
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 8000 });
+    // idleTimeoutMillis + keepAlive: the backend closes connections that sit idle, and node-pg's
+    // default keeps idle clients forever, so the next request was handed a dead socket — measured
+    // 2026-09-12 as «Connection terminated unexpectedly» on /admin/entities, /admin/kb and
+    // /admin/campaigns minutes after every deploy, 500s in the dashboard, and the pool latched to
+    // memory-only until the 30s reprobe. Closing idle clients ourselves after 10s means a request
+    // opens a fresh socket instead of inheriting one the server already dropped.
+    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 8000,
+      idleTimeoutMillis: 10_000, keepAlive: true });
     // node-pg emits 'error' on idle clients if the backend drops mid-life; unhandled it
     // kills the process. Log, flip connected so /health tells the truth; writes no-op.
     pool.on("error", (e) => {
