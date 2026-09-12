@@ -460,11 +460,19 @@ input[type="checkbox"]::before {
 input[type="checkbox"]:hover::before { box-shadow: inset 0 0 0 1.5px var(--ink-2); }
 input[type="checkbox"]:checked::before {
   background: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent);
-  /* The tick is drawn, not a glyph: a font that lacks it would render a box. */
-  background-image: linear-gradient(45deg, transparent 42%, var(--paper) 42%, var(--paper) 52%, transparent 52%),
-                    linear-gradient(-45deg, transparent 58%, var(--paper) 58%, var(--paper) 68%, transparent 68%);
-  background-size: 100% 100%;
 }
+/* The tick is drawn, not a glyph: a font that lacks it would render a box. It WAS drawn as two
+   crossing gradient bands, which rendered an X — «remove», on every selected row in the product
+   (caught by the V5 design sign-off, 2026-09-12). Now an L of two borders rotated 45deg: a real
+   check, which is not mirrored in RTL because a tick is not directional text. */
+input[type="checkbox"] { place-items: center; }
+input[type="checkbox"]::before, input[type="checkbox"]::after { grid-area: 1 / 1; }
+input[type="checkbox"]::after {
+  content: ""; width: 5px; height: 9px; margin-block-start: -2px;
+  border: solid var(--paper); border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0); transition: transform var(--fast) var(--ease);
+}
+input[type="checkbox"]:checked::after { transform: rotate(45deg) scale(1); }
 input[type="checkbox"]:focus-visible { outline: none; }
 input[type="checkbox"]:focus-visible::before {
   box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--accent-tint);

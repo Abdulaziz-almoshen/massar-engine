@@ -89,15 +89,25 @@ export const OPPS_CRM_CSS = `
   .ox-met .l { font-size:var(--t-xs); color:var(--muted); display:flex; align-items:center; gap:4px; white-space:nowrap; }
   .ox-met.on .l { color:var(--accent-deep); }
   .ox-met.warn .n { color:var(--s-attn-text); }
+  .ox-met.zero .n { color:var(--muted); font-weight:500; }
   .ox-met.warn .n .ox-ico { color:var(--s-attn-mark); }
   /* A container cannot restyle itself, so the query is on .ox and the summary is its child. */
   @container oxw (max-width: 760px) {
     .ox-sum { grid-template-columns:1fr; padding:var(--s3); gap:var(--s3); }
     .ox-mets { width:100%; }
     .ox-met { flex:1; min-width:0; padding-inline:var(--s2); }
-    .ox-leg { flex-direction:column; align-items:stretch; gap:0; }
-    .ox-lg { width:100%; justify-content:flex-start; border-radius:var(--r-sm); min-height:36px; }
-    .ox-lg b { margin-inline-start:auto; }
+    /* Two compact columns: the six stage filters stay operable without pushing the first deal
+       below the fold. */
+    .ox-leg { display:grid; grid-template-columns:1fr 1fr; gap:2px var(--s2); margin-top:var(--s2); }
+    .ox-lg { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto;
+      column-gap:6px; row-gap:0; align-items:center; text-align:start; border-radius:var(--r-sm); min-height:40px; padding:4px 6px; }
+    .ox-lg > .ox-dot { grid-row:1; grid-column:1; }
+    .ox-lg > span:not(.n) { grid-row:1; grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .ox-lg .n { grid-row:1; grid-column:3; }
+    .ox-lg b { grid-row:2; grid-column:2 / 4; font-size:var(--t-xs); }
+    .ox-fig { margin-block:2px var(--s2); }
+    .ox-met { padding-block:6px; }
+    .ox-met .n { font-size:var(--t-lg); }
     .ox-fig { font-size:var(--t-xl); }
     .ox-figsub { display:block; margin-inline-start:0; margin-top:2px; }
   }
@@ -121,6 +131,9 @@ export const OPPS_CRM_CSS = `
   .ox-f.on select { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
   .ox-f .ox-chev { position:absolute; inset-inline-end:10px; color:var(--muted); pointer-events:none; display:flex; }
   .ox-f.on .ox-chev { color:var(--accent-deep); }
+  .ox-fw { display:flex; width:100%; }
+  .ox-fw select { width:100%; max-width:none; height:38px; box-shadow:inset 0 0 0 1px var(--s-off-mark); color:var(--ink); font-weight:450; }
+  .ox-fw select[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
   .ox-clear { font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--accent-deep);
     background:transparent; border:none; cursor:pointer; min-height:36px; padding-inline:8px; border-radius:var(--r-sm); }
   .ox-clear:hover { background:var(--accent-wash); }
@@ -159,12 +172,14 @@ export const OPPS_CRM_CSS = `
 
   /* ---- the table ---- */
   .ox-t { display:block; }
-  .ox-hr, .ox-r { display:grid; align-items:center; column-gap:12px; padding-inline:var(--s2) var(--s3);
-    grid-template-columns:36px minmax(150px,1.35fr) minmax(110px,1fr) 160px 116px 112px 104px minmax(130px,1.2fr) 36px; }
+  .ox-hr, .ox-r { display:grid; align-items:center; column-gap:16px; padding-inline:var(--s2) var(--s3);
+    grid-template-columns:36px minmax(140px,1.2fr) minmax(150px,1.2fr) 150px 116px 108px 100px minmax(120px,1fr) 32px; }
   .ox-hr { min-height:40px; background:var(--surface); border-bottom:1px solid var(--line-soft);
     font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-  .ox-hr .ox-hv { text-align:end; }
-  .ox-r { min-height:56px; padding-block:var(--s2); border-bottom:1px solid var(--line-soft); cursor:pointer;
+  /* The figure is end-aligned, so it needs its own air on the side that faces the next column, or
+     «القيمة المصدر» read as one header. */
+  .ox-hr .ox-hv { text-align:end; padding-inline-end:16px; }
+  .ox-r { min-height:56px; padding-block:6px; border-bottom:1px solid var(--line-soft); cursor:pointer;
     position:relative; transition:background var(--fast) var(--ease); }
   .ox-r:hover { background:var(--accent-wash); }
   .ox-r.is-sel { background:var(--accent-tint); }
@@ -180,7 +195,10 @@ export const OPPS_CRM_CSS = `
     box-shadow:inset 0 0 0 1px var(--accent-mark); border-radius:var(--r-pill); padding:0 7px; line-height:20px; }
   .ox-uns { flex:none; color:var(--s-fail-text); display:inline-flex; }
   .ox-c-pr { display:flex; flex-direction:column; gap:2px; }
-  .ox-pn { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Two lines, not an ellipsis: «تكامل الأنظمة (HIS/ERP)» truncated mid-parenthesis rendered as
+     «…ERP) تكامل الأنظمة», a bidi scramble. A clamp keeps the run whole. */
+  .ox-pn { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2;
+    -webkit-box-orient:vertical; line-height:1.35; overflow-wrap:anywhere; }
   .ox-srcsub { display:none; font-size:var(--t-xs); color:var(--muted); align-items:center; gap:4px; }
   .ox-c-st { display:flex; flex-direction:column; gap:3px; }
   .ox-stg { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); color:var(--ink); white-space:nowrap; }
@@ -189,7 +207,7 @@ export const OPPS_CRM_CSS = `
     color:var(--s-attn-text); box-shadow:inset 0 0 0 1px var(--s-attn-mark); border-radius:var(--r-pill);
     padding:0 8px; line-height:20px; white-space:nowrap; }
   .ox-warn .ox-ico { width:12px; height:12px; color:var(--s-attn-mark); }
-  .ox-c-vl { text-align:end; font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ox-c-vl { padding-inline-end:16px; text-align:end; font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .ox-c-vl.unp { font-weight:450; color:var(--muted); }
   .ox-c-src { display:flex; align-items:center; gap:6px; font-size:var(--t-sm); color:var(--ink-2); white-space:nowrap; min-width:0; }
   .ox-c-src .ox-ico, .ox-srcsub .ox-ico { color:var(--muted); }
@@ -212,9 +230,9 @@ export const OPPS_CRM_CSS = `
   .ox-skel { display:grid; grid-template-columns:36px 1.4fr 1fr 176px 124px 1fr; gap:var(--s3); align-items:center;
     min-height:56px; padding-inline:var(--s2) var(--s3); border-bottom:1px solid var(--line-soft); }
   .ox-skel i { display:block; height:12px; border-radius:var(--r-sm); background:var(--skeleton); }
-  @container oxl (max-width: 1099px) {
-    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.35fr) minmax(120px,1fr) 160px 112px 104px minmax(120px,1.1fr) 36px; }
-    .ox-c-src { display:none; }
+  @container oxl (max-width: 1119px) {
+    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.3fr) minmax(130px,1.1fr) 150px 116px 100px minmax(120px,1.1fr) 32px; }
+    .ox-c-src, .ox-hsrc { display:none; }
     .ox-srcsub { display:flex; }
   }
   @container oxl (max-width: 899px) {
@@ -264,7 +282,8 @@ export const OPPS_CRM_CSS = `
   .ox-kc .m { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); margin-top:4px; }
   .ox-kc .m b { font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .ox-kc .m b.unp { font-weight:450; color:var(--muted); }
-  .ox-kc .o { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-kc .o { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; min-width:0; }
+  .ox-kc .o .ox-ico { width:14px; height:14px; }
   .ox-kempty { font-size:var(--t-xs); color:var(--muted); text-align:center; padding:var(--s3) var(--s2);
     border:1px dashed var(--line); border-radius:var(--r-md); }
   .ox-kmore { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:var(--accent-bar);
@@ -523,7 +542,10 @@ function opSrcLabel(k) { return OPP_SRC[k] || OPP_SRC.other; }
 function opLoad(force) {
   // A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY LEDGER (DESIGN.md §4). The failure stays null so the
   // next render retries, and it is SAID.
-  if (oppLoading || (oppRows && !force)) return;
+  /* …and a failure is NOT retried by the next paint. It used to be, so a persistent outage became a
+     fetch loop that re-rendered forever and flashed the error away before anyone could read it. The
+     retry is the button's job (opRetry passes force). */
+  if (oppLoading || (oppRows && !force) || (oppFailed && !force)) return;
   oppLoading = true; oppFailed = false;
   fetch("/admin/opps", { headers: { "x-admin-token": TOKEN } })
     .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
@@ -658,7 +680,7 @@ function opSummary() {
   h += "</div>";
   var met = function (key, n, label, warn) {
     var on = opShort === key;
-    return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + '" aria-pressed="' + on + '"' +
+    return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + (n ? "" : " zero") + '" aria-pressed="' + on + '"' +
       ' onclick="opSetShort(&quot;' + key + '&quot;)">' +
       '<span class="n">' + (warn && n ? opIco("warn") : "") + fmtN(n) + "</span>" +
       '<span class="l">' + (on ? opIco("check") : "") + label + "</span></button>";
@@ -683,12 +705,13 @@ function opToolbar() {
   if (sel.length) {
     var all = opLines();
     h += '<span class="ox-selc">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
-    h += '<select class="ox-bulk" id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
+    h += '<span class="ox-f"><select id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
       '<option value="">نقل إلى مرحلة…</option>' +
-      OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + "</select>";
+      OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
     h += '<input class="ox-bulk" id="oxb_owner" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
     h += '<datalist id="oxowners">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
-    if (sel.length < all.length) {
+    var pg = pageSlice("opps", opSorted());
+    if (sel.length < all.length && pg.length && pg.every(function (l) { return opSel[l.id]; })) {
       h += '<button class="ox-clear" onclick="opSelectAll()">تحديد كل المطابِق (' + fmtN(all.length) + ")</button>";
     }
     h += '<span class="sp"></span><button class="btn btn-ghost ox-add" onclick="opClearSel()">إلغاء التحديد</button>';
@@ -704,8 +727,8 @@ function opToolbar() {
     opSrc !== "all", "opSetSrc");
   h += opSelect("oxf_own", "المسؤول", opOwn,
     [["all", "كل المسؤولين"], ["__none", "بلا مسؤول"]].concat(opOwners().map(function (o) { return [o, o]; })), opOwn !== "all", "opSetOwn");
-  if (opMode === "list") {
-    h += opSelect("oxf_sort", "ترتيب", opSort,
+  {
+    h += opSelect("oxf_sort", opMode === "kanban" ? "ترتيب البطاقات داخل كل مرحلة" : "ترتيب", opSort,
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
   if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()">مسح التصفية</button>';
@@ -727,7 +750,7 @@ function opWaRow() {
   if (!un.length) return "";
   var h = '<div class="ox-wa">';
   h += '<button class="ox-wa-h" aria-expanded="' + opWaOpen + '" aria-controls="oxwa" onclick="opToggleWa()">' +
-    opIco("whatsapp") + "<span>اهتمام في واتساب بلا فرصة مسجّلة · <b>" + opNEnt(un.length) + "</b></span>" +
+    opIco("whatsapp") + "<span><b>" + opPl(un.length, "جهة واحدة مهتمّة", "جهتان مهتمّتان", "جهات مهتمّة", "جهة مهتمّة") + "</b> عبر واتساب بلا فرصة</span>" +
     '<span class="sp"></span><span>' + (opWaOpen ? "إخفاء" : "عرض") + "</span>" + opIco("chevD", "chev") + "</button>";
   if (opWaOpen) {
     var shown = un.slice(0, 8);
@@ -793,7 +816,7 @@ function opListView() {
   h += '<div class="ox-hr" role="row">' +
     '<div class="ox-c ox-c-chk" role="columnheader"><input type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
     '<div role="columnheader">الجهة</div><div role="columnheader">المنتج</div><div role="columnheader">المرحلة</div>' +
-    '<div class="ox-hv" role="columnheader">القيمة</div><div class="ox-c-src" role="columnheader">المصدر</div>' +
+    '<div class="ox-hv" role="columnheader">القيمة</div><div class="ox-hsrc" role="columnheader">المصدر</div>' +
     '<div role="columnheader">المسؤول</div><div role="columnheader">الخطوة التالية</div><div role="columnheader"><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">تفاصيل</span></div></div>';
   if (!page.length) {
     h += '<div class="ox-state">' + (oppRows && oppRows.length
@@ -805,7 +828,8 @@ function opListView() {
   if (rows.length) {
     var live = opSumLive(rows);
     var unp = rows.filter(function (l) { return !opPriced(l); }).length;
-    h += '<div class="ox-foot">' + pageBar("opps", rows.length, "بند") +
+    var unit = rows.length >= 3 && rows.length <= 10 ? "بنود" : rows.length >= 11 ? "بندًا" : "بند";
+    h += '<div class="ox-foot">' + pageBar("opps", rows.length, unit) +
       '<span class="tot">' + (live ? "قيمة المطابِق <b>" + opMoney(live) + "</b>" + (opHasLost(rows) ? " · دون الخسارة" : "") : "لا قيمة مسعَّرة في المطابِق") +
       (unp ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</span></div>";
   }
@@ -817,8 +841,10 @@ function opKanbanView() {
   var rows = opLines();
   var h = '<div class="ox-kb" role="list" aria-label="لوحة المراحل">';
   OPP_ST.forEach(function (st) {
-    var cards = rows.filter(function (l) { return l.stage === st.key; })
-      .sort(function (a, b) { return (opPriced(b) - opPriced(a)) || (opValue(b) - opValue(a)); });
+    /* The same ordering the list uses, applied inside each column, so switching views never reorders
+       what the reader already scanned. */
+    var inStage = {}; rows.forEach(function (l) { if (l.stage === st.key) inStage[l.id] = 1; });
+    var cards = opSorted().filter(function (l) { return inStage[l.id]; });
     var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
     var unp = cards.filter(function (l) { return !opPriced(l); }).length;
     var cap = opKCap[st.key] || OPP_KCAP;
@@ -830,9 +856,9 @@ function opKanbanView() {
         ' aria-label="' + esc(l.account_name) + " — " + esc(l.product) + '"' +
         ' ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()" onclick="opOpenLine(' + l.id + ',this.id)" onkeydown="opCardKey(event,' + l.id + ',this.id)">' +
         '<span class="a">' + esc(l.account_name) + "</span>" +
-        '<span class="p">' + esc(l.product) + "</span>" +
+        '<span class="p">' + esc(l.product) + (l.created_by === "المساعد" ? ' <span class="ox-auto">تلقائي</span>' : "") + "</span>" +
         '<span class="m"><b class="' + (opPriced(l) ? "" : "unp") + '">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</b>" +
-        '<span class="o">' + (String(l.owner || "").trim() ? esc(l.owner) : "بلا مسؤول") + "</span></span>" +
+        '<span class="o">' + opIco(l.source in OPP_ICO ? l.source : "other") + " " + (String(l.owner || "").trim() ? esc(l.owner) : "بلا مسؤول") + "</span></span>" +
         (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>" : "") + "</div>";
     });
     if (!cards.length) h += '<div class="ox-kempty">لا بنود</div>';
@@ -883,10 +909,13 @@ function opField(l, key, label, type) {
 function opDrawerShell(labelId, head, body, foot) {
   var cls = opDrShown ? " in" : "";
   return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
-    '<aside class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
-    '<header class="ox-dh">' + head + '<button class="ox-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></header>" +
+    /* Plain divs, not aside/header/footer: the shell styles those ELEMENTS (the rail is an aside that
+       becomes a centred top bar on a phone), and the drawer inherited it — its header rendered 216px
+       wide inside a 390px drawer. */
+    '<div class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
+    '<div class="ox-dh">' + head + '<button class="ox-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></div>" +
     '<div class="ox-db" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
-    '<footer class="ox-df">' + foot + "</footer></aside>";
+    '<div class="ox-df">' + foot + "</div></div>";
 }
 function opDetailDrawer(l) {
   var st = opStage(l.stage);
@@ -985,11 +1014,11 @@ function opCreateDrawer() {
       return '<button role="radio" aria-checked="' + (d.source === k) + '" onclick="opDraftSrc(&quot;' + k + '&quot;)">' + opIco(k) + esc(OPP_SRC[k]) + "</button>";
     }).join("") + "</div>";
   if (d.source === "whatsapp") {
-    b += '<div class="ox-fld"><label for="opd_camp">من أي حملة؟</label><select class="inp" id="opd_camp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
+    b += '<div class="ox-fld"><label for="opd_camp">من أي حملة؟</label><span class="ox-f ox-fw"><select id="opd_camp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
       '<option value="">— لم تُحدَّد —</option>' +
       (campaigns || []).map(function (cp) {
         return '<option value="' + esc(cp.id) + '"' + (String(d.source_ref) === String(cp.id) ? " selected" : "") + ">" + esc(clip(cp.name, 48)) + "</option>";
-      }).join("") + "</select></div>";
+      }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>";
   }
   b += "</section>";
   var total = 0, unp = 0;
@@ -1005,10 +1034,10 @@ function opCreateDrawer() {
     b += '<div class="ox-lblk"><div class="hd"><span>المنتج ' + fmtN(i + 1) + "</span>" +
       (d.lines.length > 1 ? '<button onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
       '<div class="ox-fld"><label for="' + fid("product") + '">الخدمة <span class="req" aria-hidden="true">*</span></label>' +
-      '<select class="inp" id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
+      '<span class="ox-f ox-fw"><select id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
       '<option value="">— اختر الخدمة —</option>' +
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
-      "</select></div>" +
+      '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>" +
       '<div class="ox-g2">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
       numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "٠") + "</div>" +
       '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoney(v) : OPP_UNPRICED) + "</span></div></div>";
@@ -1046,7 +1075,11 @@ if (!window.__oxKeys) {
     var dr = document.querySelector(".ox-dr");
     if (!dr) return;
     if (e.key === "Escape") {
-      if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) return;
+      /* Escape on an ARMED delete disarms it and keeps the drawer: the first Escape cancels the
+         most recent intent, not the whole surface. */
+      if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) {
+        e.preventDefault(); opRender(); var hb = document.querySelector(".ox-df .rv-hold"); if (hb) hb.focus(); return;
+      }
       e.preventDefault(); window.opCloseDrawer(); return;
     }
     if (e.key !== "Tab") return;
