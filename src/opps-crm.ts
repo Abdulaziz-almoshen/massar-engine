@@ -1,288 +1,458 @@
-// opps-crm.ts — «فرص البيع», the opportunity board, built to the prototype's own screen.
+// opps-crm.ts — «فرص البيع», the opportunity ledger.
 //
-// THE SPEC IS _مسار/مسار.dc.html, screen «opportunities», and its model is taken whole:
-// «فرصة = عميل + عدة منتجات». One row in the ledger is ONE PRODUCT LINE; the card is the ACCOUNT,
-// and everything on its head — the status word, the breakdown, the total — is computed from the
-// lines beneath it at render time. Nothing about a group is stored, so the head can never disagree
-// with the rows it sits above.
+// V5, 2026-09-12. REBUILT to one grammar after the founder's verdict on the V4 board: «not
+// professional, not enterprise-level, not modern and minimalist, not connected». The spec was
+// synthesized from Dribbble/Pinterest references and three design voices (Claude, an independent
+// Claude designer, and GPT via Codex) and approved by GPT before a line was written:
+// docs/designs/opps-v5-spec.md.
 //
-// WHAT THIS ROUTE USED TO BE, and where that went. #opps rendered «لوحة الفرز» — the founder's
-// three questions about WhatsApp replies (who is interested, who is not, when do we call them).
-// That board is not deleted and not moved to another URL: it is the SECOND tab of this route,
-// «فرز الردود», because it is the feeder of this one. The first tab is now the thing he asked for.
+// WHAT THE PAGE IS NOW, top to bottom: the shell's ONE tab row (الفرص · فرز الردود · لوحة المتابعة);
+// a single SUMMARY panel (one leading figure, the open pipeline drawn as one bar, a legend that is
+// also the stage filter, three shortcut metrics); a single LEDGER panel (toolbar, the WhatsApp
+// action row, a flush table or the kanban); and ONE DRAWER that is both the detail view and the
+// create form. Everything the V4 page stacked as separate furniture — the second view toggle, nine
+// stage boxes, a floating triage banner, an inset editor of a different width, a black button —
+// is gone, because each one was a second idiom on a screen that needed one.
 //
-// THE FOUNDER'S OWN DISTINCTION, which is why an opportunity is stored rather than derived:
-// «sometimes the oppurtiunity comes from whatsapp campaign and sometimes we call them or visit
-// them and record the client in our massar». A conversation's CRM stage is readable from the
-// ledger, so storing it could only let it drift — that is why CRM_STAGE is derived. A deal's stage
-// is not readable from anything this system holds: «التقييم الفني والمالي» is a fact about a
-// meeting nobody here witnessed. So it is stored, with its author and the day it was last moved,
-// and every line carries the SOURCE that produced it. A whatsapp line names its campaign; a visit
-// names nothing, which is honest — nobody logged the visit.
+// THE MODEL IS UNCHANGED, and so is every rule that makes a figure on this page true:
+// «فرصة = عميل + عدة منتجات». One row in the ledger is ONE PRODUCT LINE; its stage is STORED (a deal's
+// stage is a fact about a meeting nobody here witnessed), its SOURCE says where it came from, and
+// its value is سعر × سنوات × كمية × (١−خصم). Those rules live in src/opps-domain.ts, which ships its
+// compiled source into this scope (OPP_STAGES, OPP_SOURCES, isOpenStage, calculateLineValue …), so
+// the UI restates none of them.
 //
-// PORTED FROM THE PROTOTYPE: the group model, the five-rung stage ladder with its labels, the
-// status rollup (قائمة / مكتملة جزئياً / ربح / خسارة), the «متوقّف» reading (≥14 days in تقييم or
-// تفاوض), the value arithmetic (سعر × سنوات × كمية × (١−خصم)), the card composition, and the
-// multi-line create form.
-// NOT PORTED, and named here because an omission nobody wrote down is indistinguishable from a bug:
-//   · the «دعم» chip (a help-request/escalation object). Massar has no such record, and a chip
-//     that can never light is furniture. Its slot on the card carries the SOURCE instead — the
-//     thing the founder actually asked to see. Re-trigger: the first real escalation workflow.
-//   · the full opportunity DETAIL screen (stage rail + per-stage result log + probability). Its
-//     substance — move the stage, name the next step, own it, price it — is an inline expander on
-//     the line itself. A second screen for six fields is a click, not a feature.
-//   · daysInStage as a typed field: it is derived from stage_at, which moves only on a real stage
-//     change, so «متوقّف منذ ١٨ يومًا» counts days in the stage and not days since anyone touched
-//     the row.
+// NOT HERE, and named so the omission is not mistaken for a bug:
+//   · the cards view. It repeated the kanban at a lower density and made every row a card, which
+//     DESIGN.md §3.6 forbids on a surface that can exceed twelve rows. List and kanban remain.
+//   · an expected-close date and a probability. The schema has close_on and no UI ever set it, and
+//     there is no earned probability model; a column of blanks or guesses is not enterprise, it is
+//     furniture. Re-trigger: the first time a rep records a close date.
+//   · optimistic concurrency. PATCH is last-write-wins (the row has no version column); the row the
+//     server returns replaces the local copy, so the screen never shows a value the ledger refused.
 //
 // Client JS in the dashboard.ts <script> scope (see campaigns-crm.ts for the seam). It borrows
-// esc, fmtN, fmtD, ic, clip, contactByPhone, entities, campaigns, cache, tagList, crmSkeleton,
-// alertBar, pageSlice, pageBar, PAGE_SIZES, TOKEN and vMorningList — and defines no statistic that
-// exists anywhere else.
+// esc, fmtN, fmtD, ic, clip, contactByPhone, entities, campaigns, cache, tagList, alertBar,
+// pageSlice, pageBar, PAGE, TOKEN, showTest and render.
 
 export const OPPS_CRM_CSS = `
-  /* ===== opps board ===== */
-  .opgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(390px,1fr)); gap:14px; }
-  @media (max-width: 860px) { .opgrid { grid-template-columns:1fr; } }
-  .opcard { background:#fff; border:1px solid #ECEEF2; border-radius:14px; overflow:hidden;
-    display:flex; flex-direction:column; }
-  .opcard:hover { border-color:#656B76; }
-  .opcard .oph { padding:15px 18px; }
-  .opcard .opt { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
-  .opcard .av { width:38px; height:38px; flex:none; border-radius:9px; background:#E5E8EE; color:#33373E;
-    display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; }
-  .opcard .nm { font-size:14px; font-weight:500; color:#14161A; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
-  .opcard .sub { font-size:12px; color:#656B76; margin-top:3px; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
-  .opcard .opm { display:flex; align-items:center; justify-content:space-between; gap:8px;
-    margin-top:13px; flex-wrap:wrap; }
-  .opcard .val { font-size:16px; font-weight:600; color:#2563EB; font-variant-numeric:tabular-nums;
-    white-space:nowrap; }
-  .opcard .brk { font-size:12px; color:#656B76; font-variant-numeric:tabular-nums; }
-  .opst { flex:none; font-size:12px; font-weight:500; padding:4px 11px; border-radius:999px; white-space:nowrap; }
-  .opsrc { font-size:12px; font-weight:500; color:#33373E; background:#E5E8EE; border-radius:999px;
-    padding:3px 9px; white-space:nowrap; }
-  .opwarn { font-size:12px; font-weight:500; color:#7A5600; background:#FFF5D6; border-radius:999px;
-    padding:3px 9px; white-space:nowrap; }
-  .opcard .oplines { border-top:1px solid #E5E8EE; background:#EFF1F5; padding:2px 18px 8px; flex:1; }
-  .opline { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #E5E8EE;
-    cursor:pointer; }
-  .opline:last-child { border-bottom:none; }
-  .opline:hover { opacity:.75; }
-  .opline .d { width:7px; height:7px; border-radius:999px; flex:none; }
-  .opline .pn { flex:1; min-width:0; font-size:12px; font-weight:450; color:#14161A;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opline .sg { font-size:12px; color:#656B76; white-space:nowrap; }
-  .opauto { font-size:12px; font-weight:500; color:#2563EB; background:#EAF1FE; border-radius:999px;
-    padding:2px 7px; margin-inline-start:7px; vertical-align:middle; }
-  .opline .lv { font-size:12px; font-weight:500; color:#2563EB; min-width:84px; text-align:end;
-    font-variant-numeric:tabular-nums; }
-  /* the inline expander — the detail screen the prototype spends a page on, as six controls */
-  .opedit { border-bottom:1px solid #E5E8EE; padding:4px 0 13px; }
-  .opedit .lb { font-size:12px; color:#656B76; margin:9px 0 6px; }
-  .opedit .rail { display:flex; flex-wrap:wrap; gap:6px; }
-  .opedit .rung { font-family:inherit; font-size:12px; font-weight:500; border-radius:999px;
-    padding:6px 11px; cursor:pointer; color:#33373E; background:#fff; border:1px solid #ECEEF2;
-    display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
-  .opedit .rung .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .opedit .rung.on { color:#14161A; background:#E5E8EE; border-color:#656B76; }
-  .opedit .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:8px; }
-  .opedit .inp { padding:8px 11px; font-size:12px; border-radius:8px; width:100%; }
-  .opedit .acts { display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap; }
-  .opedit .acts .btn { height:30px; padding:0 11px; font-size:12px; }
-  .opedit .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
-  .opedit .dngr.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; }
+  /* ===== فرص البيع — V5 ===== */
+  .ox { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:oxw; }
+  .ox :focus { outline:none; }
+  .ox :focus-visible, .ox-dr :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .ox .btn-teal:focus-visible, .ox-dr .btn-teal:focus-visible {
+    outline:2px solid var(--paper); outline-offset:2px; box-shadow:0 0 0 4px rgba(37,99,235,.35); }
+  .ox bdi { unicode-bidi:isolate; }
+  .ox-dot { display:inline-block; width:8px; height:8px; border-radius:var(--r-pill); flex:none; }
+  .ox-ico { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.5;
+    stroke-linecap:round; stroke-linejoin:round; }
 
-  /* ===== the LIST — seven tracks, seven cells; the arity rule that wrapped three earlier tables ===== */
-  /* المسؤول is its own column now (founder, 2026-09-08). Narrow and fixed: it holds one avatar,
-     and giving it a fraction would let it stretch and pull the step column below a readable
-     measure on a laptop. */
-  .opflat .crow { grid-template-columns: 40px 1.7fr 1.45fr 1.1fr .8fr .65fr 74px 1.35fr; padding-inline:20px 12px; }
-  .opflat .crow .o-ac { display:flex; align-items:center; gap:10px; min-width:0; }
-  /* A round, accent-tinted initial instead of a grey square — the same chip the owner column uses,
-     so one identity idiom serves the whole row. */
-  .opflat .crow .o-ac .av { width:30px; height:30px; flex:none; border-radius:999px; background:#EAF1FE;
-    color:#1A47BE; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; }
-  .opflat .crow .o-ac .lb { font-size:14px; font-weight:600; color:#14161A; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opflat .crow .o-pr { font-size:12px; color:#33373E; min-width:0;
-    display:flex; flex-direction:column; align-items:flex-start; gap:4px; }
-  .opflat .crow .o-pr .pnm { max-width:100%; display:-webkit-box; -webkit-line-clamp:2;
-    -webkit-box-orient:vertical; overflow:hidden; line-height:1.4; }
-  .opflat .crow .o-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#33373E; min-width:0; }
-  /* 8px, and it carries the stage's own colour. At 6px the pipeline ramp was invisible and every
-     row read the same shade of grey. */
-  .opflat .crow .o-st .d { width:8px; height:8px; border-radius:999px; flex:none; }
-  .opflat .crow .o-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* MONEY IS THE ROW'S ANCHOR. It was 14px in accent blue beside eleven other 12px greys, so the
-     eye had nothing to land on. Ink and 16px: the figure leads, the accent is spent on state. */
-  .opflat .crow .o-vl { font-size:16px; font-weight:600; color:#14161A; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .opflat .crow .o-ow { min-width:0; display:flex; align-items:center; }
-  .opflat .crow .o-nx { font-size:12px; color:#656B76; min-width:0;
-    display:flex; align-items:center; }
-  .nx-body { min-width:0; display:flex; flex-direction:column; gap:2px; }
-  /* 26px is the visual mark. The ROW is the tap target and it is already 62px tall, so this does
-     not need its own 44px hit area — it is not separately clickable. */
-  .nx-av { width:26px; height:26px; border-radius:999px; flex:none;
-    display:flex; align-items:center; justify-content:center;
-    background:#EAF1FE; color:#1A47BE; font-size:12px; font-weight:600; }
-  .nx-av.none { background:transparent; border:1.5px dashed #767D89; }
-  .nx-step { color:#14161A; font-weight:500; max-width:100%;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  /* A slot, not a sentence. Dashed underline says fillable; the row click opens the editor. */
-  .nx-add { color:#656B76; border-block-end:1px dashed #A2A9B4; align-self:flex-start; }
-  .opflat .crow:hover .nx-add { color:#1A47BE; border-block-end-color:#2563EB; }
-  /* Age is neutral until the line is actually stalled. A column where every row is coloured
-     ranks nothing. */
-  .nx-age { color:#656B76; white-space:nowrap; }
-  .nx-age.bad { color:#8E2A27; font-weight:600; }
-  .opexp { padding:0 20px 4px; background:#EFF1F5; border-bottom:1px solid #ECEEF2; }
-  @media (max-width: 1100px) {
-    .opflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
-    /* 1/6, not 1/5: the stacked card is FIVE rows, so the checkbox was centring itself across
-       the first four and sitting visibly high against the last one. */
-    .opflat .crow .selcell { grid-row:1 / 6; grid-column:1; align-self:center; }
-    .opflat .crow .o-ac { grid-row:1; grid-column:2; }
-    .opflat .crow .o-vl { grid-row:1; grid-column:3; text-align:end; }
-    .opflat .crow .o-pr { grid-row:2; grid-column:2 / 4; }
-    .opflat .crow .o-st { grid-row:3; grid-column:2 / 4; }
-    .opflat .crow .o-sr { grid-row:4; grid-column:2; }
-    .opflat .crow .o-ow { grid-row:4; grid-column:3; justify-content:flex-end; }
-    .opflat .crow .o-nx { grid-row:5; grid-column:2 / 4; }
+  /* ---- summary panel ---- */
+  .ox-sum { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
+    padding:var(--s4); display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s4);
+    align-items:start; }
+  .ox-lbl { font-size:var(--t-xs); font-weight:500; color:var(--muted); }
+  .ox-fig { font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight);
+    margin-block:var(--s1) var(--s3); font-variant-numeric:tabular-nums; }
+  .ox-fig.none { color:var(--muted); font-weight:500; }
+  .ox-figsub { font-size:var(--t-xs); color:var(--muted); font-weight:450; margin-inline-start:var(--s2); }
+  .ox-bar { display:flex; gap:2px; height:8px; border-radius:var(--r-pill); overflow:hidden;
+    background:var(--surface-2); }
+  .ox-bar i { display:block; height:100%; min-width:0; cursor:pointer; position:relative;
+    transition:opacity var(--fast) var(--ease); }
+  .ox-bar i::after { content:""; position:absolute; inset-inline:0; inset-block:-8px; }
+  .ox-bar:hover i { opacity:.55; }
+  .ox-bar i:hover, .ox-bar i.on { opacity:1; }
+  .ox-leg { display:flex; flex-wrap:wrap; gap:var(--s1) var(--s2); margin-top:var(--s3); }
+  .ox-lg { font-family:inherit; font-size:var(--t-xs); color:var(--ink-2); background:transparent;
+    border:1px solid transparent; border-radius:var(--r-pill); min-height:28px; padding:2px 10px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+  .ox-lg:hover { background:var(--accent-wash); }
+  .ox-lg.on { background:var(--accent-tint); border-color:var(--accent-mark); color:var(--accent-deep); }
+  .ox-lg b { font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .ox-lg.on b { color:var(--accent-deep); }
+  /* The count sits behind a hairline, never a «·»: beside Arabic-Indic digits a middle dot reads as
+     a zero («٠»), and «· ٥» rendered as «٥٠» in the first screenshot of this legend. */
+  .ox-lg .n { color:var(--muted); font-variant-numeric:tabular-nums; padding-inline-start:6px; border-inline-start:1px solid var(--line); line-height:14px; }
+  .ox-lg.zero b, .ox-lg.zero { color:var(--muted); font-weight:450; }
+  .ox-mets { display:flex; align-items:stretch; border:1px solid var(--line-soft); border-radius:var(--r-md); }
+  .ox-met { font-family:inherit; background:transparent; border:none; cursor:pointer; text-align:start;
+    padding:var(--s2) var(--s3); min-width:112px; display:flex; flex-direction:column; gap:2px;
+    transition:background var(--fast) var(--ease); }
+  .ox-met + .ox-met { border-inline-start:1px solid var(--line-soft); }
+  .ox-met:first-child { border-start-start-radius:var(--r-md); border-end-start-radius:var(--r-md); }
+  .ox-met:last-child { border-start-end-radius:var(--r-md); border-end-end-radius:var(--r-md); }
+  .ox-met:hover { background:var(--accent-wash); }
+  .ox-met.on { background:var(--accent-tint); }
+  .ox-met .n { font-size:var(--t-xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight);
+    font-variant-numeric:tabular-nums; display:flex; align-items:center; gap:6px; }
+  .ox-met .l { font-size:var(--t-xs); color:var(--muted); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .ox-met.on .l { color:var(--accent-deep); }
+  .ox-met.warn .n { color:var(--s-attn-text); }
+  .ox-met.warn .n .ox-ico { color:var(--s-attn-mark); }
+  /* A container cannot restyle itself, so the query is on .ox and the summary is its child. */
+  @container oxw (max-width: 760px) {
+    .ox-sum { grid-template-columns:1fr; padding:var(--s3); gap:var(--s3); }
+    .ox-mets { width:100%; }
+    .ox-met { flex:1; min-width:0; padding-inline:var(--s2); }
+    .ox-leg { flex-direction:column; align-items:stretch; gap:0; }
+    .ox-lg { width:100%; justify-content:flex-start; border-radius:var(--r-sm); min-height:36px; }
+    .ox-lg b { margin-inline-start:auto; }
+    .ox-fig { font-size:var(--t-xl); }
+    .ox-figsub { display:block; margin-inline-start:0; margin-top:2px; }
   }
 
-  /* ===== the stage strip — the pipeline in one line, and the stage filter ===== */
-  .opstrip { display:flex; gap:8px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px; }
-  .opstrip .opsc { font-family:inherit; flex:1; min-width:118px; text-align:start; cursor:pointer;
-    background:#fff; border:1px solid #D8DCE3; border-radius:12px; padding:11px 13px 10px;
-    display:flex; flex-direction:column; gap:3px; position:relative; overflow:hidden;
-    transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
-  /* The stage's own colour, as a rule on the inline-start edge. It is the only place the pipeline
-     ramp appears on this screen, and it is what makes eight boxes read as eight STAGES. */
-  .opstrip .opsc::before { content:""; position:absolute; inset-block:0; inset-inline-start:0;
-    width:3px; background:var(--stg, transparent); }
-  .opstrip .opsc:hover { border-color:#A2A9B4; box-shadow:0 1px 3px rgba(16,24,40,.08); transform:translateY(-1px); }
-  .opstrip .opsc.on { border-color:#2563EB; background:#EAF1FE; box-shadow:0 1px 3px rgba(16,24,40,.08); }
-  .opstrip .opsc:focus-visible { outline:2px solid #2563EB; outline-offset:2px; }
-  /* An empty stage is still a filter, but it stops competing for attention. */
-  .opstrip .opsc.empty { background:#F6F7F9; border-color:#ECEEF2; }
-  .opstrip .opsc.empty::before { opacity:.35; }
-  /* Recede via the GROUND and the weight, never via unreadable text. --s-off is 2.37:1 and
-     DESIGN.md 3.4 forbids it as a text colour — the gate caught exactly that here. --muted at
-     5.36:1 is the lightest legal ink, and the tinted card plus a lighter weight does the rest. */
-  .opstrip .opsc.empty .n { color:#656B76; font-weight:450; }
-  .opstrip .opsc.empty .t, .opstrip .opsc.empty .v { color:#656B76; }
-  /* The share of the board sitting in this stage — the pipeline shape, drawn. */
-  .opstrip .opsc .sh { display:block; height:3px; border-radius:999px; background:#ECEEF2;
-    margin-block-start:7px; overflow:hidden; }
-  .opstrip .opsc .sh i { display:block; height:100%; border-radius:999px; background:var(--stg,#2563EB); }
-  .opstrip .opsc .t { font-size:12px; color:#656B76; display:flex; align-items:center; gap:6px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opstrip .opsc .t .d { width:8px; height:8px; border-radius:999px; flex:none; background:var(--stg,#A2A9B4); }
-  .opstrip .opsc .n { font-size:22px; font-weight:600; color:#14161A; font-variant-numeric:tabular-nums; line-height:1.2; }
-  .opstrip .opsc .v { font-size:12px; color:#2563EB; font-variant-numeric:tabular-nums;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .opstrip .opsc .u { color:#7A5600; margin-inline-start:6px; }
-  .opstrip .opsc .u2 { color:#656B76; margin-inline-start:6px; }
+  /* ---- ledger panel ---- */
+  .ox-led { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
+    overflow:hidden; container-type:inline-size; container-name:oxl; }
+  .ox-tb { display:flex; align-items:center; gap:var(--s2); min-height:64px; padding:var(--s2) var(--s3);
+    border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
+  .ox-tb .sp { flex:1; }
+  .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 280px; min-width:180px; }
+  .ox-srch .ox-si { position:absolute; inset-inline-start:12px; color:var(--muted); display:flex; pointer-events:none; }
+  .ox-srch .inp { width:100%; min-height:36px; height:36px; padding-inline-start:36px; font-size:var(--t-sm); }
+  .ox-f { position:relative; display:inline-flex; align-items:center; }
+  .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px;
+    font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
+    border:none; box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-sm);
+    padding-inline:12px 32px; cursor:pointer; max-width:190px; text-overflow:ellipsis;
+    transition:box-shadow var(--fast) var(--ease), background var(--fast) var(--ease); }
+  .ox-f select:hover { box-shadow:inset 0 0 0 1px var(--ink-2); }
+  .ox-f.on select { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
+  .ox-f .ox-chev { position:absolute; inset-inline-end:10px; color:var(--muted); pointer-events:none; display:flex; }
+  .ox-f.on .ox-chev { color:var(--accent-deep); }
+  .ox-clear { font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--accent-deep);
+    background:transparent; border:none; cursor:pointer; min-height:36px; padding-inline:8px; border-radius:var(--r-sm); }
+  .ox-clear:hover { background:var(--accent-wash); }
+  .ox-seg { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; flex:none; }
+  .ox-seg button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--muted-2);
+    background:transparent; border:none; border-radius:var(--r-sm); height:32px; padding-inline:10px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+  .ox-seg button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
+  .ox-add.btn { height:36px; padding-inline:14px; font-size:var(--t-sm); gap:6px; }
+  .ox-add[aria-disabled="true"] { pointer-events:none; }
+  .ox-selc { font-size:var(--t-sm); font-weight:600; color:var(--accent-deep); background:var(--accent-tint);
+    border-radius:var(--r-sm); min-height:36px; padding-inline:12px; display:inline-flex; align-items:center; gap:6px; }
+  .ox-bulk { font-family:inherit; height:36px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
+    border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:12px; }
+  .ox-bulk:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
+  input.ox-bulk { width:170px; }
 
-  /* bulk-bar controls, on the dark bar the campaigns list already established */
-  .bulkbar .opbulk { font-family:inherit; font-size:12px; height:30px; border-radius:999px;
-    padding:0 11px; border:1px solid rgba(255,255,255,.22); background:transparent; color:#fff;
-    max-width:150px; }
-  .bulkbar .opbulk option { color:#14161A; }
-  .bulkbar .opbulk::placeholder { color:rgba(255,255,255,.6); }
+  /* ---- the WhatsApp action row (Tonomo's action-row component) ---- */
+  .ox-wa { border-bottom:1px solid var(--line-soft); }
+  .ox-wa-h { font-family:inherit; width:100%; min-height:48px; display:flex; align-items:center; gap:var(--s2);
+    padding:var(--s2) var(--s3); background:var(--accent-bar); color:var(--accent-deep); border:none;
+    cursor:pointer; font-size:var(--t-sm); font-weight:500; text-align:start;
+    transition:background var(--fast) var(--ease); }
+  .ox-wa-h:hover { background:var(--accent-bar-hover); }
+  .ox-wa-h .sp { flex:1; }
+  .ox-wa-h .ox-ico.chev { transition:transform var(--base) var(--ease); }
+  .ox-wa-h[aria-expanded="true"] .ox-ico.chev { transform:rotate(180deg); }
+  .ox-wa-r { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto; align-items:center; gap:var(--s3);
+    min-height:52px; padding:var(--s1) var(--s3); border-top:1px solid var(--line-soft); }
+  .ox-wa-r .nm { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-wa-r .pr { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-wa-r .btn { height:32px; padding-inline:12px; font-size:var(--t-xs); }
+  .ox-wa-f { display:flex; justify-content:flex-end; padding:var(--s2) var(--s3); border-top:1px solid var(--line-soft); }
+  .ox-lnk { color:var(--accent-deep); font-weight:500; text-decoration:none; border-radius:var(--r-sm); }
+  .ox-lnk:hover { text-decoration:underline; text-underline-offset:3px; }
 
-  /* ===== the un-recorded band: replies that are already opportunities and are not on the board ===== */
-  .optriage { background:#fff; border:1px solid #ECEEF2; border-radius:13px; margin-bottom:14px; }
-  .optriage > summary { list-style:none; cursor:pointer; padding:13px 18px; display:flex;
-    align-items:center; gap:10px; font-size:12px; color:#33373E; }
-  .optriage > summary::-webkit-details-marker { display:none; }
-  .optriage .trow3 { display:flex; align-items:center; gap:10px; padding:10px 18px;
-    border-top:1px solid #E5E8EE; }
-  .optriage .trow3 .nm { flex:1; min-width:0; font-size:14px; color:#14161A;
+  /* ---- the table ---- */
+  .ox-t { display:block; }
+  .ox-hr, .ox-r { display:grid; align-items:center; column-gap:12px; padding-inline:var(--s2) var(--s3);
+    grid-template-columns:36px minmax(150px,1.35fr) minmax(110px,1fr) 160px 116px 112px 104px minmax(130px,1.2fr) 36px; }
+  .ox-hr { min-height:40px; background:var(--surface); border-bottom:1px solid var(--line-soft);
+    font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+  .ox-hr .ox-hv { text-align:end; }
+  .ox-r { min-height:56px; padding-block:var(--s2); border-bottom:1px solid var(--line-soft); cursor:pointer;
+    position:relative; transition:background var(--fast) var(--ease); }
+  .ox-r:hover { background:var(--accent-wash); }
+  .ox-r.is-sel { background:var(--accent-tint); }
+  .ox-r.is-open { background:var(--accent-tint); box-shadow:inset -3px 0 0 var(--accent); }
+  [dir="ltr"] .ox-r.is-open { box-shadow:inset 3px 0 0 var(--accent); }
+  .ox-c { min-width:0; }
+  .ox-c-chk { display:flex; align-items:center; justify-content:center; }
+  .ox-c-ac { display:flex; align-items:center; gap:6px; min-width:0; }
+  .ox-nm, .ox-c-ac .ox-lnk { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .ox-c-ac .ox-lnk:hover { color:var(--accent-deep); }
+  .ox-auto { flex:none; font-size:var(--t-xs); font-weight:500; color:var(--s-attend-text);
+    box-shadow:inset 0 0 0 1px var(--accent-mark); border-radius:var(--r-pill); padding:0 7px; line-height:20px; }
+  .ox-uns { flex:none; color:var(--s-fail-text); display:inline-flex; }
+  .ox-c-pr { display:flex; flex-direction:column; gap:2px; }
+  .ox-pn { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-srcsub { display:none; font-size:var(--t-xs); color:var(--muted); align-items:center; gap:4px; }
+  .ox-c-st { display:flex; flex-direction:column; gap:3px; }
+  .ox-stg { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); color:var(--ink); white-space:nowrap; }
+  .ox-sub { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
+  .ox-warn { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; font-size:var(--t-xs); font-weight:500;
+    color:var(--s-attn-text); box-shadow:inset 0 0 0 1px var(--s-attn-mark); border-radius:var(--r-pill);
+    padding:0 8px; line-height:20px; white-space:nowrap; }
+  .ox-warn .ox-ico { width:12px; height:12px; color:var(--s-attn-mark); }
+  .ox-c-vl { text-align:end; font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ox-c-vl.unp { font-weight:450; color:var(--muted); }
+  .ox-c-src { display:flex; align-items:center; gap:6px; font-size:var(--t-sm); color:var(--ink-2); white-space:nowrap; min-width:0; }
+  .ox-c-src .ox-ico, .ox-srcsub .ox-ico { color:var(--muted); }
+  .ox-c-src .ox-lnk { display:inline-flex; align-items:center; gap:6px; }
+  .ox-c-src .ox-lnk .ox-ico { color:currentColor; }
+  .ox-c-ow { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-none { color:var(--muted); font-weight:450; }
+  .ox-c-nx { font-size:var(--t-sm); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-c-nx .ox-none { border-block-end:1px dashed var(--s-off); }
+  .ox-go { font-family:inherit; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); background:transparent; border:none; border-radius:var(--r-sm); cursor:pointer; }
+  .ox-r:hover .ox-go, .ox-go:hover { color:var(--accent-deep); background:var(--paper); }
+  .ox-foot { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); flex-wrap:wrap;
+    min-height:52px; padding:var(--s2) var(--s3); font-size:var(--t-xs); color:var(--muted); }
+  .ox-foot .tot b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  .ox-state { padding:var(--s5) var(--s4); text-align:center; font-size:var(--t-sm); color:var(--ink-2);
+    display:flex; flex-direction:column; align-items:center; gap:var(--s2); }
+  .ox-state .s { font-size:var(--t-xs); color:var(--muted); max-width:52ch; line-height:var(--lh-loose); }
+  .ox-state .btn { height:36px; font-size:var(--t-sm); }
+  .ox-skel { display:grid; grid-template-columns:36px 1.4fr 1fr 176px 124px 1fr; gap:var(--s3); align-items:center;
+    min-height:56px; padding-inline:var(--s2) var(--s3); border-bottom:1px solid var(--line-soft); }
+  .ox-skel i { display:block; height:12px; border-radius:var(--r-sm); background:var(--skeleton); }
+  @container oxl (max-width: 1099px) {
+    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.35fr) minmax(120px,1fr) 160px 112px 104px minmax(120px,1.1fr) 36px; }
+    .ox-c-src { display:none; }
+    .ox-srcsub { display:flex; }
+  }
+  @container oxl (max-width: 899px) {
+    .ox-tb { gap:var(--s2); }
+    .ox-srch { flex:1 1 200px; }
+    .ox-filt { order:3; flex:1 0 100%; display:flex; gap:var(--s2); overflow-x:auto; padding-bottom:2px; }
+    .ox-hr { display:none; }
+    .ox-r { grid-template-columns:36px minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s3); }
+    .ox-r .ox-c-chk { grid-row:1 / 5; grid-column:1; align-self:start; padding-top:2px; }
+    .ox-r .ox-c-ac { grid-row:1; grid-column:2; }
+    .ox-r .ox-c-vl { grid-row:1; grid-column:3; }
+    .ox-r .ox-c-pr { grid-row:2; grid-column:2 / 4; }
+    .ox-r .ox-c-st { grid-row:3; grid-column:2 / 4; flex-direction:row; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+    .ox-r .ox-c-ow { grid-row:4; grid-column:2; font-size:var(--t-xs); color:var(--muted); }
+    .ox-r .ox-c-nx { grid-row:4; grid-column:3; font-size:var(--t-xs); max-width:48vw; text-align:end; }
+    .ox-r .ox-c-go { display:none; }
+    .ox-wa-r { grid-template-columns:minmax(0,1fr) auto; }
+    .ox-wa-r .pr { grid-row:2; grid-column:1; }
+    .ox-wa-r .btn { grid-row:1 / 3; grid-column:2; }
+  }
+  @media (pointer:coarse) {
+    .ox-f select, .ox-seg button, .ox-bulk, .ox-clear, .ox-add.btn { min-height:44px; }
+    .ox-go { width:44px; height:44px; }
+    .ox-lg { min-height:44px; }
+    .ox-c-chk input[type="checkbox"] { width:44px; height:44px; }
+  }
+
+  /* ---- kanban ---- */
+  .ox-kb { display:flex; gap:var(--s3); padding:var(--s3); overflow-x:auto; align-items:flex-start; }
+  /* width AND min-width: a flex item's automatic minimum is its content, so one long hospital name
+     used to widen its whole column to 520px. */
+  .ox-kcol { flex:0 0 272px; width:272px; min-width:0; background:var(--surface); border-radius:var(--r-lg); padding:var(--s2);
+    display:flex; flex-direction:column; gap:var(--s2); transition:box-shadow var(--fast) var(--ease); }
+  .ox-kcol.over { box-shadow:inset 0 0 0 2px var(--accent-mark); }
+  .ox-kh { padding:var(--s1) var(--s1) var(--s2); }
+  .ox-kh .t { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
+  .ox-kh .t .n { margin-inline-start:auto; font-size:var(--t-xs); font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ox-kh .v { font-size:var(--t-xs); color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .ox-kc { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); padding:10px 12px;
+    display:flex; flex-direction:column; gap:2px; cursor:pointer;
+    transition:border-color var(--fast) var(--ease), background var(--fast) var(--ease); }
+  .ox-kc:hover { border-color:var(--s-off-mark); }
+  .ox-kc.is-open { border-color:var(--accent); background:var(--accent-wash); }
+  .ox-kc { min-width:0; }
+  .ox-kc .a { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-kc .p { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-kc .m { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); margin-top:4px; }
+  .ox-kc .m b { font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ox-kc .m b.unp { font-weight:450; color:var(--muted); }
+  .ox-kc .o { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-kempty { font-size:var(--t-xs); color:var(--muted); text-align:center; padding:var(--s3) var(--s2);
+    border:1px dashed var(--line); border-radius:var(--r-md); }
+  .ox-kmore { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:var(--accent-bar);
+    border:none; border-radius:var(--r-md); min-height:36px; cursor:pointer; }
+
+  /* ---- the drawer: detail and create are one component ---- */
+  .ox-scrim { position:fixed; inset:0; background:rgba(16,24,40,.28); z-index:var(--z-overlay);
+    opacity:0; transition:opacity var(--base) var(--ease); }
+  .ox-scrim.in { opacity:1; }
+  .ox-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(520px,100vw); background:var(--paper);
+    border-inline-end:1px solid var(--line); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10));
+    z-index:var(--z-modal); display:flex; flex-direction:column;
+    transform:translateX(100%); opacity:0;
+    transition:transform var(--base) var(--ease), opacity var(--fast) var(--ease); }
+  [dir="ltr"] .ox-dr { transform:translateX(-100%); }
+  .ox-dr.in, [dir="ltr"] .ox-dr.in { transform:none; opacity:1; }
+  @media (prefers-reduced-motion: reduce) { .ox-dr, .ox-scrim { transition:none; } }
+  .ox-dh { flex:none; display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4);
+    min-height:72px; border-bottom:1px solid var(--line-soft); }
+  .ox-dh .tt { flex:1; min-width:0; }
+  .ox-dh h2:focus, .ox-dh h2:focus-visible { outline:none; }
+  .ox-dh h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); line-height:var(--lh-tight);
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .optriage .trow3 .pr { font-size:12px; color:#656B76; white-space:nowrap; }
-  .optriage .trow3 .btn { height:28px; padding:0 10px; font-size:12px; }
+  .ox-dh .st { font-size:var(--t-sm); color:var(--muted); margin-top:2px; display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+  .ox-x { font-family:inherit; flex:none; width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; border-radius:var(--r-sm); color:var(--muted); cursor:pointer; }
+  .ox-x:hover { background:var(--surface); color:var(--ink); }
+  .ox-db { flex:1; overflow-y:auto; padding:var(--s4); display:flex; flex-direction:column; gap:var(--s4); }
+  .ox-sec { display:flex; flex-direction:column; gap:var(--s2); }
+  .ox-sec + .ox-sec { padding-top:var(--s4); border-top:1px solid var(--line-soft); }
+  .ox-sech { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+  .ox-track { display:flex; gap:4px; }
+  .ox-track i { flex:1; height:6px; border-radius:var(--r-pill); background:var(--surface-2); cursor:pointer; position:relative;
+    transition:background var(--fast) var(--ease); }
+  .ox-track i::after { content:""; position:absolute; inset-inline:0; inset-block:-9px; }
+  .ox-track i:hover { background:var(--accent-mark); }
+  .ox-track i.on { background:var(--accent); }
+  .ox-stnow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); color:var(--ink); }
+  .ox-stnow b { font-weight:600; }
+  .ox-stnow .ox-sub { white-space:normal; }
+  .ox-strow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+  .ox-strow .ox-f select { max-width:220px; }
+  .ox-strow .btn { height:36px; padding-inline:12px; font-size:var(--t-sm); gap:6px; }
+  .ox-out { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-sm); font-weight:600; border-radius:var(--r-pill);
+    padding:4px 12px; }
+  .ox-out.won { color:var(--s-issued-text); background:var(--s-issued-soft); }
+  .ox-out.lost { color:var(--s-fail-text); background:var(--s-fail-soft); }
+  .ox-vfig { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:var(--lh-tight); }
+  .ox-vfig.unp { color:var(--muted); font-weight:500; font-size:var(--t-lg); }
+  .ox-form { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ox-g2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); }
+  .ox-fld { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .ox-fld > label, .ox-fld > .l { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+  .ox-fld .req { color:var(--s-fail-text); }
+  .ox-fld .inp, .ox-fld select.inp { width:100%; min-height:38px; height:38px; font-size:var(--t-sm); border-radius:var(--r-sm); }
+  .ox-fld .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
+  .ox-fld select.inp { padding-block:0; padding-inline:12px; }
+  .ox-dr input[list]::-webkit-calendar-picker-indicator, .ox-tb input[list]::-webkit-calendar-picker-indicator { display:none !important; opacity:0; }
+  .ox-fld .inp[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
+  /* The save state sits at the END OF THE LABEL ROW, so it reserves no vertical space and nothing
+     below it moves when «جارٍ الحفظ…» appears (DESIGN.md §8.1 failure 1). */
+  .ox-lr { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); min-height:18px; }
+  .ox-lr > label, .ox-lr > .l { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+  .ox-fs { font-size:var(--t-xs); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .ox-fs .ox-ico { width:14px; height:14px; }
+  .ox-fs.pend { color:var(--muted); }
+  .ox-fs.ok { color:var(--s-issued-text); }
+  .ox-fs.bad { color:var(--s-fail-text); }
+  .ox-fs button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:transparent;
+    border:none; cursor:pointer; padding:0 4px; border-radius:var(--r-sm); }
+  .ox-hint { font-size:var(--t-xs); color:var(--s-attn-text); display:flex; align-items:center; gap:6px; }
+  .ox-hint .ox-ico { width:14px; height:14px; color:var(--s-attn-mark); }
+  .ox-dl { display:grid; grid-template-columns:112px minmax(0,1fr); gap:var(--s2) var(--s3); margin:0; font-size:var(--t-sm); }
+  .ox-dl dt { color:var(--muted); font-size:var(--t-xs); font-weight:600; padding-top:2px; }
+  .ox-dl dd { margin:0; color:var(--ink); min-width:0; overflow-wrap:anywhere; }
+  .ox-rel { display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; }
+  .ox-relr { font-family:inherit; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:var(--s3); align-items:center;
+    min-height:44px; padding:var(--s1) var(--s3); background:transparent; border:none; text-align:start; cursor:pointer;
+    font-size:var(--t-sm); color:var(--ink); transition:background var(--fast) var(--ease); }
+  .ox-relr + .ox-relr { border-top:1px solid var(--line-soft); }
+  .ox-relr:hover { background:var(--accent-wash); }
+  .ox-relr .p { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-relr .s { font-size:var(--t-xs); color:var(--muted); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .ox-relr .v { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ox-df { flex:none; display:flex; align-items:center; gap:var(--s2); padding:var(--s3) var(--s4);
+    border-top:1px solid var(--line-soft); background:var(--paper); flex-wrap:wrap; }
+  .ox-df .sp { flex:1; }
+  .ox-df .btn { height:38px; font-size:var(--t-sm); }
+  .ox-df .rv-hold { height:38px; padding-inline:16px; font-size:var(--t-sm); }
+  .ox-df .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
+  .ox-df .rv-hold:hover { background:var(--s-fail-soft); }
+  .ox-derr { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; flex:1 0 100%; }
+  .ox-srcs { display:flex; flex-wrap:wrap; gap:6px; }
+  .ox-srcs button { font-family:inherit; font-size:var(--t-sm); color:var(--ink-2); background:var(--paper); border:none;
+    box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-pill); min-height:34px; padding-inline:12px;
+    display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+  .ox-srcs button:hover { box-shadow:inset 0 0 0 1px var(--ink-2); }
+  .ox-srcs button[aria-checked="true"] { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
+  .ox-lblk { border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s3); }
+  .ox-lblk .hd { display:flex; align-items:center; justify-content:space-between; gap:var(--s2);
+    font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+  .ox-lblk .hd button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--s-fail-text);
+    background:transparent; border:none; cursor:pointer; min-height:28px; padding-inline:6px; border-radius:var(--r-sm); }
+  .ox-lblk .lv { font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .ox-lblk .lv.unp { color:var(--muted); font-weight:450; }
+  .ox-arow { font-family:inherit; width:100%; min-height:44px; display:flex; align-items:center; justify-content:center; gap:6px;
+    background:var(--accent-bar); color:var(--accent-deep); border:none; border-radius:var(--r-md); font-size:var(--t-sm);
+    font-weight:600; cursor:pointer; transition:background var(--fast) var(--ease); }
+  .ox-arow:hover { background:var(--accent-bar-hover); }
+  .ox-total { display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); }
+  .ox-total .v { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+  @media (max-width: 560px) {
+    .ox-dh, .ox-db, .ox-df { padding-inline:var(--s3); }
+    .ox-g2 { grid-template-columns:1fr; }
+  }
 
-  /* ===== إضافة فرصة ===== */
-  .opsheet { position:fixed; inset:0; z-index:var(--z-toast); background:rgba(23,23,23,.32);
-    display:flex; align-items:flex-start; justify-content:center; padding:48px 20px; overflow-y:auto; }
-  .opsheet .sheet { background:#fff; border:1px solid #ECEEF2; border-radius:14px; width:100%;
-    max-width:660px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
-  .opsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .opsheet .sh .t { font-size:16px; font-weight:600; color:#14161A; }
-  .opsheet .hint { font-size:12px; color:#656B76; line-height:1.9; margin-top:6px; }
-  .opsheet .fld { margin-top:13px; }
-  .opsheet .fld > label { display:block; font-size:12px; color:#656B76; margin-bottom:6px; }
-  .opsheet .inp, .opsheet select.inp { width:100%; height:38px; padding:0 12px; font-size:14px; border-radius:9px; }
-  .opsheet .two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  @media (max-width: 560px) { .opsheet .two { grid-template-columns:1fr; } }
-  .opsheet .lrow { border:1px solid #ECEEF2; border-radius:11px; padding:11px; margin-top:9px; background:#EFF1F5; }
-  .opsheet .lrow .num { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
-  @media (max-width: 560px) { .opsheet .lrow .num { grid-template-columns:1fr 1fr; } }
-  .opsheet .lrow .num label { display:block; font-size:12px; color:#656B76; margin-bottom:4px; }
-  .opsheet .lfoot { display:flex; align-items:center; justify-content:space-between; gap:9px; margin-top:9px; }
-  .opsheet .lfoot .v { font-size:12px; font-weight:500; color:#2563EB; font-variant-numeric:tabular-nums; }
-  .opsheet .tot { display:flex; align-items:center; justify-content:space-between; gap:10px;
-    margin-top:14px; padding-top:13px; border-top:1px solid #ECEEF2; }
-  .opsheet .tot .v { font-size:18px; font-weight:600; color:#2563EB; font-variant-numeric:tabular-nums; }
-  .opsheet .err { font-size:12px; color:#8E2A27; margin-top:10px; }
-  .opsheet .acts { display:flex; gap:9px; margin-top:16px; flex-wrap:wrap; }
+  /* ---- toast with an action ---- */
+  .ox-toast { position:fixed; inset-block-end:24px; inset-inline:0; margin-inline:auto; width:max-content;
+    max-width:min(92vw,56ch); z-index:var(--z-toast); display:flex; align-items:center; gap:var(--s3);
+    background:var(--ink); color:var(--paper); border-radius:var(--r-md); padding:10px 12px 10px 16px;
+    font-size:var(--t-sm); font-weight:500; box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); }
+  .ox-toast.bad { background:var(--s-fail-text); }
+  .ox-toast button { font-family:inherit; font-size:var(--t-sm); font-weight:600; color:var(--paper);
+    background:transparent; border:1px solid rgba(255,255,255,.45); border-radius:var(--r-sm); min-height:30px;
+    padding-inline:10px; cursor:pointer; }
+  .ox-toast button.x { border:none; font-size:var(--t-md); padding-inline:6px; }
 `;
 
 export const OPPS_CRM_JS = `
-/* ============================ opps-crm (client) ============================ */
+/* ============================ opps-crm V5 (client) ============================ */
 /* Own state, own names. oppTab/oppQ belong to «فرز الردود» (vMorningList) and are NOT reused: two
    screens sharing one search box is how a filter typed on one silently narrows the other. */
 var oppRows = null, oppLoading = false, oppBusy = false, oppFailed = false;
-/* THE TAB, and inside it THE VIEW. «فرص» is the board; «فرز الردود» is the WhatsApp triage this
-   board feeds off. The board itself has the product's three-view control — قائمة · كانبان · بطاقات
-   — the same one #kmon carries, because a card grid answers «show me these six deals» and nothing
-   else: at two hundred lines it is a scroll, not a screen. The LIST is the default and the thing
-   that scales; the KANBAN is where a pipeline is actually worked; the CARDS are the account view
-   the prototype drew. */
-var opView = "board";        /* board | triage — the tab, not a filter */
-var opMode = "list";         /* list | kanban | cards */
+var opView = "board";        /* retained for dataSignature; triage is now its own route (#triage) */
+var opMode = "list";         /* list | kanban */
 var opSort = "value";        /* value | recent | stage | account */
-var opSel = {};              /* selected LINE ids for the bulk bar, keyed by id */
+var opSel = {};              /* selected LINE ids, keyed by id */
 var opQ = "", opStat = "all", opSrc = "all", opStg = "all";
+var opOwn = "all";           /* all | __none | <owner name> */
+var opShort = "";            /* "" | open | stalled | unpriced — the summary's shortcut metrics */
 var opDragId = null;
-var opOpen = 0;              /* id of the expanded line; 0 = none. One at a time, by construction. */
-var opArm = 0;               /* id of the line whose delete is armed */
-var opSheet = null;          /* the create form's whole draft, or null when closed */
-var opErr = "";
+var opOpen = 0;              /* id of the line whose drawer is open; 0 = none */
+var opArm = 0;
+var opSheet = null;          /* the create draft; non-null means the drawer is in CREATE mode */
+var opErr = "", opErrFld = "";
+var opWaOpen = false;        /* the WhatsApp action row, expanded */
+var opFState = {};           /* "id:key" -> { s: pending|saved|failed|invalid, v, m } */
+var opFQueue = {};           /* "id:key" -> the next value, written after the pending one returns */
+var opOpener = "";           /* id of the element that opened the drawer, for focus return */
+var opDrShown = false;       /* the drawer's entrance has played for the current open */
+var opDrScroll = 0;
+var opKCap = {};             /* kanban: per-stage render cap */
+var opDelErr = "";
 
-/* THE LADDER, THE SOURCES AND THE STALL RULE NOW COME FROM THE BUSINESS TIER.
-   They used to be declared here, in the presentation module, which is what let the card head and
-   the stage strip disagree about whether a lost deal counts. src/opps-domain.ts owns them, a unit
-   test asserts them, and OPPS_DOMAIN_JS ships that exact compiled source into this scope — so
-   OPP_STAGES, OPP_SOURCES, OPP_STALL_STAGES, OPP_STALL_DAYS and every rule function below are
-   already defined by the time this file runs. Technical Standards §1 (UI holds no business logic)
-   and §4 (those rules are tested) are both satisfied by that seam rather than by intent. */
 var OPP_ST = OPP_STAGES;
-/* The founder's own list of where a deal comes from. «حملة واتساب» is the only one this system can
-   witness by itself; the rest are a human telling it what happened offline, which is exactly why
-   they are recorded rather than guessed. */
 var OPP_SRC = OPP_SOURCES;
+var OPP_KCAP = 50;
 
-/* ARABIC COUNTS ARE NOT «n + noun». The board first shipped «١ منتجات» and «٥ جهة» — both wrong
-   in the product's own language, on the two lines a reader's eye lands on first. The rule is
-   four-way: مفرد · مثنى · جمع القلة (٣–١٠) · تمييز مفرد (١١+ AND zero — CLDR puts ar's zero in the
-   singular form, «٠ فرصة», not «٠ فرص»; a unit test caught this comment claiming the opposite).
-   Scoped to this file deliberately: retrofitting every count in the dashboard is its own change,
-   and the counts here are the ones this screen emits. */
+/* ARABIC COUNTS ARE NOT «n + noun» — four-way, via the business tier's pluralizeArabic. */
 function opPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function opNProd(n) { return opPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
-function opNOpp(n) { return opPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
+function opNLine(n) { return opPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
 function opNEnt(n) { return opPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
-function opNDay(n) { return opPl(n, "يوم", "يومين", "أيام", "يومًا"); }
+function opNDay(n) { return opPl(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
+function opNYear(n) { return opPl(n, "سنة واحدة", "سنتان", "سنوات", "سنة"); }
 
 function opStage(k) {
   for (var i = 0; i < OPP_ST.length; i++) if (OPP_ST[i].key === k) return OPP_ST[i];
   return OPP_ST[0];
 }
-/* Thin adapters: they translate a ledger ROW (snake_case columns, as Postgres returns them) into
-   the shape the business tier speaks, and delegate. No rule is restated here. */
+function opOpenStages() { return OPP_ST.filter(function (s) { return isOpenStage(s.key); }); }
+function opWonKey() { var s = OPP_ST.filter(function (x) { return isWonStage(x.key); })[0]; return s ? s.key : "won"; }
+function opLostKey() { var s = OPP_ST.filter(function (x) { return isLostStage(x.key); })[0]; return s ? s.key : "lost"; }
+/* ONE colour per stage, used by the summary bar, the legend, the row dot, the kanban header and
+   the drawer. Open stages are a single blue ramp that encodes ORDER only (DESIGN.md §5 Bar); the
+   two outcomes use the status channel. The domain's own dot colours are not used here: they were
+   eight unrelated hues, which is exactly why the V4 board read as a paint chart. */
+var OPP_RAMP = ["var(--blue-light)", "var(--accent-mark)", "var(--accent)", "var(--accent-press)", "var(--accent-deep)", "var(--s-review-text)"];
+function opColor(k) {
+  if (isWonStage(k)) return "var(--s-issued)";
+  if (isLostStage(k)) return "var(--s-fail)";
+  var open = opOpenStages();
+  for (var i = 0; i < open.length; i++) if (open[i].key === k) return OPP_RAMP[Math.min(i, OPP_RAMP.length - 1)];
+  return "var(--s-off-mark)";
+}
+function opDot(k) { return '<i class="ox-dot" style="background:' + opColor(k) + '"></i>'; }
+
+/* Thin adapters: a ledger ROW (snake_case, as Postgres returns it) into the business tier's shape. */
 function opFacts(o) {
   return { stage: o.stage, salePrice: Number(o.sale_price || 0), years: Number(o.years || 1),
     quantity: Number(o.qty || 1), discountPercent: Number(o.discount || 0),
@@ -293,137 +463,103 @@ function opIsLost(o) { return isLostStage(o.stage); }
 function opIsOpen(o) { return isOpenStage(o.stage); }
 function opDays(o) { return daysInStage(opFacts(o), Date.now()); }
 function opStalled(o) { return isLineStalled(opFacts(o), Date.now()); }
-/* سعر البيع × السنوات × الكمية × (١ − الخصم). The prototype's arithmetic, unchanged — and the ONE
-   definition of what a line is worth: the card total, the board total and the form preview all
-   call this, so no two numbers on the screen can be computed differently. */
 function opValue(o) { return calculateLineValue(opFacts(o)); }
-/* AN AUTO-CREATED LINE HAS NO PRICE, and «٠ ر.س» is not the same statement as «we have not priced
-   this yet» — the first reads as a worthless deal on a board whose whole left column is money. The
-   conversation contains no number and inventing one would be a forecast dressed as a reading, so
-   the absence is rendered as an absence. It also keeps the totals honest: an unpriced line adds
-   nothing to a sum, and now says why. */
 function opPriced(l) { return isLinePriced(opFacts(l)); }
-var OPP_UNPRICED = "لم تُسعَّر";
-/* «٥٫٣ م ر.س» / «٤٥٠ ألف ر.س» — the prototype's short money, in Arabic-Indic digits. */
-function opMoney(v) {
-  v = Number(v || 0);
-  if (v >= 1e6) return fmtN(Math.round(v / 1e5) / 10) + " م ر.س";
-  if (v >= 1000) return fmtN(Math.round(v / 1000)) + " ألف ر.س";
-  return fmtN(v) + " ر.س";
-}
-/* The group key. A phone is the account's identity everywhere else in this product (entities and
-   contacts are both phone-keyed), so a line that has one groups by it and a line recorded after a
-   visit with no number groups by its name. Never by both, or one client would open two cards. */
+function opSumLive(ls) { return sumLiveValue(ls.map(opFacts)); }
+function opHasLost(ls) { return hasLostLine(ls.map(opFacts)); }
 function opKey(o) { return accountKey(o.account_name, o.phone); }
+var OPP_UNPRICED = "لم تُسعَّر";
 
-/* The assignee chip. A filled circle carries the owner's first letter and a title with the full
-   name; an unassigned line gets a dashed circle, which reads as a slot rather than as an absence.
-   The letter is decorative — the accessible name is on the wrapper — so it never has to clear the
-   text contrast floor on its own. */
-function opAvatar(owner) {
-  var nm = String(owner || "").trim();
-  if (!nm) {
-    return '<span class="nx-av none" role="img" aria-label="غير مُسندة" title="غير مُسندة"></span>';
+/* A ROW SHOWS THE WHOLE FIGURE. «٤ ألف ر.س» was both rounded (the line is ٤٬٢٠٠) and a counted-noun
+   error (٣–١٠ take آلاف). Full amounts in rows and the drawer; the compact form only where space
+   genuinely forbids it (kanban headers, legend), and with the right noun. */
+function opMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v || 0))) + " ر.س</bdi>"; }
+function opMoneyShort(v) {
+  v = Number(v || 0);
+  if (v >= 1e6) {
+    var m = Math.round(v / 1e5) / 10;
+    var mNoun = m >= 3 && m <= 10 && m === Math.floor(m) ? "ملايين" : "مليون";
+    return "<bdi>" + fmtN(m) + " " + mNoun + " ر.س</bdi>";
   }
-  return '<span class="nx-av" role="img" aria-label="المسؤول ' + esc(nm) + '" title="' + esc(nm) + '">' +
-    '<span aria-hidden="true">' + esc(nm.slice(0, 1)) + "</span></span>";
+  if (v >= 1e4) {
+    var k = Math.round(v / 1000);
+    var kNoun = k >= 3 && k <= 10 ? "آلاف" : "ألف";
+    return "<bdi>" + fmtN(k) + " " + kNoun + " ر.س</bdi>";
+  }
+  return opMoney(v);
 }
+function opAgo(o) {
+  var d = opDays(o);
+  return d <= 0 ? "منذ اليوم" : "منذ " + opNDay(d);
+}
+
+/* ---- icons: 16px, stroke 1.5, currentColor (DESIGN.md §5 Icon) ---- */
+var OPP_ICO = {
+  whatsapp: '<path d="M4 5h16v11H9l-5 4z"/>',
+  call: '<path d="M6 3h3l2 5-2 1.5a11 11 0 0 0 5.5 5.5L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/>',
+  visit: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  referral: '<path d="M15 6l5 5-5 5"/><path d="M20 11H10a6 6 0 0 0-6 6v1"/>',
+  inbound: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  other: '<circle cx="12" cy="12" r="8"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/>',
+  board: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>',
+  chevS: '<path d="M15 6l-6 6 6 6"/>',
+  chevD: '<path d="M6 9l6 6 6-6"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  back: '<path d="M9 6l6 6-6 6"/>'
+};
+function opIco(n, cls) {
+  return '<svg class="ox-ico' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (OPP_ICO[n] || "") + "</svg>";
+}
+function opSrcLabel(k) { return OPP_SRC[k] || OPP_SRC.other; }
 
 function opLoad(force) {
-  // A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY LEDGER. The catch used to set oppRows = [], and an
-  // empty array is TRUTHY, so the guard below then refused to ever retry: one transient failure
-  // left «لا فرص مسجّلة بعد» on a board with six live opportunities until a hard reload. Observed
-  // against production on 2026-09-08 with /admin/opps returning 6 rows the whole time. The failure
-  // now stays null so the next render retries, and it is SAID rather than disguised as emptiness
-  // (DESIGN.md 4: a blank table and a broken query must never look alike).
+  // A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY LEDGER (DESIGN.md §4). The failure stays null so the
+  // next render retries, and it is SAID.
   if (oppLoading || (oppRows && !force)) return;
   oppLoading = true; oppFailed = false;
   fetch("/admin/opps", { headers: { "x-admin-token": TOKEN } })
-    .then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    })
-    .then(function (j) { oppRows = j.opps || []; oppLoading = false; render(false); })
-    .catch(function () { oppRows = null; oppFailed = true; oppLoading = false; render(false); });
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (j) { oppRows = j.opps || []; oppLoading = false; opRender(); })
+    .catch(function () { oppFailed = true; oppLoading = false; opRender(); });
 }
 
-/* ---- grouping ---- */
-function opGroups() {
-  var by = {}, order = [];
-  (oppRows || []).forEach(function (o) {
-    var k = opKey(o);
-    if (!by[k]) { by[k] = { key: k, name: o.account_name, phone: o.phone || "", lines: [] }; order.push(k); }
-    /* The newest line's name wins for the card head: renaming an account on a later line is the
-       only way to correct a typo, and a card that keeps showing the first spelling is unfixable.
-       listOpps returns newest-first, so the FIRST row seen for a key is the newest. */
-    by[k].lines.push(o);
-  });
-  /* Live lines lead. The ledger's own order is newest-first, which put a LOST line at the top of a
-     card whose head said «قائمة» — the first thing read under a live deal was the one part of it
-     that is over. Within a class, the biggest number first. */
-  var cls = { open: 0, won: 1, lost: 2 };
-  var classOf = function (l) { return opIsOpen(l) ? "open" : opIsWon(l) ? "won" : "lost"; };
-  return order.map(function (k) {
-    by[k].lines.sort(function (a, b) {
-      return (cls[classOf(a)] - cls[classOf(b)]) || (opValue(b) - opValue(a));
-    });
-    return by[k];
-  });
-}
-/* ONE MONEY RULE, and it is the prototype's: A LOST LINE IS WORTH NOTHING, so it never counts
-   toward any total that MIXES stages. It shipped broken for one build — the card head excluded
-   lost while the stage strip and the list footer added it back, so two numbers on one screen
-   disagreed by the exact value of every deal we had already failed to win. Single-stage figures
-   (the خسارة column, the خسارة strip cell) still state their own sum: that is a fact about one
-   stage, not a total across them. Every mixed total says «دون الخسارة» when the set it is drawn
-   from contains one — a silent exclusion is the same defect wearing better manners. */
-function opSumLive(ls) { return sumLiveValue(ls.map(opFacts)); }
-function opHasLost(ls) { return hasLostLine(ls.map(opFacts)); }
+/* Every re-render from this module goes through here, so the drawer keeps its scroll position
+   across the #body rewrite that every change causes. */
+function opRender() { render(false); }
 
-function opGroupValue(g) { return opSumLive(g.lines); }
-/* قائمة while anything is still live; ربح/خسارة only once every line has landed; مكتملة جزئياً for
-   the mixed close. The prototype's exact rollup — the head must never claim a deal is won while a
-   line under it is still open. */
-function opGroupStatus(g) {
-  /* The COLOURS are presentation and stay here; the RULE — which word an account's lines add up to
-     — is the business tier's, and is unit-tested there. */
-  var key = groupStatusKey(g.lines.map(opFacts));
-  var style = {
-    open:    { label: "قائمة",         bg: "#EEF4FB", color: "#1E5FCC" },
-    partial: { label: "مكتملة جزئياً", bg: "#FFF5D6", color: "#7A5600" },
-    won:     { label: "ربح",           bg: "#E7F6EE", color: "#12633F" },
-    lost:    { label: "خسارة",         bg: "#FBE7E6", color: "#8E2A27" }
-  }[key];
-  return { key: key, label: style.label, bg: style.bg, color: style.color };
-}
-function opGroupSources(g) {
-  var seen = [];
-  g.lines.forEach(function (l) { var s = OPP_SRC[l.source] || OPP_SRC.other; if (seen.indexOf(s) === -1) seen.push(s); });
-  return seen;
-}
-function opGroupOwners(g) {
-  var seen = [];
-  g.lines.forEach(function (l) { if (l.owner && seen.indexOf(l.owner) === -1) seen.push(l.owner); });
-  return seen;
-}
-/* ONE filter, applied to LINES, and every view reads it — the list, the kanban, the cards and the
-   totals. Two definitions of «what is on screen» is how a header ends up disagreeing with the rows
-   beneath it, which is the defect this file's own card head was designed to make impossible. */
-function opLines() {
+/* ---- filters ---- */
+function opBaseMatch(l) {
   var q = opQ.trim();
-  return (oppRows || []).filter(function (l) {
-    if (opSrc !== "all" && l.source !== opSrc) return false;
-    if (opStg !== "all") {
-      if (opStg === "open" ? !opIsOpen(l) : opStg === "live" ? !(opIsOpen(l) || opIsWon(l)) : l.stage !== opStg) return false;
-    }
-    if (!q) return true;
-    return String(l.account_name).includes(q) || String(l.product).includes(q) ||
-      String(l.phone || "").includes(q) || String(l.owner || "").includes(q);
+  if (opSrc !== "all" && l.source !== opSrc) return false;
+  if (opOwn === "__none" && String(l.owner || "").trim()) return false;
+  if (opOwn !== "all" && opOwn !== "__none" && String(l.owner || "").trim() !== opOwn) return false;
+  if (!q) return true;
+  return String(l.account_name).includes(q) || String(l.product).includes(q) ||
+    String(l.phone || "").includes(q) || String(l.owner || "").includes(q) || String(l.next_step || "").includes(q);
+}
+/* The summary reflects search/source/owner but NOT the stage filter or the shortcut — it is the
+   navigator for those two, and a navigator that shrinks to the one stage you chose cannot take you
+   to another. */
+function opBaseRows() { return (oppRows || []).filter(opBaseMatch); }
+function opShortMatch(l) {
+  if (opShort === "open") return opIsOpen(l);
+  if (opShort === "stalled") return opStalled(l);
+  if (opShort === "unpriced") return opIsOpen(l) && !opPriced(l);
+  return true;
+}
+/* ONE filter over LINES, read by the list, the kanban and every total. */
+function opLines() {
+  return opBaseRows().filter(function (l) {
+    if (opStg !== "all" && l.stage !== opStg) return false;
+    return opShortMatch(l);
   });
 }
-/* Sorted lines for the list. «القيمة» leads by default because the question a pipeline answers
-   first is «what is the biggest thing at risk», and an unpriced line sorts last rather than as
-   zero-among-equals — it is not a small deal, it is an unanswered one. */
+function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort; }
 function opSorted() {
   var rows = opLines().slice();
   var pos = {}; OPP_ST.forEach(function (st, i) { pos[st.key] = i; });
@@ -434,78 +570,22 @@ function opSorted() {
     return (opPriced(b) - opPriced(a)) || (opValue(b) - opValue(a));
   });
 }
-/* Selection INTERSECTED with what is visible on read — the rule the reviewer forced on the
-   campaigns list after a selection survived navigation and staged one campaign's phones under
-   another campaign's name. A filter that hides a row also drops it from the bulk write. */
 function opSelIds() {
   var live = {};
   opLines().forEach(function (l) { live[l.id] = true; });
   return Object.keys(opSel).map(Number).filter(function (id) { return live[id]; });
 }
-
-/* The CARDS view groups the SAME filtered lines — it does not re-filter. A card that showed lines
-   the list had excluded would be a second answer to «what is on screen». */
-function opMatches() {
-  var keep = {};
-  opLines().forEach(function (l) { keep[l.id] = true; });
-  return opGroups().map(function (g) {
-    return { key: g.key, name: g.name, phone: g.phone, lines: g.lines.filter(function (l) { return keep[l.id]; }) };
-  }).filter(function (g) {
-    if (!g.lines.length) return false;
-    return opStat === "all" || opGroupStatus(g).key === opStat;
-  }).sort(function (a, b) {
-    var ord = { open: 0, partial: 1, won: 2, lost: 3 };
-    return (ord[opGroupStatus(a).key] - ord[opGroupStatus(b).key]) || (opGroupValue(b) - opGroupValue(a));
-  });
+function opOwners() {
+  var seen = [];
+  (oppRows || []).forEach(function (l) { var o = String(l.owner || "").trim(); if (o && seen.indexOf(o) === -1) seen.push(o); });
+  return seen.sort(function (a, b) { return a.localeCompare(b, "ar"); });
+}
+function opUnsaved(id) {
+  return Object.keys(opFState).some(function (k) { return k.indexOf(id + ":") === 0 && opFState[k].s === "failed"; });
 }
 
-/* ---- the stage strip: the pipeline in one line ----
-   Six cells, count and money per stage, over EVERY match rather than the visible page — a total
-   that changes when you turn a page is not a total. It doubles as the stage filter, so the fastest
-   way to ask «what is sitting in التفاوض» is to click the number that says how much is. */
-function opStageStrip() {
-  var rows = (oppRows || []).filter(function (l) {
-    var q = opQ.trim();
-    if (opSrc !== "all" && l.source !== opSrc) return false;
-    if (!q) return true;
-    return String(l.account_name).includes(q) || String(l.product).includes(q) ||
-      String(l.phone || "").includes(q) || String(l.owner || "").includes(q);
-  });
-  var cell = function (key, label, dot, ls, mixed) {
-    /* mixed = this cell spans more than one stage, so the money rule applies */
-    var val = mixed ? opSumLive(ls) : ls.reduce(function (a, l) { return a + opValue(l); }, 0);
-    var unpriced = ls.filter(function (l) { return !opPriced(l); }).length;
-    // A stage with nothing in it RECEDES. Eight equal boxes, seven of them showing «·» and «—»,
-    // is why this strip read as dead: the empty stages were shouting as loudly as the full ones and
-    // the eye had nowhere to land. The stage's own colour now rides an inline-start rule, the share
-    // bar shows how much of the board sits here, and an empty stage keeps its filter without
-    // pretending to hold anything.
-    var share = rows.length ? Math.round(ls.length / rows.length * 100) : 0;
-    var empty = ls.length === 0;
-    return '<button class="opsc' + (opStg === key ? " on" : "") + (empty ? " empty" : "") + '"' +
-      (dot ? ' style="--stg:' + dot + '"' : "") +
-      ' onclick="opSetStg(&quot;' + key + '&quot;)">' +
-      '<span class="t">' + (dot ? '<span class="d"></span>' : "") + label + "</span>" +
-      '<span class="n">' + fmtN(ls.length) + "</span>" +
-      '<span class="v">' + (val ? opMoney(val) : "—") +
-      (mixed && opHasLost(ls) ? '<span class="u2">دون الخسارة</span>' : "") +
-      (unpriced ? '<span class="u" title="بند بلا سعر — لا يدخل في أي مجموع">' + fmtN(unpriced) + " بلا تسعير</span>" : "") +
-      "</span>" +
-      (key === "all" || empty ? "" : '<span class="sh"><i style="width:' + share + '%"></i></span>') +
-      "</button>";
-  };
-  var h = '<div class="opstrip rise">' + cell("all", "الكل", "", rows, true);
-  OPP_ST.forEach(function (st) {
-    h += cell(st.key, st.label, st.dot, rows.filter(function (l) { return l.stage === st.key; }), false);
-  });
-  return h + "</div>";
-}
-
-/* ---- the un-recorded band ----
-   Contacts the assistant already read as interested that have NO line on the board. This is the
-   founder's «sometimes the opportunity comes from whatsapp campaign» made actionable: the reply is
-   already in the ledger, and the only missing act is a human saying what it is worth. It lists what
-   is MISSING, never what exists, so it empties itself as the board fills. */
+/* ---- the WhatsApp band's source: interested contacts with NO line on the board ----
+   It lists what is MISSING, never what exists, so it empties itself as the board fills. */
 function opUnrecorded() {
   var have = {};
   (oppRows || []).forEach(function (o) { if (o.phone) have[o.phone] = 1; });
@@ -517,15 +597,11 @@ function opUnrecorded() {
     return warm || c.outcome === "interested" || c.outcome === "scheduled" || c.outcome === "handoff";
   }).sort(function (a, b) { return (b.lastEventAt || 0) - (a.lastEventAt || 0); });
 }
-/* Which service the assistant heard them ask about — the prefill for the form, and blank when the
-   reading names none. A guessed product on a money form is worse than an empty select. */
 function opReadProduct(c) {
   var t = (c.tags || []).filter(function (x) { return x.product; })
     .sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); })[0];
   return t ? t.product : "";
 }
-/* The campaign this contact was actually targeted by, so a whatsapp line lands with the campaign it
-   came from rather than an id someone had to remember. Newest wins when several targeted them. */
 function opLastCampaign(phone) {
   var hit = null;
   (campaigns || []).forEach(function (cp) {
@@ -535,541 +611,707 @@ function opLastCampaign(phone) {
   });
   return hit;
 }
-
-/* ---- the card ---- */
-function opCard(g) {
-  var stt = opGroupStatus(g);
-  var open = 0, won = 0, lost = 0;
-  g.lines.forEach(function (l) { if (opIsOpen(l)) open++; else if (opIsWon(l)) won++; else lost++; });
-  var owners = opGroupOwners(g);
-  var stalled = g.lines.filter(function (l) { return opStalled(l); }).length;
-  var h = '<div class="opcard">';
-  h += '<div class="oph">';
-  h += '<div class="opt"><div style="display:flex;align-items:center;gap:11px;min-width:0;">' +
-    '<span class="av">' + esc(String(g.name).trim().charAt(0)) + "</span>" +
-    '<div style="min-width:0;"><div class="nm">' + esc(g.name) + "</div>" +
-    '<div class="sub">' + opNProd(g.lines.length) +
-      (owners.length ? " · " + esc(clip(owners.slice(0, 2).join("، "), 34)) : "") + "</div></div></div>" +
-    '<span class="opst" style="background:' + stt.bg + ';color:' + stt.color + ';">' + stt.label + "</span></div>";
-  h += '<div class="opm"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;">' +
-    (stalled ? '<span class="opwarn" title="بند تجاوز مدته في مرحلته">متوقّف</span>' : "") +
-    opGroupSources(g).slice(0, 2).map(function (s) {
-      return '<span class="opsrc" title="مصدر الفرصة">' + esc(s) + "</span>";
-    }).join("") +
-    '<span class="brk">قائمة ' + fmtN(open) + " · ربح " + fmtN(won) + " · خسارة " + fmtN(lost) + "</span></div>" +
-    (g.lines.some(opPriced)
-      ? '<span class="val">' + opMoney(opGroupValue(g)) + "</span>"
-      : '<span class="val" style="color:#656B76;font-size:14px;font-weight:450;">' + OPP_UNPRICED + "</span>") + "</div>";
-  h += "</div>";
-  h += '<div class="oplines">' + g.lines.map(function (l) {
-    var st = opStage(l.stage);
-    var row = '<div class="opline" onclick="opToggleLine(' + l.id + ')">' +
-      '<span class="d" style="background:' + st.dot + ';"></span>' +
-      '<span class="pn">' + esc(l.product) +
-      (l.created_by === "المساعد" ? '<span class="opauto" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
-      "</span>" +
-      (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") +
-      '<span class="sg">' + st.label + "</span>" +
-      '<span class="lv"' + (opPriced(l) ? "" : ' style="color:#656B76;font-weight:450;"') + ">" +
-      (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span></div>";
-    return row + (opOpen === l.id ? opLineEditor(l) : "");
-  }).join("") + "</div>";
-  return h + "</div>";
-}
-
-/* The prototype's detail screen, as the six controls that actually change something. Every field
-   writes through PATCH /admin/opps/:id, so what the card shows next paint is what the ledger
-   stored — never a local optimism that a failed request would leave standing. */
-/* One labelled field. The label is a real <label for>, not a .lb heading floating above a grid,
-   so clicking it focuses the input and a screen reader gets the pairing. Number ranges stay on the
-   element that enforces them. */
-function opField(l, key, label, type, ph, val, mod) {
-  var id = "opf_" + key + "_" + l.id;
-  var rng = key === "years" ? ' min="1" max="20"'
-          : key === "discount" ? ' min="0" max="100"'
-          : key === "qty" ? ' min="1"'
-          : key === "sale_price" ? ' min="0"' : "";
-  return '<div class="opf ' + mod + '">' +
-    '<label class="opf-l" for="' + id + '">' + esc(label) + "</label>" +
-    '<input class="inp" id="' + id + '" type="' + type + '"' + rng +
-      (ph ? ' placeholder="' + esc(ph) + '"' : "") +
-      ' value="' + esc(val == null ? "" : val) + '"' +
-      ' onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"></div>';
-}
-
-function opLineEditor(l) {
-  var h = '<div class="opedit" onclick="event.stopPropagation()">';
-  h += '<div class="lb">المرحلة</div><div class="rail">' + OPP_ST.map(function (s) {
-    return '<button class="rung' + (s.key === l.stage ? " on" : "") + '" onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)">' +
-      '<span class="d" style="background:' + s.dot + ';"></span>' + s.label + "</button>";
-  }).join("") + "</div>";
-  // EVERY FIELD CARRIES ITS OWN LABEL. One combined label over four number boxes left a screen
-  // reader announcing four unlabelled inputs, and left a sighted reader counting positions to work
-  // out which box is الخصم. A placeholder is not a label — it disappears the moment you type.
-  h += '<div class="opfields">' +
-    opField(l, "next_step", "الخطوة التالية", "text", "ما الذي يجب فعله بعد؟", l.next_step || "", "wide") +
-    opField(l, "owner", "المسؤول", "text", "غير مُسند", l.owner || "", "") +
-  "</div>";
-  h += '<div class="opfields">' +
-    opField(l, "sale_price", "السعر السنوي", "number", "", l.sale_price, "num") +
-    opField(l, "years", "السنوات", "number", "", l.years, "num") +
-    opField(l, "qty", "الكمية", "number", "", l.qty, "num") +
-    opField(l, "discount", "الخصم ٪", "number", "", l.discount, "num") +
-  "</div>";
-  h += '<div class="acts"><span style="font-size:12px;color:#656B76;">' +
-    "مصدرها " + esc(OPP_SRC[l.source] || OPP_SRC.other) +
-    (l.source === "whatsapp" && l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
-    (l.created_by ? " · سجّلها " + esc(l.created_by) : "") +
-    " · في هذه المرحلة " + (opDays(l) === 0 ? "منذ اليوم" : "منذ " + opNDay(opDays(l))) + "</span>" + '<span style="flex:1"></span>' +
-    (l.phone ? '<a class="btn btn-ghost" href="#customer/' + esc(l.phone) + '" style="text-decoration:none;line-height:30px;">ملف العميل ←</a>' : "") +
-    // hold-to-confirm replaces arm-then-confirm: one deliberate gesture instead of two clicks in
-    // the same place, which is how a row gets deleted by a fast double-click. Keyboard and reduced
-    // motion still get the two-step path — see HOLD_JS.
-    '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '"' +
-      ' data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
-      ' aria-pressed="false" title="اضغط مع الاستمرار للحذف">' +
-      '<span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>' +
-    "</div>";
-  return h + "</div>";
-}
 function opCampName(id) {
   var cp = (campaigns || []).find(function (x) { return String(x.id) === String(id); });
   return cp ? cp.name : "حملة محذوفة";
 }
 
-/* ---- the LIST: the view that scales ----
-   The product's own flat-table idiom (.tblwrap/.crow/.krow/.thead-wide), so this reads as the same
-   application as #kmon, #customers and #targets rather than a screen with private furniture. Seven
-   real columns, every one of them a stored field; a row expands in place rather than navigating,
-   because the work here is «move this along», not «go read about it». */
+/* ================================ SUMMARY ================================ */
+function opSummary() {
+  var rows = opBaseRows();
+  var open = rows.filter(opIsOpen);
+  var openVal = opSumLive(open);
+  var stalled = rows.filter(opStalled).length;
+  var unpriced = open.filter(function (l) { return !opPriced(l); }).length;
+  var stages = opOpenStages().map(function (st) {
+    var ls = open.filter(function (l) { return l.stage === st.key; });
+    return { st: st, n: ls.length, v: ls.reduce(function (a, l) { return a + opValue(l); }, 0) };
+  });
+  var h = '<section class="ox-sum" aria-label="ملخص الفرص"><div>';
+  h += '<div class="ox-lbl">القيمة المفتوحة</div>';
+  h += openVal
+    ? '<div class="ox-fig">' + opMoney(openVal) +
+      (unpriced ? '<span class="ox-figsub">خارجها: ' + opNLine(unpriced) + " بلا تسعير</span>" : "") + "</div>"
+    : '<div class="ox-fig none">—<span class="ox-figsub">' + (open.length ? "لا بند مفتوح مسعَّر بعد" : "لا بنود مفتوحة") + "</span></div>";
+  /* The bar's geometry IS the priced open value per stage. It is a pointer shortcut; the legend
+     below it is the operable, readable form, so zero and hair-thin stages never need a target. */
+  h += '<div class="ox-bar" aria-hidden="true">';
+  if (openVal) {
+    stages.forEach(function (s) {
+      if (!s.v) return;
+      h += '<i class="' + (opStg === s.st.key ? "on" : "") + '" tabindex="-1" style="flex:' + s.v + ' 1 0;background:' + opColor(s.st.key) + '"' +
+        ' title="' + esc(s.st.label) + '" onclick="opSetStg(&quot;' + s.st.key + '&quot;)"></i>';
+    });
+  }
+  h += "</div>";
+  h += '<div class="ox-leg" role="group" aria-label="المراحل المفتوحة — اضغط للتصفية">' + stages.map(function (s) {
+    var on = opStg === s.st.key;
+    return '<button class="ox-lg' + (on ? " on" : "") + (s.n ? "" : " zero") + '" aria-pressed="' + on + '"' +
+      ' onclick="opSetStg(&quot;' + s.st.key + '&quot;)">' + opDot(s.st.key) +
+      "<span>" + esc(s.st.label) + "</span>" +
+      (s.v ? "<b>" + opMoneyShort(s.v) + "</b>" : "") +
+      '<span class="n" title="عدد البنود">' + fmtN(s.n) + "</span></button>";
+  }).join("") + "</div>";
+  h += "</div>";
+  var met = function (key, n, label, warn) {
+    var on = opShort === key;
+    return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + '" aria-pressed="' + on + '"' +
+      ' onclick="opSetShort(&quot;' + key + '&quot;)">' +
+      '<span class="n">' + (warn && n ? opIco("warn") : "") + fmtN(n) + "</span>" +
+      '<span class="l">' + (on ? opIco("check") : "") + label + "</span></button>";
+  };
+  h += '<div class="ox-mets" role="group" aria-label="اختصارات">' +
+    met("open", open.length, "بنود مفتوحة", false) +
+    met("stalled", stalled, "متوقفة", true) +
+    met("unpriced", unpriced, "لم تُسعَّر", false) + "</div>";
+  return h + "</section>";
+}
+
+/* ================================ TOOLBAR ================================ */
+function opSelect(id, label, value, opts, on, handler) {
+  return '<span class="ox-f' + (on ? " on" : "") + '"><select id="' + id + '" aria-label="' + label + '" onchange="' + handler + '(this.value)">' +
+    opts.map(function (o) {
+      return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
+}
+function opToolbar() {
+  var sel = opSelIds();
+  var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص">';
+  if (sel.length) {
+    var all = opLines();
+    h += '<span class="ox-selc">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
+    h += '<select class="ox-bulk" id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
+      '<option value="">نقل إلى مرحلة…</option>' +
+      OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + "</select>";
+    h += '<input class="ox-bulk" id="oxb_owner" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
+    h += '<datalist id="oxowners">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
+    if (sel.length < all.length) {
+      h += '<button class="ox-clear" onclick="opSelectAll()">تحديد كل المطابِق (' + fmtN(all.length) + ")</button>";
+    }
+    h += '<span class="sp"></span><button class="btn btn-ghost ox-add" onclick="opClearSel()">إلغاء التحديد</button>';
+    return h + "</div>";
+  }
+  h += '<span class="ox-srch"><span class="ox-si">' + opIco("search") + "</span>" +
+    '<input id="opq" class="inp" type="search" value="' + esc(opQ) + '" oninput="opSearch(this)" aria-label="بحث في الفرص" placeholder="بحث بالجهة أو المنتج أو المسؤول"></span>';
+  h += '<span class="ox-filt">';
+  h += opSelect("oxf_stg", "المرحلة", opStg,
+    [["all", "كل المراحل"]].concat(OPP_ST.map(function (s) { return [s.key, s.label]; })), opStg !== "all", "opSetStg");
+  h += opSelect("oxf_src", "المصدر", opSrc,
+    [["all", "كل المصادر"]].concat(Object.keys(OPP_SRC).filter(function (k) { return k !== "other"; }).map(function (k) { return [k, OPP_SRC[k]]; })),
+    opSrc !== "all", "opSetSrc");
+  h += opSelect("oxf_own", "المسؤول", opOwn,
+    [["all", "كل المسؤولين"], ["__none", "بلا مسؤول"]].concat(opOwners().map(function (o) { return [o, o]; })), opOwn !== "all", "opSetOwn");
+  if (opMode === "list") {
+    h += opSelect("oxf_sort", "ترتيب", opSort,
+      [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
+  }
+  if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()">مسح التصفية</button>';
+  h += '<span class="sp"></span>';
+  h += '<span class="ox-seg" role="group" aria-label="طريقة العرض">' +
+    '<button aria-pressed="' + (opMode === "list") + '" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "قائمة</button>" +
+    '<button aria-pressed="' + (opMode === "kanban") + '" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "كانبان</button></span>";
+  h += "</span>";
+  /* While the create drawer is open ITS primary is the only blue button in the DOM. */
+  h += opSheet
+    ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
+    : '<button class="btn btn-teal ox-add" id="oxadd" onclick="opOpenSheet(this.id)">' + opIco("plus") + "إضافة فرصة</button>";
+  return h + "</div>";
+}
+
+/* ================================ WHATSAPP ROW ================================ */
+function opWaRow() {
+  var un = opUnrecorded();
+  if (!un.length) return "";
+  var h = '<div class="ox-wa">';
+  h += '<button class="ox-wa-h" aria-expanded="' + opWaOpen + '" aria-controls="oxwa" onclick="opToggleWa()">' +
+    opIco("whatsapp") + "<span>اهتمام في واتساب بلا فرصة مسجّلة · <b>" + opNEnt(un.length) + "</b></span>" +
+    '<span class="sp"></span><span>' + (opWaOpen ? "إخفاء" : "عرض") + "</span>" + opIco("chevD", "chev") + "</button>";
+  if (opWaOpen) {
+    var shown = un.slice(0, 8);
+    h += '<div id="oxwa">' + shown.map(function (c) {
+      var pr = opReadProduct(c);
+      return '<div class="ox-wa-r"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
+        '<span class="pr">' + (pr ? "سأل عن " + esc(pr) : "لم تُقرأ خدمة بعد") + "</span>" +
+        '<button class="btn btn-ghost" id="oxwa_' + esc(c.phone) + '" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;,this.id)">فتح فرصة</button></div>';
+    }).join("") +
+    '<div class="ox-wa-f"><a class="ox-lnk" href="#triage">' + (un.length > shown.length ? "و" + opNEnt(un.length - shown.length) + " أخرى · " : "") +
+      "كل الردود في «فرز الردود» ←</a></div></div>";
+  }
+  return h + "</div>";
+}
+
+/* ================================ LIST ================================ */
+function opStageCell(l) {
+  var st = opStage(l.stage);
+  var h = '<span class="ox-stg">' + opDot(l.stage) + "<span>" + esc(st.label) + "</span></span>";
+  if (opStalled(l)) h += '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>";
+  else h += '<span class="ox-sub">' + opAgo(l) + "</span>";
+  return h;
+}
+function opSrcCell(l) {
+  var lbl = esc(opSrcLabel(l.source));
+  if (l.source === "whatsapp" && l.phone) {
+    return '<a class="ox-lnk" href="#customer/' + esc(l.phone) + '" title="فتح المحادثة" onclick="event.stopPropagation()">' + opIco("whatsapp") + lbl + "</a>";
+  }
+  return opIco(l.source in OPP_ICO ? l.source : "other") + "<span>" + lbl + "</span>";
+}
+function opRowHtml(l) {
+  var nm = esc(l.account_name);
+  var h = '<div class="ox-r' + (opSel[l.id] ? " is-sel" : "") + (opOpen === l.id && !opSheet ? " is-open" : "") + '" role="row" onclick="opRowClick(event,' + l.id + ')">';
+  h += '<div class="ox-c ox-c-chk" role="cell"><input type="checkbox" id="oxs_' + l.id + '"' + (opSel[l.id] ? " checked" : "") +
+    ' aria-label="تحديد ' + nm + " — " + esc(l.product) + '" onclick="event.stopPropagation();opToggleSel(' + l.id + ')"></div>';
+  h += '<div class="ox-c ox-c-ac" role="cell">' +
+    (l.phone ? '<a class="ox-lnk" href="#customer/' + esc(l.phone) + '" title="ملف العميل" onclick="event.stopPropagation()">' + nm + "</a>"
+             : '<span class="ox-nm">' + nm + "</span>") +
+    (l.created_by === "المساعد" ? '<span class="ox-auto" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
+    (opUnsaved(l.id) ? '<span class="ox-uns" title="تعديل لم يُحفظ">' + opIco("warn") + "</span>" : "") + "</div>";
+  h += '<div class="ox-c ox-c-pr" role="cell"><span class="ox-pn">' + esc(l.product) + "</span>" +
+    '<span class="ox-srcsub">' + opIco(l.source in OPP_ICO ? l.source : "other") + esc(opSrcLabel(l.source)) + "</span></div>";
+  h += '<div class="ox-c ox-c-st" role="cell">' + opStageCell(l) + "</div>";
+  h += '<div class="ox-c ox-c-vl' + (opPriced(l) ? "" : " unp") + '" role="cell">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>";
+  h += '<div class="ox-c ox-c-src" role="cell">' + opSrcCell(l) + "</div>";
+  h += '<div class="ox-c ox-c-ow" role="cell">' + (String(l.owner || "").trim() ? esc(l.owner) : '<span class="ox-none">بلا مسؤول</span>') + "</div>";
+  h += '<div class="ox-c ox-c-nx" role="cell" title="' + esc(l.next_step || "") + '">' +
+    (String(l.next_step || "").trim() ? esc(l.next_step) : '<span class="ox-none">لم تُحدَّد</span>') + "</div>";
+  h += '<div class="ox-c ox-c-go" role="cell"><button class="ox-go" id="oxt_' + l.id + '" aria-label="فتح تفاصيل ' + nm + " — " + esc(l.product) + '"' +
+    ' onclick="event.stopPropagation();opOpenLine(' + l.id + ',this.id)">' + opIco("chevS") + "</button></div>";
+  return h + "</div>";
+}
+function opSkeleton(n) {
+  var h = '<div aria-busy="true" aria-live="polite">';
+  for (var i = 0; i < n; i++) h += '<div class="ox-skel"><i style="width:16px"></i><i style="width:70%"></i><i style="width:55%"></i><i style="width:60%"></i><i style="width:70%"></i><i style="width:45%"></i></div>';
+  return h + "</div>";
+}
 function opListView() {
   var rows = opSorted();
-  var sel = opSelIds();
   var page = pageSlice("opps", rows);
   var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
-  var h = '<div class="tblwrap opflat rise">';
-  h += '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
-    (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
-    "<div>الجهة</div><div>الخدمة</div><div>المرحلة</div><div>القيمة</div><div>المصدر</div>" +
-    "<div>المسؤول</div><div>الخطوة التالية</div></div>" +
-    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
-    (allOn ? " checked" : "") + ' onclick="opTogglePage()"></span><span>الفرصة</span><span style="flex:1"></span><span>المرحلة</span></div>';
+  var h = '<div class="ox-t" role="table" aria-label="بنود الفرص">';
+  h += '<div class="ox-hr" role="row">' +
+    '<div class="ox-c ox-c-chk" role="columnheader"><input type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
+    '<div role="columnheader">الجهة</div><div role="columnheader">المنتج</div><div role="columnheader">المرحلة</div>' +
+    '<div class="ox-hv" role="columnheader">القيمة</div><div class="ox-c-src" role="columnheader">المصدر</div>' +
+    '<div role="columnheader">المسؤول</div><div role="columnheader">الخطوة التالية</div><div role="columnheader"><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">تفاصيل</span></div></div>';
   if (!page.length) {
-    // FOUR distinct states, said in words. oppRows is null while loading AND after a failure, so
-    // reading .length on it here would throw; and «لا فرص مسجّلة بعد» over a broken fetch is the
-    // exact lie DESIGN.md 4 forbids.
-    h += '<div style="padding:26px 20px;text-align:center;font-size:12px;color:#656B76;">' +
-      (oppFailed
-        ? 'تعذّر تحميل الفرص. <button class="btn btn-ghost" style="height:30px;padding:0 12px;font-size:12px;margin-inline-start:8px;" onclick="event.stopPropagation();opRetry()">أعد المحاولة</button>'
-        : oppRows === null ? "جارٍ التحميل…"
-        : oppRows.length ? "لا بند يطابق ما اخترته."
-        : "لا فرص مسجّلة بعد.") + "</div>";
+    h += '<div class="ox-state">' + (oppRows && oppRows.length
+      ? "لا بند يطابق التصفية." + '<button class="btn btn-ghost" onclick="opClearFilters()">مسح التصفية</button>'
+      : "لا فرص مسجّلة بعد." + '<span class="s">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا.</span>') + "</div>";
   }
-  page.forEach(function (l) {
-    var st = opStage(l.stage);
-    h += '<div class="trow km krow crow' + (opSel[l.id] ? " sel" : "") + '" onclick="opToggleLine(' + l.id + ')">' +
-      '<div class="selcell" onclick="event.stopPropagation()"><input type="checkbox"' +
-        (opSel[l.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(l.product) + '" onclick="opToggleSel(' + l.id + ')"></div>' +
-      '<div class="o-ac"><span class="av">' + esc(String(l.account_name).trim().charAt(0)) + "</span>" +
-        '<span class="lb">' + esc(l.account_name) + "</span></div>" +
-      // The badge sits BELOW the name, not inline after it. Inline, the two-line clamp cut through
-      // the chip and rendered half a pill — it read as a broken glyph, not as a badge.
-      '<div class="o-pr"><span class="pnm">' + esc(l.product) + "</span>" +
-        (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
-      '<div class="o-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span>" +
-        (opStalled(l) ? '<span class="opwarn">' + opNDay(opDays(l)) + "</span>" : "") + "</div>" +
-      '<div class="o-vl"' + (opPriced(l) ? "" : ' style="color:#656B76;font-weight:450;"') + ">" +
-        (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>" +
-      '<div class="o-sr"><span class="opsrc">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span></div>" +
-      // THE ABSENCE IS THE SIGNAL. This cell used to render owner and step on one line joined by a
-      // dot, at the same weight, and «لم تُحدَّد خطوة» in grey — so the single most important state
-      // on the board (a line nobody owes an action on) was the quietest thing in the row, repeated
-      // down the column as dead text. Now the absence is a badge in the attention channel and it
-      // carries its AGE, which is the part you can act on: «بلا خطوة» alone is a label, «بلا خطوة ·
-      // ٩ أيام» is a queue. It escalates to the failure channel once the line is stalled, reusing
-      // opStalled rather than inventing a second threshold.
-      // ClickUp's list grammar: the ASSIGNEE is an avatar, not a name in prose, and an empty slot
-      // is a dashed placeholder you can see is fillable rather than a sentence saying it is empty.
-      // Urgency lives on the step's age, coloured only once the line is genuinely stalled — a
-      // column where every row shouts ranks nothing.
-      '<div class="o-ow">' + opAvatar(l.owner) + "</div>" +
-      '<div class="o-nx"><span class="nx-body">' +
-        (l.next_step
-          ? '<span class="nx-step">' + esc(clip(l.next_step, 40)) + "</span>"
-          : '<span class="nx-add">حدِّد الخطوة</span>') +
-        (opDays(l) > 0
-          ? '<span class="nx-age' + (opStalled(l) ? " bad" : "") + '">' + opNDay(opDays(l)) + "</span>"
-          : "") +
-      "</span></div>" +
-      "</div>";
-    if (opOpen === l.id) h += '<div class="opexp">' + opLineEditor(l) + "</div>";
-  });
-  /* «٠ ر.س» is the one thing this footer must never say when nothing under it is priced — it is the
-     same false claim the line cells were fixed to stop making, one row lower. */
-  var live = opSumLive(rows);
-  h += '<div class="tfoot">' + pageBar("opps", rows.length, "بند") +
-    "<span>" + (live ? opMoney(live) + " قيمة المعروض" + (opHasLost(rows) ? " · دون الخسارة" : "")
-                     : "لا قيمة مسعَّرة بعد") + "</span></div></div>";
-  if (sel.length) h += opBulkBar(sel);
+  page.forEach(function (l) { h += opRowHtml(l); });
+  h += "</div>";
+  if (rows.length) {
+    var live = opSumLive(rows);
+    var unp = rows.filter(function (l) { return !opPriced(l); }).length;
+    h += '<div class="ox-foot">' + pageBar("opps", rows.length, "بند") +
+      '<span class="tot">' + (live ? "قيمة المطابِق <b>" + opMoney(live) + "</b>" + (opHasLost(rows) ? " · دون الخسارة" : "") : "لا قيمة مسعَّرة في المطابِق") +
+      (unp ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</span></div>";
+  }
   return h;
 }
 
-/* ---- the KANBAN: where a pipeline is worked ----
-   The prototype's own «لوحة متابعة الفرص — أدر فرص البيع واسحبها بين المراحل», on the board chrome
-   #kmon already uses. Each column states its count AND its money, because a stage with four deals
-   worth 40k and a stage with four worth 4m are not the same stage. Dragging writes the stage
-   through the same PATCH the rungs use — there is no second write path. */
+/* ================================ KANBAN ================================ */
 function opKanbanView() {
   var rows = opLines();
-  var h = '<div class="kboard ms-scroll rise">';
+  var h = '<div class="ox-kb" role="list" aria-label="لوحة المراحل">';
   OPP_ST.forEach(function (st) {
     var cards = rows.filter(function (l) { return l.stage === st.key; })
       .sort(function (a, b) { return (opPriced(b) - opPriced(a)) || (opValue(b) - opValue(a)); });
     var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
-    h += '<div class="kcol" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ' +
-      'ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">' +
-      '<div class="kcolh"><span style="width:8px;height:8px;border-radius:999px;flex:none;background:' + st.dot + ';"></span>' +
-      '<div class="lb">' + st.label + "</div><span style=\'flex:1\'></span>" +
-      '<span class="cntpill">' + fmtN(cards.length) + "</span></div>" +
-      '<div style="font-size:12px;color:#656B76;padding:0 4px 9px;font-variant-numeric:tabular-nums;">' +
-      (val ? opMoney(val) : "بلا تسعير") + "</div>";
-    var shown = cards.slice(0, LIST_CAP);
-    shown.forEach(function (l) {
-      h += '<div class="kcard" draggable="true" ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()" ' +
-        'onclick="opToggleLine(' + l.id + ')">' +
-        '<div class="ktitle"><span class="nm">' + esc(l.account_name) + "</span></div>" +
-        '<div class="kline">' + esc(l.product) +
-          (l.created_by === "المساعد" ? '<span class="opauto">تلقائي</span>' : "") + "</div>" +
-        '<div class="kfoot"><span class="kl">' + esc(OPP_SRC[l.source] || OPP_SRC.other) + "</span>" +
-        '<span class="ksep">·</span><span class="kv">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</span>" +
-        (opStalled(l) ? '<span class="ksep">·</span><span class="kl" style="color:#7A5600;">متوقّف ' + opNDay(opDays(l)) + "</span>" : "") +
-        "</div></div>";
+    var unp = cards.filter(function (l) { return !opPriced(l); }).length;
+    var cap = opKCap[st.key] || OPP_KCAP;
+    h += '<div class="ox-kcol" role="listitem" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">';
+    h += '<div class="ox-kh"><div class="t">' + opDot(st.key) + "<span>" + esc(st.label) + '</span><span class="n">' + fmtN(cards.length) + "</span></div>" +
+      '<div class="v">' + (val ? opMoneyShort(val) : "بلا قيمة مسعَّرة") + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</div></div>";
+    cards.slice(0, cap).forEach(function (l) {
+      h += '<div class="ox-kc' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="true"' +
+        ' aria-label="' + esc(l.account_name) + " — " + esc(l.product) + '"' +
+        ' ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()" onclick="opOpenLine(' + l.id + ',this.id)" onkeydown="opCardKey(event,' + l.id + ',this.id)">' +
+        '<span class="a">' + esc(l.account_name) + "</span>" +
+        '<span class="p">' + esc(l.product) + "</span>" +
+        '<span class="m"><b class="' + (opPriced(l) ? "" : "unp") + '">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</b>" +
+        '<span class="o">' + (String(l.owner || "").trim() ? esc(l.owner) : "بلا مسؤول") + "</span></span>" +
+        (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>" : "") + "</div>";
     });
-    if (!shown.length) h += '<div class="kdrop">اسحب بندًا هنا لنقله إلى «' + st.label + "»</div>";
-    /* A board that silently shows the first 200 of 900 is a board that lies about the stage. */
-    if (cards.length > shown.length) {
-      h += '<div style="font-size:12px;color:#7A5600;font-weight:500;padding:4px;">تُعرض ' +
-        fmtN(shown.length) + " من " + fmtN(cards.length) + " — استخدم «قائمة» لرؤيتها كلها</div>";
+    if (!cards.length) h += '<div class="ox-kempty">لا بنود</div>';
+    if (cards.length > cap) {
+      h += '<button class="ox-kmore" onclick="opKMore(&quot;' + st.key + '&quot;)">تُعرض ' + fmtN(cap) + " من " + fmtN(cards.length) + " — عرض " + fmtN(Math.min(OPP_KCAP, cards.length - cap)) + " أخرى</button>";
     }
     h += "</div>";
   });
-  return h + "</div>" + (opOpen ? opOpenCardSheet() : "");
-}
-/* The kanban has no room for an expander inside a 290px column, so a clicked card opens the SAME
-   editor in a sheet — one editor, two placements, never two implementations. */
-function opOpenCardSheet() {
-  var l = (oppRows || []).find(function (x) { return x.id === opOpen; });
-  if (!l) return "";
-  return '<div class="opsheet" onclick="opToggleLine(0)"><div class="sheet" style="max-width:560px;" onclick="event.stopPropagation()">' +
-    '<div class="sh"><span class="t">' + esc(l.account_name) + " · " + esc(l.product) + "</span>" +
-    '<button class="btn btn-ghost" onclick="opToggleLine(0)">إغلاق</button></div>' +
-    opLineEditor(l) + "</div></div>";
+  return h + "</div>";
 }
 
-/* ---- the bulk bar ----
-   The scale affordance the list exists for: at two hundred lines the work is «move these eleven to
-   التفاوض», not eleven visits to eleven rows. Same floating-bar idiom as the campaigns list, and
-   the same intersect-on-read rule — a hidden row is never in the write. */
-function opBulkBar(sel) {
-  return '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + opPl(sel.length, "بند واحد", "بندان", "بنود", "بندًا") + " محدّد</span>" +
-    '<select class="opbulk" onchange="opBulkStage(this)" ' + (oppBusy ? "disabled" : "") + ">" +
-    '<option value="">انقل إلى مرحلة…</option>' +
-    OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + st.label + "</option>"; }).join("") +
-    "</select>" +
-    '<input class="opbulk" id="opbulkowner" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)">' +
-    '<button class="x" title="إلغاء التحديد" onclick="opClearSel()">×</button></div></div>';
+/* ================================ DRAWER ================================ */
+function opValidate(key, v) {
+  var s = String(v == null ? "" : v).trim();
+  if (key === "sale_price") { if (s === "") return ""; var p = Number(s); return isFinite(p) && p >= 0 ? "" : "أدخل سعرًا صفرًا أو أكبر."; }
+  if (key === "years") { var y = Number(s); return s !== "" && Math.floor(y) === y && y >= 1 && y <= 20 ? "" : "السنوات عدد صحيح من ١ إلى ٢٠."; }
+  if (key === "qty") { var q = Number(s); return s !== "" && Math.floor(q) === q && q >= 1 ? "" : "الكمية عدد صحيح من ١ فأكثر."; }
+  if (key === "discount") { if (s === "") return ""; var d = Number(s); return isFinite(d) && d >= 0 && d <= 100 ? "" : "الخصم بين ٠ و١٠٠."; }
+  if (key === "owner") return s.length <= 60 ? "" : "اسم المسؤول أطول من ٦٠ حرفًا.";
+  if (key === "next_step") return s.length <= 300 ? "" : "الخطوة أطول من ٣٠٠ حرف.";
+  return "";
+}
+function opFieldStatus(sk, id) {
+  var st = opFState[sk];
+  if (!st) return '<span class="ox-fs" id="' + id + '_s" aria-live="polite"></span>';
+  if (st.s === "pending") return '<span class="ox-fs pend" id="' + id + '_s" aria-live="polite">جارٍ الحفظ…</span>';
+  if (st.s === "saved") return '<span class="ox-fs ok" id="' + id + '_s" aria-live="polite">' + opIco("check") + "حُفظ</span>";
+  if (st.s === "invalid") return '<span class="ox-fs bad" id="' + id + '_s" aria-live="assertive">' + opIco("warn") + esc(st.m) + "</span>";
+  var p = sk.split(":");
+  return '<span class="ox-fs bad" id="' + id + '_s" aria-live="assertive">' + opIco("warn") + "تعذّر الحفظ" +
+    '<button onclick="opRetryField(' + p[0] + ',&quot;' + p[1] + '&quot;)">أعد المحاولة</button>' +
+    '<button onclick="opDiscardField(' + p[0] + ',&quot;' + p[1] + '&quot;)">تجاهل</button></span>';
+}
+function opField(l, key, label, type) {
+  var id = "oxd_" + key + "_" + l.id, sk = l.id + ":" + key, st = opFState[sk];
+  var cur = l[key] == null ? "" : l[key];
+  if (key === "sale_price" && Number(cur) === 0) cur = "";
+  var val = st && st.s !== "saved" ? st.v : cur;
+  var num = type === "number";
+  var rng = key === "years" ? ' min="1" max="20" step="1"' : key === "discount" ? ' min="0" max="100"' : key === "qty" ? ' min="1" step="1"' : key === "sale_price" ? ' min="0"' : "";
+  return '<div class="ox-fld"><div class="ox-lr"><label for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>" +
+    '<input class="inp' + (num ? " num" : "") + '" id="' + id + '" type="' + (num ? "number" : "text") + '"' + rng +
+    (num ? ' inputmode="decimal"' : "") +
+    (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="ما الذي يجب فعله بعد؟"' : "") +
+    ' value="' + esc(val) + '"' + (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
+    ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"></div>';
+}
+function opDrawerShell(labelId, head, body, foot) {
+  var cls = opDrShown ? " in" : "";
+  return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
+    '<aside class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
+    '<header class="ox-dh">' + head + '<button class="ox-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></header>" +
+    '<div class="ox-db" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
+    '<footer class="ox-df">' + foot + "</footer></aside>";
+}
+function opDetailDrawer(l) {
+  var st = opStage(l.stage);
+  var open = opOpenStages();
+  var idx = -1; open.forEach(function (s, i) { if (s.key === l.stage) idx = i; });
+  var head = '<div class="tt"><h2 id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
+    '<div class="st"><span>' + esc(l.product) + "</span>" +
+    (l.created_by === "المساعد" ? '<span class="ox-auto">تلقائي</span>' : "") + "</div></div>";
+  var b = "";
+  /* المرحلة */
+  var ssk = l.id + ":stage";
+  b += '<section class="ox-sec" aria-labelledby="oxsec_st"><div class="ox-lr"><div class="ox-sech" id="oxsec_st">المرحلة</div>' + opFieldStatus(ssk, "oxd_stage_" + l.id) + "</div>";
+  if (opIsOpen(l)) {
+    b += '<div class="ox-track" aria-hidden="true">' + open.map(function (s) {
+      return '<i class="' + (s.key === l.stage ? "on" : "") + '" title="' + esc(s.label) + '" onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)"></i>';
+    }).join("") + "</div>";
+    b += '<div class="ox-stnow">' + opDot(l.stage) + "<b>" + esc(st.label) + "</b>" +
+      '<span class="ox-sub">المرحلة ' + fmtN(idx + 1) + " من " + fmtN(open.length) + "، " + opAgo(l) + "</span>" +
+      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(OPP_STALL_DAYS) + "</span>" : "") + "</div>";
+    b += '<div class="ox-strow">' +
+      opSelect("oxd_stage_" + l.id, "نقل إلى مرحلة", l.stage, OPP_ST.map(function (s) { return [s.key, s.label]; }), false, "opSetStageSel") +
+      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
+      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
+  } else {
+    b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
+      '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
+      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button></div>';
+  }
+  b += "</section>";
+  /* القيمة */
+  var disc = Number(l.discount || 0);
+  b += '<section class="ox-sec" aria-labelledby="oxsec_v"><div class="ox-sech" id="oxsec_v">القيمة</div>';
+  b += opPriced(l)
+    ? '<div class="ox-vfig">' + opMoney(opValue(l)) + "</div>" +
+      '<div class="ox-form"><bdi>' + fmtN(Number(l.sale_price)) + " ر.س سنويًا × " + opNYear(Number(l.years || 1)) + " × " + fmtN(Number(l.qty || 1)) +
+      (disc ? " × (١ − " + fmtN(disc) + "٪)" : "") + "</bdi></div>"
+    : '<div class="ox-vfig unp">' + OPP_UNPRICED + '</div><div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
+  b += '<div class="ox-g2">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
+    opField(l, "qty", "الكمية", "number") + opField(l, "discount", "الخصم ٪", "number") + "</div>";
+  if (disc > 50) b += '<div class="ox-hint">' + opIco("warn") + "خصم مرتفع: " + fmtN(disc) + "٪ من السعر السنوي. تأكّد أنه مقصود.</div>";
+  b += "</section>";
+  /* المتابعة */
+  b += '<section class="ox-sec" aria-labelledby="oxsec_f"><div class="ox-sech" id="oxsec_f">المتابعة</div>' +
+    opField(l, "next_step", "الخطوة التالية", "text") + opField(l, "owner", "المسؤول", "text") +
+    '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist></section>";
+  /* التفاصيل */
+  var srcDD = esc(opSrcLabel(l.source));
+  if (l.source === "whatsapp") {
+    srcDD = opIco("whatsapp") + " " + srcDD + (l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
+      (l.phone ? ' · <a class="ox-lnk" href="#customer/' + esc(l.phone) + '">المحادثة ←</a>' : "");
+  }
+  b += '<section class="ox-sec" aria-labelledby="oxsec_d"><div class="ox-sech" id="oxsec_d">التفاصيل</div><dl class="ox-dl">' +
+    "<dt>المصدر</dt><dd>" + srcDD + "</dd>" +
+    (l.phone ? '<dt>الجوال</dt><dd><bdi dir="ltr">+' + esc(l.phone) + "</bdi></dd>" : "") +
+    "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
+    "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
+    "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
+  /* بنود أخرى لهذه الجهة */
+  var key = opKey(l);
+  var rel = (oppRows || []).filter(function (o) { return o.id !== l.id && opKey(o) === key; });
+  if (rel.length) {
+    b += '<section class="ox-sec" aria-labelledby="oxsec_r"><div class="ox-sech" id="oxsec_r">بنود أخرى لهذه الجهة (' + fmtN(rel.length) + ')</div><div class="ox-rel">' +
+      rel.map(function (o) {
+        return '<button class="ox-relr" onclick="opSwitchLine(' + o.id + ')"><span class="p">' + esc(o.product) + "</span>" +
+          '<span class="s">' + opDot(o.stage) + esc(opStage(o.stage).label) + "</span>" +
+          '<span class="v">' + (opPriced(o) ? opMoney(opValue(o)) : '<span class="ox-none">' + OPP_UNPRICED + "</span>") + "</span></button>";
+      }).join("") + "</div></section>";
+  }
+  var foot = (opDelErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opDelErr) + "</span>" : "") +
+    (l.phone ? '<a class="btn btn-ghost" href="#customer/' + esc(l.phone) + '" style="text-decoration:none;">ملف العميل ←</a>' : "") +
+    '<span class="sp"></span>' +
+    '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
+    ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>';
+  return opDrawerShell("oxdrt", head, b, foot);
 }
 
-/* ---- the view ---- */
-function vOppsCrm() {
-  opLoad(false);
-  var h = '<div class="crmbar rise">';
-  h += '<span class="vtog">' +
-    '<button class="' + (opView === "board" ? "on" : "") + '" onclick="opSetView(&quot;board&quot;)">الفرص</button>' +
-    '<button class="' + (opView === "triage" ? "on" : "") + '" onclick="opSetView(&quot;triage&quot;)">فرز الردود</button></span>';
-  if (opView !== "board") {
-    h += '<span style="flex:1"></span><span style="font-size:12px;color:#656B76;">' +
-      "من ردّ، ومن لم يردّ، ومتى موعد المهتمين</span></div>";
-    return h + vMorningList();
-  }
-  h += '<span class="hair"></span>';
-  h += '<span class="vtog">' + [["list", "قائمة"], ["kanban", "كانبان"], ["cards", "بطاقات"]].map(function (v) {
-    return '<button class="' + (opMode === v[0] ? "on" : "") + '" onclick="opSetMode(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
-  }).join("") + "</span>";
-  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:170px;max-width:260px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + "</span>" +
-    '<input id="opq" class="inp" value="' + esc(opQ) + '" oninput="opSearch(this)" placeholder="جهة، خدمة، مسؤول…" ' +
-    'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
-  h += '<select class="crmsel' + (opSrc !== "all" ? " on" : "") + '" onchange="opSetSrc(this.value)"' +
-    (opSrc !== "all" ? ' style="border-color:#5B8DEF;color:#2563EB;background:#DCE8FC;"' : "") + ">" +
-    '<option value="all">كل المصادر</option>' +
-    Object.keys(OPP_SRC).map(function (k) {
-      return '<option value="' + k + '"' + (opSrc === k ? " selected" : "") + ">" + OPP_SRC[k] + "</option>";
-    }).join("") + "</select>";
-  /* Sorting belongs to the list; a kanban is sorted by its own columns and a card grid by account
-     status, so offering a sort control there would be a control that does nothing. */
-  if (opMode === "list") {
-    h += '<select class="crmsel" onchange="opSetSort(this.value)">' +
-      [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]]
-        .map(function (o) { return '<option value="' + o[0] + '"' + (opSort === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
-      "</select>";
-  }
-  if (opMode === "cards") {
-    h += '<select class="crmsel' + (opStat !== "all" ? " on" : "") + '" onchange="opSetStat(this.value)"' +
-      (opStat !== "all" ? ' style="border-color:#5B8DEF;color:#2563EB;background:#DCE8FC;"' : "") + ">" +
-      [["all", "كل الحالات"], ["open", "قائمة"], ["partial", "مكتملة جزئياً"], ["won", "ربح"], ["lost", "خسارة"]]
-        .map(function (o) { return '<option value="' + o[0] + '"' + (opStat === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") +
-      "</select>";
-  }
-  h += '<span style="flex:1"></span>';
-  h += '<button class="btn btn-dark" onclick="opOpenSheet()">+ إضافة فرصة</button>';
-  h += "</div>";
-  if (opSheet) h += opSheetHtml();
-  if (oppRows === null) return h + crmSkeleton(5);
-
-  h += opStageStrip();
-
-  var un = opUnrecorded();
-  if (un.length) {
-    var shown = un.slice(0, 8);
-    h += '<details class="optriage rise"' + (oppRows.length ? "" : " open") + ">" +
-      "<summary>" + ic("reply", 16) + '<b style="font-weight:500;color:#14161A;">' + opNEnt(un.length) +
-      " أبدت اهتمامًا في واتساب ولا فرصة مسجّلة لها</b>" +
-      '<span style="color:#656B76;font-size:12px;">النية المرتفعة تُفتح فرصةً تلقائيًا — هذه أقل من ذلك</span>' +
-      '<span style="flex:1"></span><span style="color:#656B76;font-size:12px;">اضغط للعرض</span></summary>' +
-      shown.map(function (c) {
-        var pr = opReadProduct(c);
-        return '<div class="trow3"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
-          '<span class="pr">' + (pr ? esc(clip(pr, 26)) : "لم تُقرأ خدمة") + "</span>" +
-          '<button class="btn btn-ghost" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;)">سجّل فرصة</button></div>';
-      }).join("") +
-      (un.length > shown.length
-        ? '<div class="trow3"><span class="nm" style="color:#656B76;">' +
-          "وبقيّتها في «فرز الردود» — " + opNEnt(un.length - shown.length) + " أخرى</span></div>"
-        : "") +
-      "</details>";
-  }
-
-  if (!oppRows.length) {
-    return h + '<div class="tblwrap rise" style="padding:34px 22px;text-align:center;">' +
-      '<div style="font-size:14px;color:#14161A;margin-bottom:7px;">لا فرص مسجّلة بعد.</div>' +
-      '<div style="font-size:12px;color:#656B76;line-height:1.9;">' +
-      "الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. " +
-      "النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا؛ وما دون ذلك يُسجَّل بضغطة" +
-      (un.length ? " من القائمة أعلاه" : "") + "، أو بـ«إضافة فرصة».</div></div>";
-  }
-  if (opMode === "kanban") return h + opKanbanView();
-  if (opMode === "cards") {
-    var groups = opMatches();
-    if (!groups.length) {
-      return h + '<div class="tblwrap rise" style="padding:30px 22px;text-align:center;font-size:12px;color:#656B76;">' +
-        "لا فرصة تطابق ما اخترته.</div>";
-    }
-    var page = pageSlice("opps", groups);
-    h += '<div class="opgrid rise">' + page.map(opCard).join("") + "</div>";
-    if (groups.length > PAGE_SIZES[0]) {
-      h += '<div class="tblwrap" style="margin-top:14px;"><div class="tfoot">' +
-        pageBar("opps", groups.length, "فرصة") + "</div></div>";
-    }
-    return h;
-  }
-  return h + opListView();
-}
-
-/* ---- the create form ---- */
-function opBlankLine() { return { product: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
-/* One numeric field, one definition. Four near-identical inputs written out four times is how a
-   min= or an oninput target drifts on one of them and nobody notices until a discount of 400
-   renders a negative deal value. */
-function opNumFld(label, i, key, val, min, max) {
-  return "<div><label>" + label + "</label>" +
-    '<input class="inp" type="number" min="' + min + '"' + (max ? ' max="' + max + '"' : "") +
-    ' value="' + esc(val) + '" oninput="opLineSet(' + i + ',&quot;' + key + '&quot;,this.value)"></div>';
-}
-function opSheetHtml() {
+function opCreateDrawer() {
   var d = opSheet;
   var reg = tagList();
-  var total = 0;
-  var h = '<div class="opsheet" onclick="opCloseSheet()"><div class="sheet" onclick="event.stopPropagation()">';
-  h += '<div class="sh"><span class="t">إضافة فرصة</span>' +
-    '<button class="btn btn-ghost" onclick="opCloseSheet()">إغلاق</button></div>';
-  h += '<div class="hint">الفرصة = عميل واحد + منتج أو أكثر. سجّل من أين جاءت — ردّ على حملة، أو مكالمة، أو زيارة — لأن ذلك هو ما يجعل «من أين تأتي صفقاتنا؟» سؤالًا له جواب.</div>';
-  h += '<div class="fld two"><div><label>الجهة</label>' +
-    '<input class="inp" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="اسم الجهة" ' +
-    'oninput="opDraft(&quot;name&quot;,this.value)"></div>' +
-    "<div><label>الجوال (اختياري)</label>" +
-    '<input class="inp" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr" ' +
-    'oninput="opDraft(&quot;phone&quot;,this.value)"></div></div>';
-  /* The suggestion list is CAPPED, and says so: 3,000 <option> nodes rebuilt on every keystroke is
-     a measurable stall, and a cap nobody is told about reads as «that client is not in the system». */
+  var head = '<div class="tt"><h2 id="oxdrt" tabindex="-1">إضافة فرصة</h2><div class="st">جهة واحدة، ومنتج أو أكثر — ومن أين جاءت</div></div>';
+  var errOf = function (f) { return opErrFld === f ? ' aria-invalid="true"' : ""; };
+  var b = '<section class="ox-sec"><div class="ox-sech">الجهة</div>';
+  b += '<div class="ox-fld"><label for="opd_name">اسم الجهة <span class="req" aria-hidden="true">*</span></label>' +
+    '<input class="inp" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مثال: مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
+    ' oninput="opDraft(&quot;name&quot;,this.value)"></div>';
   var accts = entities.slice(0, 400);
-  h += '<datalist id="opaccts">' + accts.map(function (e) {
-    return '<option value="' + esc(e.name) + '"></option>';
-  }).join("") + "</datalist>";
-  if (entities.length > accts.length) {
-    h += '<div style="font-size:12px;color:#656B76;margin-top:5px;">الاقتراحات تعرض أول ' +
-      fmtN(accts.length) + " جهة من " + fmtN(entities.length) + " — اكتب اسم أي جهة أخرى كاملًا.</div>";
-  }
-  h += '<div class="fld two"><div><label>مصدر الفرصة</label><select class="inp" onchange="opDraft(&quot;source&quot;,this.value)">' +
-    Object.keys(OPP_SRC).map(function (k) {
-      return '<option value="' + k + '"' + (d.source === k ? " selected" : "") + ">" + OPP_SRC[k] + "</option>";
-    }).join("") + "</select></div>";
-  h += "<div>" + (d.source === "whatsapp"
-    ? '<label>من أي حملة؟</label><select class="inp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
+  b += '<datalist id="opaccts">' + accts.map(function (e) { return '<option value="' + esc(e.name) + '"></option>'; }).join("") + "</datalist>";
+  b += '<div class="ox-g2"><div class="ox-fld"><label for="opd_phone">الجوال (اختياري)</label>' +
+    '<input class="inp" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr"' + errOf("phone") + ' oninput="opDraft(&quot;phone&quot;,this.value)"></div>' +
+    '<div class="ox-fld"><label for="opd_owner">المسؤول (اختياري)</label>' +
+    '<input class="inp" id="opd_owner" list="oxowners2" value="' + esc(d.owner || "") + '" placeholder="بلا مسؤول" oninput="opDraft(&quot;owner&quot;,this.value)"></div></div>' +
+    '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
+  b += "</section>";
+  b += '<section class="ox-sec"><div class="ox-sech" id="opd_srcl">مصدر الفرصة</div><div class="ox-srcs" role="radiogroup" aria-labelledby="opd_srcl">' +
+    Object.keys(OPP_SRC).filter(function (k) { return k !== "other"; }).map(function (k) {
+      return '<button role="radio" aria-checked="' + (d.source === k) + '" onclick="opDraftSrc(&quot;' + k + '&quot;)">' + opIco(k) + esc(OPP_SRC[k]) + "</button>";
+    }).join("") + "</div>";
+  if (d.source === "whatsapp") {
+    b += '<div class="ox-fld"><label for="opd_camp">من أي حملة؟</label><select class="inp" id="opd_camp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
       '<option value="">— لم تُحدَّد —</option>' +
       (campaigns || []).map(function (cp) {
-        return '<option value="' + esc(cp.id) + '"' + (String(d.source_ref) === String(cp.id) ? " selected" : "") + ">" +
-          esc(clip(cp.name, 40)) + "</option>";
-      }).join("") + "</select>"
-    : '<label>المسؤول (اختياري)</label><input class="inp" value="' + esc(d.owner || "") + '" placeholder="اسم المسؤول" oninput="opDraft(&quot;owner&quot;,this.value)">') + "</div></div>";
-
-  h += '<div class="fld"><label>المنتجات</label>';
+        return '<option value="' + esc(cp.id) + '"' + (String(d.source_ref) === String(cp.id) ? " selected" : "") + ">" + esc(clip(cp.name, 48)) + "</option>";
+      }).join("") + "</select></div>";
+  }
+  b += "</section>";
+  var total = 0, unp = 0;
+  b += '<section class="ox-sec"><div class="ox-sech">المنتجات</div>';
   d.lines.forEach(function (l, i) {
-    var v = opValue(l);
-    total += v;
-    h += '<div class="lrow"><select class="inp" onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
+    var v = opValue(l); total += v; if (!opPriced(l)) unp++;
+    var fid = function (k) { return "opd_" + k + "_" + i; };
+    var numF = function (k, label, rng, ph) {
+      return '<div class="ox-fld"><label for="' + fid(k) + '">' + label + "</label>" +
+        '<input class="inp num" id="' + fid(k) + '" type="number" inputmode="decimal"' + rng + (ph ? ' placeholder="' + ph + '"' : "") +
+        ' value="' + esc(l[k]) + '"' + errOf(k + "_" + i) + ' oninput="opLineSet(' + i + ',&quot;' + k + '&quot;,this.value)"></div>';
+    };
+    b += '<div class="ox-lblk"><div class="hd"><span>المنتج ' + fmtN(i + 1) + "</span>" +
+      (d.lines.length > 1 ? '<button onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
+      '<div class="ox-fld"><label for="' + fid("product") + '">الخدمة <span class="req" aria-hidden="true">*</span></label>' +
+      '<select class="inp" id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
       '<option value="">— اختر الخدمة —</option>' +
-      reg.map(function (t) {
-        return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>";
-      }).join("") + "</select>" +
-      '<div class="num">' +
-      opNumFld("السعر السنوي", i, "sale_price", l.sale_price, 0, "") +
-      opNumFld("سنوات", i, "years", l.years, 1, "20") +
-      opNumFld("الكمية", i, "qty", l.qty, 1, "") +
-      opNumFld("خصم ٪", i, "discount", l.discount, 0, "100") +
-      "</div>" +
-      '<div class="lfoot"><span class="v">' + opMoney(v) + "</span>" +
-      (d.lines.length > 1 ? '<button class="btn btn-ghost" style="height:28px;padding:0 10px;font-size:12px;" onclick="opLineDel(' + i + ')">إزالة</button>' : "") +
-      "</div></div>";
+      reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
+      "</select></div>" +
+      '<div class="ox-g2">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
+      numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "٠") + "</div>" +
+      '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoney(v) : OPP_UNPRICED) + "</span></div></div>";
   });
-  h += '<button class="btn btn-ghost" style="margin-top:9px;" onclick="opLineAdd()">+ إضافة منتج</button></div>';
-  h += '<div class="tot"><span style="font-size:12px;color:#656B76;">قيمة الفرصة</span>' +
-    '<span class="v">' + opMoney(total) + "</span></div>";
-  if (opErr) h += '<div class="err">' + esc(opErr) + "</div>";
-  h += '<div class="acts"><button class="btn btn-dark" onclick="opSubmit()"' + (oppBusy ? " disabled" : "") + ">" +
+  b += '<button class="ox-arow" onclick="opLineAdd()">' + opIco("plus") + "منتج آخر</button>";
+  b += '<div class="ox-total"><span class="ox-lbl">قيمة الفرصة' + (unp && total ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</span>" +
+    (total ? '<span class="v">' + opMoney(total) + "</span>" : '<span class="v ox-none" style="font-size:var(--t-md);">' + OPP_UNPRICED + "</span>") + "</div>";
+  b += "</section>";
+  var foot = (opErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opErr) + "</span>" : "") +
+    '<button class="btn btn-teal" id="opd_submit" style="min-width:132px;justify-content:center;" onclick="opSubmit()"' + (oppBusy ? ' disabled aria-busy="true"' : "") + ">" +
     (oppBusy ? "جارٍ الحفظ…" : "إنشاء الفرصة") + "</button>" +
-    '<button class="btn btn-ghost" onclick="opCloseSheet()">إلغاء</button></div>';
-  return h + "</div></div>";
+    '<button class="btn btn-ghost" onclick="opCloseDrawer()">إلغاء</button>';
+  return opDrawerShell("oxdrt", head, b, foot);
 }
 
-/* ---- handlers ---- */
-window.opSetView = function (v) { opView = v; opOpen = 0; opArm = 0; render(false); };
-/* PAGE is reset on every control that changes WHAT is listed: a filter that shrinks 34 pages to 1
-   must not strand the reader on an empty page 34. Selection is cleared with it — a checkbox the
-   reader can no longer see is a write they did not authorise. */
-window.opRetry = function () { oppFailed = false; oppRows = null; opLoad(true); render(false); };
-window.opSetMode = function (v) { opMode = v; opOpen = 0; opArm = 0; PAGE.opps = 1; render(false); };
-window.opSetSort = function (v) { opSort = v; PAGE.opps = 1; render(false); };
-window.opSetStg = function (v) { opStg = opStg === v && v !== "all" ? "all" : v; PAGE.opps = 1; opSel = {}; render(false); };
-window.opToggleSel = function (id) { if (opSel[id]) delete opSel[id]; else opSel[id] = 1; render(false); };
+/* After every paint: play the drawer entrance once, restore its scroll, move focus in. */
+function opAfterRender() {
+  var dr = document.querySelector(".ox-dr");
+  if (!dr) return;
+  var db = document.getElementById("oxdb");
+  if (db && opDrScroll) db.scrollTop = opDrScroll;
+  if (!opDrShown) {
+    opDrShown = true;
+    requestAnimationFrame(function () {
+      var s = document.querySelector(".ox-scrim"), d = document.querySelector(".ox-dr");
+      if (s) s.classList.add("in"); if (d) d.classList.add("in");
+      var h = document.getElementById(opSheet ? "opd_name" : "oxdrt");
+      if (h) h.focus();
+    });
+  }
+}
+if (!window.__oxKeys) {
+  window.__oxKeys = 1;
+  document.addEventListener("keydown", function (e) {
+    var dr = document.querySelector(".ox-dr");
+    if (!dr) return;
+    if (e.key === "Escape") {
+      if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) return;
+      e.preventDefault(); window.opCloseDrawer(); return;
+    }
+    if (e.key !== "Tab") return;
+    var f = Array.prototype.slice.call(dr.querySelectorAll("a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])"))
+      .filter(function (x) { return x.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (!dr.contains(document.activeElement)) { e.preventDefault(); first.focus(); return; }
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+}
+
+function opToast(msg, bad, act, actFn) {
+  var old = document.getElementById("oxtoast"); if (old) old.remove();
+  var el = document.createElement("div");
+  el.id = "oxtoast"; el.className = "ox-toast" + (bad ? " bad" : "");
+  el.setAttribute("role", bad ? "alert" : "status");
+  var t = document.createElement("span"); t.textContent = msg; el.appendChild(t);
+  if (act) {
+    var b = document.createElement("button"); b.textContent = act;
+    b.onclick = function () { el.remove(); actFn(); }; el.appendChild(b);
+  }
+  var x = document.createElement("button"); x.className = "x"; x.textContent = "×"; x.setAttribute("aria-label", "إغلاق");
+  x.onclick = function () { el.remove(); }; el.appendChild(x);
+  document.body.appendChild(el);
+  if (!bad) setTimeout(function () { if (el.parentNode) el.remove(); }, 4200);
+}
+
+/* ================================ THE VIEW ================================ */
+function vOppsCrm() {
+  opLoad(false);
+  /* #opps/<id> is the shareable record URL: it opens that line's drawer. */
+  var hid = Number(((location.hash || "").split("/")[1]) || 0);
+  if (hid && oppRows && opOpen !== hid && !opSheet) {
+    if (oppRows.some(function (o) { return o.id === hid; })) { opOpen = hid; opDrShown = false; opDrScroll = 0; }
+  }
+  var h = '<div class="ox">';
+  if (oppRows === null && !oppFailed) {
+    h += '<section class="ox-sum" aria-busy="true"><div><div class="ox-lbl">القيمة المفتوحة</div><div class="ox-fig none">—</div><div class="ox-bar"></div></div></section>';
+  } else if (oppRows) {
+    h += opSummary();
+  }
+  h += '<section class="ox-led" aria-label="بنود الفرص">' + opToolbar();
+  if (oppFailed && !oppRows) {
+    h += '<div class="ox-state" role="alert">تعذّر تحميل الفرص.<span class="s">لم يُعرض شيء لأن الطلب فشل، لا لأن السجل فارغ.</span>' +
+      '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
+  } else if (oppRows === null) {
+    h += opSkeleton(5);
+  } else {
+    if (oppFailed) h += '<div class="ox-state" role="alert" style="padding:var(--s2);">' + opIco("warn") + "تعذّر تحديث الفرص — المعروض آخر نسخة محمّلة." + '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
+    h += opWaRow();
+    h += opMode === "kanban" ? opKanbanView() : opListView();
+  }
+  h += "</section></div>";
+  if (opSheet) h += opCreateDrawer();
+  else if (opOpen && oppRows) {
+    var l = oppRows.find(function (x) { return x.id === opOpen; });
+    if (l) h += opDetailDrawer(l);
+  }
+  setTimeout(opAfterRender, 0);
+  return h;
+}
+
+/* ================================ HANDLERS ================================ */
+/* Anything that changes WHAT is listed resets the page and clears the selection, and says so: a
+   checkbox the reader can no longer see is a write they did not authorise. */
+function opResetScope() {
+  var n = Object.keys(opSel).length;
+  opSel = {}; PAGE.opps = 1;
+  if (n) opToast("أُلغي تحديد " + opNLine(n) + " عند تغيير التصفية", false);
+}
+window.opRetry = function () { oppFailed = false; opLoad(true); opRender(); };
+window.opSetMode = function (v) { if (opMode === v) return; opMode = v; opResetScope(); opRender(); };
+window.opSetSort = function (v) { opSort = v; opResetScope(); opRender(); };
+window.opSetStg = function (v) { opStg = opStg === v && v !== "all" ? "all" : v; opResetScope(); opRender(); };
+window.opSetSrc = function (v) { opSrc = v; opResetScope(); opRender(); };
+window.opSetOwn = function (v) { opOwn = v; opResetScope(); opRender(); };
+window.opSetShort = function (v) { opShort = opShort === v ? "" : v; opResetScope(); opRender(); };
+window.opSetStat = function (v) { opStat = v; opRender(); };
+window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opResetScope(); opRender(); };
+window.opSearch = function (el) {
+  opQ = el.value; clearTimeout(window.__opq);
+  window.__opq = setTimeout(function () { opResetScope(); opRender(); }, 250);
+};
+window.opToggleWa = function () { opWaOpen = !opWaOpen; opRender(); };
+window.opKMore = function (k) { opKCap[k] = (opKCap[k] || OPP_KCAP) + OPP_KCAP; opRender(); };
+window.opToggleSel = function (id) { if (opSel[id]) delete opSel[id]; else opSel[id] = 1; opRender(); };
 window.opTogglePage = function () {
   var page = pageSlice("opps", opSorted());
   var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
   page.forEach(function (l) { if (allOn) delete opSel[l.id]; else opSel[l.id] = 1; });
-  render(false);
+  opRender();
 };
-window.opClearSel = function () { opSel = {}; render(false); };
-/* A bulk write is N single writes through the ONE endpoint — no second server path that could
-   validate differently from the one a single row uses. It reports what actually landed, including
-   the failures, rather than assuming the whole set went. */
+window.opSelectAll = function () { opLines().forEach(function (l) { opSel[l.id] = 1; }); opRender(); };
+window.opClearSel = function () { opSel = {}; opRender(); };
+
+/* ---- the drawer ---- */
+window.opOpenLine = function (id, opener) {
+  opSheet = null; opErr = ""; opDelErr = "";
+  if (opOpen !== id) { opDrScroll = 0; }
+  if (!opOpen) opDrShown = false;
+  opOpen = id; opOpener = opener || "";
+  try { history.replaceState(null, "", "#opps/" + fmtId(id)); } catch (e) {}
+  opRender();
+};
+window.opRowClick = function (e, id) {
+  var t = e.target;
+  if (t && t.closest && t.closest("a,button,input,select,label")) return;
+  window.opOpenLine(id, "oxt_" + id);
+};
+window.opCardKey = function (e, id, opener) {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.opOpenLine(id, opener); }
+};
+window.opSwitchLine = function (id) { opDelErr = ""; opDrScroll = 0; opOpen = id; try { history.replaceState(null, "", "#opps/" + fmtId(id)); } catch (e) {} opRender(); };
+window.opCloseDrawer = function () {
+  var wasSheet = !!opSheet;
+  var pend = Object.keys(opFState).filter(function (k) { return opFState[k].s === "pending"; }).length;
+  opOpen = 0; opSheet = null; opErr = ""; opErrFld = ""; opDelErr = ""; opDrShown = false; opDrScroll = 0;
+  if ((location.hash || "").split("/")[1]) { try { history.replaceState(null, "", "#opps"); } catch (e) {} }
+  opRender();
+  if (pend) opToast("يُستكمل حفظ " + opNLine(pend) + " في الخلفية", false);
+  var back = document.getElementById(opOpener) || (wasSheet ? document.getElementById("oxadd") : null);
+  if (back) back.focus();
+};
+
+/* ---- autosave: one PATCH path, per-field state, ordered writes ---- */
+window.opSaveField = async function (id, key, val) {
+  var l = (oppRows || []).find(function (o) { return o.id === id; });
+  if (!l) return;
+  var sk = id + ":" + key;
+  var msg = key === "stage" ? "" : opValidate(key, val);
+  if (msg) {
+    opFState[sk] = { s: "invalid", v: val, m: msg }; opRender();
+    var f = document.getElementById("oxd_" + key + "_" + id); if (f) f.focus();
+    return;
+  }
+  var num = key === "sale_price" || key === "years" || key === "qty" || key === "discount";
+  var norm = num ? (String(val).trim() === "" ? 0 : Number(val)) : String(val == null ? "" : val).trim();
+  var cur = l[key] == null ? (num ? 0 : "") : l[key];
+  /* An unchanged value is not a write — the server answers 404 not_found_or_no_change to one. */
+  if (String(num ? Number(cur) : cur) === String(norm)) { delete opFState[sk]; opRender(); return; }
+  if (opFState[sk] && opFState[sk].s === "pending") { opFQueue[sk] = val; opFState[sk].v = val; return; }
+  opFState[sk] = { s: "pending", v: val }; opRender();
+  var body = {}; body[key] = norm;
+  var ok = false;
+  try {
+    var r = await fetch("/admin/opps/" + fmtId(id), {
+      method: "PATCH", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    var j = await r.json();
+    if (r.ok && j.ok) {
+      ok = true;
+      oppRows = (oppRows || []).map(function (o) { return o.id === j.opp.id ? j.opp : o; });
+    }
+  } catch (e) { ok = false; }
+  if (ok) {
+    opFState[sk] = { s: "saved", v: val };
+    setTimeout(function () { if (opFState[sk] && opFState[sk].s === "saved") { delete opFState[sk]; opRender(); } }, 1600);
+  } else {
+    opFState[sk] = { s: "failed", v: val };
+    var nm = l.account_name;
+    if (opOpen !== id) opToast("لم يُحفظ تعديل على «" + nm + "»", true, "فتح البند", function () { window.opOpenLine(id, ""); });
+  }
+  opRender();
+  if (opFQueue[sk] !== undefined) { var nv = opFQueue[sk]; delete opFQueue[sk]; void window.opSaveField(id, key, nv); }
+};
+window.opRetryField = function (id, key) {
+  var st = opFState[id + ":" + key]; if (!st) return;
+  var v = st.v; delete opFState[id + ":" + key]; void window.opSaveField(id, key, v);
+};
+window.opDiscardField = function (id, key) { delete opFState[id + ":" + key]; opRender(); };
+window.opSetStage = function (id, stage) { return window.opSaveField(id, "stage", stage); };
+window.opSetStageSel = function (v) { if (opOpen) void window.opSaveField(opOpen, "stage", v); };
+
+window.opDel = async function (id) {
+  id = Number(id); opDelErr = "";
+  try {
+    var r = await fetch("/admin/opps/" + fmtId(id), { method: "DELETE", headers: { "x-admin-token": TOKEN } });
+    var j = r.ok ? await r.json() : null;
+    if (!r.ok || !j || !j.ok) { opDelErr = "تعذّر الحذف — أعد المحاولة."; opRender(); return; }
+    oppRows = (oppRows || []).filter(function (o) { return o.id !== id; });
+    delete opSel[id];
+    window.opCloseDrawer();
+    opToast("حُذف البند", false);
+  } catch (e) { opDelErr = "تعذّر الاتصال بالخادم — أعد المحاولة."; opRender(); }
+};
+
+/* ---- bulk: N single writes through the ONE endpoint; failures stay selected ---- */
 async function opBulkPatch(patch, label) {
   var ids = opSelIds();
   if (!ids.length || oppBusy) return;
-  oppBusy = true; render(false);
-  var ok = 0, bad = 0;
+  oppBusy = true; opRender();
+  var ok = 0, bad = [];
   for (var i = 0; i < ids.length; i++) {
     try {
       var r = await fetch("/admin/opps/" + fmtId(ids[i]), {
-        method: "PATCH", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-        body: JSON.stringify(patch) });
+        method: "PATCH", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify(patch) });
       var j = await r.json();
       if (r.ok && j.ok) { ok++; oppRows = oppRows.map(function (o) { return o.id === j.opp.id ? j.opp : o; }); }
-      else bad++;
-    } catch (e) { bad++; }
+      else if (r.status === 404 && j && j.error === "not_found_or_no_change") ok++;
+      else bad.push(ids[i]);
+    } catch (e) { bad.push(ids[i]); }
   }
-  oppBusy = false; opSel = {}; render(false);
-  alertBar(label + " — " + opPl(ok, "بند واحد", "بندان", "بنود", "بندًا") +
-    (bad ? " · تعذّر " + fmtN(bad) : ""), bad > 0);
+  oppBusy = false;
+  opSel = {}; bad.forEach(function (id) { opSel[id] = 1; });
+  opRender();
+  opToast(label + " — " + opNLine(ok) + (bad.length ? " · تعذّر " + fmtN(bad.length) + " (ما زالت محدّدة)" : ""), bad.length > 0);
 }
 window.opBulkStage = function (el) {
   var v = el.value; el.value = "";
   if (!v) return;
-  var st = opStage(v);
-  void opBulkPatch({ stage: v }, "نُقلت إلى «" + st.label + "»");
+  void opBulkPatch({ stage: v }, "نُقلت إلى «" + opStage(v).label + "»");
 };
 window.opBulkOwner = function (el) {
   var v = String(el.value || "").trim(); el.value = "";
   if (!v) return;
   void opBulkPatch({ owner: v }, "أُسندت إلى " + v);
 };
-/* Drag writes through the same PATCH the stage rungs use. The column's own key is the payload —
-   never the rendered label, which is the mistake the campaigns board documented: a visible string
-   is a coincidence, a key is a contract. */
+
+/* ---- kanban drag: the column KEY is the payload, never its rendered label ---- */
 window.opDragStart = function (e, id) { opDragId = id; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; };
 window.opDragEnd = function () { opDragId = null; };
 window.opDragOver = function (e, el) { e.preventDefault(); if (el) el.classList.add("over"); };
 window.opDragLeave = function (el) { if (el) el.classList.remove("over"); };
-window.opDrop = function (e, stage, el) {
+window.opDrop = async function (e, stage, el) {
   e.preventDefault();
   if (el) el.classList.remove("over");
   var id = opDragId; opDragId = null;
   if (id === null) return;
   var l = (oppRows || []).find(function (x) { return x.id === id; });
-  if (!l || l.stage === stage) return;   /* a drop onto the same column is not a write */
-  void window.opSaveField(id, "stage", stage);
+  if (!l || l.stage === stage) return;
+  await window.opSaveField(id, "stage", stage);
+  var st = opFState[id + ":stage"];
+  if (st && st.s === "failed") {
+    delete opFState[id + ":stage"]; opRender();
+    opToast("تعذّر نقل «" + l.account_name + "»", true, "أعد المحاولة", function () { void window.opSaveField(id, "stage", stage); });
+  }
 };
-window.opSearch = function (el) { opQ = el.value; clearTimeout(window.__opq); window.__opq = setTimeout(function () { render(false); }, 250); };
-window.opSetStat = function (v) { opStat = v; PAGE.opps = 1; render(false); };
-window.opSetSrc = function (v) { opSrc = v; PAGE.opps = 1; render(false); };
-window.opToggleLine = function (id) { opOpen = opOpen === id ? 0 : id; opArm = 0; render(false); };
-window.opArmDel = function (id) { opArm = id; render(false); };
-window.opDraft = function (k, v) { opSheet[k] = v; opErr = ""; if (k === "source") render(false); };
-window.opLineSet = function (i, k, v) { opSheet.lines[i][k] = v; opErr = ""; render(false); };
-window.opLineAdd = function () { opSheet.lines.push(opBlankLine()); render(false); };
-window.opLineDel = function (i) { opSheet.lines.splice(i, 1); render(false); };
-window.opCloseSheet = function () { opSheet = null; opErr = ""; render(false); };
-window.opOpenSheet = function () {
+
+/* ---- create ---- */
+function opBlankLine() { return { product: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
+window.opOpenSheet = function (opener) {
   opSheet = { name: "", phone: "", source: "call", source_ref: "", owner: "", lines: [opBlankLine()] };
-  opErr = ""; render(false);
+  opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opOpener = opener || "oxadd";
+  opRender();
 };
-/* Prefill from a reply the assistant already read: the account, its number, the service it asked
-   about and the campaign that reached it. Everything here is a value already in the ledger — the
-   form asks only for the one thing nobody recorded, which is what it is worth. */
-window.opFromContact = function (phone) {
+window.opDraft = function (k, v) { opSheet[k] = v; opErr = ""; opErrFld = ""; if (k === "source") opRender(); };
+window.opDraftSrc = function (k) { opSheet.source = k; if (k !== "whatsapp") opSheet.source_ref = ""; opRender(); };
+window.opLineSet = function (i, k, v) { opSheet.lines[i][k] = v; opErr = ""; opErrFld = ""; opRender(); };
+window.opLineAdd = function () { opSheet.lines.push(opBlankLine()); opRender(); };
+window.opLineDel = function (i) { opSheet.lines.splice(i, 1); opRender(); };
+/* Prefill from a reply the assistant already read: account, number, the service it asked about and
+   the campaign that reached it — every value already in the ledger. The form asks only what it is
+   worth. */
+window.opFromContact = function (phone, opener) {
   var c = contactByPhone(phone);
   var ent = entities.find(function (e) { return e.phone === phone; });
   var cp = opLastCampaign(phone);
   var pr = c ? opReadProduct(c) : "";
   var line = opBlankLine();
   if (pr) line.product = pr;
-  opSheet = {
-    name: (ent && ent.name) || (c && c.waName) || phone,
-    phone: phone, source: "whatsapp", source_ref: cp ? String(cp.id) : "", owner: "", lines: [line]
-  };
-  opErr = ""; render(false);
+  opSheet = { name: (ent && ent.name) || (c && c.waName) || phone, phone: phone, source: "whatsapp",
+    source_ref: cp ? String(cp.id) : "", owner: "", lines: [line] };
+  opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opOpener = opener || "";
+  opRender();
 };
-
-/* ---- the door from جهات الاستهداف ----
- * The founder onboards a book of leads, phones one of them, and then has to record the deal. Until
- * this existed the only way in was to open #opps and RETYPE the account name into a datalist that
- * suggests the first 400 of three thousand — so the answer to «how do I move this lead to the
- * opportunity list» was «you don't, you type it again». The action belongs on the object, not on
- * the other screen.
- *
- * Prefill is only what the ledger already holds: the account's name and number, and — when the
- * operator has tagged it «مرشّح لـ» exactly one service — that service, because a single candidate
- * tag IS his own decision about what to sell them. Two tags prefill nothing; picking one for him
- * would be a guess wearing his authority.
- *
- * The source defaults to «مكالمة» here rather than the board's neutral default: the reason you are
- * standing on a lead row with a deal to record is almost always that you just spoke to them. It is
- * a select, not a commitment.
- *
- * It NAVIGATES to #opps with the sheet open rather than rendering the sheet over the target list —
- * the opportunity is about to live on the board, and finishing the act on the screen that will hold
- * it is the difference between a form and a place. */
+/* The door from جهات الاستهداف: record the deal on the object you are standing on, then land on the
+   board that will hold it. One candidate tag prefills the service; two prefill nothing. */
 window.opFromEntity = function (id) {
   var e = entities.find(function (x) { return x.id === id; });
   if (!e) return;
@@ -1077,20 +1319,33 @@ window.opFromEntity = function (id) {
   var tags = e.productTags || [];
   if (tags.length === 1) line.product = tags[0];
   opSheet = { name: e.name, phone: e.phone, source: "call", source_ref: "", owner: "", lines: [line] };
-  opErr = "";
-  opView = "board";
-  if ((location.hash || "").slice(1).split("/")[0] === "opps") render(false);
-  else location.hash = "#opps";   /* hashchange renders; assigning the same hash fires nothing */
+  opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opView = "board";
+  if ((location.hash || "").slice(1).split("/")[0] === "opps") opRender();
+  else location.hash = "#opps";
 };
-
+function opCreateInvalid(f, msg) {
+  opErr = msg; opErrFld = f; opRender();
+  var idMap = { name: "opd_name", phone: "opd_phone" };
+  var p = f.split("_"); var idx = p.pop();
+  var el = document.getElementById(idMap[f] || ("opd_" + p.join("_") + "_" + idx));
+  if (el) el.focus();
+}
 window.opSubmit = async function () {
   if (oppBusy) return;
   var d = opSheet;
   if (!d) return;
-  if (!String(d.name || "").trim()) { opErr = "اسم الجهة مطلوب."; return render(false); }
+  if (!String(d.name || "").trim()) return opCreateInvalid("name", "اسم الجهة مطلوب.");
   var lines = d.lines.filter(function (l) { return String(l.product || "").trim(); });
-  if (!lines.length) { opErr = "اختر خدمة واحدة على الأقل."; return render(false); }
-  oppBusy = true; render(false);
+  if (!lines.length) return opCreateInvalid("product_0", "اختر خدمة واحدة على الأقل.");
+  for (var i = 0; i < d.lines.length; i++) {
+    if (!String(d.lines[i].product || "").trim()) continue;
+    var ks = ["sale_price", "years", "qty", "discount"];
+    for (var k = 0; k < ks.length; k++) {
+      var m = opValidate(ks[k], d.lines[i][ks[k]]);
+      if (m) return opCreateInvalid(ks[k] + "_" + i, "المنتج " + fmtN(i + 1) + ": " + m);
+    }
+  }
+  oppBusy = true; opRender();
   try {
     var r = await fetch("/admin/opps", {
       method: "POST",
@@ -1099,60 +1354,36 @@ window.opSubmit = async function () {
         account_name: String(d.name).trim(), phone: String(d.phone || "").trim(),
         source: d.source, source_ref: d.source === "whatsapp" ? d.source_ref : "",
         lines: lines.map(function (l) {
-          return {
-            product: l.product, sale_price: Number(l.sale_price || 0), years: Number(l.years || 1),
-            qty: Number(l.qty || 1), discount: Number(l.discount || 0), owner: d.owner || ""
-          };
+          return { product: l.product, sale_price: Number(l.sale_price || 0), years: Number(l.years || 1),
+            qty: Number(l.qty || 1), discount: Number(l.discount || 0), owner: d.owner || "" };
         })
       })
     });
     var j = await r.json();
     oppBusy = false;
     if (!r.ok || !j.ok) {
-      /* The server names the field it rejected; repeating that name is the difference between a
-         form the operator can fix and one they can only retry. */
+      /* The server names the field it rejected; repeating that name is what makes it fixable. */
+      if (j.error === "invalid_field" && j.field === "phone") return opCreateInvalid("phone", "رقم الجوال غير صالح.");
+      if (j.error === "invalid_field" && j.field === "account_name") return opCreateInvalid("name", "اسم الجهة مطلوب.");
       opErr = j.error === "unknown_product" ? "خدمة غير معروفة: " + String(j.product || "")
+        : j.error === "unknown_ref" ? "الحملة المختارة لم تعد موجودة."
         : j.error === "invalid_field" ? "قيمة غير صالحة في الحقل: " + String(j.field || "")
         : j.error === "db_unavailable" ? "قاعدة البيانات غير متاحة — لم تُحفظ الفرصة."
         : "تعذّر الحفظ (" + fmtN(r.status) + ")";
-      return render(false);
+      return opRender();
     }
-    opSheet = null; opErr = "";
-    oppRows = (j.opps || []).concat(oppRows || []);
-    render(false);
-    alertBar("سُجّلت الفرصة — " + opPl((j.opps || []).length, "بند واحد", "بندان", "بنود", "بندًا"), false);
+    var made = j.opps || [];
+    oppRows = made.concat(oppRows || []);
+    opSheet = null; opErr = ""; opErrFld = ""; opDrShown = false;
+    opRender();
+    var visible = {}; opLines().forEach(function (l) { visible[l.id] = 1; });
+    var hidden = made.some(function (l) { return !visible[l.id]; });
+    if (hidden) opToast("أُنشئت الفرصة خارج التصفية الحالية", false, "عرض", function () { window.opClearFilters(); });
+    else opToast("سُجّلت الفرصة — " + opNLine(made.length), false);
+    var back = document.getElementById("oxadd"); if (back) back.focus();
   } catch (e) {
-    oppBusy = false; opErr = "تعذّر الاتصال بالخادم. أعد المحاولة."; render(false);
+    oppBusy = false; opErr = "تعذّر الاتصال بالخادم — لم تُحفظ الفرصة. أعد المحاولة."; opRender();
   }
-};
-
-/* One write path for every field on the line, and it re-reads the row the server returned rather
-   than patching the local copy — the difference between what the ledger holds and what the screen
-   hopes it holds is exactly the bug class this codebase keeps paying for. */
-window.opSaveField = async function (id, key, val) {
-  var body = {};
-  body[key] = val;
-  try {
-    var r = await fetch("/admin/opps/" + fmtId(id), {
-      method: "PATCH",
-      headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    });
-    var j = await r.json();
-    if (!r.ok || !j.ok) { alertBar("تعذّر حفظ التعديل (" + fmtN(r.status) + ")", true); return opLoad(true); }
-    oppRows = (oppRows || []).map(function (o) { return o.id === j.opp.id ? j.opp : o; });
-    render(false);
-  } catch (e) { alertBar("تعذّر الاتصال بالخادم. أعد المحاولة.", true); }
-};
-window.opSetStage = function (id, stage) { return window.opSaveField(id, "stage", stage); };
-window.opDel = async function (id) {
-  try {
-    var r = await fetch("/admin/opps/" + fmtId(id), { method: "DELETE", headers: { "x-admin-token": TOKEN } });
-    if (!r.ok) { alertBar("تعذّر الحذف (" + fmtN(r.status) + ")", true); return; }
-    oppRows = (oppRows || []).filter(function (o) { return o.id !== id; });
-    opArm = 0; opOpen = 0; render(false);
-    alertBar("حُذف البند", false);
-  } catch (e) { alertBar("تعذّر الاتصال بالخادم. أعد المحاولة.", true); }
 };
 /* A URL segment is not UI copy: fmtN would put Arabic-Indic digits in the path and the route would
    404. One named helper so the distinction is visible at every call site. */

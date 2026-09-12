@@ -891,7 +891,7 @@ const NAV = [
 // under الحملات. «الهيكل التنظيمي» sits under المنتجات because dept and manager are the same
 // rollup layer as the sector.
 const SUBS = {
-  opps:      [["opps", "الفرص"], ["pipeline", "لوحة المتابعة"]],
+  opps:      [["opps", "الفرص"], ["triage", "فرز الردود"], ["pipeline", "لوحة المتابعة"]],
   customers: [["customers", "العملاء"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
@@ -918,7 +918,7 @@ const TITLES = {
   kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
-  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل الفرص — اضغط بندًا لعرض تفاصيله وتحريك مرحلته"],
+  customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل بند من أول تواصل حتى الإغلاق"], triage: ["فرز الردود", "من ردّ، ومن لم يردّ، ومتى موعد المهتمين"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "الكتالوج وقطاعاته وباقاته — والإنجاز الربعي"],
@@ -3269,7 +3269,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
   if (pool > items.length) {
     h += '<div style="display:flex;align-items:center;gap:10px;padding:11px 2px;border-top:1px solid #ECEEF2;font-size:12px;color:#656B76;">' +
       '<span>أهمّ ' + fmtN(items.length) + " من " + fmtN(pool) + " تستحق المتابعة.</span>" +
-      '<a href="#opps" style="color:#2563EB;font-weight:500;text-decoration:none;">لوحة الفرز الكاملة ←</a></div>';
+      '<a href="#triage" style="color:#2563EB;font-weight:500;text-decoration:none;">لوحة الفرز الكاملة ←</a></div>';
   }
   if (notifyNumber) {
     h += '<div style="display:flex;align-items:center;gap:8px;padding:11px 2px;border-top:1px solid #ECEEF2;font-size:12px;color:#656B76;">' +
@@ -4248,6 +4248,7 @@ function dataSignature() {
     tagReg.length, oppTab, oppQ, campFilter, rQ, selProd,
     oppRows ? oppRows.length : -1, oppRows ? oppRows.reduce((a, o) => a + o.updated_at, 0) : 0,
     opView, opMode, opSort, opQ, opStat, opSrc, opStg, opOpen, opArm, oppBusy, opErr,
+    opOwn, opShort, opWaOpen, opErrFld, opDelErr, JSON.stringify(opFState), JSON.stringify(opKCap),
     Object.keys(opSel).join(","), opSheet ? JSON.stringify(opSheet) : "",
     retargetCohort ? retargetCohort.targets.length : 0,
     profileData ? (profileData.contact ? profileData.contact.phone + "|" + (profileData.contact.transcript || []).length : "x") : "",
@@ -4299,7 +4300,7 @@ function render(fetchNew) {
     // it would look up a product that does not exist. Same shape as #kb.
     const nm = decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "");
     b.innerHTML = cur === "product" ? vProductDrill(nm) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "products" || cur === "reports") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4310,6 +4311,7 @@ function render(fetchNew) {
       : cur === "targets" ? vTargetsCrm()
       : cur === "perf" ? vSalesPerf()
       : cur === "opps" ? vOppsCrm()
+      : cur === "triage" ? vMorningList()
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()

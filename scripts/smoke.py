@@ -36,6 +36,8 @@ ROUTES = [
     # «إضافة فرصة» is the board tab's own control bar and renders before any fetch resolves, so it
     # is green on a slow ledger and red on a broken view, which is the distinction that matters.
     ("#opps", "إضافة فرصة"),
+    # فرز الردود became its own tab under فرص البيع (V5); «مؤجل» is one of its fixed group headings.
+    ("#triage", "مؤجل"),
     # المستهدفات والأداء renders its period chips and KPI shells BEFORE the fetch resolves, so
     # «المتوقع من الفرص المفتوحة» is green on a slow ledger and red on a broken view — the same
     # distinction the #opps landmark was chosen for. A landmark inside the table would go red
