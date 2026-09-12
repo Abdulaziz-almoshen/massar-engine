@@ -120,11 +120,12 @@ export const OPPS_CRM_CSS = `
   .ox-tb { display:flex; align-items:center; gap:var(--s2); min-height:64px; padding:var(--s2) var(--s3);
     border-bottom:1px solid var(--line-soft); flex-wrap:nowrap; }
   .ox-tb .sp { flex:1; }
-  /* The filters are ONE strip that scrolls inside itself when the owner list gets long, so the
-     primary action never wraps onto a line of its own (it did at 1440 once owner names grew). */
-  .ox-filt { display:flex; align-items:center; gap:var(--s2); flex:1 1 auto; min-width:0; overflow-x:auto;
-    padding:3px; margin:-3px; scrollbar-width:thin; }
+  /* On desktop the filters WRAP inside their own group — never scroll, never clip. A scrolling strip
+     clipped «الأعلى قيمة» at 1440 and would have hidden «مسح التصفية» (final Claude sign-off). The
+     group takes the free width, so search, the view switch and the primary stay on the first row. */
+  .ox-filt { display:flex; align-items:center; gap:var(--s2); flex:1 1 0; min-width:0; flex-wrap:wrap; }
   .ox-filt > * { flex:none; }
+  .ox-brk { display:none; }
   .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 280px; min-width:180px; }
   .ox-srch .ox-si { position:absolute; inset-inline-start:12px; color:var(--muted); display:flex; pointer-events:none; }
   .ox-srch .inp { width:100%; min-height:36px; height:36px; padding-inline-start:36px; font-size:var(--t-sm); }
@@ -252,12 +253,18 @@ export const OPPS_CRM_CSS = `
     .ox-seg { order:2; margin-inline-start:auto; }
     .ox-add { order:2; }
     .ox-tb > .sp { display:none; }
-    .ox-filt { order:3; flex:1 0 100%; margin:0; }
+    .ox-filt { order:3; flex:1 0 100%; }
   }
   @container oxl (max-width: 899px) {
     .ox-tb { gap:var(--s2); }
-    .ox-srch { flex:1 1 200px; }
-    .ox-filt { order:3; flex:1 0 100%; }
+    /* Phone: two rows. Search + primary; then the filters as a strip that scrolls INSIDE itself
+       (a phone has no room to wrap four selects) with the view switch beside it. */
+    .ox-srch { order:1; flex:1 1 150px; }
+    .ox-add { order:2; }
+    .ox-brk { display:block; order:3; flex-basis:100%; height:0; }
+    .ox-filt { order:4; flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow-x:auto; padding:3px; margin:-3px; scrollbar-width:none; }
+    .ox-seg { order:5; margin-inline-start:0; }
+    .ox-seg button { padding-inline:8px; }
     .ox-hr { display:none; }
     .ox-r { grid-template-columns:36px minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s3); }
     .ox-r .ox-c-chk { grid-row:1 / 5; grid-column:1; align-self:start; padding-top:2px; }
@@ -762,6 +769,7 @@ function opToolbar() {
   h += opSheet
     ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
     : '<button class="btn btn-teal ox-add" id="oxadd" onclick="opOpenSheet(this.id)">' + opIco("plus") + "إضافة فرصة</button>";
+  h += '<span class="ox-brk" aria-hidden="true"></span>';
   return h + "</div>";
 }
 
@@ -1054,7 +1062,7 @@ function opCreateDrawer() {
         '<input class="inp num" id="' + fid(k) + '" type="number" inputmode="decimal"' + rng + (ph ? ' placeholder="' + ph + '"' : "") +
         ' value="' + esc(l[k]) + '"' + errOf(k + "_" + i) + ' oninput="opLineSet(' + i + ',&quot;' + k + '&quot;,this.value)"></div>';
     };
-    b += '<div class="ox-lblk"><div class="hd"><span>المنتج ' + fmtN(i + 1) + "</span>" +
+    b += '<div class="ox-lblk"><div class="hd"><span>البند ' + fmtN(i + 1) + "</span>" +
       (d.lines.length > 1 ? '<button onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
       '<div class="ox-fld"><label for="' + fid("product") + '">المنتج <span class="req" aria-hidden="true">*</span></label>' +
       '<span class="ox-f ox-fw"><select id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
