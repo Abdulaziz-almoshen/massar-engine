@@ -99,11 +99,13 @@ export const OPPS_CRM_CSS = `
     /* Two compact columns: the six stage filters stay operable without pushing the first deal
        below the fold. */
     .ox-leg { display:grid; grid-template-columns:1fr 1fr; gap:2px var(--s2); margin-top:var(--s2); }
-    .ox-lg { width:100%; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto;
+    .ox-lg { width:100%; display:grid; grid-template-columns:auto minmax(0,max-content) 1fr; grid-template-rows:auto auto;
       column-gap:6px; row-gap:0; align-items:center; text-align:start; border-radius:var(--r-sm); min-height:40px; padding:4px 6px; }
     .ox-lg > .ox-dot { grid-row:1; grid-column:1; }
     .ox-lg > span:not(.n) { grid-row:1; grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-    .ox-lg .n { grid-row:1; grid-column:3; }
+    /* The count follows its own label, with no hairline: at the far end of a two-column chip it read
+       as belonging to the neighbouring stage. */
+    .ox-lg .n { grid-row:1; grid-column:3; justify-self:start; border:none; padding-inline-start:2px; }
     .ox-lg b { grid-row:2; grid-column:2 / 4; font-size:var(--t-xs); }
     .ox-fig { margin-block:2px var(--s2); }
     .ox-met { padding-block:6px; }
@@ -116,16 +118,21 @@ export const OPPS_CRM_CSS = `
   .ox-led { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
     overflow:hidden; container-type:inline-size; container-name:oxl; }
   .ox-tb { display:flex; align-items:center; gap:var(--s2); min-height:64px; padding:var(--s2) var(--s3);
-    border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
+    border-bottom:1px solid var(--line-soft); flex-wrap:nowrap; }
   .ox-tb .sp { flex:1; }
+  /* The filters are ONE strip that scrolls inside itself when the owner list gets long, so the
+     primary action never wraps onto a line of its own (it did at 1440 once owner names grew). */
+  .ox-filt { display:flex; align-items:center; gap:var(--s2); flex:1 1 auto; min-width:0; overflow-x:auto;
+    padding:3px; margin:-3px; scrollbar-width:thin; }
+  .ox-filt > * { flex:none; }
   .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 280px; min-width:180px; }
   .ox-srch .ox-si { position:absolute; inset-inline-start:12px; color:var(--muted); display:flex; pointer-events:none; }
   .ox-srch .inp { width:100%; min-height:36px; height:36px; padding-inline-start:36px; font-size:var(--t-sm); }
   .ox-f { position:relative; display:inline-flex; align-items:center; }
-  .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px;
+  .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px; max-width:170px;
     font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
     border:none; box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-sm);
-    padding-inline:12px 32px; cursor:pointer; max-width:190px; text-overflow:ellipsis;
+    padding-inline:12px 32px; cursor:pointer; text-overflow:ellipsis;
     transition:box-shadow var(--fast) var(--ease), background var(--fast) var(--ease); }
   .ox-f select:hover { box-shadow:inset 0 0 0 1px var(--ink-2); }
   .ox-f.on select { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
@@ -231,14 +238,24 @@ export const OPPS_CRM_CSS = `
     min-height:56px; padding-inline:var(--s2) var(--s3); border-bottom:1px solid var(--line-soft); }
   .ox-skel i { display:block; height:12px; border-radius:var(--r-sm); background:var(--skeleton); }
   @container oxl (max-width: 1119px) {
-    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.3fr) minmax(130px,1.1fr) 150px 116px 100px minmax(120px,1.1fr) 32px; }
+    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.2fr) minmax(150px,1.3fr) 140px 116px 100px minmax(120px,1fr) 32px; }
     .ox-c-src, .ox-hsrc { display:none; }
     .ox-srcsub { display:flex; }
+    /* Source sits under the product in this band, so the product gets ONE line — three stacked
+       lines made rows 70px tall and uneven. The full name is on the cell's title. */
+    .ox-pn { -webkit-line-clamp:1; }
+    /* Search and the primary action share the first toolbar row; the filter strip goes beneath. */
+    .ox-tb { flex-wrap:wrap; }
+    .ox-srch { order:1; }
+    .ox-seg { order:2; margin-inline-start:auto; }
+    .ox-add { order:2; }
+    .ox-tb > .sp { display:none; }
+    .ox-filt { order:3; flex:1 0 100%; margin:0; }
   }
   @container oxl (max-width: 899px) {
     .ox-tb { gap:var(--s2); }
     .ox-srch { flex:1 1 200px; }
-    .ox-filt { order:3; flex:1 0 100%; display:flex; gap:var(--s2); overflow-x:auto; padding-bottom:2px; }
+    .ox-filt { order:3; flex:1 0 100%; }
     .ox-hr { display:none; }
     .ox-r { grid-template-columns:36px minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s3); }
     .ox-r .ox-c-chk { grid-row:1 / 5; grid-column:1; align-self:start; padding-top:2px; }
@@ -340,6 +357,7 @@ export const OPPS_CRM_CSS = `
   .ox-fld .req { color:var(--s-fail-text); }
   .ox-fld .inp, .ox-fld select.inp { width:100%; min-height:38px; height:38px; font-size:var(--t-sm); border-radius:var(--r-sm); }
   .ox-fld .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
+  .ox-fld .inp.num:placeholder-shown { text-align:start; }
   .ox-fld select.inp { padding-block:0; padding-inline:12px; }
   .ox-dr input[list]::-webkit-calendar-picker-indicator, .ox-tb input[list]::-webkit-calendar-picker-indicator { display:none !important; opacity:0; }
   .ox-fld .inp[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
@@ -732,11 +750,12 @@ function opToolbar() {
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
   if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()">مسح التصفية</button>';
-  h += '<span class="sp"></span>';
+  h += "</span>";
+  /* The view switch sits OUTSIDE the scrolling filter strip, so it can never be scrolled out of
+     sight. */
   h += '<span class="ox-seg" role="group" aria-label="طريقة العرض">' +
     '<button aria-pressed="' + (opMode === "list") + '" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "قائمة</button>" +
     '<button aria-pressed="' + (opMode === "kanban") + '" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "كانبان</button></span>";
-  h += "</span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
   h += opSheet
     ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
@@ -791,7 +810,7 @@ function opRowHtml(l) {
              : '<span class="ox-nm">' + nm + "</span>") +
     (l.created_by === "المساعد" ? '<span class="ox-auto" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
     (opUnsaved(l.id) ? '<span class="ox-uns" title="تعديل لم يُحفظ">' + opIco("warn") + "</span>" : "") + "</div>";
-  h += '<div class="ox-c ox-c-pr" role="cell"><span class="ox-pn">' + esc(l.product) + "</span>" +
+  h += '<div class="ox-c ox-c-pr" role="cell"><span class="ox-pn" title="' + esc(l.product) + '">' + esc(l.product) + "</span>" +
     '<span class="ox-srcsub">' + opIco(l.source in OPP_ICO ? l.source : "other") + esc(opSrcLabel(l.source)) + "</span></div>";
   h += '<div class="ox-c ox-c-st" role="cell">' + opStageCell(l) + "</div>";
   h += '<div class="ox-c ox-c-vl' + (opPriced(l) ? "" : " unp") + '" role="cell">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>";
@@ -850,7 +869,8 @@ function opKanbanView() {
     var cap = opKCap[st.key] || OPP_KCAP;
     h += '<div class="ox-kcol" role="listitem" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">';
     h += '<div class="ox-kh"><div class="t">' + opDot(st.key) + "<span>" + esc(st.label) + '</span><span class="n">' + fmtN(cards.length) + "</span></div>" +
-      '<div class="v">' + (val ? opMoneyShort(val) : "بلا قيمة مسعَّرة") + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</div></div>";
+      '<div class="v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "")
+        : unp ? opNLine(unp) + " بلا تسعير" : "بلا قيمة مسعَّرة") + "</div></div>";
     cards.slice(0, cap).forEach(function (l) {
       h += '<div class="ox-kc' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="true"' +
         ' aria-label="' + esc(l.account_name) + " — " + esc(l.product) + '"' +
@@ -963,12 +983,13 @@ function opDetailDrawer(l) {
     '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist></section>";
   /* التفاصيل */
   var srcDD = esc(opSrcLabel(l.source));
-  if (l.source === "whatsapp") {
-    srcDD = opIco("whatsapp") + " " + srcDD + (l.source_ref ? " · " + esc(opCampName(l.source_ref)) : "") +
-      (l.phone ? ' · <a class="ox-lnk" href="#customer/' + esc(l.phone) + '">المحادثة ←</a>' : "");
-  }
+  if (l.source === "whatsapp") srcDD = opIco("whatsapp") + " " + srcDD;
+  /* One fact per row. Joined with «·», the conversation link wrapped to its own line and left a
+     dangling separator at the end of the campaign name. */
   b += '<section class="ox-sec" aria-labelledby="oxsec_d"><div class="ox-sech" id="oxsec_d">التفاصيل</div><dl class="ox-dl">' +
     "<dt>المصدر</dt><dd>" + srcDD + "</dd>" +
+    (l.source === "whatsapp" && l.source_ref ? "<dt>الحملة</dt><dd>" + esc(opCampName(l.source_ref)) + "</dd>" : "") +
+    (l.source === "whatsapp" && l.phone ? '<dt>المحادثة</dt><dd><a class="ox-lnk" href="#customer/' + esc(l.phone) + '">فتح المحادثة ←</a></dd>' : "") +
     (l.phone ? '<dt>الجوال</dt><dd><bdi dir="ltr">+' + esc(l.phone) + "</bdi></dd>" : "") +
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
@@ -1033,9 +1054,9 @@ function opCreateDrawer() {
     };
     b += '<div class="ox-lblk"><div class="hd"><span>المنتج ' + fmtN(i + 1) + "</span>" +
       (d.lines.length > 1 ? '<button onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
-      '<div class="ox-fld"><label for="' + fid("product") + '">الخدمة <span class="req" aria-hidden="true">*</span></label>' +
+      '<div class="ox-fld"><label for="' + fid("product") + '">المنتج <span class="req" aria-hidden="true">*</span></label>' +
       '<span class="ox-f ox-fw"><select id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
-      '<option value="">— اختر الخدمة —</option>' +
+      '<option value="">— اختر المنتج —</option>' +
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
       '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>" +
       '<div class="ox-g2">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
@@ -1372,7 +1393,7 @@ window.opSubmit = async function () {
   if (!d) return;
   if (!String(d.name || "").trim()) return opCreateInvalid("name", "اسم الجهة مطلوب.");
   var lines = d.lines.filter(function (l) { return String(l.product || "").trim(); });
-  if (!lines.length) return opCreateInvalid("product_0", "اختر خدمة واحدة على الأقل.");
+  if (!lines.length) return opCreateInvalid("product_0", "اختر منتجًا واحدًا على الأقل.");
   for (var i = 0; i < d.lines.length; i++) {
     if (!String(d.lines[i].product || "").trim()) continue;
     var ks = ["sale_price", "years", "qty", "discount"];
