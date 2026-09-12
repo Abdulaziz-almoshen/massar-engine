@@ -1515,6 +1515,7 @@ app.delete("/admin/notes/:id", async (req, reply) => {
 
 app.get("/admin/opps", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
   return { opps: await db.listOpps() };
 });
 

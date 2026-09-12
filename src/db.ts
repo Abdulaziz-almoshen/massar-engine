@@ -1621,6 +1621,15 @@ function rowToOpp(r: Record<string, unknown>): OppRow {
   };
 }
 
+/** A READ must not mistake «the database is briefly down» for «the table is empty». With a pool
+ *  latched off, listOpps() returns [] and the board rendered «لا فرص مسجّلة بعد» over six real
+ *  deals — captured on production 2026-09-12 during a massar-db health-check failure. Callers ask
+ *  this first and answer 503 instead. One probe on the latched path; free when already connected. */
+export async function canRead(): Promise<boolean> {
+  if (!enabled()) return true;          // memory-only mode by design: an empty ledger IS the truth
+  return reprobe();
+}
+
 export async function listOpps(): Promise<OppRow[]> {
   if (!pool || !connected) return [];
   return (await pool.query(`SELECT * FROM opportunities ORDER BY id DESC`)).rows.map(rowToOpp);
