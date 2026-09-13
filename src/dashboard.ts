@@ -777,7 +777,12 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let cache = null; let selProd = 0; let selProdName = ""; let selLost = "";
+let cache = null; let selProd = 0; let selProdName = "";
+// selLost is the NAME to show in the notice; selNeedsPick is the requirement it creates. They are
+// two facts: the product coming back ends the notice, it does not end the need for a human to
+// choose. Collapsing them re-selected the first eligible product on the next render — GPT's round-4
+// finding, and a regression the previous commit introduced while fixing the previous one.
+let selLost = ""; let selNeedsPick = false;
 // Behavioural segmentation. audMode «file» keeps the existing column-chip picker; «behaviour»
 // builds a live segment over the ledger. The two are modes of ONE step, not separate screens:
 // a behavioural audience is by definition outside WhatsApp's 24h window, so it can only be
@@ -1947,11 +1952,11 @@ window.campNameSet = (el) => { campName = el.value; };
 // silently swap the product a campaign is about to sell. A product the assistant cannot sell is not
 // selectable at all (V5 checklist 22/28).
 window.wizOpenProd = (name) => { location.hash = "#product/" + encodeURIComponent(name) + "/knowledge"; };
-window.pick = (i) => { const r = wizProducts(); if (!r[i] || r[i].eligible === false) return; selProd = i; selProdName = r[i].name; selLost = ""; render(false); };
+window.pick = (i) => { const r = wizProducts(); if (!r[i] || r[i].eligible === false) return; selProd = i; selProdName = r[i].name; selLost = ""; selNeedsPick = false; render(false); };
 window.launchWithProduct = (name) => {
   const reg = wizProducts();
   const i = reg.findIndex((x) => x.name === name);
-  selProdName = name; selLost = "";
+  selProdName = name; selLost = ""; selNeedsPick = false;
   if (i >= 0) selProd = i;
   retargetCohort = null;
   location.hash = "aimkt";
@@ -2301,13 +2306,13 @@ function vAimkt() {
   // failed read) a product is not gone, it is unknown, and clearing the choice there would blame the
   // operator for a network blip.
   const catalogueKnown = reg.length > 0;
-  if (catalogueKnown && selProdName && byName < 0) { selLost = selProdName; selProdName = ""; selProd = -1; }
-  else if (byName >= 0 && reg[byName].eligible === false) { selLost = selProdName; selProdName = ""; selProd = -1; }
-  // A product that comes BACK (restored, or its knowledge approved) ends the notice: the thing it
-  // warned about is no longer true.
+  if (catalogueKnown && selProdName && byName < 0) { selLost = selProdName; selNeedsPick = true; selProdName = ""; selProd = -1; }
+  else if (byName >= 0 && reg[byName].eligible === false) { selLost = selProdName; selNeedsPick = true; selProdName = ""; selProd = -1; }
+  // A product that comes BACK (restored, or its knowledge approved) ends the NOTICE — the thing it
+  // warned about stopped being true — but not the requirement to choose.
   if (selLost && reg.some((x) => x.name === selLost && x.eligible !== false)) selLost = "";
   else if (byName >= 0) selProd = byName;
-  else if (!selProdName && !selLost) {
+  else if (!selProdName && !selNeedsPick) {
     // Nothing chosen YET (never chosen, and nothing lost): land on the first sellable product.
     const firstOk = reg.findIndex((x) => x.eligible !== false);
     selProd = firstOk;
@@ -2331,6 +2336,10 @@ function vAimkt() {
       : "") +
     (lostSelection
       ? '<div role="alert" style="font-size:var(--t-sm);color:#7A5600;padding:10px 0;">لم يعد «' + esc(lostSelection) + '» متاحًا للحملات — اختر خدمة أخرى.</div>'
+      : selNeedsPick
+      // The product came back, so the warning is spent — but nothing is selected, and the screen
+      // must not leave that silent while a launch button sits below it.
+      ? '<div style="font-size:var(--t-sm);color:#656B76;padding:10px 0;">اختر الخدمة التي تبيعها هذه الحملة.</div>'
       : "") + '<div class="prods">' +
     reg.map((x, i) => {
       // Say which knowledge this service actually has. Removing the invented scores collapsed

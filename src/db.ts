@@ -2854,6 +2854,16 @@ export async function activeStageKeys(): Promise<string[]> {
   return (await listStages()).filter((s) => s.active).map((s) => s.key);
 }
 
+/** Where a line with no stage of its own STARTS: the first active, non-terminal rung in ladder
+ *  order. The INSERT used to default to 'contact' after validation had already passed, so pausing
+ *  «تواصل أولي» rejected a line that named it and accepted one that omitted it — the guard read a
+ *  field the database was about to fill in. The caller resolves the stage BEFORE validating now. */
+export async function defaultStageKey(): Promise<string> {
+  const live = (await listStages()).filter((s) => s.active && s.terminal === null)
+    .sort((a, b) => a.position - b.position);
+  return live.length ? live[0].key : "contact";
+}
+
 async function defaultPipelineId(): Promise<number | null> {
   if (!pool) return null;
   const r = await pool.query("SELECT id FROM pipelines WHERE product IS NULL ORDER BY id LIMIT 1");

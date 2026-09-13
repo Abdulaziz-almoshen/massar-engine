@@ -2093,7 +2093,12 @@ app.post("/admin/opps", async (req, reply) => {
   // NEW lines may only start on an ACTIVE rung; an existing line keeps whatever rung it is on
   // (see the PATCH route below, which allows the line's own stage too).
   const liveStages = await db.activeStageKeys();
+  // Resolve the stage the line will ACTUALLY be stored on before judging it: an omitted stage used
+  // to slip past the guard and be defaulted to «contact» by the INSERT, so a paused «contact»
+  // rejected the explicit form and accepted the silent one.
+  const startStage = await db.defaultStageKey();
   for (const l of lines) {
+    if (l.stage == null || l.stage === "") l.stage = startStage;
     const bad = db.validateOppLine(l, liveStages);
     if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
     if (!known.has(String(l.product).trim())) {

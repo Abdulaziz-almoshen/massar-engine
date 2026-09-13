@@ -781,6 +781,14 @@ function opSelect(id, label, value, opts, on, handler) {
    row the resting bar is taller than the one-row selection bar, and selecting a row made the whole
    table jump ~34px (final Claude sign-off). The height is read after each resting paint. */
 var opTbH = 0;
+/* The board runs on the ladder «إعدادات النظام» owns. If that read failed, the board is working from
+   the compiled fallback and should say so rather than quietly mislabelling a custom rung. */
+function opLadderNotice() {
+  if (typeof cfFailed === "undefined" || !cfFailed) return "";
+  return '<div class="ox-state" role="alert" style="padding:var(--s2);">' + opIco("warn") +
+    "تعذّر تحميل مراحل البيع — المعروض المراحل الأساسية، وقد تظهر مرحلة مخصصة باسمها البرمجي." +
+    '<button class="btn btn-ghost" data-op="ladderretry">أعد المحاولة</button></div>';
+}
 function opToolbar() {
   var sel = opSelIds();
   var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص"' + (sel.length && opTbH ? ' style="min-height:' + opTbH + 'px"' : "") + ">";
@@ -927,7 +935,14 @@ function opKanbanView() {
   var h = '<div class="ox-kb" role="list" aria-label="لوحة المراحل">';
   var withLines = {};
   (oppRows || []).forEach(function (o) { withLines[o.stage] = 1; });
-  OPP_ST.filter(function (st) { return st.active !== false || withLines[st.key]; }).forEach(function (st) {
+  /* A stage the ladder does not carry AT ALL — a custom rung whose config read failed — still has
+     deals on it. Give it a column built from opStage(), or those cards render nowhere: not in a
+     column, not in a count, just gone. */
+  var cols = OPP_ST.filter(function (st) { return st.active !== false || withLines[st.key]; });
+  Object.keys(withLines).forEach(function (k) {
+    if (!cols.some(function (st) { return st.key === k; })) cols.push(opStage(k));
+  });
+  cols.forEach(function (st) {
     /* The same ordering the list uses, applied inside each column, so switching views never reorders
        what the reader already scanned. */
     var inStage = {}; rows.forEach(function (l) { if (l.stage === st.key) inStage[l.id] = 1; });
@@ -1331,7 +1346,7 @@ function vOppsCrm() {
   } else if (oppRows) {
     h += opSummary();
   }
-  h += '<section class="ox-led" aria-label="بنود الفرص">' + opToolbar();
+  h += '<section class="ox-led" aria-label="بنود الفرص">' + opToolbar() + opLadderNotice();
   if (oppFailed && !oppRows) {
     h += '<div class="ox-state" role="alert">تعذّر تحميل الفرص.<span class="s">لم يُعرض شيء لأن الطلب فشل، لا لأن السجل فارغ.</span>' +
       '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
@@ -1475,6 +1490,7 @@ document.addEventListener("click", function (ev) {
   if (a === "escsave") { opEscSave(); return; }
   if (a === "escdone") { opEscResolve(Number(t.getAttribute("data-i")), Number(t.getAttribute("data-o"))); return; }
   if (a === "escretry") { var oid = Number(t.getAttribute("data-i")); opEscFailed[oid] = false; opEscLoad(oid, true); return; }
+  if (a === "ladderretry") { if (typeof cfLoad === "function") { cfFailed = false; cfLoad(true); } return; }
 });
 document.addEventListener("input", function (ev) {
   var t = ev.target; if (!t || !t.getAttribute) return;
