@@ -98,6 +98,9 @@ var tgtFilters = {};
    here rather than three; «who owns what» is the question you ask of a list, and the negation and the
    interest reading belong where an audience is being chosen. */
 var tgtProd = "";
+/* Exact operator tag (entities.productTags), set by the product record's «الجهات المستهدفة» link. */
+var tgtTagProd = "";
+window.tgtClearTagProd = function () { tgtTagProd = ""; render(false); };
 /* Selection lives here, keyed by id, and is INTERSECTED with the visible match on read — the same
    structural rule the reviewer forced on the campaigns list after a selection survived navigation
    and staged one campaign's phones under another campaign's name. */
@@ -117,6 +120,7 @@ function tgtMatches() {
   return entities.filter(function (e) {
     return Object.keys(tgtFilters).every(function (k) { return !tgtFilters[k] || ((e.attrs || {})[k] || "") === tgtFilters[k]; }) &&
       (!tgtProd || entUses(e, tgtProd)) &&
+      (!tgtTagProd || (e.productTags || []).indexOf(tgtTagProd) >= 0) &&
       (!q || e.name.includes(q) || e.phone.includes(q));
   });
 }
@@ -131,6 +135,7 @@ function tgtFacetBar() {
     '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="tq" class="inp" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
     'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
+  if (tgtTagProd) h += '<button class="px-toggle" aria-pressed="true" onclick="tgtClearTagProd()" title="إزالة تصفية المنتج">موسومة بـ: ' + esc(tgtTagProd) + ' ×</button>';
   groups.forEach(function (g, ki) {
     var on = Boolean(tgtFilters[g.key]);
     h += '<select class="crmsel' + (on ? " on" : "") + '" onchange="tgtSetAttr(' + ki + ', Number(this.value))"' +

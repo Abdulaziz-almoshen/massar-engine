@@ -68,6 +68,10 @@ function cusTopTag(c) {
    one department's list must not change what the pills report the ledger contains. Its own state,
    because a filter set while reading العملاء must not follow you into the campaign wizard. */
 var cusTagF = "";
+/* The assistant's interest READING (contacts.tags[].product), exact — not the operator's targeting label
+   (cusTagF). Set by the product record's «اهتمام رصده المساعد» link. */
+var cusProdF = "";
+window.cusClearProd = function () { cusProdF = ""; render(false); };
 function cusContacts() {
   var all = ((cache && cache.contacts) || []).slice();
   var q = cusQ.trim();
@@ -81,6 +85,7 @@ function cusContacts() {
     if (cusTab === "interested" && !cusTopTag(c) && c.outcome !== "interested") return false;
     if (cusTab === "stopped" && !(c.optedOut || c.outcome === "stopped")) return false;
     if (cusTagF && !contactTagged(c, cusTagF)) return false;
+    if (cusProdF && !(c.tags || []).some(function (t) { return t.product === cusProdF; })) return false;
     if (!q) return true;
     return (c.waName || "").includes(q) || (c.phone || "").includes(q) ||
       (c.tags || []).some(function (t) { return (t.product || "").includes(q); });
@@ -193,6 +198,7 @@ function cusControlBar(nTotal) {
           esc(clip(t.name, 26)) + "</option>";
       }).join("") + "</select>";
   }
+  if (cusProdF) h += '<button class="px-toggle" aria-pressed="true" onclick="cusClearProd()" title="إزالة تصفية المنتج">اهتمام رصده المساعد: ' + esc(cusProdF) + ' ×</button>';
   h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12px;" onclick="cusExport()">' + ic("doc", 15) + ' تصدير CSV</button>';
   h += '<span class="cntpill">' + fmtN(nTotal) + " جهة</span></div>";
   return h;

@@ -454,6 +454,8 @@ var opSort = "value";        /* value | recent | stage | account */
 var opSel = {};              /* selected LINE ids, keyed by id */
 var opQ = "", opStat = "all", opSrc = "all", opStg = "all";
 var opOwn = "all";           /* all | __none | <owner name> */
+/* Exact product, set by links from a product record so the list reproduces that record's count. */
+var opProd = "";
 var opShort = "";            /* "" | open | stalled | unpriced — the summary's shortcut metrics */
 var opDragId = null;
 var opOpen = 0;              /* id of the line whose drawer is open; 0 = none */
@@ -591,6 +593,7 @@ function opRender() { render(false); }
 /* ---- filters ---- */
 function opBaseMatch(l) {
   var q = opQ.trim();
+  if (opProd && l.product !== opProd) return false;
   if (opSrc !== "all" && l.source !== opSrc) return false;
   if (opOwn === "__none" && String(l.owner || "").trim()) return false;
   if (opOwn !== "all" && opOwn !== "__none" && String(l.owner || "").trim() !== opOwn) return false;
@@ -615,7 +618,7 @@ function opLines() {
     return opShortMatch(l);
   });
 }
-function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort; }
+function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort || opProd; }
 function opSorted() {
   var rows = opLines().slice();
   var pos = {}; OPP_ST.forEach(function (st, i) { pos[st.key] = i; });
@@ -766,6 +769,7 @@ function opToolbar() {
     h += opSelect("oxf_sort", opMode === "kanban" ? "ترتيب البطاقات داخل كل مرحلة" : "ترتيب", opSort,
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
+  if (opProd) h += '<button class="px-toggle" aria-pressed="true" onclick="opClearProd()" title="إزالة تصفية المنتج">المنتج: ' + esc(opProd) + " " + opIco("x") + "</button>";
   if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()" aria-label="مسح التصفية" title="مسح التصفية">' + opIco("x") + "مسح</button>";
   h += "</span>";
   /* The view switch sits OUTSIDE the scrolling filter strip, so it can never be scrolled out of
@@ -1202,7 +1206,8 @@ window.opSetSrc = function (v) { opSrc = v; opResetScope(); opRender(); };
 window.opSetOwn = function (v) { opOwn = v; opResetScope(); opRender(); };
 window.opSetShort = function (v) { opShort = opShort === v ? "" : v; opResetScope(); opRender(); };
 window.opSetStat = function (v) { opStat = v; opRender(); };
-window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opResetScope(); opRender(); };
+window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opProd = ""; opResetScope(); opRender(); };
+window.opClearProd = function () { opProd = ""; opResetScope(); opRender(); };
 window.opSearch = function (el) {
   opQ = el.value; clearTimeout(window.__opq);
   window.__opq = setTimeout(function () { opResetScope(); opRender(); }, 250);

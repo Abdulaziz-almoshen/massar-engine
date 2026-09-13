@@ -1,4 +1,5 @@
 import pg from "pg";
+import { createHash } from "node:crypto";
 import * as facts from "./facts.js";
 import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
@@ -590,6 +591,28 @@ ALTER TABLE opportunities ADD CONSTRAINT opp_package_product_fk
   DEFERRABLE INITIALLY IMMEDIATE;
 `,
   },
+  {
+    version: "007-products-v5",
+    sql: `
+-- KNOWLEDGE IS REVIEWED BEFORE THE ASSISTANT READS IT.
+--
+-- product_kb.md was written straight from the extraction model on upload, and the assistant read
+-- every row on its next refresh. Nobody looked at the text between the upload and the customer.
+-- The upload now lands in the draft_* columns; only «اعتماد المعرفة» copies a draft into md, and
+-- records WHO did it and WHEN. Rows that predate this step keep approved_at NULL — they were live
+-- without anyone recording an approval, and inventing one now would be a manufactured provenance
+-- (spec A′). They stop reaching the assistant until a human approves the text they can see.
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS draft_md     TEXT;
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS draft_source TEXT;
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS draft_by     TEXT;
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS draft_at     BIGINT;
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS approved_by  TEXT;
+ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS approved_at  BIGINT;
+-- Archive, never delete: a product referenced by a deal, a campaign or a reading must keep its
+-- name resolvable. NULL = live.
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS archived_at BIGINT;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -649,7 +672,9 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
   actions: ["id", "opp_id", "dept", "title", "state", "created_at"],
   sectors: ["id", "name"],
-  product_meta: ["product", "sector_id"],
+  product_meta: ["product", "sector_id", "archived_at"],
+  product_kb: ["product", "md", "source_filename", "updated_at", "draft_md", "draft_source", "draft_by", "draft_at", "approved_by", "approved_at"],
+  product_assets: ["product", "public_id", "filename", "content_type", "bytes", "updated_at"],
   targets: ["product", "year", "quarter", "amount"],
   engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
   packages: ["id", "product", "name", "list_price", "years", "scope", "retired_at", "created_at"],
@@ -1355,17 +1380,184 @@ export function saveInsights(phone: string, data: unknown, turnsAt: number): voi
 
 // ------------------------------ product hub (agent-readable KB) ------------------------------
 
-export async function listKb(): Promise<{ product: string; md: string; source_filename: string | null; updated_at: string }[]> {
-  if (!pool || !connected) return [];
-  return (await pool.query(`SELECT product, md, source_filename, updated_at FROM product_kb ORDER BY product`)).rows;
+export type KbRow = {
+  product: string; md: string; source_filename: string | null; updated_at: number;
+  draft_md: string | null; draft_source: string | null; draft_by: string | null; draft_at: number | null;
+  approved_by: string | null; approved_at: number | null;
+};
+
+const KB_COLS = "product, md, source_filename, updated_at, draft_md, draft_source, draft_by, draft_at, approved_by, approved_at";
+function rowToKb(x: any): KbRow {
+  return {
+    product: String(x.product), md: String(x.md ?? ""),
+    source_filename: x.source_filename == null ? null : String(x.source_filename),
+    updated_at: Number(x.updated_at) || 0,
+    draft_md: x.draft_md == null ? null : String(x.draft_md),
+    draft_source: x.draft_source == null ? null : String(x.draft_source),
+    draft_by: x.draft_by == null ? null : String(x.draft_by),
+    draft_at: x.draft_at == null ? null : Number(x.draft_at),
+    approved_by: x.approved_by == null ? null : String(x.approved_by),
+    approved_at: x.approved_at == null ? null : Number(x.approved_at),
+  };
 }
 
-export async function saveKb(product: string, md: string, sourceFilename: string): Promise<void> {
+/** Every product_kb row, drafts and provenance included. The ADMIN read — the assistant never
+ *  reads this; it reads runtimeKb(). */
+export async function listKb(): Promise<KbRow[]> {
+  if (!pool || !connected) return [];
+  return (await pool.query(`SELECT ${KB_COLS} FROM product_kb ORDER BY product`)).rows.map(rowToKb);
+}
+
+export async function knowledgeOf(product: string): Promise<KbRow | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const r = await pool.query(`SELECT ${KB_COLS} FROM product_kb WHERE product = $1`, [product]);
+  return r.rows[0] ? rowToKb(r.rows[0]) : null;
+}
+
+/** Hex SHA-256 of the exact UTF-8 text. The approval handshake: the reviewer approves the bytes
+ *  they were shown, and the server approves only if the stored bytes still hash the same. */
+export function sha256Hex(text: string): string {
+  return createHash("sha256").update(String(text ?? ""), "utf8").digest("hex");
+}
+
+/**
+ * The upload writer — and it writes the DRAFT, never md. kb.processDeck calls this with what the
+ * model extracted; nothing the model wrote reaches the assistant until approveKbDraft copies it.
+ * A product with no row yet gets one with md = '' so the draft has somewhere to live.
+ */
+export async function saveKb(product: string, md: string, sourceFilename: string, by: string | null = null): Promise<void> {
   if (!pool || !connected) throw new Error("db not connected — product hub requires Postgres");
   await pool.query(
-    `INSERT INTO product_kb (product, md, source_filename, updated_at) VALUES ($1,$2,$3,$4)
-     ON CONFLICT (product) DO UPDATE SET md = EXCLUDED.md, source_filename = EXCLUDED.source_filename, updated_at = EXCLUDED.updated_at`,
-    [product, md, sourceFilename, Date.now()]);
+    `INSERT INTO product_kb (product, md, source_filename, updated_at, draft_md, draft_source, draft_by, draft_at)
+     VALUES ($1, '', NULL, $4, $2, $3, $5, $4)
+     ON CONFLICT (product) DO UPDATE SET draft_md = EXCLUDED.draft_md, draft_source = EXCLUDED.draft_source,
+       draft_by = EXCLUDED.draft_by, draft_at = EXCLUDED.draft_at`,
+    [product, md, sourceFilename, Date.now(), by]);
+}
+
+/** kb.processDeck does not know who is uploading; the endpoint does, and stamps it after. */
+export async function setKbDraftBy(product: string, by: string): Promise<void> {
+  if (!pool || !connected) return;
+  await pool.query(`UPDATE product_kb SET draft_by = $2 WHERE product = $1 AND draft_md IS NOT NULL`, [product, by]);
+}
+
+/**
+ * «اعتماد المعرفة»: draft → md, atomically, and only if the draft is still the one the reviewer
+ * saw. FOR UPDATE so two reviewers cannot both approve different drafts of one product.
+ */
+export async function approveKbDraft(product: string, draftHash: string, by: string):
+  Promise<"ok" | "no_draft" | "stale"> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`SELECT draft_md, draft_source FROM product_kb WHERE product = $1 FOR UPDATE`, [product]);
+    const row = r.rows[0];
+    if (!row || row.draft_md == null) { await client.query("ROLLBACK"); return "no_draft"; }
+    if (sha256Hex(String(row.draft_md)) !== draftHash) { await client.query("ROLLBACK"); return "stale"; }
+    const now = Date.now();
+    await client.query(
+      `UPDATE product_kb SET md = draft_md, source_filename = draft_source, approved_by = $2, approved_at = $3,
+              updated_at = $3, draft_md = NULL, draft_source = NULL, draft_by = NULL, draft_at = NULL
+        WHERE product = $1`, [product, by, now]);
+    await client.query("COMMIT");
+    return "ok";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** «اعتماد النص الحالي» for a legacy row: records who approved the text as it stands. Content is
+ *  untouched — this is a signature, not an edit. */
+export async function approveKbCurrent(product: string, contentHash: string, by: string):
+  Promise<"ok" | "no_knowledge" | "stale"> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`SELECT md FROM product_kb WHERE product = $1 FOR UPDATE`, [product]);
+    const row = r.rows[0];
+    if (!row || !String(row.md ?? "").trim()) { await client.query("ROLLBACK"); return "no_knowledge"; }
+    if (sha256Hex(String(row.md)) !== contentHash) { await client.query("ROLLBACK"); return "stale"; }
+    await client.query(`UPDATE product_kb SET approved_by = $2, approved_at = $3 WHERE product = $1`,
+      [product, by, Date.now()]);
+    await client.query("COMMIT");
+    return "ok";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** Discard a draft. A row that held ONLY a draft (md = '') is removed with it, so «none» is a
+ *  missing row rather than an empty one. Approved text is never touched. */
+export async function discardKbDraft(product: string): Promise<boolean> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const r = await pool.query(
+    `UPDATE product_kb SET draft_md = NULL, draft_source = NULL, draft_by = NULL, draft_at = NULL
+      WHERE product = $1 AND draft_md IS NOT NULL`, [product]);
+  if (!(r.rowCount ?? 0)) return false;
+  await pool.query(`DELETE FROM product_kb WHERE product = $1 AND md = '' AND draft_md IS NULL`, [product]);
+  return true;
+}
+
+/**
+ * WHAT THE ASSISTANT READS (spec B′ rule 1). Approved text only, for a product that is a live,
+ * non-archived tag. Drafts, legacy rows, archived products and `__*` pseudo-products never
+ * appear here — not filtered later, not filtered by the prompt; they are not in the result.
+ */
+export async function runtimeKb(): Promise<{ product: string; md: string }[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(
+    `SELECT k.product, k.md
+       FROM product_kb k
+       JOIN tags t ON t.name = k.product
+       LEFT JOIN product_meta pm ON pm.product = k.product
+      WHERE k.approved_at IS NOT NULL AND k.md <> ''
+        AND pm.archived_at IS NULL
+        AND k.product NOT LIKE '\\_\\_%'
+      ORDER BY k.product`);
+  return r.rows.map((x: any) => ({ product: String(x.product), md: String(x.md) }));
+}
+
+/**
+ * WHAT THE ASSISTANT MAY SEND (spec B′ rule 3): the intro PDF of a runtime-eligible product —
+ * live tag, not archived, and either approved knowledge or membership of the embedded catalogue
+ * (passed in, because the catalogue constant lives above this tier).
+ */
+export async function runtimeAssets(embedded: readonly string[]):
+  Promise<{ product: string; public_id: string; filename: string }[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(
+    `SELECT a.product, a.public_id, a.filename
+       FROM product_assets a
+       JOIN tags t ON t.name = a.product
+       LEFT JOIN product_meta pm ON pm.product = a.product
+       LEFT JOIN product_kb k ON k.product = a.product
+      WHERE pm.archived_at IS NULL
+        AND a.product NOT LIKE '\\_\\_%'
+        AND ((k.approved_at IS NOT NULL AND k.md <> '') OR a.product = ANY($1::text[]))
+      ORDER BY a.product`, [[...embedded]]);
+  return r.rows.map((x: any) => ({ product: String(x.product), public_id: String(x.public_id), filename: String(x.filename) }));
+}
+
+/** Live (non-archived) tag names — what the wizard, the opps select and the launch guard treat
+ *  as the product line. */
+export async function activeTagNames(): Promise<string[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(
+    `SELECT t.name FROM tags t LEFT JOIN product_meta pm ON pm.product = t.name
+      WHERE pm.archived_at IS NULL ORDER BY t.name`);
+  return r.rows.map((x: any) => String(x.name));
+}
+
+export async function tagState(name: string): Promise<{ exists: boolean; archived: boolean }> {
+  if (!(await reprobe()) || !pool) return { exists: false, archived: false };
+  const r = await pool.query(
+    `SELECT pm.archived_at FROM tags t LEFT JOIN product_meta pm ON pm.product = t.name WHERE t.name = $1`, [name]);
+  if (!r.rows[0]) return { exists: false, archived: false };
+  return { exists: true, archived: r.rows[0].archived_at != null };
 }
 
 // ------------------------------ campaigns (launches) ------------------------------
@@ -2200,9 +2392,63 @@ export async function saveAsset(product: string, publicId: string, filename: str
     [product, publicId, filename, contentType, bytes, Date.now()]);
 }
 
-export async function listAssets(): Promise<{ product: string; public_id: string; filename: string }[]> {
+export async function listAssets():
+  Promise<{ product: string; public_id: string; filename: string; size: number; updated_at: number }[]> {
   if (!pool || !connected) return [];
-  return (await pool.query(`SELECT product, public_id, filename FROM product_assets ORDER BY product`)).rows;
+  return (await pool.query(
+    `SELECT product, public_id, filename, octet_length(bytes) AS size, updated_at FROM product_assets ORDER BY product`))
+    .rows.map((x: any) => ({
+      product: String(x.product), public_id: String(x.public_id), filename: String(x.filename),
+      size: Number(x.size) || 0, updated_at: Number(x.updated_at) || 0,
+    }));
+}
+
+/** The proposal-deck skill zip rides in product_assets under the `__skill__` pseudo-product. */
+export async function skillAsset(): Promise<{ publicId: string; filename: string } | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT public_id, filename FROM product_assets WHERE product = '__skill__'`);
+  return r.rows[0] ? { publicId: String(r.rows[0].public_id), filename: String(r.rows[0].filename) } : null;
+}
+
+/** Files whose product name is not a tag — an LLM-named upload, or a tag deleted from under its
+ *  files. Surfaced as «غير مطابق» rows, never hidden and never counted as products. */
+export async function unmatchedFiles(): Promise<{ name: string; kind: "kb" | "asset"; filename: string | null }[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(
+    `SELECT k.product AS name, 'kb' AS kind, COALESCE(k.draft_source, k.source_filename) AS filename
+       FROM product_kb k WHERE k.product NOT LIKE '\\_\\_%' AND NOT EXISTS (SELECT 1 FROM tags t WHERE t.name = k.product)
+     UNION ALL
+     SELECT a.product, 'asset', a.filename
+       FROM product_assets a WHERE a.product NOT LIKE '\\_\\_%' AND NOT EXISTS (SELECT 1 FROM tags t WHERE t.name = a.product)
+     ORDER BY 1, 2`);
+  return r.rows.map((x: any) => ({
+    name: String(x.name), kind: x.kind === "asset" ? "asset" : "kb", filename: x.filename == null ? null : String(x.filename),
+  }));
+}
+
+/**
+ * Move an off-registry kb row or asset row onto an existing tag, whole — md, draft and provenance
+ * travel together because they are one row. Refused when the target already has that kind: two
+ * knowledge files for one product is a merge decision, not a move.
+ */
+export async function reconcileFile(from: string, to: string, kind: "kb" | "asset"):
+  Promise<"ok" | "unknown_source" | "target_has"> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const table = kind === "kb" ? "product_kb" : "product_assets";     // frozen pair, never a caller's string
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const src = await client.query(`SELECT 1 FROM ${table} WHERE product = $1 FOR UPDATE`, [from]);
+    if (!src.rowCount) { await client.query("ROLLBACK"); return "unknown_source"; }
+    const dst = await client.query(`SELECT 1 FROM ${table} WHERE product = $1`, [to]);
+    if (dst.rowCount) { await client.query("ROLLBACK"); return "target_has"; }
+    await client.query(`UPDATE ${table} SET product = $2 WHERE product = $1`, [from, to]);
+    await client.query("COMMIT");
+    return "ok";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
 }
 
 export async function getAssetByPublicId(publicId: string):
@@ -2213,9 +2459,16 @@ export async function getAssetByPublicId(publicId: string):
 }
 
 export type CatalogueRow = {
-  product: string; sector: string | null; sectorAssumed: boolean;
+  product: string; sector: string | null; sectorId: number | null; sectorAssumed: boolean;
   owner: string | null; pricingNote: string | null;
   packages: { id: number; name: string; listPrice: number; years: number; scope: string | null }[];
+  retiredPackageCount: number;
+  archived: boolean; archivedAt: number | null;
+  createdAt: number;
+  /** The product_kb row's facts; the STATE is derived above this tier (kbStateOf). */
+  kb: { md: string; source: string | null; approvedBy: string | null; approvedAt: number | null; updatedAt: number } | null;
+  draft: { source: string | null; by: string | null; at: number | null; md: string } | null;
+  asset: { filename: string; publicId: string; size: number; updatedAt: number } | null;
 };
 
 /**
@@ -2231,22 +2484,31 @@ export type CatalogueRow = {
 export async function productCatalogue(): Promise<CatalogueRow[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query(
-    `SELECT t.name AS product, s.name AS sector,
+    `SELECT t.name AS product, t.created_at, s.name AS sector, pm.sector_id,
             COALESCE(pm.sector_assumed, false) AS sector_assumed,
-            pm.owner, pm.pricing_note,
+            pm.owner, pm.pricing_note, pm.archived_at,
             COALESCE(
               (SELECT json_agg(json_build_object(
                         'id', p.id, 'name', p.name, 'listPrice', p.list_price,
                         'years', p.years, 'scope', p.scope) ORDER BY p.list_price)
                  FROM packages p
-                WHERE p.product = t.name AND p.retired_at IS NULL), '[]'::json) AS packages
+                WHERE p.product = t.name AND p.retired_at IS NULL), '[]'::json) AS packages,
+            (SELECT COUNT(*) FROM packages p WHERE p.product = t.name AND p.retired_at IS NOT NULL) AS retired_count,
+            k.md AS kb_md, k.source_filename AS kb_source, k.approved_by, k.approved_at, k.updated_at AS kb_updated_at,
+            k.draft_md, k.draft_source, k.draft_by, k.draft_at,
+            a.filename AS asset_filename, a.public_id AS asset_public_id,
+            octet_length(a.bytes) AS asset_size, a.updated_at AS asset_updated_at
        FROM tags t
-       LEFT JOIN product_meta pm ON pm.product = t.name
-       LEFT JOIN sectors s       ON s.id = pm.sector_id
+       LEFT JOIN product_meta pm   ON pm.product = t.name
+       LEFT JOIN sectors s         ON s.id = pm.sector_id
+       LEFT JOIN product_kb k      ON k.product = t.name
+       LEFT JOIN product_assets a  ON a.product = t.name
+      WHERE t.name NOT LIKE '\\_\\_%'
       ORDER BY t.name`);
   return r.rows.map((x: any) => ({
     product: String(x.product),
     sector: x.sector ? String(x.sector) : null,
+    sectorId: x.sector_id == null ? null : Number(x.sector_id),
     sectorAssumed: Boolean(x.sector_assumed),
     owner: x.owner ? String(x.owner) : null,
     pricingNote: x.pricing_note ? String(x.pricing_note) : null,
@@ -2254,7 +2516,293 @@ export async function productCatalogue(): Promise<CatalogueRow[]> {
       id: Number(p.id), name: String(p.name), listPrice: Number(p.listPrice),
       years: Number(p.years), scope: p.scope ? String(p.scope) : null,
     })),
+    retiredPackageCount: Number(x.retired_count) || 0,
+    archived: x.archived_at != null,
+    archivedAt: x.archived_at == null ? null : Number(x.archived_at),
+    createdAt: Number(x.created_at) || 0,
+    kb: x.kb_md == null ? null : {
+      md: String(x.kb_md), source: x.kb_source == null ? null : String(x.kb_source),
+      approvedBy: x.approved_by == null ? null : String(x.approved_by),
+      approvedAt: x.approved_at == null ? null : Number(x.approved_at),
+      updatedAt: Number(x.kb_updated_at) || 0,
+    },
+    draft: x.draft_md == null ? null : {
+      source: x.draft_source == null ? null : String(x.draft_source),
+      by: x.draft_by == null ? null : String(x.draft_by),
+      at: x.draft_at == null ? null : Number(x.draft_at),
+      md: String(x.draft_md),
+    },
+    asset: x.asset_public_id == null ? null : {
+      filename: String(x.asset_filename), publicId: String(x.asset_public_id),
+      size: Number(x.asset_size) || 0, updatedAt: Number(x.asset_updated_at) || 0,
+    },
   }));
+}
+
+// ------------------------------ «المنتجات» V5 writers ------------------------------
+
+export type ProductImpact = {
+  openLines: number; campaigns: number; targetedEntities: number; interestReadings: number;
+  kb: boolean; asset: boolean; packages: number; targets: number;
+};
+
+/**
+ * What a product touches, for the rename modal, the archive hold and the delete guard. The
+ * predicates are the SAME ones the related links use (spec H′): campaigns by exact `product`,
+ * entities by product_tags membership, readings as distinct non-test phones in interest_tags.
+ */
+export async function impactOf(product: string): Promise<ProductImpact> {
+  const zero: ProductImpact = { openLines: 0, campaigns: 0, targetedEntities: 0, interestReadings: 0,
+    kb: false, asset: false, packages: 0, targets: 0 };
+  if (!(await reprobe()) || !pool) return zero;
+  const r = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM opportunities o WHERE o.product = $1 AND o.stage NOT IN ('won','lost')) AS open_lines,
+       (SELECT COUNT(*) FROM campaigns c WHERE c.product = $1) AS campaigns,
+       (SELECT COUNT(*) FROM entities e WHERE e.product_tags @> jsonb_build_array($1::text)) AS targeted,
+       (SELECT COUNT(DISTINCT i.phone) FROM interest_tags i LEFT JOIN contacts c ON c.phone = i.phone
+         WHERE i.product = $1 AND COALESCE(c.test, false) = false) AS readings,
+       EXISTS (SELECT 1 FROM product_kb k WHERE k.product = $1) AS kb,
+       EXISTS (SELECT 1 FROM product_assets a WHERE a.product = $1) AS asset,
+       (SELECT COUNT(*) FROM packages p WHERE p.product = $1 AND p.retired_at IS NULL) AS packages,
+       (SELECT COUNT(*) FROM targets t WHERE t.product = $1) AS targets`, [product]);
+  const x = r.rows[0];
+  return {
+    openLines: Number(x.open_lines) || 0, campaigns: Number(x.campaigns) || 0,
+    targetedEntities: Number(x.targeted) || 0, interestReadings: Number(x.readings) || 0,
+    kb: Boolean(x.kb), asset: Boolean(x.asset),
+    packages: Number(x.packages) || 0, targets: Number(x.targets) || 0,
+  };
+}
+
+/** Every row, in every product-keyed table, that still carries this name. Non-zero anywhere means
+ *  a delete would orphan data — the answer is archive. */
+export async function productReferences(name: string): Promise<{ total: number; counts: Record<string, number> }> {
+  const counts: Record<string, number> = {};
+  if (!(await reprobe()) || !pool) return { total: 0, counts };
+  for (const t of PRODUCT_NAME_TABLES) {
+    if (t === "product_meta") continue;      // the product's own metadata row is not a reference
+    const r = await pool.query(`SELECT COUNT(*) AS n FROM ${t} WHERE product = $1`, [name]);
+    const n = Number(r.rows[0]?.n) || 0;
+    if (n) counts[t] = n;
+  }
+  const e = await pool.query(`SELECT COUNT(*) AS n FROM entities WHERE product_tags @> jsonb_build_array($1::text)`, [name]);
+  if (Number(e.rows[0]?.n)) counts.entities = Number(e.rows[0].n);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return { total, counts };
+}
+
+/**
+ * Create a product: tag + product_meta + optional first package in ONE transaction, so the drawer
+ * never leaves a tag with no metadata row or a package on a tag that failed. "exists" rather than
+ * an exception on collision — the drawer shows it inline.
+ */
+export async function createProduct(p: {
+  name: string; sectorId: number | null; owner: string | null; pricingNote: string | null;
+  firstPackage: { name: string; listPrice: number; years: number; scope: string | null } | null;
+}, by: string): Promise<"ok" | "exists" | "unknown_sector"> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const now = Date.now();
+    const t = await client.query(
+      `INSERT INTO tags (name, created_at, created_by) VALUES ($1,$2,$3) ON CONFLICT (name) DO NOTHING RETURNING id`,
+      [p.name, now, by]);
+    if (!t.rowCount) { await client.query("ROLLBACK"); return "exists"; }
+    if (p.sectorId != null) {
+      const s = await client.query(`SELECT 1 FROM sectors WHERE id = $1`, [p.sectorId]);
+      if (!s.rowCount) { await client.query("ROLLBACK"); return "unknown_sector"; }
+    }
+    // A metadata row can predate the tag (a deleted product re-created, or a seed row); the
+    // drawer's values win, and a chosen sector is a fact rather than a guess.
+    await client.query(
+      `INSERT INTO product_meta (product, sector_id, owner, pricing_note, sector_assumed, archived_at, updated_at)
+       VALUES ($1,$2,$3,$4,false,NULL,$5)
+       ON CONFLICT (product) DO UPDATE SET sector_id = EXCLUDED.sector_id, owner = EXCLUDED.owner,
+         pricing_note = EXCLUDED.pricing_note, sector_assumed = false, archived_at = NULL, updated_at = EXCLUDED.updated_at`,
+      [p.name, p.sectorId, p.owner, p.pricingNote, now]);
+    if (p.firstPackage) {
+      await client.query(
+        `INSERT INTO packages (product, name, list_price, years, scope, created_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [p.name, p.firstPackage.name, Math.round(p.firstPackage.listPrice), Math.round(p.firstPackage.years),
+          p.firstPackage.scope, now]);
+    }
+    await client.query("COMMIT");
+    return "ok";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/**
+ * The product_meta writer the screens never had: sector, owner and pricing note were seeded once
+ * at boot and corrected by hand in SQL. Only the fields SENT change; sending sectorId — even the
+ * same value — is a human confirming it, so the «مُستنتَج» flag clears.
+ */
+export async function patchProductMeta(product: string, patch: {
+  sectorId?: number | null; owner?: string | null; pricingNote?: string | null;
+}): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const sendSector = patch.sectorId !== undefined;
+  const sendOwner = patch.owner !== undefined;
+  const sendNote = patch.pricingNote !== undefined;
+  const r = await pool.query(
+    `INSERT INTO product_meta (product, sector_id, owner, pricing_note, sector_assumed, updated_at)
+     VALUES ($1, $2, $3, $4, false, $8)
+     ON CONFLICT (product) DO UPDATE SET
+       sector_id      = CASE WHEN $5::boolean THEN EXCLUDED.sector_id    ELSE product_meta.sector_id END,
+       sector_assumed = CASE WHEN $5::boolean THEN false                 ELSE product_meta.sector_assumed END,
+       owner          = CASE WHEN $6::boolean THEN EXCLUDED.owner        ELSE product_meta.owner END,
+       pricing_note   = CASE WHEN $7::boolean THEN EXCLUDED.pricing_note ELSE product_meta.pricing_note END,
+       updated_at     = EXCLUDED.updated_at`,
+    [product, patch.sectorId ?? null, patch.owner ?? null, patch.pricingNote ?? null,
+      sendSector, sendOwner, sendNote, Date.now()]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+/** Archive or restore. Idempotent: archiving an archived product keeps its original moment. */
+export async function setArchived(product: string, archived: boolean): Promise<void> {
+  if (!pool || !connected) throw new Error("db not connected");
+  const now = Date.now();
+  await pool.query(
+    `INSERT INTO product_meta (product, archived_at, updated_at) VALUES ($1, $2, $3)
+     ON CONFLICT (product) DO UPDATE SET
+       archived_at = CASE WHEN $4::boolean THEN COALESCE(product_meta.archived_at, EXCLUDED.archived_at) ELSE NULL END,
+       updated_at  = EXCLUDED.updated_at`,
+    [product, archived ? now : null, now, archived]);
+}
+
+/** Identity-preserving package edit. A deal points at the package by id, so the id must survive
+ *  a rename; the composite FK and the quoted snapshot on the deal are what keep its money fixed. */
+export async function updatePackage(id: number, p: { name: string; listPrice: number; years: number; scope: string | null }):
+  Promise<PackageRow | null | "name_exists"> {
+  if (!(await reprobe()) || !pool) return null;
+  try {
+    const r = await pool.query(
+      `UPDATE packages SET name = $2, list_price = $3, years = $4, scope = $5 WHERE id = $1
+       RETURNING id, product, name, list_price, years, scope, retired_at`,
+      [id, p.name, Math.round(p.listPrice), Math.round(p.years), p.scope]);
+    const x = r.rows[0];
+    if (!x) return null;
+    return { id: Number(x.id), product: String(x.product), name: String(x.name),
+             listPrice: Number(x.list_price), years: Number(x.years),
+             scope: x.scope ? String(x.scope) : null,
+             retiredAt: x.retired_at == null ? null : Number(x.retired_at) };
+  } catch (e: any) {
+    if (e?.code === "23505") return "name_exists";
+    throw e;
+  }
+}
+
+/** «إزالة مستهدف الربع»: the row goes, so the quarter reads «بلا مستهدف» rather than «٠». */
+export async function deleteTarget(product: string, year: number, quarter: number): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(`DELETE FROM targets WHERE product = $1 AND year = $2 AND quarter = $3`, [product, year, quarter]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export type ProductPerformanceRow = {
+  product: string;
+  achieved: number; wonLines: number; lostLines: number;
+  openValue: number; openLines: number; unpricedOpenLines: number;
+  annualTarget: number | null; targetQuarters: number;
+  quarters: { quarter: number; target: number | null; achieved: number }[];
+};
+
+/**
+ * «الأداء — من سجل الفرص», one query for every product (spec G, G′).
+ *
+ *  · achieved / quarter achieved: lines CURRENTLY won whose LATEST transition into won falls in
+ *    the window — the salesPerformance rule, so this screen reconciles to «المستهدفات والأداء».
+ *  · won / lost lines: same predicate per terminal stage, over the fiscal year.
+ *  · open value: UNWEIGHTED, all periods, PRICED lines only; unpriced lines are counted, not summed,
+ *    because «٠ ر.س» over a line nobody priced is a claim, not a figure. No weighted number leaves
+ *    this function — the home band keeps its own and labels it «المرجَّح».
+ *  · target: NULL when no row, so «بلا مستهدف» is distinguishable from an explicit zero.
+ */
+export async function productPerformance(
+  year: number, bounds: readonly { quarter: number; startMs: number; endMs: number }[],
+): Promise<ProductPerformanceRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const vals = bounds.map((_, i) => `($${i * 3 + 1}::int, $${i * 3 + 2}::bigint, $${i * 3 + 3}::bigint)`).join(",");
+  const params = bounds.flatMap((b) => [b.quarter, b.startMs, b.endMs]);
+  const yearParam = `$${params.length + 1}`;
+  const r = await pool.query(
+    `WITH q(quarter, start_ms, end_ms) AS (VALUES ${vals}),
+     yr AS (SELECT MIN(start_ms) AS start_ms, MAX(end_ms) AS end_ms FROM q),
+     closed AS (
+       SELECT o.product, o.stage, ${OPP_VALUE_SQL} AS value, w.effective_at
+         FROM opportunities o
+         JOIN LATERAL (
+           SELECT e.effective_at FROM track_stage_events e
+            WHERE e.opp_id = o.id AND e.to_stage = o.stage
+            ORDER BY e.effective_at DESC LIMIT 1
+         ) w ON TRUE
+        WHERE o.stage IN ('won','lost')
+     ),
+     yr_closed AS (
+       SELECT c.product,
+              COALESCE(SUM(c.value) FILTER (WHERE c.stage = 'won'), 0) AS achieved,
+              COUNT(*) FILTER (WHERE c.stage = 'won')  AS won_lines,
+              COUNT(*) FILTER (WHERE c.stage = 'lost') AS lost_lines
+         FROM closed c, yr
+        WHERE c.effective_at >= to_timestamp(yr.start_ms / 1000.0)
+          AND c.effective_at <  to_timestamp(yr.end_ms / 1000.0)
+        GROUP BY c.product
+     ),
+     q_won AS (
+       SELECT c.product, q.quarter, COALESCE(SUM(c.value), 0) AS achieved
+         FROM closed c
+         JOIN q ON c.effective_at >= to_timestamp(q.start_ms / 1000.0)
+               AND c.effective_at <  to_timestamp(q.end_ms / 1000.0)
+        WHERE c.stage = 'won'
+        GROUP BY c.product, q.quarter
+     ),
+     openv AS (
+       SELECT o.product,
+              COALESCE(SUM(${OPP_VALUE_SQL}) FILTER (WHERE o.sale_price > 0), 0) AS open_value,
+              COUNT(*) FILTER (WHERE o.sale_price > 0)  AS open_lines,
+              COUNT(*) FILTER (WHERE o.sale_price <= 0) AS unpriced
+         FROM opportunities o
+        WHERE o.stage NOT IN ('won','lost')
+        GROUP BY o.product
+     ),
+     grid AS (SELECT t.name AS product, q.quarter FROM tags t CROSS JOIN q WHERE t.name NOT LIKE '\\_\\_%')
+     SELECT g.product, g.quarter,
+            tg.amount AS target,
+            COALESCE(qw.achieved, 0) AS q_achieved,
+            COALESCE(yc.achieved, 0) AS achieved,
+            COALESCE(yc.won_lines, 0) AS won_lines,
+            COALESCE(yc.lost_lines, 0) AS lost_lines,
+            COALESCE(ov.open_value, 0) AS open_value,
+            COALESCE(ov.open_lines, 0) AS open_lines,
+            COALESCE(ov.unpriced, 0) AS unpriced
+       FROM grid g
+       LEFT JOIN targets tg   ON tg.product = g.product AND tg.year = ${yearParam} AND tg.quarter = g.quarter
+       LEFT JOIN q_won qw     ON qw.product = g.product AND qw.quarter = g.quarter
+       LEFT JOIN yr_closed yc ON yc.product = g.product
+       LEFT JOIN openv ov     ON ov.product = g.product
+      ORDER BY g.product, g.quarter`,
+    [...params, year]);
+
+  const by = new Map<string, ProductPerformanceRow>();
+  for (const x of r.rows as any[]) {
+    const p = String(x.product);
+    const row = by.get(p) ?? {
+      product: p, achieved: Number(x.achieved) || 0,
+      wonLines: Number(x.won_lines) || 0, lostLines: Number(x.lost_lines) || 0,
+      openValue: Number(x.open_value) || 0, openLines: Number(x.open_lines) || 0,
+      unpricedOpenLines: Number(x.unpriced) || 0,
+      annualTarget: null, targetQuarters: 0, quarters: [],
+    };
+    const target = x.target == null ? null : Number(x.target);
+    row.quarters.push({ quarter: Number(x.quarter), target, achieved: Number(x.q_achieved) || 0 });
+    if (target !== null) { row.annualTarget = (row.annualTarget ?? 0) + target; row.targetQuarters++; }
+    by.set(p, row);
+  }
+  return [...by.values()];
 }
 
 /** The three sectors as stored, for a selector. Ordered as seeded. */

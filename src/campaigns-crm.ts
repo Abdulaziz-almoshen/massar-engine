@@ -367,6 +367,7 @@ function crmControlBar(nShown, nTotal) {
   h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
     '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
     '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
+  if (campProd) h += '<button class="px-toggle" aria-pressed="true" onclick="campClearProd()" title="إزالة تصفية المنتج">كل الحملات · المنتج: ' + esc(campProd) + ' ×</button>';
   h += '<span class="vtog">' +
     [["list", "قائمة"], ["group", "تجميع"], ["kanban", "كانبان"]].map(function (v) {
       return '<button class="' + (crmView === v[0] ? "on" : "") + '" onclick="crmSetView(&quot;' + v[0] + '&quot;)">' + v[1] + '</button>';
@@ -404,10 +405,14 @@ function crmControlBar(nShown, nTotal) {
 }
 
 /* ------------------------------- shared list plumbing ------------------------------- */
+/* Exact product, set by the product record's «الحملات» link so the list shows exactly its count. */
+var campProd = "";
+window.campClearProd = function () { campProd = ""; render(false); };
 function crmFiltered() {
   var q = campQ.trim();
   var list = campaigns.filter(function (c) {
     return (campTab === "all" || (campTab === "test") === campIsTest(c)) &&
+      (!campProd || (c.product || "") === campProd) &&
       (!q || c.name.includes(q) || (c.product || "").includes(q));
   });
   var withSt = list.map(function (c) { return { c: c, st: campStats(c) }; });

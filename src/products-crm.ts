@@ -1,4 +1,8 @@
-// products-crm.ts — «المنتجات»: the catalogue, its sectors, and what each product is worth.
+// products-crm.ts — «المنتجات»: ONE products section (V5, Sep 2026). The catalogue, each product's
+// record (performance, prices, targets, knowledge and files), create/edit/rename/archive, and the
+// proposal-skill download. «معرفة الخدمة» (#kb) was merged into it; #kb routes redirect here.
+//
+// Earlier header, kept for its history:
 //
 // This is the screen the sector layer and the package layer were built FOR. Both shipped as
 // endpoints with no UI, which meant everything behind them was invisible: the founder opened the
@@ -129,136 +133,1203 @@ export const PRODUCTS_CRM_CSS = `
   .pc-q{grid-template-columns:repeat(2,1fr)}
   .pc-sub,.pc-note{max-width:none}
 }
+
+/* ===================== «المنتجات» V5 — list, record, create ===================== */
+.px { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:pxw; }
+.px :focus { outline:none; }
+.px :focus-visible, .px-dr :focus-visible, .px-modal :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.px .btn-teal:focus-visible, .px-dr .btn-teal:focus-visible, .px-modal .btn-teal:focus-visible {
+  outline:2px solid var(--paper); outline-offset:2px; box-shadow:0 0 0 4px rgba(37,99,235,.35); }
+.px bdi { unicode-bidi:isolate; }
+
+/* readiness: four cells, colour + texture + a word */
+.px-cells { display:inline-flex; gap:2px; flex:none; }
+.px-cells i { display:block; width:16px; height:6px; border-radius:var(--r-sm); background:var(--s-issued); }
+.px-cells i.miss { background-color:var(--surface-2);
+  background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
+.px-cells i.pend { background:var(--s-attn-mark); }
+.px-ready { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.px-rw { font-size:var(--t-xs); color:var(--ink-2); line-height:1.35; }
+.px-rw.no { color:var(--s-attn-text); font-weight:500; }
+.px-rw.ok { color:var(--s-issued-text); font-weight:500; }
+
+/* list table */
+.px-t .ox-hr, .px-t .ox-r { grid-template-columns:minmax(200px,1fr) 168px 168px 112px 120px 120px 32px; column-gap:16px; padding-inline:var(--s3); }
+.px-t .ox-r { min-height:56px; padding-block:6px; }
+.px-c-nm { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.px-nm { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-sub { font-size:var(--t-xs); color:var(--muted); display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.px-read { font-size:var(--t-xs); font-weight:500; color:var(--ink-2); border:1px dashed var(--s-off-mark); border-radius:var(--r-pill); padding:0 6px; line-height:18px; flex:none; }
+.px-arch { font-size:var(--t-xs); font-weight:500; color:var(--s-off-text); box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-pill); padding:0 7px; line-height:18px; flex:none; }
+.px-price { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.px-price b { font-size:var(--t-sm); font-weight:600; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.px-price span { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-num { text-align:end; display:flex; flex-direction:column; gap:2px; align-items:flex-end; min-width:0; }
+.px-num b { font-size:var(--t-sm); font-weight:600; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.px-num span { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
+.px-num .none { font-size:var(--t-sm); color:var(--muted); font-weight:450; }
+.px-t .ox-hr .px-he { text-align:end; }
+.px-lg-b { display:inline-block; width:10px; height:10px; border-radius:3px; flex:none; }
+.px-actrow { display:flex; align-items:center; gap:var(--s2); min-height:48px; padding:var(--s2) var(--s3); background:var(--accent-bar);
+  color:var(--accent-deep); font-size:var(--t-sm); font-weight:500; border-bottom:1px solid var(--line-soft); }
+.px-actrow .sp { flex:1; }
+.px-actrow a, .px-actrow button.lnk { font-family:inherit; font-size:var(--t-sm); font-weight:600; color:var(--accent-deep);
+  background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--accent-mark); border-radius:var(--r-sm);
+  min-height:32px; padding-inline:12px; display:inline-flex; align-items:center; gap:6px; text-decoration:none; cursor:pointer; }
+.px-actrow .fn { font-size:var(--t-xs); color:var(--accent-deep); opacity:.85; }
+.px-um-h { font-family:inherit; width:100%; border:none; cursor:pointer; text-align:start; }
+.px-um-r { display:grid; grid-template-columns:minmax(0,1.2fr) 110px minmax(0,1fr) auto; gap:var(--s3); align-items:center;
+  min-height:52px; padding:var(--s1) var(--s3); border-bottom:1px solid var(--line-soft); font-size:var(--t-sm); }
+.px-um-r .nm { color:var(--ink); font-weight:500; border-block-end:1px dashed var(--s-off-mark); justify-self:start; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-um-r .k { font-size:var(--t-xs); color:var(--muted); }
+.px-um-r .fn { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-um-r .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
+.px-um-r select, .px-sel { font-family:inherit; height:32px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none;
+  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; max-width:190px; }
+.px-um-r .btn { height:32px; padding-inline:10px; font-size:var(--t-xs); }
+.px-toggle { font-family:inherit; height:36px; font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
+  border:none; box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-sm); padding-inline:12px; cursor:pointer; flex:none;
+  display:inline-flex; align-items:center; gap:6px; }
+.px-toggle[aria-pressed="true"] { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
+
+@container oxl (max-width: 1099px) {
+  .px-t .ox-hr, .px-t .ox-r { grid-template-columns:minmax(180px,1fr) 150px 150px 128px 120px 32px; }
+  .px-c-tg { display:none !important; }
+  .px-c-ach .px-tgsub { display:inline !important; }
+}
+.px-tgsub { display:none; }
+@container oxl (max-width: 899px) {
+  .px-t .ox-hr { display:none; }
+  .px-t .ox-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
+  .px-t .ox-r .px-c-nm { grid-row:1; grid-column:1; }
+  .px-t .ox-r .px-c-rd { grid-row:2; grid-column:1 / 3; flex-direction:row; align-items:center; gap:var(--s2); }
+  .px-t .ox-r .px-c-pr { grid-row:3; grid-column:1; }
+  .px-t .ox-r .px-c-ach { grid-row:3; grid-column:2; }
+  .px-t .ox-r .px-c-op { grid-row:4; grid-column:2; }
+  .px-t .ox-r .px-c-go { grid-row:1; grid-column:2; justify-self:end; }
+  .px-um-r { grid-template-columns:minmax(0,1fr); }
+}
+
+/* record */
+.px-back { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:600; color:var(--muted);
+  text-decoration:none; border-radius:var(--r-sm); align-self:flex-start; min-height:24px; }
+.px-back:hover { color:var(--accent-deep); }
+.px-head { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s3) var(--s4);
+  display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
+.px-head .tt { flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:var(--s2); }
+.px-head h1 { margin:0; font-size:var(--t-xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); letter-spacing:0;
+  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
+.px-head .meta { display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; font-size:var(--t-xs); color:var(--muted); }
+.px-head .meta .px-fi { display:inline-flex; align-items:center; gap:6px; }
+.px-head .meta label { font-weight:600; color:var(--muted); }
+.px-head .meta select, .px-head .meta input { font-family:inherit; height:32px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
+  border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; }
+.px-head .meta input { width:150px; }
+.px-head .meta select:focus, .px-head .meta input:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
+.px-head .end { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; position:relative; }
+.px-head .end .btn { height:38px; font-size:var(--t-sm); }
+.px-why { font-size:var(--t-xs); color:var(--s-attn-text); max-width:220px; line-height:1.4; }
+.px-menu { position:absolute; inset-block-start:calc(100% + 4px); inset-inline-end:0; z-index:var(--z-dropdown); background:var(--paper);
+  border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); min-width:220px; padding:4px; }
+.px-menu button { font-family:inherit; display:flex; width:100%; min-height:40px; align-items:center; gap:8px; padding-inline:12px; background:transparent;
+  border:none; border-radius:var(--r-sm); font-size:var(--t-sm); color:var(--ink); cursor:pointer; text-align:start; }
+.px-menu button:hover { background:var(--accent-wash); }
+.px-menu button[aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
+.px-menu .why { font-size:var(--t-xs); color:var(--muted); padding:0 12px 8px; line-height:1.5; }
+.px-rec { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); align-items:start; }
+.px-side { display:flex; flex-direction:column; gap:var(--s3); }
+@container pxw (min-width: 1100px) {
+  .px-rec { grid-template-columns:minmax(0,1fr) 320px; }
+  .px-side { position:sticky; inset-block-start:var(--s3); }
+}
+.px-main { display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
+.px-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); min-width:0; scroll-margin-top:var(--s4); }
+.px-sech { display:flex; align-items:center; gap:var(--s2); min-height:48px; padding:0 var(--s4); border-bottom:1px solid var(--line-soft); }
+.px-sech h2 { margin:0; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
+.px-sech .src { font-size:var(--t-xs); color:var(--muted); }
+.px-sech .sp { flex:1; }
+.px-secb { padding:var(--s3) var(--s4) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
+.px-fig { font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); font-variant-numeric:tabular-nums; }
+.px-fig.none { color:var(--muted); font-weight:500; font-size:var(--t-lg); }
+.px-note { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
+.px-stats { display:flex; gap:var(--s4); flex-wrap:wrap; }
+.px-stat { display:flex; flex-direction:column; gap:2px; }
+.px-stat .l { font-size:var(--t-xs); color:var(--muted); }
+.px-stat .v { font-size:var(--t-md); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+.px-qbar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:var(--s2); }
+.px-qc { display:flex; flex-direction:column; gap:4px; }
+.px-qc .trk { height:8px; border-radius:var(--r-pill); background-color:var(--surface-2); overflow:hidden; }
+.px-qc .trk.not { background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
+.px-qc .trk i { display:block; height:100%; background:var(--accent); border-radius:var(--r-pill); }
+.px-qc .l { font-size:var(--t-xs); color:var(--muted); display:flex; justify-content:space-between; gap:4px; }
+.px-list { display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; }
+.px-li { font-family:inherit; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:var(--s3); align-items:center; min-height:44px;
+  padding:var(--s1) var(--s3); background:transparent; border:none; text-align:start; cursor:pointer; font-size:var(--t-sm); color:var(--ink); text-decoration:none; }
+.px-li + .px-li { border-top:1px solid var(--line-soft); }
+.px-li:hover { background:var(--accent-wash); }
+.px-li .a { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-li .s { font-size:var(--t-xs); color:var(--muted); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.px-li .v { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.px-more { font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); text-decoration:none; align-self:flex-start; min-height:24px; display:inline-flex; align-items:center; }
+
+.px-pk { display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; }
+.px-pkh, .px-pkr { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 72px 128px auto; gap:var(--s3); align-items:center; padding:0 var(--s3); }
+.px-pkh { min-height:36px; background:var(--surface); font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+.px-pkr { min-height:48px; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
+.px-pkr .end, .px-pkh .end { text-align:end; font-variant-numeric:tabular-nums; }
+.px-pkr .acts { display:flex; gap:6px; justify-content:flex-end; }
+.px-pkr .acts .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
+.px-pkr.retired { color:var(--muted); }
+.px-pke { border-top:1px solid var(--line-soft); padding:var(--s3); background:var(--accent-wash); display:flex; flex-direction:column; gap:var(--s2); }
+.px-pke .g { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 96px 140px; gap:var(--s2); }
+.px-pke .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
+.px-pke .acts .btn { height:34px; font-size:var(--t-sm); }
+.px-fl { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.px-fl label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+.px-fl .inp { width:100%; min-height:36px; height:36px; font-size:var(--t-sm); border-radius:var(--r-sm); }
+.px-fl .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
+.px-fl .inp[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
+.px-err { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; }
+.px-ok { font-size:var(--t-xs); color:var(--s-issued-text); }
+
+.px-q { display:grid; grid-template-columns:72px 176px minmax(0,1fr) 140px; gap:var(--s3); align-items:center; min-height:52px; border-top:1px solid var(--line-soft); }
+.px-q:first-of-type { border-top:none; }
+.px-q .lb { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
+.px-q .ach { font-size:var(--t-sm); color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.px-q .cov { display:flex; flex-direction:column; gap:3px; }
+.px-q .cov .trk { height:6px; border-radius:var(--r-pill); background-color:var(--surface-2); overflow:hidden; }
+.px-q .cov .trk.not { background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
+.px-q .cov .trk i { display:block; height:100%; background:var(--accent); }
+.px-q .cov span { font-size:var(--t-xs); color:var(--muted); }
+.px-qf { display:flex; flex-direction:column; gap:3px; }
+.px-qf .inp { height:36px; min-height:36px; text-align:end; font-variant-numeric:tabular-nums; font-size:var(--t-sm); width:100%; }
+.px-confirm { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-xs); color:var(--s-attn-text); grid-column:1 / -1; padding-bottom:var(--s2); }
+.px-confirm .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
+.px-yr { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; }
+.px-yr button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--muted-2); background:transparent; border:none; border-radius:var(--r-sm); height:28px; padding-inline:10px; cursor:pointer; }
+.px-yr button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
+
+.px-file { display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:var(--s3); align-items:center; min-height:64px; border-top:1px solid var(--line-soft); padding-block:var(--s2); }
+.px-file:first-of-type { border-top:none; }
+.px-file .t { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
+.px-file .d { font-size:var(--t-xs); color:var(--muted); line-height:1.6; overflow-wrap:anywhere; }
+.px-file .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+.px-file .acts .btn, .px-file .acts .rv-hold { height:34px; font-size:var(--t-xs); padding-inline:12px; }
+.px-file .acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
+.px-draft { border:1px solid var(--s-attn-mark); border-radius:var(--r-md); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); background:var(--paper); }
+.px-draft .h { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); font-weight:600; color:var(--s-attn-text); }
+.px-draft .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
+.px-draft .acts .btn, .px-draft .acts .rv-hold { height:36px; font-size:var(--t-sm); padding-inline:14px; }
+.px-draft .acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
+.px-md { max-height:420px; overflow:auto; border:1px solid var(--line-soft); border-radius:var(--r-md); padding:var(--s3); line-height:var(--lh-loose); background:var(--paper); }
+.px-acc > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--s2); min-height:40px; font-size:var(--t-sm); font-weight:600; color:var(--ink); border-radius:var(--r-sm); }
+.px-acc > summary::-webkit-details-marker { display:none; }
+.px-acc > summary .ox-ico { transition:transform var(--base) var(--ease); }
+.px-acc[open] > summary .ox-ico { transform:rotate(180deg); }
+.px-acc > summary .src { font-size:var(--t-xs); font-weight:450; color:var(--muted); }
+
+.px-rd { display:flex; flex-direction:column; }
+.px-rdr { display:grid; grid-template-columns:16px minmax(0,1fr) auto; gap:var(--s2); align-items:center; min-height:44px; border-top:1px solid var(--line-soft); padding-block:4px; }
+.px-rdr:first-child { border-top:none; }
+.px-rdr i { width:16px; height:6px; border-radius:var(--r-sm); background:var(--s-issued); display:block; }
+.px-rdr i.miss { background-color:var(--surface-2); background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
+.px-rdr i.pend { background:var(--s-attn-mark); }
+.px-rdr .n { font-size:var(--t-sm); color:var(--ink); }
+.px-rdr .st { font-size:var(--t-xs); color:var(--muted); line-height:1.4; }
+.px-rdr .go { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:transparent; border:none; cursor:pointer; min-height:28px; padding-inline:6px; border-radius:var(--r-sm); white-space:nowrap; }
+.px-rdf { font-size:var(--t-xs); font-weight:600; padding-top:var(--s2); border-top:1px solid var(--line-soft); }
+.px-rdf.no { color:var(--s-attn-text); } .px-rdf.ok { color:var(--s-issued-text); }
+.px-lk { font-family:inherit; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s2); align-items:center; min-height:44px; width:100%;
+  background:transparent; border:none; border-top:1px solid var(--line-soft); text-align:start; cursor:pointer; font-size:var(--t-sm); color:var(--ink); padding:0; }
+.px-lk:first-child { border-top:none; }
+.px-lk:hover .l { color:var(--accent-deep); }
+.px-lk .v { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; display:inline-flex; gap:6px; align-items:center; font-variant-numeric:tabular-nums; }
+.px-lk .v b { color:var(--ink); font-weight:600; font-size:var(--t-sm); }
+.px-foot { font-size:var(--t-xs); color:var(--muted); padding-inline:var(--s1); }
+
+/* drawer + modal (own classes: the opportunities drawer owns .ox-dr and its keyboard handler) */
+.px-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(520px,100vw); background:var(--paper);
+  border-inline-end:1px solid var(--line); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); z-index:var(--z-modal);
+  display:flex; flex-direction:column; transform:translateX(100%); opacity:0;
+  transition:transform var(--base) var(--ease), opacity var(--fast) var(--ease); }
+[dir="ltr"] .px-dr { transform:translateX(-100%); }
+.px-dr.in, [dir="ltr"] .px-dr.in { transform:none; opacity:1; }
+.px-modal { position:fixed; inset:0; z-index:var(--z-modal); display:flex; align-items:flex-start; justify-content:center; padding:10vh var(--s3) var(--s3); pointer-events:none; }
+.px-modal .box { pointer-events:auto; width:100%; max-width:480px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
+  box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); padding:var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
+.px-modal h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); }
+.px-modal .acts { display:flex; gap:var(--s2); flex-wrap:wrap; }
+.px-modal .acts .btn { height:38px; font-size:var(--t-sm); }
+@media (prefers-reduced-motion: reduce) { .px-dr { transition:none; } }
+@media (max-width: 560px) {
+  .px-pkh { display:none; }
+  .px-pkr { grid-template-columns:minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s2); }
+  .px-pke .g { grid-template-columns:minmax(0,1fr); }
+  .px-q { grid-template-columns:minmax(0,1fr) minmax(0,1fr); row-gap:6px; padding-block:var(--s2); }
+  .px-q .lb { grid-column:1 / -1; }
+  .px-head .meta input { width:100%; }
+  .px-qbar { grid-template-columns:repeat(2, minmax(0,1fr)); }
+}
+@media (pointer:coarse) {
+  .px-toggle, .px-sel, .px-um-r select, .px-rdr .go, .px-li, .px-lk { min-height:44px; }
+}
 `;
 
 export const PRODUCTS_CRM_JS = `
-/* ============================ products-crm (client) ============================ */
-var pcCat = null, pcSectors = null, pcQuarters = null, pcLoading = false;
-
-function pcLoad(force) {
-  if (pcLoading || (pcCat && !force)) return;
-  pcLoading = true;
-  var h = { headers: { "x-admin-token": TOKEN } };
-  Promise.all([
-    fetch("/admin/products", h).then(function (r) { return r.json(); }),
-    fetch("/admin/sales/sectors", h).then(function (r) { return r.json(); }),
-    fetch("/admin/sales/quarters", h).then(function (r) { return r.json(); })
-  ]).then(function (out) {
-    pcCat = out[0].products || [];
-    pcSectors = out[1];
-    pcQuarters = out[2];
-    pcLoading = false; render(false);
-  }).catch(function () { pcCat = []; pcLoading = false; render(false); });
-}
-
 /* Money, via the same helper the performance screen uses, so two screens cannot format one figure
    two ways. Arabic-Indic numerals come from fmtN. */
 function pcMoney(n) { return fmtN(Math.round(Number(n) || 0)) + " ر.س"; }
-
-/* A YEAR is not a quantity: fmtN groups thousands, so ٢٠٢٦ printed as «٢٬٠٢٦». sales-crm already
-   solved this with arYear, and this screen uses that one rather than adding a second answer. */
-
 function pcBar(pct, cap) {
   var w = Math.max(0, Math.min(100, Number(pct) || 0));
   return '<div class="crm-bar" style="max-width:' + (cap || 120) + 'px"><i style="width:' + w + '%"></i></div>';
 }
 
-function vProductsCrm() {
-  pcLoad(false);
-  if (typeof opLoad === "function") opLoad(false);
-  if (!pcCat) return '<div class="sh-tiles">' +
-    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div>' +
-    '<div class="sh-tile">' + moSkeleton(2, ["w60", "w80"]) + '</div></div>' +
-    '<div style="margin-block-start:20px">' + moSkeleton(5, ["w80", "w60", "w40"]) + '</div>';
+/* ============================ products-crm V5 (client) ============================
+   ONE products section. The catalogue (tags) is the only registry; knowledge, the intro PDF,
+   prices, targets and performance hang off it. Spec: docs/designs/products-v5-spec.md.
+   Rules (readiness, eligibility, name validation, coverage, price summary) come from the business
+   tier, PRODUCT_DOMAIN_JS, so the list, the record, the wizard and the server agree by construction. */
+var pcCat = null, pcSectors = null, pcQuarters = null, pcLoading = false, pcFailed = false;
+var pcUnmatched = [], pcSkill = null, pcSectorList = [];
+var pcPerf = {}, pcPerfLoading = {}, pcPerfFailed = {};
+var pcPerfYear = new Date().getFullYear();
+var pcUnmatchedOpen = false;
 
-  var withPkg = pcCat.filter(function (p) { return p.packages && p.packages.length; }).length;
-  var noSector = pcCat.filter(function (p) { return !p.sector; }).length;
-  var assumed = pcCat.filter(function (p) { return p.sectorAssumed; }).length;
-  var pkgCount = pcCat.reduce(function (n, p) { return n + ((p.packages || []).length); }, 0);
-  var h = "";
+/* list state — survives opening a record and pressing Back */
+var pxQ = "", pxSector = "all", pxReadyF = "all", pxSort = "name", pxShort = "", pxArchived = false, pxOnly = "";
+var pxListScroll = 0;
+/* record + write state */
+var pxKnow = {}, pxKnowLoading = {}, pxKnowFailed = {};
+var pxRetired = {}, pxShowRetired = {};
+var pxFState = {};            /* "product|field" -> { s: pending|saved|failed|invalid, v, m } */
+var pxPkgEdit = null;         /* { product, id (0 = new), d: {name,listPrice,years,scope}, err, busy } */
+var pxQConfirm = {};          /* "product|year|quarter" -> true while a clear awaits confirmation */
+var pxUp = {};                /* "product|kind" -> { s: busy|failed|done, m } */
+var pxMenuOpen = false;
+var pxSheet = null;           /* create draft */
+var pxSheetErr = "", pxSheetBusy = false, pxDrShown = false;
+var pxModal = null;           /* { kind:"rename", product, to, impact, err, busy } */
+var pxAppr = {};              /* "product" -> { busy, err } */
+var pxOpener = "";
 
-  /* ---- tiles: figure at the inline-end, the lead one on a wash ---- */
-  h += '<div class="sh-tiles">' +
-    '<div class="sh-tile lead"><div><div class="k">المنتجات</div>' +
-      '<div class="s">في سجل الوسوم</div></div><div class="v">' + fmtN(pcCat.length) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">لها سعر منشور</div>' +
-      '<div class="s">' + fmtN(pkgCount) + ' باقة · البقية «يحدده المختص»</div></div>' +
-      '<div class="v">' + fmtN(withPkg) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">قطاع مُستنتَج</div>' +
-      '<div class="s">تصنيف لم يؤكَّد بعد</div></div><div class="v">' + fmtN(assumed) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">بلا قطاع</div>' +
-      '<div class="s">لا تدخل في أي مجموع قطاعي</div></div><div class="v">' + fmtN(noSector) + '</div></div>' +
-  '</div>';
+function pxT() { return { headers: { "x-admin-token": TOKEN } }; }
+function pxJson(method, url, body) {
+  return fetch(url, { method: method, headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j || {} }; }); });
+}
+function pxEnc(name) { return encodeURIComponent(name); }
+function pxMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v) || 0)) + " ر.س</bdi>"; }
+function pxPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
+function pxNProd(n) { return pxPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
+function pxNLine(n) { return pxPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
+function pxNPkg(n) { return pxPl(n, "باقة واحدة", "باقتان", "باقات", "باقة"); }
+function pxNCamp(n) { return pxPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
+function pxNEnt(n) { return pxPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
+function pxIco(n, cls) { return typeof opIco === "function" ? opIco(n, cls) : ""; }
+function pxToast(msg, bad, act, fn) { if (typeof opToast === "function") opToast(msg, bad, act, fn); else moToast(msg); }
 
-  /* NO SECTOR / QUARTER / ATTAINMENT REPORTS HERE. They were added on 2026-09-08 and removed the
-     same day on the founder's instruction, and he was right: they are the SAME three reports
-     الرئيسية already carries, so this page had stopped being about products and become a second
-     copy of the home board. #products answers «what do we sell and at what price» — the catalogue
-     and the per-product target grid below. The company-level roll-ups belong on الرئيسية, once. */
-
-  /* ---- product x quarter grid ---- */
-  /* ---- ONE TABLE: the catalogue AND its targets ----
-     These were two sections listing the same products, one saying what each costs and the other
-     saying what each is meant to earn — so answering «is the thing we sell at 18,000 actually
-     hitting its number» meant scrolling between two tables and matching names by eye.
-
-     The join is the product NAME and it is a UNION, deliberately. A product priced but untargeted
-     keeps its row with «—» in the target columns; a product targeted but absent from the catalogue
-     keeps its row with its pricing note. Inner-joining would have silently dropped exactly the
-     products worth looking at — the ones set up in one place and not the other. */
-  var byName = {};
-  var order = [];
-  (pcCat || []).forEach(function (p) {
-    byName[p.product] = { product: p.product, cat: p, q: null };
-    order.push(p.product);
-  });
-  ((pcQuarters && pcQuarters.byProduct) || []).forEach(function (p) {
-    if (!byName[p.product]) { byName[p.product] = { product: p.product, cat: null, q: null }; order.push(p.product); }
-    byName[p.product].q = p;
-  });
-
-  h += '<div class="sh-sec"><div class="sh-h">الكتالوج والمستهدف' +
-    (pcQuarters ? " · " + arYear(pcQuarters.year) : "") + '</div>' +
-    '<div class="sh-hs">كل منتج، قطاعه، سعره المنشور، ومستهدفه السنوي. اضغط منتجًا لأرباعه وفرصه وباقاته. ' +
-    'المنتج بلا سعر يعرض نص التسعير كما هو مكتوب، والمنتج بلا مستهدف يعرض «—» لا صفر.</div>';
-  if (!order.length) {
-    h += shEmpty("box", "لا منتجات في السجل", "يظهر هنا كل وسم منتج. أضف وسمًا من «جهات الاستهداف» وسيظهر بقطاعه وباقاته.");
-  } else {
-    // NO QUARTER COLUMNS HERE. The product record already owns the quarterly breakdown, and
-    // carrying ر١-ر٤ on the list as well printed the same eight target/achieved figures on two
-    // screens. The list answers «what do we sell, and is it hitting its number»; the record
-    // answers «why». Six columns also fit without a horizontal scroll, which nine never did.
-    h += '<div class="crm-scroll"><table class="crm-tbl"><thead><tr>' +
-      "<th>المنتج</th><th>السعر المنشور</th>" +
-      '<th class="crm-money">المستهدف السنوي</th>' +
-      '<th class="crm-money">المحقق</th><th>الإنجاز</th></tr></thead><tbody>';
-    order.forEach(function (nm) {
-      var row = byName[nm], c = row.cat, q = row.q;
-      var price = c && c.packages && c.packages.length
-        ? c.packages.map(function (k) {
-            return esc(k.name) + " " + pcMoney(k.listPrice) + (k.scope ? " (" + esc(k.scope) + ")" : "");
-          }).join(" · ")
-        : esc((c && c.pricingNote) || "لا سعر منشور");
-      var cov = q ? q.coveragePct : null;
-      var cls = cov === null ? "crm-none" : (cov >= 100 ? "crm-ok" : (cov >= 70 ? "crm-warn" : "crm-bad"));
-      var sector = c
-        ? (c.sector ? esc(c.sector) : '<span style="color:var(--s-attn-text)">بلا قطاع</span>') +
-          (c.sectorAssumed ? '<span class="pc-assumed" title="القطاع مُستنتَج ولم يؤكَّد">مُستنتَج</span>' : "")
-        : '<span style="color:var(--muted)">خارج الكتالوج</span>';
-      h += '<tr class="pcrow" data-go="product" data-nm="' + esc(nm) + '">' +
-        '<td><b>' + esc(nm) + '</b><div class="sub">' + sector + '</div></td>' +
-        '<td class="pcprice">' + price + "</td>" +
-        '<td class="crm-money">' + (q && q.annualTarget ? fmtN(q.annualTarget) : "—") + "</td>" +
-        '<td class="crm-money">' + (q ? fmtN(q.achieved) : "—") + "</td>" +
-        '<td><span class="crm-st ' + cls + '"><i></i>' + (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + "</span></td></tr>";
+function pcLoad(force) {
+  if (pcLoading) return;
+  if (pcCat && !force) return;
+  if (pcFailed && !force) return;
+  pcLoading = true;
+  var h = pxT();
+  fetch("/admin/products", h).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (j) {
+    pcCat = j.products || []; pcUnmatched = j.unmatched || []; pcSkill = j.skill || null;
+    pcSectorList = j.sectors || []; pcFailed = false;
+  }).catch(function () { pcFailed = true; })
+    .then(function () {
+      return Promise.all([
+        fetch("/admin/sales/sectors", h).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+        fetch("/admin/sales/quarters", h).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      ]);
+    }).then(function (out) {
+      if (out && out[0]) pcSectors = out[0];
+      if (out && out[1]) pcQuarters = out[1];
+      pcLoading = false; render(false);
     });
-    h += "</tbody></table></div>";
+}
+function pcPerfLoad(year, force) {
+  if (pcPerfLoading[year]) return;
+  if (pcPerf[year] && !force) return;
+  if (pcPerfFailed[year] && !force) return;
+  pcPerfLoading[year] = true;
+  fetch("/admin/products/performance?year=" + year, pxT()).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
+  }).then(function (j) {
+    var by = {}; (j.byProduct || []).forEach(function (x) { by[x.product] = x; });
+    pcPerf[year] = by; pcPerfFailed[year] = false;
+  }).catch(function () { pcPerfFailed[year] = true; })
+    .then(function () { pcPerfLoading[year] = false; render(false); });
+}
+function pxKnowLoad(name, force) {
+  if (pxKnowLoading[name]) return;
+  if (pxKnow[name] && !force) return;
+  if (pxKnowFailed[name] && !force) return;
+  pxKnowLoading[name] = true;
+  fetch("/admin/products/knowledge?product=" + pxEnc(name), pxT()).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
+  }).then(function (j) { pxKnow[name] = j; pxKnowFailed[name] = false; })
+    .catch(function () { pxKnowFailed[name] = true; })
+    .then(function () { pxKnowLoading[name] = false; render(false); });
+}
+function pxRow(name) { return (pcCat || []).filter(function (p) { return p.product === name; })[0] || null; }
+function pxPrice(p) { return priceSummary(p.packages || [], p.pricingNote || ""); }
+function pxReadiness(p) {
+  var ps = pxPrice(p);
+  return readinessOf({ archived: !!p.archived, kbState: (p.kb && p.kb.state) || "none", hasDraft: !!p.draft,
+    embedded: !!p.embedded, hasAsset: !!p.asset, hasPrice: ps.kind !== "none", eligible: !!p.eligible, loadFailed: false });
+}
+function pxCellsHtml(rd) {
+  return '<span class="px-cells" aria-hidden="true">' + rd.cells.map(function (c) {
+    return '<i class="' + (c.state === "missing" ? "miss" : c.state === "pending" ? "pend" : "") + '"></i>';
+  }).join("") + "</span>";
+}
+function pxWordCls(rd) { return rd.eligible ? (rd.cells.every(function (c) { return c.state === "done"; }) ? "ok" : "") : "no"; }
+
+/* ---- the related-population predicates. The record's counts and the destination filters use
+   THESE, so a count can never disagree with the page it opens. ---- */
+function pxOppLines(name) { return (typeof oppRows !== "undefined" && oppRows ? oppRows : []).filter(function (o) { return o.product === name; }); }
+function pxOpenLines(name) { return pxOppLines(name).filter(function (o) { return isOpenStage(o.stage); }); }
+function pxCampaigns(name) { return (campaigns || []).filter(function (c) { return (c.product || "") === name; }); }
+function pxInterest(name) {
+  var seen = {};
+  ((cache && cache.contacts) || []).forEach(function (c) {
+    if (c.test) return;
+    if ((c.tags || []).some(function (t) { return t.product === name; })) seen[c.phone] = 1;
+  });
+  return Object.keys(seen).length;
+}
+function pxTargeted(name) { return (entities || []).filter(function (e) { return (e.productTags || []).indexOf(name) >= 0; }).length; }
+
+/* ================================ LIST ================================ */
+function pxBaseRows() {
+  var q = pxQ.trim();
+  return (pcCat || []).filter(function (p) {
+    if (!!p.archived !== pxArchived) return false;
+    if (pxSector === "__none" && p.sectorId) return false;
+    if (pxSector !== "all" && pxSector !== "__none" && String(p.sectorId) !== pxSector) return false;
+    if (q && p.product.indexOf(q) === -1 && String(p.owner || "").indexOf(q) === -1) return false;
+    return true;
+  });
+}
+function pxShortMatch(p) {
+  if (pxShort === "notSelling") return !p.eligible;
+  if (pxShort === "noPrice") return pxPrice(p).kind === "none";
+  if (pxShort === "assumed") return !!p.sectorAssumed;
+  return true;
+}
+function pxReadyMatch(p) {
+  if (pxReadyF === "all") return true;
+  var rd = pxReadiness(p);
+  if (pxReadyF === "notSelling") return !rd.eligible;
+  if (pxReadyF === "ready") return rd.eligible && rd.cells.every(function (c) { return c.state === "done"; });
+  if (pxReadyF === "gaps") return rd.eligible && rd.cells.some(function (c) { return c.state !== "done"; });
+  return true;
+}
+function pxRows() {
+  var perf = pcPerf[pcPerfYear] || {};
+  var rows = pxBaseRows().filter(pxShortMatch).filter(pxReadyMatch).filter(function (p) { return !pxOnly || p.product === pxOnly; });
+  return rows.sort(function (a, b) {
+    var pa = perf[a.product] || {}, pb = perf[b.product] || {};
+    if (pxSort === "achieved") return (Number(pb.achieved) || 0) - (Number(pa.achieved) || 0);
+    if (pxSort === "open") return (Number(pb.openValue) || 0) - (Number(pa.openValue) || 0);
+    if (pxSort === "readiness") return (pxReadiness(a).eligible - pxReadiness(b).eligible) || a.product.localeCompare(b.product, "ar");
+    return a.product.localeCompare(b.product, "ar");
+  });
+}
+function pxFiltered() { return pxQ.trim() || pxSector !== "all" || pxReadyF !== "all" || pxShort || pxOnly; }
+
+var PX_RAMP = ["var(--accent-deep)", "var(--accent-press)", "var(--accent)", "var(--accent-mark)", "var(--blue-light)", "var(--s-review-text)"];
+function pxSummary() {
+  var perf = pcPerf[pcPerfYear];
+  var rows = pxBaseRows();
+  var notSelling = rows.filter(function (p) { return !p.eligible; }).length;
+  var noPrice = rows.filter(function (p) { return pxPrice(p).kind === "none"; }).length;
+  var assumed = rows.filter(function (p) { return !!p.sectorAssumed; }).length;
+  var h = '<section class="ox-sum" aria-label="ملخص المنتجات"><div>';
+  h += '<div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + "</div>";
+  if (!perf) {
+    h += '<div class="ox-fig none">' + (pcPerfFailed[pcPerfYear] ? "تعذّر تحميل الأداء" : "—") + "</div>";
+  } else {
+    var ach = 0, tgt = 0, anyT = false, won = [];
+    rows.forEach(function (p) {
+      var x = perf[p.product]; if (!x) return;
+      ach += Number(x.achieved) || 0;
+      if (x.annualTarget !== null && x.annualTarget !== undefined) { anyT = true; tgt += Number(x.annualTarget) || 0; }
+      if ((Number(x.achieved) || 0) > 0) won.push({ n: p.product, v: Number(x.achieved) });
+    });
+    var cov = anyT ? coveragePct(ach, tgt) : null;
+    h += '<div class="ox-fig">' + pxMoney(ach) + '<span class="ox-figsub">' +
+      (anyT ? "من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + fmtN(cov) + "٪") : "بلا مستهدف سنوي") + "</span></div>";
+    if (won.length || (anyT && tgt > 0)) {
+      won.sort(function (a, b) { return b.v - a.v; });
+      var denom = Math.max(ach, tgt, 1);
+      h += '<div class="ox-bar" aria-hidden="true">' + won.map(function (w, i) {
+        return '<i style="flex:' + w.v + ' 1 0;background:' + PX_RAMP[i % PX_RAMP.length] + '" title="' + esc(w.n) + '"></i>';
+      }).join("") + (tgt > ach ? '<i style="flex:' + (tgt - ach) + ' 1 0;background-color:var(--surface-2);background-image:repeating-linear-gradient(115deg,var(--s-off-mark) 0 1px,transparent 1px 4px)" title="المتبقي حتى المستهدف"></i>' : "") + "</div>";
+      if (won.length) {
+        h += '<div class="ox-leg" role="group" aria-label="المنتجات المحققة — اضغط للتصفية">' + won.map(function (w, i) {
+          var on = pxOnly === w.n;
+          return '<button class="ox-lg' + (on ? " on" : "") + '" aria-pressed="' + on + '" data-px="only" data-nm="' + esc(w.n) + '">' +
+            '<i class="px-lg-b" style="background:' + PX_RAMP[i % PX_RAMP.length] + '"></i><span>' + esc(w.n) + "</span><b>" + pxMoney(w.v) + "</b></button>";
+        }).join("") + "</div>";
+      }
+      void denom;
+    } else {
+      h += '<div class="px-note">لا مبيعات مربوحة بعد في ' + arYear(pcPerfYear) + ".</div>";
+    }
   }
-  h += '</div>';
+  h += "</div>";
+  var met = function (key, n, label, warn) {
+    var on = pxShort === key;
+    return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + (n ? "" : " zero") + '" aria-pressed="' + on + '" data-px="short" data-nm="' + key + '">' +
+      '<span class="n">' + (warn && n ? pxIco("warn") : "") + fmtN(n) + "</span>" +
+      '<span class="l">' + (on ? pxIco("check") : "") + label + "</span></button>";
+  };
+  h += '<div class="ox-mets" role="group" aria-label="ما يلزم إكماله">' +
+    met("notSelling", notSelling, "لا يبيعها المساعد", true) +
+    met("noPrice", noPrice, "بلا سعر منشور", false) +
+    met("assumed", assumed, "قطاع مُستنتَج", false) + "</div>";
+  return h + "</section>";
+}
+function pxSelect(id, label, value, opts, on) {
+  return '<span class="ox-f' + (on ? " on" : "") + '"><select id="' + id + '" aria-label="' + label + '" data-pxchange="' + id + '">' +
+    opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
+    '</select><span class="ox-chev">' + pxIco("chevD") + "</span></span>";
+}
+function pxToolbar() {
+  var nArch = (pcCat || []).filter(function (p) { return p.archived; }).length;
+  var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات المنتجات">';
+  h += '<span class="ox-srch"><span class="ox-si">' + pxIco("search") + "</span>" +
+    '<input id="pxq" class="inp" type="search" value="' + esc(pxQ) + '" data-pxinput="q" aria-label="ابحث باسم المنتج" placeholder="ابحث باسم المنتج"></span>';
+  h += '<span class="ox-filt">';
+  h += pxSelect("pxf_sector", "القطاع", pxSector, [["all", "كل القطاعات"], ["__none", "بلا قطاع"]].concat(pcSectorList.map(function (s) { return [String(s.id), s.name]; })), pxSector !== "all");
+  h += pxSelect("pxf_ready", "الجاهزية", pxReadyF, [["all", "كل الحالات"], ["notSelling", "لا يبيعها المساعد"], ["gaps", "يبيعها وتنقصها أشياء"], ["ready", "جاهزة للمساعد"]], pxReadyF !== "all");
+  h += pxSelect("pxf_sort", "ترتيب", pxSort, [["name", "حسب الاسم"], ["achieved", "الأعلى تحقيقًا"], ["open", "الأعلى مفتوحًا"], ["readiness", "غير الجاهزة أولًا"]], false);
+  h += '<button class="px-toggle" aria-pressed="' + pxArchived + '" data-px="archived">' + (pxArchived ? pxIco("check") : "") + "المؤرشفة" + (nArch ? " (" + fmtN(nArch) + ")" : "") + "</button>";
+  if (pxFiltered()) h += '<button class="ox-clear" data-px="clear" aria-label="مسح التصفية" title="مسح التصفية">' + pxIco("x") + "مسح</button>";
+  h += "</span>";
+  h += pxSheet
+    ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + pxIco("plus") + "إضافة منتج</button>"
+    : '<button class="btn btn-teal ox-add" id="pxadd" data-px="create">' + pxIco("plus") + "إضافة منتج</button>";
+  h += '<span class="ox-brk" aria-hidden="true"></span>';
+  return h + "</div>";
+}
+function pxSkillLink(label) {
+  if (!pcSkill) return '<span class="fn">المهارة غير مرفوعة بعد</span>';
+  return '<a href="/assets/' + esc(pcSkill.publicId) + '" download>' + pxIco("chevD") + label + "</a>";
+}
+function pxActionRows() {
+  var h = "";
+  var missing = (pcCat || []).filter(function (p) { return !p.archived && !p.asset; }).length;
+  if (missing) {
+    h += '<div class="px-actrow">' + pxIco("plus") + "<span><b>" + pxNProd(missing) + "</b> بلا ملف تعريفي — مهارة إعداد العرض تُنتجه بمساعد ذكاء اصطناعي</span>" +
+      '<span class="sp"></span>' + (pcSkill ? '<span class="fn"><bdi>' + esc(pcSkill.filename) + "</bdi></span>" : "") + pxSkillLink("تحميل المهارة") + "</div>";
+  }
+  if (pcUnmatched.length) {
+    h += '<div class="px-actrow" style="padding:0;"><button class="px-actrow px-um-h" style="border:none;" aria-expanded="' + pcUnmatchedOpen + '" data-px="unmatched">' +
+      pxIco("warn") + "<span>ملفات تحتاج ربطًا بمنتج · <b>" + fmtN(pcUnmatched.length) + '</b></span><span class="sp"></span><span>' + (pcUnmatchedOpen ? "إخفاء" : "عرض") + "</span>" + pxIco("chevD") + "</button></div>";
+    if (pcUnmatchedOpen) {
+      var tags = (pcCat || []).filter(function (p) { return !p.archived; });
+      h += pcUnmatched.map(function (u, i) {
+        return '<div class="px-um-r"><span class="nm" title="' + esc(u.name) + '">' + esc(u.name) + "</span>" +
+          '<span class="k">' + (u.kind === "kb" ? "ملف معرفة" : "ملف تعريفي") + "</span>" +
+          '<span class="fn"><bdi>' + esc(u.filename || "—") + "</bdi></span>" +
+          '<span class="acts"><select id="pxum_' + i + '" aria-label="ربط «' + esc(u.name) + '» بمنتج"><option value="">ربط بمنتج…</option>' +
+          tags.map(function (t) { return '<option value="' + esc(t.product) + '">' + esc(t.product) + "</option>"; }).join("") + "</select>" +
+          '<button class="btn btn-ghost" data-px="reconcile" data-i="' + i + '">ربط</button>' +
+          '<button class="btn btn-ghost" data-px="umcreate" data-i="' + i + '">إنشاء منتج بهذا الاسم</button></span></div>';
+      }).join("");
+    }
+  }
   return h;
 }
+function pxListRow(p) {
+  var perf = (pcPerf[pcPerfYear] || {})[p.product];
+  var rd = pxReadiness(p), ps = pxPrice(p);
+  var nm = esc(p.product);
+  var h = '<div class="ox-r" role="row" data-pxrow="' + nm + '">';
+  h += '<div class="px-c-nm" role="cell"><span class="px-nm" title="' + nm + '">' + nm + "</span>" +
+    '<span class="px-sub">' + (p.sector ? esc(p.sector) : "بلا قطاع") + (p.sectorAssumed ? '<span class="px-read">مُستنتَج</span>' : "") +
+    (p.owner ? " · " + esc(p.owner) : "") + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</span></div>";
+  h += '<div class="px-ready px-c-rd" role="cell" title="' + esc(rd.word) + '">' + pxCellsHtml(rd) + '<span class="px-rw ' + pxWordCls(rd) + '">' + esc(rd.word) + "</span></div>";
+  h += '<div class="px-price px-c-pr" role="cell">' + (ps.kind === "package"
+      ? "<b>" + pxMoney(ps.lowest.listPrice) + " / سنة</b><span>" + (ps.count > 1 ? "يبدأ من · " + pxNPkg(ps.count) : esc(ps.lowest.name)) + "</span>"
+      : ps.kind === "note" ? '<span style="color:var(--ink-2);font-size:var(--t-sm);white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(p.pricingNote) + "</span>"
+      : '<span class="none" style="font-size:var(--t-sm);">لا سعر منشور</span>') + "</div>";
+  var tgt = perf ? perf.annualTarget : null;
+  h += '<div class="px-num px-c-tg" role="cell">' + (!perf ? '<span class="none">—</span>' : tgt === null || tgt === undefined ? '<span class="none">بلا مستهدف</span>' : "<b>" + pxMoney(tgt) + "</b>" + (perf.targetQuarters < 4 ? "<span>" + fmtN(perf.targetQuarters) + " من ٤ أرباع</span>" : "")) + "</div>";
+  var cov = perf ? coveragePct(perf.achieved, tgt) : null;
+  h += '<div class="px-num px-c-ach" role="cell">' + (!perf ? '<span class="none">—</span>' :
+    "<b>" + pxMoney(perf.achieved) + "</b><span>" + (cov === null ? "—" : fmtN(cov) + "٪ من المستهدف") +
+    '<span class="px-tgsub">' + (tgt ? " · من " + pxMoney(tgt) : "") + "</span></span>") + "</div>";
+  h += '<div class="px-num px-c-op" role="cell">' + (!perf ? '<span class="none">—</span>' :
+    (perf.openLines ? "<b>" + (perf.openValue ? pxMoney(perf.openValue) : "لم تُسعَّر") + "</b><span>" + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + fmtN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span>" : '<span class="none">لا بنود مفتوحة</span>')) + "</div>";
+  h += '<div class="px-c-go" role="cell"><button class="ox-go" data-px="open" data-nm="' + nm + '" aria-label="فتح سجل ' + nm + '">' + pxIco("chevS") + "</button></div>";
+  return h + "</div>";
+}
+function vProductsCrm() {
+  pcLoad(false); pcPerfLoad(pcPerfYear, false);
+  if (typeof opLoad === "function") opLoad(false);
+  var h = '<div class="px">';
+  if (pcCat === null && !pcFailed) {
+    h += '<section class="ox-sum" aria-busy="true"><div><div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + '</div><div class="ox-fig none">—</div></div></section>';
+    h += '<section class="ox-led"><div class="ox-state" aria-busy="true">' + moSkeleton(5, ["w80", "w60", "w40"]) + "</div></section>";
+    return h + "</div>" + pxSheetHtml();
+  }
+  if (pcCat) h += pxSummary();
+  h += '<section class="ox-led" aria-label="الكتالوج">' + pxToolbar();
+  if (pcFailed && !pcCat) {
+    h += '<div class="ox-state" role="alert">تعذّر تحميل المنتجات.<span class="s">لم يُعرض شيء لأن الطلب فشل، لا لأن الكتالوج فارغ.</span>' +
+      '<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div></section></div>';
+    return h;
+  }
+  if (pcFailed) h += '<div class="ox-state" role="alert" style="padding:var(--s2);">' + pxIco("warn") + "تعذّر تحديث المنتجات — المعروض آخر نسخة محمّلة." + '<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div>';
+  h += pxActionRows();
+  var rows = pxRows();
+  h += '<div class="ox-t px-t" role="table" aria-label="الكتالوج">';
+  h += '<div class="ox-hr" role="row"><div role="columnheader">المنتج</div><div role="columnheader">جاهزية المساعد</div><div role="columnheader">السعر المنشور</div>' +
+    '<div class="px-he px-c-tg" role="columnheader">المستهدف ' + arYear(pcPerfYear) + '</div><div class="px-he" role="columnheader">المحقق</div><div class="px-he" role="columnheader">المفتوح الآن</div><div role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">فتح</span></div></div>';
+  if (!rows.length) {
+    h += '<div class="ox-state">' + ((pcCat || []).length
+      ? (pxArchived && !pxFiltered() ? "لا منتجات مؤرشفة." : "لا منتج يطابق التصفية.") + (pxFiltered() ? '<button class="btn btn-ghost" data-px="clear">مسح التصفية</button>' : "")
+      : 'لم تُضف منتجات بعد.<span class="s">أضف منتجًا ثم ارفع ملف معرفته ليبيعه المساعد.</span><button class="btn btn-teal" data-px="create">إضافة منتج</button>') + "</div>";
+  }
+  rows.forEach(function (p) { h += pxListRow(p); });
+  h += "</div>";
+  if (rows.length) {
+    var perf = pcPerf[pcPerfYear] || {};
+    var ach = rows.reduce(function (n, p) { return n + (Number((perf[p.product] || {}).achieved) || 0); }, 0);
+    h += '<div class="ox-foot"><span class="pgrange"><b>١–' + fmtN(rows.length) + "</b> من " + pxNProd(rows.length) + "</span>" +
+      '<span class="tot">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" + (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; }) ? ' · <a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download>مهارة إعداد العرض ↓</a>' : "") + "</span></div>";
+  }
+  h += "</section></div>";
+  if (pxListScroll) { var y = pxListScroll; pxListScroll = 0; setTimeout(function () { window.scrollTo(0, y); }, 0); }
+  return h + pxSheetHtml();
+}
+
+/* ================================ CREATE DRAWER ================================ */
+function pxSheetHtml() {
+  if (!pxSheet) return "";
+  var d = pxSheet, cls = pxDrShown ? " in" : "";
+  var nameCheck = d.name.trim() ? normalizeProductName(d.name) : null;
+  var exists = nameCheck && nameCheck.ok && (pcCat || []).some(function (p) { return p.product === nameCheck.name; });
+  var nameErr = d.touched && d.name.trim() ? (nameCheck && !nameCheck.ok ? nameCheck.reason : exists ? "يوجد منتج بهذا الاسم." : "") : "";
+  var h = '<div class="ox-scrim' + cls + '" data-px="sheetclose"></div>';
+  h += '<div class="px-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="pxdrt">';
+  h += '<div class="ox-dh"><div class="tt"><h2 id="pxdrt" tabindex="-1">إضافة منتج</h2><div class="st">يولد المنتج غير جاهز للمساعد، وسجلّه يوضح ما يلزم</div></div>' +
+    '<button class="ox-x" data-px="sheetclose" aria-label="إغلاق">' + pxIco("x") + "</button></div>";
+  h += '<div class="ox-db">';
+  h += '<section class="ox-sec"><div class="ox-sech">المنتج</div>' +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_name">اسم المنتج <span class="req" aria-hidden="true">*</span></label></div>' +
+    '<input class="inp" id="pxs_name" maxlength="60" value="' + esc(d.name) + '" data-pxsheet="name" aria-required="true"' + (nameErr ? ' aria-invalid="true" aria-describedby="pxs_name_e"' : "") + ' placeholder="مثال: سجل التطعيمات الوطني">' +
+    (nameErr ? '<span class="px-err" id="pxs_name_e">' + pxIco("warn") + esc(nameErr) + "</span>" : "") + "</div>" +
+    '<div class="ox-g2"><div class="ox-fld"><div class="ox-lr"><label for="pxs_sector">القطاع</label></div><span class="ox-f ox-fw"><select id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
+    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
+    '</select><span class="ox-chev">' + pxIco("chevD") + "</span></span></div>" +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_owner">المسؤول</label></div><input class="inp" id="pxs_owner" maxlength="60" value="' + esc(d.owner) + '" data-pxsheet="owner" placeholder="بلا مسؤول"></div></div>' +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_note">ملاحظة التسعير</label></div><input class="inp" id="pxs_note" maxlength="120" value="' + esc(d.pricingNote) + '" data-pxsheet="pricingNote" placeholder="مثال: اشتراك سنوي يحدده المختص وفق الحجم"></div></section>';
+  h += '<section class="ox-sec"><div class="ox-sech">الباقة الأولى (اختياري)</div>' +
+    '<div class="ox-g2"><div class="ox-fld"><div class="ox-lr"><label for="pxs_pn">اسم الباقة</label></div><input class="inp" id="pxs_pn" maxlength="60" value="' + esc(d.pkgName) + '" data-pxsheet="pkgName" placeholder="الباقة القياسية"></div>' +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_ps">النطاق</label></div><input class="inp" id="pxs_ps" maxlength="120" value="' + esc(d.pkgScope) + '" data-pxsheet="pkgScope" placeholder="فرع واحد"></div>' +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_pp">السعر السنوي (ر.س)</label></div><input class="inp num" id="pxs_pp" type="number" min="0" step="1" inputmode="numeric" value="' + esc(d.pkgPrice) + '" data-pxsheet="pkgPrice"></div>' +
+    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_py">المدة (سنوات)</label></div><input class="inp num" id="pxs_py" type="number" min="1" max="10" step="1" inputmode="numeric" value="' + esc(d.pkgYears) + '" data-pxsheet="pkgYears"></div></div></section>';
+  h += "</div>";
+  h += '<div class="ox-df">' + (pxSheetErr ? '<span class="ox-derr" role="alert">' + pxIco("warn") + esc(pxSheetErr) + "</span>" : "") +
+    '<button class="btn btn-teal" id="pxs_submit" style="min-width:132px;justify-content:center;" data-px="sheetsubmit"' + (pxSheetBusy ? ' disabled aria-busy="true"' : "") + ">" + (pxSheetBusy ? "جارٍ الإنشاء…" : "إنشاء المنتج") + "</button>" +
+    '<button class="btn btn-ghost" data-px="sheetclose">إلغاء</button></div></div>';
+  setTimeout(function () {
+    if (!pxDrShown) {
+      pxDrShown = true;
+      requestAnimationFrame(function () {
+        var s = document.querySelector(".ox-scrim"), dr = document.querySelector(".px-dr");
+        if (s) s.classList.add("in"); if (dr) dr.classList.add("in");
+        var n = document.getElementById("pxs_name"); if (n) n.focus();
+      });
+    }
+  }, 0);
+  return h;
+}
+function pxSheetSubmit() {
+  var d = pxSheet; if (!d || pxSheetBusy) return;
+  d.touched = true;
+  var nc = normalizeProductName(d.name || "");
+  if (!nc.ok) { pxSheetErr = nc.reason; render(false); var f = document.getElementById("pxs_name"); if (f) f.focus(); return; }
+  var body = { name: nc.name };
+  if (d.sectorId) body.sectorId = Number(d.sectorId);
+  if (d.owner.trim()) body.owner = d.owner.trim();
+  if (d.pricingNote.trim()) body.pricingNote = d.pricingNote.trim();
+  if (d.pkgName.trim()) {
+    var price = Number(d.pkgPrice), years = Number(d.pkgYears || 1);
+    if (String(d.pkgPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { pxSheetErr = "سعر الباقة عدد صحيح من ٠ فأكثر."; render(false); return; }
+    if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { pxSheetErr = "مدة الباقة من ١ إلى ١٠ سنوات."; render(false); return; }
+    body.firstPackage = { name: d.pkgName.trim(), listPrice: price, years: years, scope: d.pkgScope.trim() };
+  }
+  pxSheetBusy = true; pxSheetErr = ""; render(false);
+  pxJson("POST", "/admin/products", body).then(function (r) {
+    pxSheetBusy = false;
+    if (!r.ok) {
+      pxSheetErr = r.j.error === "name_exists" ? "يوجد منتج بهذا الاسم." : r.j.error === "invalid_name" ? (r.j.detail || "اسم غير صالح.") : r.j.detail || "تعذّر إنشاء المنتج (" + fmtN(r.status) + ")";
+      render(false); return;
+    }
+    var name = (r.j.product && r.j.product.product) || nc.name;
+    pxSheet = null; pxDrShown = false;
+    pcLoad(true); pcPerfLoad(pcPerfYear, true);
+    if (typeof tagReg !== "undefined") { try { fetch("/admin/tags", pxT()).then(function (x) { return x.json(); }).then(function (t) { if (Array.isArray(t)) tagReg = t; else if (t && t.tags) tagReg = t.tags; }); } catch (e) {} }
+    location.hash = "product/" + pxEnc(name);
+    pxToast("أُنشئ «" + name + "» — أضف ملف المعرفة ليبيعه المساعد", false);
+  }).catch(function () { pxSheetBusy = false; pxSheetErr = "تعذّر الاتصال — لم يُنشأ المنتج."; render(false); });
+}
+
+/* ================================ RECORD ================================ */
+function pxStatusSlot(key) {
+  var st = pxFState[key];
+  if (!st) return '<span class="ox-fs" aria-live="polite"></span>';
+  if (st.s === "pending") return '<span class="ox-fs pend" aria-live="polite">جارٍ الحفظ…</span>';
+  if (st.s === "saved") return '<span class="ox-fs ok" aria-live="polite">' + pxIco("check") + "حُفظ</span>";
+  if (st.s === "invalid") return '<span class="ox-fs bad" aria-live="assertive">' + pxIco("warn") + esc(st.m) + "</span>";
+  return '<span class="ox-fs bad" aria-live="assertive">' + pxIco("warn") + "تعذّر الحفظ" +
+    '<button data-px="fretry" data-k="' + esc(key) + '">أعد المحاولة</button><button data-px="fdiscard" data-k="' + esc(key) + '">تجاهل</button></span>';
+}
+function pxEmbedded(name) { return (typeof PRODUCTS_FULL !== "undefined" ? PRODUCTS_FULL : []).filter(function (x) { return x.n === name; })[0] || null; }
+function pxSection(key, title, src, body, extra) {
+  return '<section class="px-sec" id="pxsec_' + key + '" aria-labelledby="pxsech_' + key + '"><div class="px-sech"><h2 id="pxsech_' + key + '">' + title + "</h2>" +
+    (src ? '<span class="src">' + src + "</span>" : "") + '<span class="sp"></span>' + (extra || "") + '</div><div class="px-secb">' + body + "</div></section>";
+}
+function pxPerfSection(p) {
+  var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
+  if (!perf) {
+    return pxSection("performance", "الأداء", "من سجل الفرص", pcPerfFailed[pcPerfYear]
+      ? '<div class="ox-state" role="alert">تعذّر تحميل الأداء.<button class="btn btn-ghost" data-px="perfretry">أعد المحاولة</button></div>'
+      : moSkeleton(3, ["w60", "w80", "w40"]));
+  }
+  var cov = coveragePct(perf.achieved, perf.annualTarget);
+  var b = '<div><div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + '</div><div class="px-fig">' + pxMoney(perf.achieved) +
+    '<span class="ox-figsub">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "بلا مستهدف سنوي" :
+      "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + fmtN(cov) + "٪") + (perf.targetQuarters < 4 ? " · مجموع " + fmtN(perf.targetQuarters) + " أرباع مدخلة" : "")) + "</span></div></div>";
+  b += '<div class="px-qbar">' + (perf.quarters || []).map(function (q) {
+    var has = q.target !== null && q.target !== undefined && Number(q.target) > 0;
+    var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
+    return '<div class="px-qc"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + pct + '%"></i>' : "") + "</div>" +
+      '<div class="l"><span>الربع ' + fmtN(q.quarter) + "</span><span>" + (has ? pxMoney(q.achieved) : "—") + "</span></div></div>";
+  }).join("") + "</div>";
+  b += '<div class="px-stats"><div class="px-stat"><span class="l">المفتوح الآن</span><span class="v">' + (perf.openValue ? pxMoney(perf.openValue) : "—") + '</span><span class="l">' + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + fmtN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span></div>" +
+    '<div class="px-stat"><span class="l">مربوحة ' + arYear(pcPerfYear) + '</span><span class="v">' + fmtN(perf.wonLines) + '</span><span class="l">بنود</span></div>' +
+    '<div class="px-stat"><span class="l">خاسرة ' + arYear(pcPerfYear) + '</span><span class="v">' + fmtN(perf.lostLines) + '</span><span class="l">بنود</span></div></div>';
+  var open = pxOpenLines(name).slice().sort(function (a, b2) { return opValue(b2) - opValue(a); }).slice(0, 3);
+  if (open.length) {
+    b += '<div class="ox-lbl">أعلى الفرص المفتوحة</div><div class="px-list">' + open.map(function (o) {
+      return '<a class="px-li" href="#opps/' + fmtId(o.id) + '"><span class="a">' + esc(o.account_name) + '</span><span class="s">' + opDot(o.stage) + esc(opStage(o.stage).label) +
+        '</span><span class="v">' + (opPriced(o) ? pxMoney(opValue(o)) : '<span style="color:var(--muted);font-weight:450">لم تُسعَّر</span>') + "</span></a>";
+    }).join("") + '</div><button class="px-more" style="background:none;border:none;cursor:pointer;font-family:inherit;padding:0" data-px="goopps" data-nm="' + esc(name) + '">كل فرص المنتج ←</button>';
+  }
+  b += '<div class="px-note">القيمة الإجمالية للعقد — أساس المستهدف لم يُقَرّ بعد.</div>';
+  return pxSection("performance", "الأداء", "من سجل الفرص", b);
+}
+function pxPricingSection(p) {
+  var name = p.product, b = "";
+  var ed = pxPkgEdit && pxPkgEdit.product === name ? pxPkgEdit : null;
+  var editor = function () {
+    var d = ed.d;
+    return '<div class="px-pke"><div class="g">' +
+      '<div class="px-fl"><label for="pxpk_n">اسم الباقة *</label><input class="inp" id="pxpk_n" maxlength="60" value="' + esc(d.name) + '" data-pxpkg="name"></div>' +
+      '<div class="px-fl"><label for="pxpk_s">النطاق</label><input class="inp" id="pxpk_s" maxlength="120" value="' + esc(d.scope) + '" data-pxpkg="scope"></div>' +
+      '<div class="px-fl"><label for="pxpk_y">المدة (سنوات)</label><input class="inp num" id="pxpk_y" type="number" min="1" max="10" step="1" value="' + esc(d.years) + '" data-pxpkg="years"></div>' +
+      '<div class="px-fl"><label for="pxpk_p">السعر السنوي (ر.س)</label><input class="inp num" id="pxpk_p" type="number" min="0" step="1" value="' + esc(d.listPrice) + '" data-pxpkg="listPrice"></div></div>' +
+      (ed.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ed.err) + "</span>" : "") +
+      '<div class="acts"><button class="btn btn-ghost" data-px="pkgsave"' + (ed.busy ? " disabled" : "") + ">" + (ed.busy ? "جارٍ الحفظ…" : "حفظ الباقة") + '</button><button class="btn btn-ghost" data-px="pkgcancel">إلغاء</button>' +
+      '<span class="px-note">تعديل السعر لا يغيّر قيم الفرص المسجّلة.</span></div></div>';
+  };
+  b += '<div class="px-pk"><div class="px-pkh"><span>الباقة</span><span>النطاق</span><span class="end">المدة</span><span class="end">السعر السنوي</span><span></span></div>';
+  if (!(p.packages || []).length && !(ed && ed.id === 0)) b += '<div class="px-pkr"><span style="color:var(--muted)">لا باقات منشورة.</span></div>';
+  (p.packages || []).forEach(function (k) {
+    if (ed && ed.id === k.id) { b += editor(); return; }
+    b += '<div class="px-pkr"><span>' + esc(k.name) + "</span><span>" + (k.scope ? esc(k.scope) : "—") + '</span><span class="end">' + fmtN(k.years) + ' سنة</span><span class="end"><b>' + pxMoney(k.listPrice) + "</b></span>" +
+      '<span class="acts"><button class="btn btn-ghost" data-px="pkgedit" data-id="' + k.id + '">تعديل</button><button class="btn btn-ghost" data-px="pkgretire" data-id="' + k.id + '">تقاعد</button></span></div>';
+  });
+  if (ed && ed.id === 0) b += editor();
+  b += "</div>";
+  b += '<div style="display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;">' + (ed ? "" : '<button class="ox-arow" style="width:auto;padding-inline:14px;" data-px="pkgadd">' + pxIco("plus") + "باقة</button>") +
+    (p.retiredPackageCount ? '<button class="ox-clear" data-px="retiredtoggle" aria-expanded="' + !!pxShowRetired[name] + '">' + (pxShowRetired[name] ? "إخفاء المتقاعدة" : "عرض المتقاعدة (" + fmtN(p.retiredPackageCount) + ")") + "</button>" : "") + "</div>";
+  if (pxShowRetired[name]) {
+    var ret = pxRetired[name];
+    b += '<div class="px-pk">' + (!ret ? '<div class="px-pkr"><span style="color:var(--muted)">جارٍ التحميل…</span></div>' : ret.filter(function (k) { return k.retiredAt || k.retired_at; }).map(function (k) {
+      return '<div class="px-pkr retired"><span>' + esc(k.name) + '</span><span>' + (k.scope ? esc(k.scope) : "—") + '</span><span class="end">' + fmtN(k.years) + ' سنة</span><span class="end">' + pxMoney(k.listPrice) + '</span><span class="acts"><span class="px-arch">متقاعدة</span><button class="btn btn-ghost" data-px="pkgrestore" data-id="' + k.id + '">إعادة التفعيل</button></span></div>';
+    }).join("")) + "</div>";
+  }
+  var nk = name + "|pricingNote";
+  b += '<div class="ox-fld"><div class="ox-lr"><label for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk) + '</div><input class="inp" id="pxf_note" maxlength="120" value="' +
+    esc(pxFState[nk] && pxFState[nk].s !== "saved" ? pxFState[nk].v : (p.pricingNote || "")) + '" data-pxfield="pricingNote" placeholder="لا ملاحظة تسعير"><span class="px-note">تُعرض حين لا توجد باقة منشورة.</span></div>';
+  return pxSection("pricing", "الأسعار والباقات", "", b);
+}
+function pxTargetsSection(p) {
+  var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
+  var yrs = [new Date().getFullYear(), new Date().getFullYear() + 1];
+  var extra = '<span class="px-yr" role="group" aria-label="السنة">' + yrs.map(function (y) {
+    return '<button aria-pressed="' + (pcPerfYear === y) + '" data-px="year" data-y="' + y + '">' + arYear(y) + "</button>";
+  }).join("") + "</span>";
+  if (!perf) return pxSection("targets", "المستهدفات", "", pcPerfFailed[pcPerfYear] ? '<div class="ox-state" role="alert">تعذّر تحميل المستهدفات.<button class="btn btn-ghost" data-px="perfretry">أعد المحاولة</button></div>' : moSkeleton(4, ["w80"]), extra);
+  var b = '<div>';
+  (perf.quarters || []).forEach(function (q) {
+    var key = name + "|t|" + pcPerfYear + "|" + q.quarter, st = pxFState[key];
+    var saved = q.target === null || q.target === undefined ? "" : String(q.target);
+    var val = st && st.s !== "saved" ? st.v : saved;
+    var has = saved !== "" && Number(saved) > 0;
+    var cov = coveragePct(q.achieved, q.target);
+    b += '<div class="px-q"><span class="lb">الربع ' + fmtN(q.quarter) + "</span>" +
+      '<div class="px-qf"><label class="sr" for="pxq_' + q.quarter + '" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">مستهدف الربع ' + fmtN(q.quarter) + "</label>" +
+      '<input class="inp" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" + pxStatusSlot(key) + "</div>" +
+      '<span class="ach">المحقق ' + pxMoney(q.achieved) + "</span>" +
+      '<div class="cov"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + Math.min(100, cov || 0) + '%"></i>' : "") + "</div><span>" + (cov === null ? "—" : fmtN(cov) + "٪") + "</span></div>";
+    if (pxQConfirm[key]) {
+      b += '<div class="px-confirm" role="alert">إزالة مستهدف الربع ' + fmtN(q.quarter) + '؟<button class="btn btn-ghost" data-px="tclear" data-q="' + q.quarter + '">إزالة</button><button class="btn btn-ghost" data-px="tundo" data-q="' + q.quarter + '">تراجع</button></div>';
+    }
+    b += "</div>";
+  });
+  b += "</div>";
+  b += '<div class="px-note">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "لا مستهدفات مدخلة لهذه السنة." : "مجموع المستهدفات المدخلة " + pxMoney(perf.annualTarget) + (perf.targetQuarters < 4 ? " · " + fmtN(4 - perf.targetQuarters) + " " + (4 - perf.targetQuarters === 1 ? "ربع" : "أرباع") + " بلا مستهدف" : "")) + " · القيم نفسها في «المستهدفات والأداء».</div>";
+  return pxSection("targets", "المستهدفات", "", b, extra);
+}
+function pxKnowledgeSection(p) {
+  var name = p.product, b = "", kn = pxKnow[name];
+  var upA = pxUp[name + "|asset"], upK = pxUp[name + "|kb"];
+  /* intro PDF */
+  b += '<div class="px-file"><span class="px-cells"><i class="' + (p.asset ? "" : "miss") + '"></i></span><div><div class="t">الملف التعريفي (PDF)</div><div class="d">يُرسله المساعد للعميل عند طلب التفاصيل' +
+    (p.asset ? ' · <bdi>' + esc(p.asset.filename) + "</bdi>" + (p.asset.size ? " · " + fmtN(Math.max(1, Math.round(p.asset.size / 1024))) + " ك.ب" : "") + (p.asset.updatedAt ? " · " + fmtD(p.asset.updatedAt) : "") : " · لا ملف مرفق") +
+    (upA && upA.s === "busy" ? ' · <span class="ox-fs pend">جارٍ الرفع…</span>' : upA && upA.s === "failed" ? ' · <span class="px-err">' + esc(upA.m) + "</span>" : "") + '</div></div><div class="acts">' +
+    (p.asset ? '<a class="btn btn-ghost" href="/assets/' + esc(p.asset.publicId) + '" target="_blank" rel="noopener" style="text-decoration:none;">معاينة</a>' : (pcSkill ? '<a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download>أنشئه بمهارة إعداد العرض ↓</a>' : "")) +
+    '<button class="btn btn-ghost" data-px="pickasset"' + (p.archived ? " disabled" : "") + ">" + (p.asset ? "استبدال" : "رفع PDF") + "</button>" +
+    '<input id="pxasset" type="file" accept="application/pdf,.pdf" style="display:none" data-pxupload="asset"></div></div>';
+  /* knowledge */
+  var kst = (p.kb && p.kb.state) || "none";
+  var sub = kst === "approved" ? "اعتُمدت" + (p.kb.approvedBy ? " · " + esc(p.kb.approvedBy) : "") + (p.kb.approvedAt ? " · " + fmtD(p.kb.approvedAt) : "") + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
+    : kst === "legacy" ? '<span style="color:var(--s-attn-text);font-weight:500">بانتظار اعتماد النص الحالي — المساعد لا يستخدمه</span>' + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
+    : p.embedded ? "لا ملف — المساعد يبيع من المعرفة المدمجة فقط" : "لا ملف معرفة — المساعد لا يبيع هذا المنتج";
+  b += '<div class="px-file"><span class="px-cells"><i class="' + (kst === "approved" ? "" : kst === "legacy" || p.draft ? "pend" : "miss") + '"></i></span><div><div class="t">ملف المعرفة</div><div class="d">يقرأه المساعد ليجيب عن الأسعار والاعتراضات · ' + sub +
+    (upK && upK.s === "busy" ? ' · <span class="ox-fs pend">جارٍ استخلاص المعرفة… قد يستغرق دقيقة</span>' : upK && upK.s === "failed" ? ' · <span class="px-err">' + esc(upK.m) + "</span>" : "") + '</div></div><div class="acts">' +
+    '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
+    '<input id="pxkb" type="file" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb"></div></div>';
+  if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
+  var ap = pxAppr[name] || {};
+  if (kn && kn.draftMd) {
+    b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</div>" +
+      '<div class="px-note"><bdi>' + esc(kn.draftSource || "") + "</bdi>" + (kn.draftBy ? " · رُفعت · " + esc(kn.draftBy) : "") + (kn.draftAt ? " · " + fmtD(kn.draftAt) : "") +
+      (kn.changeSummary ? " · +" + fmtN(kn.changeSummary.added) + " سطرًا · −" + fmtN(kn.changeSummary.removed) + " سطرًا مقارنة بالمعتمد" : "") + "</div>" +
+      '<div class="px-md">' + mdRender(kn.draftMd) + "</div>" +
+      (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
+      '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
+      '<button class="rv-hold" data-do="pxDiscard" data-arg="' + esc(name) + '" data-idle="تجاهل المسودة" data-holding="استمر بالضغط للتجاهل…" data-armed="اضغط مرة أخرى للتجاهل" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">تجاهل المسودة</span></button></div></div>';
+  }
+  if (kn && kn.state === "legacy" && kn.md) {
+    b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "نص مستخدم قبل تسجيل الاعتماد — راجعه ثم اعتمده ليعود إليه المساعد</div>" +
+      '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
+      '<div class="acts"><button class="btn ' + (kn.draftMd ? "btn-ghost" : "btn-teal") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div></div>";
+  } else if (kn && kn.state === "approved" && kn.md) {
+    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'النص المعتمد <span class="src">يُحدَّث برفع ملف جديد ثم اعتماده — التحرير المباشر في إصدار لاحق</span></summary><div class="px-md">' + mdRender(kn.md) + "</div></details>";
+  } else if (!kn && !pxKnowFailed[name] && kst !== "none") {
+    b += moSkeleton(2, ["w80", "w60"]);
+  }
+  var emb = pxEmbedded(name);
+  if (p.embedded && emb) {
+    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'المعرفة المدمجة <span class="src">معتمدة بمراجعة الشيفرة — للقراءة فقط</span></summary><div class="px-list">' +
+      [["العرض", emb.pitch], ["الكفاءة", (emb.eff || []).join(" · ")], ["ملائم لـ", (emb.best || []).join("، ")], ["التسعير المعتمد", emb.pricing]].map(function (x) {
+        return '<div class="px-li" style="cursor:default;grid-template-columns:120px minmax(0,1fr);"><span class="s">' + esc(x[0]) + '</span><span class="a" style="white-space:normal">' + esc(x[1]) + "</span></div>";
+      }).join("") + "</div></details>";
+  }
+  return pxSection("knowledge", "المعرفة والملفات", "", b);
+}
+function pxSide(p, rd) {
+  var name = p.product;
+  var labels = { knowledge: "معرفة المساعد", asset: "ملف تعريفي", price: "سعر منشور", lock: "يميّزه المساعد في المحادثة" };
+  var kst = (p.kb && p.kb.state) || "none";
+  var stateOf = {
+    knowledge: kst === "approved" ? "معتمدة" : p.draft ? "مسودة بانتظار الاعتماد" : kst === "legacy" ? "بانتظار اعتماد النص الحالي" : p.embedded ? "مدمجة فقط — لا ملف" : "لا معرفة",
+    asset: p.asset ? "مرفق" : "غير مرفق",
+    price: pxPrice(p).kind === "package" ? pxNPkg(pxPrice(p).count) : pxPrice(p).kind === "note" ? "ملاحظة تسعير" : "لا سعر",
+    lock: p.embedded ? "ضمن كتالوج المساعد" : "يتطلب تحديث كتالوج المساعد"
+  };
+  var goTo = { knowledge: "knowledge", asset: "knowledge", price: "pricing", lock: "" };
+  var h = '<section class="px-sec" aria-labelledby="pxrd_h"><div class="px-sech"><h2 id="pxrd_h">جاهزية المساعد</h2></div><div class="px-secb" style="gap:0"><div class="px-rd">' +
+    rd.cells.map(function (c) {
+      return '<div class="px-rdr"><i class="' + (c.state === "missing" ? "miss" : c.state === "pending" ? "pend" : "") + '"></i><div><div class="n">' + labels[c.key] + '</div><div class="st">' + esc(stateOf[c.key]) + "</div></div>" +
+        (goTo[c.key] && c.state !== "done" ? '<button class="go" data-px="jump" data-s="' + goTo[c.key] + '">' + (c.key === "price" ? "أضف سعرًا" : "رفع") + "</button>" : "<span></span>") + "</div>";
+    }).join("") + '</div><div class="px-rdf ' + pxWordCls(rd) + '">' + esc(rd.word) + "</div></div></section>";
+  var open = pxOpenLines(name), openVal = open.reduce(function (n, o) { return n + (opPriced(o) ? opValue(o) : 0); }, 0);
+  var link = function (act, label, count, extra) {
+    return '<button class="px-lk" data-px="' + act + '" data-nm="' + esc(name) + '"><span class="l">' + label + '</span><span class="v"><b>' + fmtN(count) + "</b>" + (extra || "") + pxIco("chevS") + "</span></button>";
+  };
+  h += '<section class="px-sec" aria-labelledby="pxrel_h"><div class="px-sech"><h2 id="pxrel_h">المرتبط بهذا المنتج</h2></div><div class="px-secb" style="gap:0">' +
+    link("goopen", "الفرص المفتوحة", open.length, openVal ? " · " + pxMoney(openVal) : "") +
+    link("gocamps", "الحملات", pxCampaigns(name).length) +
+    link("gointerest", 'اهتمام رصده المساعد <span class="px-read">قراءة المساعد</span>', pxInterest(name)) +
+    link("gotargets", "الجهات المستهدفة بالوسم", pxTargeted(name)) + "</div></section>";
+  return h;
+}
+function pxRenameModal() {
+  if (!pxModal) return "";
+  var m = pxModal;
+  var im = m.impact;
+  var h = '<div class="ox-scrim in" data-px="modalclose"></div><div class="px-modal" role="dialog" aria-modal="true" aria-labelledby="pxmt"><div class="box">';
+  h += '<h2 id="pxmt" tabindex="-1">إعادة تسمية «' + esc(m.product) + "»</h2>";
+  h += '<div class="px-fl"><label for="pxm_to">الاسم الجديد</label><input class="inp" id="pxm_to" maxlength="60" value="' + esc(m.to) + '" data-pxmodal="to"' + (m.err ? ' aria-invalid="true"' : "") + "></div>";
+  h += '<div class="px-note">' + (!im ? "جارٍ حساب ما سيتغيّر…" : "سيُغيَّر الاسم في: " + [
+    im.openLines ? pxNLine(im.openLines) + " مفتوحة" : "", im.campaigns ? pxNCamp(im.campaigns) : "", im.kb ? "ملف المعرفة" : "", im.asset ? "الملف التعريفي" : "",
+    im.packages ? pxNPkg(im.packages) : "", im.targetedEntities ? pxNEnt(im.targetedEntities) + " مستهدفة" : "", im.interestReadings ? fmtN(im.interestReadings) + " قراءة للمساعد" : ""
+  ].filter(Boolean).join(" · ") + ".") + "</div>";
+  if (m.err) h += '<span class="px-err" role="alert">' + pxIco("warn") + esc(m.err) + "</span>";
+  h += '<div class="acts"><button class="btn btn-teal" data-px="renamesave"' + (m.busy || !im ? " disabled" : "") + ">" + (m.busy ? "جارٍ الحفظ…" : "حفظ الاسم") + '</button><button class="btn btn-ghost" data-px="modalclose">إلغاء</button></div>';
+  return h + "</div></div>";
+}
+function vProductDrill(name, section) {
+  pcLoad(false); pcPerfLoad(pcPerfYear, false);
+  if (typeof opLoad === "function") opLoad(false);
+  var back = '<a class="px-back" href="#products">' + pxIco("back") + "كل المنتجات</a>";
+  if (pcCat === null) {
+    return '<div class="px">' + back + (pcFailed ? '<div class="ox-state" role="alert">تعذّر تحميل المنتج.<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div>' : moSkeleton(6, ["w60", "w80", "w40"])) + "</div>";
+  }
+  var p = pxRow(name);
+  if (!p) {
+    var words = String(name || "").split(/\s+/).filter(function (w) { return w.length > 2; });
+    var close = (pcCat || []).filter(function (x) { return words.some(function (w) { return x.product.indexOf(w) >= 0; }); });
+    return '<div class="px">' + back + '<div class="ox-state">لا منتج بهذا الاسم.<span class="s"><bdi>' + esc(name) + "</bdi></span>" +
+      (close.length ? '<div class="px-list" style="width:100%;max-width:420px;">' + close.map(function (x) { return '<a class="px-li" href="#product/' + pxEnc(x.product) + '"><span class="a">' + esc(x.product) + "</span></a>"; }).join("") + "</div>" : "") + "</div></div>";
+  }
+  pxKnowLoad(name, false);
+  var rd = pxReadiness(p);
+  var kn = pxKnow[name];
+  var approvePrimary = !!(kn && (kn.draftMd || (kn.state === "legacy" && kn.md)));
+  var h = '<div class="px">' + back;
+  h += '<div class="px-head"><div class="tt"><h1>' + esc(p.product) + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</h1>" +
+    '<div class="meta"><span class="px-fi"><label for="pxf_sector">القطاع</label><select id="pxf_sector" data-pxfield="sectorId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قطاع</option>' +
+    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+    (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId") + "</span>" +
+    '<span class="px-fi"><label for="pxf_owner">المسؤول</label><input id="pxf_owner" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "")) + '" data-pxfield="owner"' + (p.archived ? " disabled" : "") + ">" +
+    pxStatusSlot(name + "|owner") + "</span>" +
+    '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
+    (p.createdAt ? "<span>أُنشئ " + fmtD(p.createdAt) + "</span>" : "") + "</div></div>";
+  h += '<div class="end">';
+  if (p.archived) {
+    h += '<button class="btn btn-teal" data-px="restore">استعادة المنتج</button>';
+  } else {
+    h += (!rd.eligible ? '<span class="px-why" id="pxwhy">' + esc(rd.reason || rd.word) + "</span>" : "") +
+      '<button class="btn ' + (approvePrimary ? "btn-ghost" : "btn-teal") + '" data-px="launch" data-nm="' + esc(p.product) + '"' + (rd.eligible ? "" : ' disabled aria-disabled="true" aria-describedby="pxwhy"') + ">أطلق حملة بهذا المنتج</button>";
+  }
+  h += '<button class="btn btn-ghost" data-px="menu" aria-haspopup="menu" aria-expanded="' + pxMenuOpen + '" aria-label="إجراءات أخرى">⋯</button>';
+  if (pxMenuOpen) {
+    h += '<div class="px-menu" role="menu">' + (p.embedded
+      ? '<button role="menuitem" aria-disabled="true">إعادة تسمية</button><button role="menuitem" aria-disabled="true">أرشفة المنتج</button><div class="why">مضمَّن في كتالوج المساعد — إعادة التسمية والأرشفة تتطلبان تحديث الكتالوج.</div>'
+      : '<button role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
+  }
+  h += "</div></div>";
+  h += '<div class="px-rec"><div class="px-main">' + pxPerfSection(p) + pxPricingSection(p) + pxTargetsSection(p) + pxKnowledgeSection(p);
+  if (!p.embedded && !p.archived) {
+    h += '<section class="px-sec" id="pxsec_archive"><div class="px-sech"><h2>أرشفة المنتج</h2></div><div class="px-secb"><div class="px-note" id="pxarch_note">' +
+      (pxModal && pxModal.kind === "archiveImpact" ? "" : "الأرشفة تُخفي المنتج من القوائم ومعالج الحملات وتوقف استخدام المساعد لمعرفته وملفه، ويبقى تاريخه كما هو. يمكن استعادته.") + "</div>" +
+      '<div><button class="rv-hold" data-do="pxArchive" data-arg="' + esc(p.product) + '" data-idle="أرشفة المنتج" data-holding="استمر بالضغط للأرشفة…" data-armed="اضغط مرة أخرى للأرشفة" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">أرشفة المنتج</span></button></div></div></section>';
+  }
+  h += '</div><aside class="px-side" aria-label="الجاهزية والمرتبط">' + pxSide(p, rd) + "</aside></div>";
+  h += "</div>";
+  if (section) setTimeout(function () { var el = document.getElementById("pxsec_" + section); if (el && !el.dataset.pxJumped) { el.dataset.pxJumped = "1"; el.scrollIntoView({ block: "start" }); } }, 30);
+  return h + pxRenameModal();
+}
+
+/* ================================ WRITES ================================ */
+function pxUpdateRow(row) {
+  if (!row || !pcCat) return;
+  pcCat = pcCat.map(function (x) { return x.product === row.product ? Object.assign({}, x, row) : x; });
+}
+function pxSaveMeta(name, field, raw) {
+  var key = name + "|" + field;
+  var val = raw;
+  if (field === "sectorId") val = raw === "" ? null : Number(raw);
+  else { val = String(raw || "").trim(); if (field === "owner" && val.length > 60) { pxFState[key] = { s: "invalid", v: raw, m: "٦٠ حرفًا كحدٍّ أقصى." }; render(false); return; }
+    if (field === "pricingNote" && val.length > 120) { pxFState[key] = { s: "invalid", v: raw, m: "١٢٠ حرفًا كحدٍّ أقصى." }; render(false); return; }
+    if (val === "") val = null; }
+  pxFState[key] = { s: "pending", v: raw }; render(false);
+  var body = {}; body[field] = val;
+  pxJson("PATCH", "/admin/products?product=" + pxEnc(name), body).then(function (r) {
+    if (r.ok && r.j.ok) { pxUpdateRow(r.j.product); pxFState[key] = { s: "saved", v: raw };
+      setTimeout(function () { if (pxFState[key] && pxFState[key].s === "saved") { delete pxFState[key]; render(false); } }, 1600); }
+    else pxFState[key] = { s: r.status === 400 ? "invalid" : "failed", v: raw, m: r.j.detail || "قيمة غير صالحة." };
+    render(false);
+  }).catch(function () { pxFState[key] = { s: "failed", v: raw }; render(false); });
+}
+function pxSaveTarget(name, quarter, raw, confirmed) {
+  var key = name + "|t|" + pcPerfYear + "|" + quarter;
+  var perf = (pcPerf[pcPerfYear] || {})[name];
+  var q = perf ? (perf.quarters || []).filter(function (x) { return x.quarter === quarter; })[0] : null;
+  var saved = q && q.target !== null && q.target !== undefined ? String(q.target) : "";
+  var s = String(raw).trim();
+  if (s === saved) { delete pxFState[key]; delete pxQConfirm[key]; render(false); return; }
+  if (s === "") {
+    if (saved === "") { delete pxFState[key]; render(false); return; }
+    if (!confirmed) { pxQConfirm[key] = true; pxFState[key] = { s: "invalid", v: "", m: "بانتظار تأكيد الإزالة" }; render(false); return; }
+  } else {
+    var n = Number(s);
+    if (!isFinite(n) || n < 0 || Math.floor(n) !== n) { pxFState[key] = { s: "invalid", v: raw, m: "عدد صحيح من ٠ فأكثر." }; render(false); return; }
+  }
+  delete pxQConfirm[key];
+  pxFState[key] = { s: "pending", v: raw }; render(false);
+  pxJson("POST", "/admin/sales/targets", { product: name, year: pcPerfYear, quarter: quarter, amount: s === "" ? null : Number(s) }).then(function (r) {
+    if (r.ok && r.j.ok !== false) { pxFState[key] = { s: "saved", v: raw }; pcPerfLoad(pcPerfYear, true); pcQuarters = null; pcLoad(true);
+      setTimeout(function () { if (pxFState[key] && pxFState[key].s === "saved") { delete pxFState[key]; render(false); } }, 1600); }
+    else pxFState[key] = { s: "failed", v: raw };
+    render(false);
+  }).catch(function () { pxFState[key] = { s: "failed", v: raw }; render(false); });
+}
+function pxPkgSave() {
+  var ed = pxPkgEdit; if (!ed || ed.busy) return;
+  var d = ed.d, price = Number(d.listPrice), years = Number(d.years);
+  if (!String(d.name).trim()) { ed.err = "اسم الباقة مطلوب."; render(false); return; }
+  if (String(d.listPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { ed.err = "السعر السنوي عدد صحيح من ٠ فأكثر."; render(false); return; }
+  if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { ed.err = "المدة من ١ إلى ١٠ سنوات."; render(false); return; }
+  ed.busy = true; ed.err = ""; render(false);
+  var body = { name: String(d.name).trim(), listPrice: price, years: years, scope: String(d.scope || "").trim() };
+  var req = ed.id ? pxJson("PATCH", "/admin/packages/" + ed.id, body) : pxJson("POST", "/admin/packages", Object.assign({ product: ed.product }, body));
+  req.then(function (r) {
+    ed.busy = false;
+    if (!r.ok || r.j.ok === false) { ed.err = r.j.error === "name_exists" ? "توجد باقة بهذا الاسم لهذا المنتج." : r.j.detail || "تعذّر حفظ الباقة (" + fmtN(r.status) + ")"; render(false); return; }
+    pxPkgEdit = null; pxRetired = {}; pcLoad(true); pxToast("حُفظت الباقة «" + body.name + "»", false);
+  }).catch(function () { ed.busy = false; ed.err = "تعذّر الاتصال — لم تُحفظ الباقة."; render(false); });
+}
+function pxRetire(id, retire) {
+  pxJson("POST", "/admin/packages/" + id + "/retire", { retire: retire }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast(retire ? "تعذّر تقاعد الباقة" : "تعذّر إعادة تفعيل الباقة", true); return; }
+    pxRetired = {}; pcLoad(true); pxToast(retire ? "تقاعدت الباقة — تبقى الفرص المرتبطة كما هي" : "أُعيد تفعيل الباقة", false);
+  }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
+}
+function pxUpload(name, kind, input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  var key = name + "|" + kind;
+  if (kind === "asset" && (f.size > 10 * 1024 * 1024 || !/\.pdf$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "PDF فقط وبحد ١٠ م.ب." }; input.value = ""; render(false); return; }
+  if (kind === "kb" && (f.size > 15 * 1024 * 1024 || !/\.(pdf|docx|pptx|xlsx|md|txt)$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "الأنواع المسموحة: PDF وWord وPowerPoint وExcel وMarkdown ونص، بحد ١٥ م.ب." }; input.value = ""; render(false); return; }
+  pxUp[key] = { s: "busy" }; render(false);
+  var fd = new FormData(); fd.append("product", name); fd.append("file", f);
+  var url = kind === "asset" ? "/admin/product-asset/upload" : "/admin/kb/upload?product=" + pxEnc(name);
+  fetch(url, { method: "POST", headers: { "x-admin-token": TOKEN }, body: fd }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+  }).then(function (r) {
+    if (!r.ok || r.j.ok === false) {
+      pxUp[key] = { s: "failed", m: r.j.error === "invalid_file" ? (r.j.detail || "ملف غير صالح.") : r.j.error === "extraction_failed" ? "تعذّر استخلاص المعرفة — بقي النص الحالي كما هو." : "تعذّر الرفع (" + fmtN(r.status) + ") — بقي الملف الحالي كما هو." };
+      render(false); return;
+    }
+    delete pxUp[key];
+    if (kind === "kb") { delete pxKnow[name]; pxKnowLoad(name, true); pxToast("رُفعت المسودة — راجعها ثم اعتمدها ليقرأها المساعد", false); }
+    else { pxToast("رُفع الملف التعريفي", false); }
+    pcLoad(true);
+    if (typeof prodAssets !== "undefined") { fetch("/admin/product-assets", pxT()).then(function (x) { return x.ok ? x.json() : null; }).then(function (a) { if (Array.isArray(a)) prodAssets = a; }).catch(function () {}); }
+  }).catch(function () { pxUp[key] = { s: "failed", m: "تعذّر الاتصال — بقي الملف الحالي كما هو." }; render(false); });
+  input.value = "";
+}
+function pxApprove(name, current) {
+  var kn = pxKnow[name]; if (!kn) return;
+  pxAppr[name] = { busy: true }; render(false);
+  var body = current ? { product: name, contentHash: kn.mdHash } : { product: name, draftHash: kn.draftHash };
+  pxJson("POST", current ? "/admin/products/knowledge/approve-current" : "/admin/products/knowledge/approve", body).then(function (r) {
+    if (!r.ok || r.j.ok === false) {
+      pxAppr[name] = { err: r.j.error === "stale_draft" ? "تغيّرت المسودة منذ فتحها — راجع النسخة الحالية." : r.j.error === "stale_content" ? "تغيّر النص منذ فتحه — راجع النسخة الحالية." : "تعذّر الاعتماد (" + fmtN(r.status) + ")" };
+      delete pxKnow[name]; pxKnowLoad(name, true); render(false); return;
+    }
+    delete pxAppr[name]; delete pxKnow[name]; pxKnowLoad(name, true); pcLoad(true);
+    pxToast("اعتُمدت المعرفة — يقرؤها المساعد الآن", false);
+  }).catch(function () { pxAppr[name] = { err: "تعذّر الاتصال — لم يُعتمد شيء." }; render(false); });
+}
+window.pxDiscard = function (name) {
+  pxJson("POST", "/admin/products/knowledge/discard", { product: name }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast("تعذّر تجاهل المسودة", true); return; }
+    delete pxKnow[name]; pxKnowLoad(name, true); pcLoad(true); pxToast("تُجوهلت المسودة — بقيت المعرفة المعتمدة كما هي", false);
+  }).catch(function () { pxToast("تعذّر الاتصال — بقيت المسودة", true); });
+};
+window.pxArchive = function (name) {
+  pxJson("POST", "/admin/products/archive", { product: name, archived: true }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast(r.j.error === "embedded_product" ? "منتج مضمَّن في كتالوج المساعد — لا يُؤرشف" : "تعذّر أرشفة المنتج", true); return; }
+    pcLoad(true); pxToast("أُرشف «" + name + "» — توقف المساعد عن استخدام معرفته", false, "تراجع", function () { pxRestore(name); });
+  }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
+};
+function pxRestore(name) {
+  pxJson("POST", "/admin/products/archive", { product: name, archived: false }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast("تعذّر استعادة المنتج", true); return; }
+    pcLoad(true); pxToast("استُعيد «" + name + "»", false);
+  }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
+}
+function pxOpenRename(name) {
+  pxMenuOpen = false;
+  pxModal = { kind: "rename", product: name, to: name, impact: null, err: "", busy: false };
+  render(false);
+  fetch("/admin/products/impact?product=" + pxEnc(name), pxT()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    if (pxModal && pxModal.product === name) { pxModal.impact = j || { openLines: 0 }; if (!j) pxModal.err = "تعذّر حساب ما سيتغيّر."; render(false); var f = document.getElementById("pxm_to"); if (f) f.focus(); }
+  });
+}
+function pxRenameSave() {
+  var m = pxModal; if (!m || m.busy) return;
+  var nc = normalizeProductName(m.to || "");
+  if (!nc.ok) { m.err = nc.reason; render(false); return; }
+  if (nc.name === m.product) { pxModal = null; render(false); return; }
+  m.busy = true; m.err = ""; render(false);
+  pxJson("POST", "/admin/tags/rename", { from: m.product, to: nc.name }).then(function (r) {
+    m.busy = false;
+    if (!r.ok || r.j.ok === false) { m.err = r.status === 409 && r.j.error !== "embedded_product" ? "الاسم مستخدم لمنتج آخر." : r.j.error === "embedded_product" ? "منتج مضمَّن في كتالوج المساعد — لا تُعاد تسميته." : r.j.detail || "تعذّرت إعادة التسمية (" + fmtN(r.status) + ")"; render(false); return; }
+    pxModal = null; pxKnow = {}; pcLoad(true); pcPerf = {}; pcPerfLoad(pcPerfYear, true);
+    try { history.replaceState(null, "", "#product/" + pxEnc(nc.name)); } catch (e) {}
+    render(false);
+    pxToast("أُعيدت التسمية إلى «" + nc.name + "»", false);
+  }).catch(function () { m.busy = false; m.err = "تعذّر الاتصال — لم يتغيّر شيء."; render(false); });
+}
+function pxReconcile(i) {
+  var u = pcUnmatched[i]; if (!u) return;
+  var sel = document.getElementById("pxum_" + i), to = sel ? sel.value : "";
+  if (!to) { pxToast("اختر منتجًا للربط", true); return; }
+  pxJson("POST", "/admin/products/reconcile", { from: u.name, to: to, kind: u.kind }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast(r.status === 409 ? "لـ«" + to + "» ملف من هذا النوع بالفعل — لم يُستبدل" : "تعذّر الربط", true); return; }
+    pcLoad(true); pxToast("رُبط الملف بـ«" + to + "»", false);
+  }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
+}
+function pxUmCreate(i) {
+  var u = pcUnmatched[i]; if (!u) return;
+  pxJson("POST", "/admin/products", { name: u.name }).then(function (r) {
+    if (!r.ok || r.j.ok === false) { pxToast(r.j.error === "name_exists" ? "يوجد منتج بهذا الاسم — استخدم «ربط»" : r.j.detail || "تعذّر إنشاء المنتج", true); return; }
+    pcLoad(true); pxToast("أُنشئ «" + u.name + "» وارتبطت ملفاته", false);
+  }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
+}
+
+/* ---- links that reproduce their populations: reset the destination, set the exact product ---- */
+function pxGoOpps(name, openOnly) {
+  if (typeof opQ !== "undefined") { opQ = ""; opStg = "all"; opSrc = "all"; opOwn = "all"; opShort = openOnly ? "open" : ""; opMode = "list"; opProd = name; if (typeof PAGE !== "undefined") PAGE.opps = 1; }
+  location.hash = "opps";
+}
+function pxGoCampaigns(name) { campQ = ""; campTab = "all"; campProd = name; location.hash = "kmon"; }
+function pxGoInterest(name) { cusQ = ""; cusTagF = ""; cusTab = "all"; cusProdF = name; location.hash = "customers"; }
+function pxGoTargets(name) { tgtQ = ""; tgtFilters = {}; tgtProd = ""; tgtTagProd = name; location.hash = "targets"; }
+
+/* ---- legacy routes: #kb and #kb/<name> land on the one products section ---- */
+function pxRedirectLegacy() {
+  var raw = (location.hash || "").slice(1);
+  if (raw.split("/")[0] !== "kb") return;
+  var rest = raw.split("/").slice(1).join("/");
+  var name = ""; try { name = decodeURIComponent(rest); } catch (e) { name = rest; }
+  var target = "#products";
+  if (name) {
+    var known = pcCat ? pcCat.some(function (p) { return p.product === name; }) : (typeof tagReg !== "undefined" && tagReg.some(function (t) { return t.name === name; }));
+    if (known) target = "#product/" + pxEnc(name) + "/knowledge";
+    else pcUnmatchedOpen = true;
+  }
+  try { history.replaceState(null, "", target); } catch (e) { location.hash = target.slice(1); }
+}
+/* ---- the product route: encoded name, optional reserved last segment ---- */
+function pxParseProductRoute() {
+  var parts = (location.hash || "").slice(1).split("/").slice(1);
+  var section = "";
+  if (parts.length > 1 && RESERVED_SECTIONS.indexOf(parts[parts.length - 1]) >= 0) section = parts.pop();
+  var joined = parts.join("/"), name = joined;
+  try { name = decodeURIComponent(joined); } catch (e) { name = joined; }
+  return { name: name, section: section };
+}
+
+/* ================================ EVENTS ================================ */
+document.addEventListener("click", function (ev) {
+  var t = ev.target && ev.target.closest ? ev.target.closest("[data-px]") : null;
+  if (!t) {
+    var row = ev.target && ev.target.closest ? ev.target.closest("[data-pxrow]") : null;
+    if (row && !(ev.target.closest("a,button,input,select"))) { pxListScroll = window.scrollY; location.hash = "product/" + pxEnc(row.getAttribute("data-pxrow")); }
+    if (pxMenuOpen && !(ev.target.closest && ev.target.closest(".px-menu"))) { pxMenuOpen = false; render(false); }
+    return;
+  }
+  var a = t.getAttribute("data-px"), nm = t.getAttribute("data-nm");
+  var cur = (location.hash || "").slice(1).split("/")[0] === "product" ? pxParseProductRoute().name : "";
+  if (a !== "menu" && pxMenuOpen) pxMenuOpen = false;
+  if (a === "open") { pxListScroll = window.scrollY; location.hash = "product/" + pxEnc(nm); }
+  else if (a === "only") { pxOnly = pxOnly === nm ? "" : nm; render(false); }
+  else if (a === "short") { pxShort = pxShort === nm ? "" : nm; render(false); }
+  else if (a === "archived") { pxArchived = !pxArchived; render(false); }
+  else if (a === "clear") { pxQ = ""; pxSector = "all"; pxReadyF = "all"; pxShort = ""; pxOnly = ""; render(false); }
+  else if (a === "retry") { pcFailed = false; pcLoad(true); render(false); }
+  else if (a === "perfretry") { pcPerfFailed[pcPerfYear] = false; pcPerfLoad(pcPerfYear, true); }
+  else if (a === "knowretry") { pxKnowFailed[cur] = false; pxKnowLoad(cur, true); }
+  else if (a === "unmatched") { pcUnmatchedOpen = !pcUnmatchedOpen; render(false); }
+  else if (a === "reconcile") { pxReconcile(Number(t.getAttribute("data-i"))); }
+  else if (a === "umcreate") { pxUmCreate(Number(t.getAttribute("data-i"))); }
+  else if (a === "create") { pxOpener = t.id || "pxadd"; pxSheet = { name: "", sectorId: "", owner: "", pricingNote: "", pkgName: "", pkgScope: "", pkgPrice: "", pkgYears: "1", touched: false }; pxSheetErr = ""; pxDrShown = false; render(false); }
+  else if (a === "sheetclose") { pxSheet = null; pxSheetErr = ""; pxDrShown = false; render(false); var o = document.getElementById(pxOpener || "pxadd"); if (o) o.focus(); }
+  else if (a === "sheetsubmit") { pxSheetSubmit(); }
+  else if (a === "menu") { pxMenuOpen = !pxMenuOpen; render(false); }
+  else if (a === "rename") { pxOpenRename(cur); }
+  else if (a === "renamesave") { pxRenameSave(); }
+  else if (a === "modalclose") { pxModal = null; render(false); }
+  else if (a === "archivejump") { render(false); var s = document.getElementById("pxsec_archive"); if (s) { s.scrollIntoView({ block: "center" }); var hb = s.querySelector(".rv-hold"); if (hb) hb.focus(); } }
+  else if (a === "restore") { pxRestore(cur); }
+  else if (a === "launch") { if (typeof launchWithProduct === "function") launchWithProduct(nm); }
+  else if (a === "jump") { var el = document.getElementById("pxsec_" + t.getAttribute("data-s")); if (el) el.scrollIntoView({ block: "start" }); }
+  else if (a === "year") { pcPerfYear = Number(t.getAttribute("data-y")); pcPerfLoad(pcPerfYear, false); render(false); }
+  else if (a === "pkgadd") { pxPkgEdit = { product: cur, id: 0, d: { name: "", scope: "", years: "1", listPrice: "" }, err: "", busy: false }; render(false); var f = document.getElementById("pxpk_n"); if (f) f.focus(); }
+  else if (a === "pkgedit") { var p = pxRow(cur), id = Number(t.getAttribute("data-id")); var k = p ? (p.packages || []).filter(function (x) { return x.id === id; })[0] : null;
+    if (k) { pxPkgEdit = { product: cur, id: id, d: { name: k.name, scope: k.scope || "", years: String(k.years), listPrice: String(k.listPrice) }, err: "", busy: false }; render(false); var f2 = document.getElementById("pxpk_n"); if (f2) f2.focus(); } }
+  else if (a === "pkgcancel") { pxPkgEdit = null; render(false); }
+  else if (a === "pkgsave") { pxPkgSave(); }
+  else if (a === "pkgretire") { pxRetire(Number(t.getAttribute("data-id")), true); }
+  else if (a === "pkgrestore") { pxRetire(Number(t.getAttribute("data-id")), false); }
+  else if (a === "retiredtoggle") { pxShowRetired[cur] = !pxShowRetired[cur];
+    if (pxShowRetired[cur] && !pxRetired[cur]) fetch("/admin/packages?product=" + pxEnc(cur) + "&retired=1", pxT()).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { pxRetired[cur] = (j && (j.packages || j)) || []; render(false); });
+    render(false); }
+  else if (a === "tclear") { var q = Number(t.getAttribute("data-q")); pxSaveTarget(cur, q, "", true); }
+  else if (a === "tundo") { var q2 = Number(t.getAttribute("data-q")), k2 = cur + "|t|" + pcPerfYear + "|" + q2; delete pxQConfirm[k2]; delete pxFState[k2]; render(false); }
+  else if (a === "fretry") { var kk = t.getAttribute("data-k"), stt = pxFState[kk]; if (stt) { var parts = kk.split("|"); if (parts[1] === "t") pxSaveTarget(parts[0], Number(parts[3]), stt.v, false); else pxSaveMeta(parts[0], parts[1], stt.v); } }
+  else if (a === "fdiscard") { delete pxFState[t.getAttribute("data-k")]; render(false); }
+  else if (a === "pickasset") { var ia = document.getElementById("pxasset"); if (ia) ia.click(); }
+  else if (a === "pickkb") { var ik = document.getElementById("pxkb"); if (ik) ik.click(); }
+  else if (a === "approve") { pxApprove(cur, false); }
+  else if (a === "approvecurrent") { pxApprove(cur, true); }
+  else if (a === "goopps") { pxGoOpps(nm, false); }
+  else if (a === "goopen") { pxGoOpps(nm, true); }
+  else if (a === "gocamps") { pxGoCampaigns(nm); }
+  else if (a === "gointerest") { pxGoInterest(nm); }
+  else if (a === "gotargets") { pxGoTargets(nm); }
+});
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var cur = (location.hash || "").slice(1).split("/")[0] === "product" ? pxParseProductRoute().name : "";
+  var ch = t.getAttribute("data-pxchange");
+  if (ch === "pxf_sector") { pxSector = t.value; render(false); return; }
+  if (ch === "pxf_ready") { pxReadyF = t.value; render(false); return; }
+  if (ch === "pxf_sort") { pxSort = t.value; render(false); return; }
+  var fld = t.getAttribute("data-pxfield");
+  if (fld && cur) { pxSaveMeta(cur, fld, t.value); return; }
+  var tq = t.getAttribute("data-pxtarget");
+  if (tq && cur) { pxSaveTarget(cur, Number(tq), t.value, false); return; }
+  var up = t.getAttribute("data-pxupload");
+  if (up && cur) { pxUpload(cur, up, t); return; }
+  var sh = t.getAttribute("data-pxsheet");
+  if (sh && pxSheet) { pxSheet[sh] = t.value; if (sh === "name") pxSheet.touched = true; render(false); }
+});
+document.addEventListener("input", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  if (t.getAttribute("data-pxinput") === "q") { pxQ = t.value; clearTimeout(window.__pxq); window.__pxq = setTimeout(function () { render(false); }, 250); return; }
+  var sh = t.getAttribute("data-pxsheet"); if (sh && pxSheet) { pxSheet[sh] = t.value; pxSheetErr = ""; return; }
+  var pk = t.getAttribute("data-pxpkg"); if (pk && pxPkgEdit) { pxPkgEdit.d[pk] = t.value; pxPkgEdit.err = ""; return; }
+  var md = t.getAttribute("data-pxmodal"); if (md && pxModal) { pxModal[md] = t.value; pxModal.err = ""; }
+});
+document.addEventListener("keydown", function (ev) {
+  var dr = document.querySelector(".px-dr") || document.querySelector(".px-modal .box");
+  if (ev.key === "Enter" && pxModal && ev.target && ev.target.id === "pxm_to") { ev.preventDefault(); pxRenameSave(); return; }
+  if (!dr) { if (ev.key === "Escape" && pxMenuOpen) { pxMenuOpen = false; render(false); } return; }
+  if (ev.key === "Escape") {
+    if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) return;
+    ev.preventDefault();
+    if (pxModal) { pxModal = null; render(false); } else { pxSheet = null; pxDrShown = false; render(false); var o = document.getElementById(pxOpener || "pxadd"); if (o) o.focus(); }
+    return;
+  }
+  if (ev.key !== "Tab") return;
+  var f = Array.prototype.slice.call(dr.querySelectorAll("a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex='-1'])")).filter(function (x) { return x.offsetParent !== null; });
+  if (!f.length) return;
+  var first = f[0], last = f[f.length - 1];
+  if (!dr.contains(document.activeElement)) { ev.preventDefault(); first.focus(); return; }
+  if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+  else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+});
 `;
 
 export const PRODUCTS_DRILL_JS = `
@@ -283,88 +1354,6 @@ function pcVal(o) {
     (1 - (Number(o.discount) || 0) / 100));
 }
 
-function vProductDrill(name) {
-  pcLoad(false);
-  if (typeof opLoad === "function") opLoad(false);
-  if (!pcCat) return pcBack() + moSkeleton(6, ["w60", "w80", "w40"]);
-  var p = pcCat.filter(function (x) { return x.product === name; })[0];
-  if (!p) return pcBack() + '<div class="crm-empty"><b>منتج غير موجود</b>لا يوجد وسم بهذا الاسم في السجل.</div>';
-
-  var mine = pcOppsFor(function (o) { return o.product === name; });
-  var open = mine.filter(function (o) { return o.stage !== "won" && o.stage !== "lost"; });
-  var won  = mine.filter(function (o) { return o.stage === "won"; });
-  var lost = mine.filter(function (o) { return o.stage === "lost"; });
-  var openVal = open.reduce(function (n, o) { return n + pcVal(o); }, 0);
-
-  var h = pcBack();
-  h += '<div class="sh-tiles">' +
-    '<div class="sh-tile lead"><div><div class="k">المفتوح</div>' +
-      '<div class="s">' + fmtN(open.length) + ' فرصة</div></div>' +
-      '<div class="v">' + fmtN(Math.round(openVal)) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">مربوحة</div><div class="s">' +
-      pcMoney(won.reduce(function (n, o) { return n + pcVal(o); }, 0)) + '</div></div>' +
-      '<div class="v">' + fmtN(won.length) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">خاسرة</div><div class="s">' +
-      pcMoney(lost.reduce(function (n, o) { return n + pcVal(o); }, 0)) + '</div></div>' +
-      '<div class="v">' + fmtN(lost.length) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">القطاع</div><div class="s">' +
-      (p.sectorAssumed ? "مُستنتَج — لم يؤكَّد" : "مؤكَّد") + '</div></div>' +
-      '<div class="v" style="font-size:var(--t-md)">' + (p.sector ? esc(p.sector) : "بلا قطاع") + '</div></div>' +
-  '</div>';
-  /* data-as-visual: this product's whole book, one cell per deal. */
-  if (mine.length) h += '<div class="sh-sec">' + shUnits(mine.map(function (o) {
-    return o.stage === "won" ? "won" : (o.stage === "lost" ? "lost" : "on"); }), 80) + '</div>';
-
-  /* Packages, with the retire control. Retirement is the only exit: a package a deal references
-     cannot be deleted, and the composite FK refuses it at the database. */
-  h += '<div class="sh-sec"><div class="sh-h">الباقات</div>' +
-    '<div class="sh-hs">السعر المنشور لكل باقة. الباقة لا تُحذف — تُتقاعد، لأن صفقة قد تشير إليها والمفتاح الأجنبي يرفض الحذف.</div>';
-  if (!p.packages.length) {
-    h += shEmpty("box", "لا باقات منشورة", p.pricingNote || "لا سعر منشور لهذا المنتج.");
-  } else {
-    h += '<div class="sh-cards">';
-    p.packages.forEach(function (k) {
-      h += '<div class="sh-card"><div><div class="nm">' + esc(k.name) + '</div>' +
-        '<div class="sub">' + (k.scope ? esc(k.scope) : "—") + ' · ' + fmtN(k.years) + ' سنة</div></div>' +
-        '<div class="end"><span class="money">' + pcMoney(k.listPrice) + '</span>' +
-        '<button class="btn btn-ghost mini crm-focusable" data-retire="' + k.id + '" data-nm="' + esc(k.name) + '">تقاعد</button>' +
-        '</div></div>';
-    });
-    h += '</div>';
-  }
-  h += '</div>';
-
-  /* Its quarterly row from the same grid the products screen renders. */
-  if (pcQuarters && pcQuarters.byProduct) {
-    var pq = pcQuarters.byProduct.filter(function (x) { return x.product === name; })[0];
-    if (pq) {
-      h += '<div class="sh-sec"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div><div class="sh-tiles">';
-      pq.quarters.forEach(function (q) {
-        var isNow = q.quarter === pcQuarters.currentQuarter;
-        h += '<div class="sh-tile' + (isNow ? " lead" : "") + '"><div><div class="k">الربع ' + fmtN(q.quarter) + '</div>' +
-          '<div class="s">' + (q.target > 0 ? 'من ' + pcMoney(q.target) +
-            (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪") : "بلا مستهدف") + '</div></div>' +
-          '<div class="v">' + fmtN(Math.round(q.achieved)) + '</div></div>';
-      });
-      h += '</div></div>';
-    }
-  }
-
-  h += '<div class="sh-sec"><div class="sh-h">أعلى الفرص المفتوحة</div>';
-  if (!open.length) h += shEmpty("clock", "لا فرص مفتوحة", "لا صفقة جارية على هذا المنتج الآن.");
-  else {
-    h += '<div class="sh-cards">';
-    open.sort(function (a, b) { return pcVal(b) - pcVal(a); }).slice(0, 8).forEach(function (o) {
-      h += '<div class="sh-card"><div><div class="nm">' + esc(o.account_name || "—") + '</div>' +
-        '<div class="sub">' + esc(rpStage ? rpStage(o.stage) : o.stage) + '</div></div>' +
-        '<div class="end"><span class="money">' + pcMoney(pcVal(o)) + '</span></div></div>';
-    });
-    h += '</div>';
-  }
-  h += '</div>';
-  return h;
-}
-
 /* ONE delegated listener for every drill row. No code in an attribute: JSON.stringify emits double
    quotes that close a double-quoted attribute, and esc() turns them into &quot; which then has to
    survive a decode — the exact shape of the stored XSS this project already fixed. A data attribute
@@ -376,31 +1365,6 @@ document.addEventListener("click", function (ev) {
   if (!kind || !nm) return;
   location.hash = kind + "/" + encodeURIComponent(nm);
 });
-
-/* Delegated, like the drill rows. An inline onclick carrying JSON.stringify(name) puts DOUBLE
-   quotes inside a double-quoted attribute and closes it — the same bug as the drill rows, made
-   twice in one file. A data attribute carries the name as data and getAttribute decodes it once. */
-document.addEventListener("click", function (ev) {
-  var b = ev.target && ev.target.closest ? ev.target.closest("[data-retire]") : null;
-  if (!b) return;
-  pcRetire(Number(b.getAttribute("data-retire")), b.getAttribute("data-nm"), b);
-});
-
-window.pcRetire = function (id, name, btn) {
-  if (!window.confirm("تقاعد الباقة «" + name + "»؟ لن تظهر للبيع، وتبقى الصفقات المرتبطة بها كما هي.")) return;
-  /* text-states-swap: the label changes and the button does NOT resize, so the row beneath it does
-     not move under the cursor. The width is reserved from the longest state before the first click. */
-  if (btn) { moReserve(btn, ["تقاعد", "جارٍ…"]); moBusy(btn, "جارٍ…"); }
-  fetch("/admin/packages/" + id + "/retire", { method: "POST", headers: { "x-admin-token": TOKEN } })
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      if (btn) moIdle(btn);
-      /* The outcome is SAID, not implied by a list quietly changing under the reader. */
-      moToast(j && j.ok === false ? "تعذّر تقاعد الباقة" : "تقاعدت الباقة «" + name + "»");
-      pcCat = null; pcLoad(true);
-    })
-    .catch(function () { if (btn) moIdle(btn); moToast("تعذّر الاتصال — لم يتغيّر شيء"); });
-};
 
 /* The mockup's V.exec, as a band at the top of الرئيسية.
  *

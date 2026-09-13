@@ -200,16 +200,50 @@ export function seedKnowledge(
 ): void {
   hubKb = kb;
   productAssets = assetsIn;
+  eligibleNow = new Set([...kb.map((h) => h.product), ...(SERVICE_CATALOGUE as readonly string[])]);
 }
 
+/** The products the assistant may sell RIGHT NOW — the enforced form of isRuntimeEligible
+ *  (spec B′): approved knowledge in hubKb, or an embedded catalogue entry whose tag is live. */
+let eligibleNow = new Set<string>(SERVICE_CATALOGUE as readonly string[]);
+
+/**
+ * ONE RULE, LOADED HERE. Everything the assistant knows or may send about a product comes through
+ * this function, and the database answers with the eligibility rule already applied: approved
+ * text only (`runtimeKb`), assets only for eligible products (`runtimeAssets`), no drafts, no
+ * legacy rows, no archived tags, no `__*` pseudo-products. Filtering later — in the prompt, in the
+ * tool — is how an unreviewed document reached a customer conversation; the rows are simply not
+ * loaded.
+ */
 export async function refreshKb(): Promise<number> {
   try {
-    productAssets = (await db.listAssets()).filter((a) => !a.product.startsWith("__")).map((a) => ({
+    const embedded = SERVICE_CATALOGUE as readonly string[];
+    productAssets = (await db.runtimeAssets(embedded)).map((a) => ({
       product: a.product, url: `${cfg.publicBaseUrl}/assets/${a.public_id}.pdf`, filename: a.filename }));
-    hubKb = (await db.listKb()).map((r) => ({ product: r.product, md: r.md }));
-    console.log(JSON.stringify({ at: "agent", msg: "hub kb refreshed", products: hubKb.map((h) => h.product) }));
+    hubKb = await db.runtimeKb();
+    // An embedded product is eligible while its tag is live. With no database there is no
+    // registry to consult, and the coded catalogue is the whole product line.
+    const active = db.isConnected() ? new Set(await db.activeTagNames()) : null;
+    eligibleNow = new Set([
+      ...hubKb.map((h) => h.product),
+      ...embedded.filter((n) => active === null || active.has(n)),
+    ]);
+    console.log(JSON.stringify({ at: "agent", msg: "hub kb refreshed", products: hubKb.map((h) => h.product),
+      eligible: [...eligibleNow] }));
   } catch (e) { console.error(JSON.stringify({ at: "agent", msg: "hub kb refresh failed", err: String(e).slice(0, 200) })); }
   return hubKb.length;
+}
+
+/** Names whose approved document is in the assistant's prompt right now. /admin/products reports
+ *  `inAssistantKnowledge` from THIS list — the enforced truth, not a re-derivation. */
+export function runtimeKnowledgeProducts(): string[] {
+  return hubKb.map((h) => h.product);
+}
+
+/** May the assistant sell this product now? Asked by compose and by campaign launch before any
+ *  send. Exact name; a product the registry does not know is not eligible. */
+export function isEligibleNow(name: string): boolean {
+  return eligibleNow.has(String(name || "").trim());
 }
 
 // Exported for scripts/check-ae-prompt.mjs — the prompt is the product here, so it is asserted
@@ -732,6 +766,9 @@ function stripPricing(md: string): string {
 }
 
 export async function composeOpener(product: string, audience: string, angle: string): Promise<string> {
+  // The same gate the launch endpoint applies (spec B′ rule 2): an opener for a product the
+  // assistant cannot sell would be a message the conversation behind it cannot honour.
+  if (!isEligibleNow(product)) throw new Error("not_eligible");
   const p = PRODUCTS.find((x) => x.name === product);
   const hub = hubKb.find((h) => h.product === product);
   const know = [
@@ -886,12 +923,12 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
     case "send_asset": {
       const key = String(args.asset_id ?? args.product ?? "").trim();
       const cap = String(args.caption ?? "").slice(0, 500);
-      // EXACT match first. `includes(key)` alone is how «سجل التطعيمات الوطني» resolved to the
-      // Sick Leave file: any short or odd key the model passed could substring-hit the wrong
-      // product. Substring is kept only as a fallback, and the product lock below is the real wall.
+      // EXACT match, then the product lock's own resolver. `includes(key)` is how «سجل التطعيمات
+      // الوطني» once resolved to the Sick Leave file: any short or odd key the model passed could
+      // substring-hit the wrong product. It was kept as a fallback and is now gone (spec B′ rule
+      // 3): a key that names no canonical product sends nothing, and says so.
       const pa = productAssets.find((x) => x.product === key)
-        ?? productAssets.find((x) => productlock.productOf(key) && x.product === productlock.productOf(key))
-        ?? productAssets.find((x) => x.product.includes(key));
+        ?? productAssets.find((x) => productlock.productOf(key) && x.product === productlock.productOf(key));
       // PRODUCT LOCK. The founder's review: an NVR conversation received Sick Leave material.
       // Once the customer has established a product, nothing for a different product goes out.
       if (pa) {

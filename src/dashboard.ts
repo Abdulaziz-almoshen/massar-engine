@@ -28,6 +28,7 @@ import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
 import { SALES_DOMAIN_JS } from "./sales-domain.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
+import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -895,7 +896,7 @@ const SUBS = {
   customers: [["customers", "العملاء"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
-              ["kb", "معرفة الخدمة"], ["partners", "شركاء المبيعات"]],
+              ["partners", "شركاء المبيعات"]],
 };
 
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
@@ -915,13 +916,12 @@ const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
   aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
-  kb: ["معرفة الخدمة لمساعد المبيعات", "المعرفة المعتمدة التي يستند إليها مساعد المبيعات في واتساب"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
   customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل بند من أول تواصل حتى الإغلاق"], triage: ["فرز الردود", "من ردّ، ومن لم يردّ، ومتى موعد المهتمين"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
-  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "الكتالوج وقطاعاته وباقاته — والإنجاز الربعي"],
+  tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
@@ -2244,8 +2244,19 @@ function vAffinityBand(selName, matched) {
   return h + "</div>";
 }
 window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "", candidate: "" }; entSel.clear(); render(false); };
-function wizProducts() { return kbRegistry(); }
+// The wizard reads the CATALOGUE (active tags) once it is loaded, with the same eligibility the
+// products section and the launch endpoint enforce — so a product created in المنتجات appears here,
+// and one the assistant cannot sell is shown but cannot be launched (V5 spec B′).
+function wizProducts() {
+  if (typeof pcCat === "undefined" || !pcCat) return kbRegistry();
+  return pcCat.filter((p) => !p.archived).map((p) => ({
+    name: p.product, sc: null, seed: !!p.embedded,
+    hub: p.kb && p.kb.state === "approved" ? { product: p.product, source_filename: p.kb.source } : null,
+    eligible: !!p.eligible, why: pxReadiness(p).word,
+  }));
+}
 function vAimkt() {
+  if (typeof pcLoad === "function") pcLoad(false);
   const reg = wizProducts();
   if (selProd >= reg.length) selProd = 0;
   const m = entMatches();
@@ -2261,8 +2272,9 @@ function vAimkt() {
       // Say which knowledge this service actually has. Removing the invented scores collapsed
       // every card onto the «Product Hub» branch, which claimed uploaded knowledge for six
       // services that have none — a new false claim in place of the old one.
-      const inner = '<div style="height:6px;"></div>' + (x.hub
-        ? '<span class="chip c-teal">معرفة من Product Hub ✓</span>'
+      const inner = '<div style="height:6px;"></div>' + (x.eligible === false
+        ? '<span class="chip c-warn">' + esc(x.why || "لا يبيعه المساعد") + "</span>"
+        : x.hub ? '<span class="chip c-teal">معرفة معتمدة ✓</span>'
         : '<span class="chip c-grey">معرفة مدمجة</span>');
       const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
       return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
@@ -2359,7 +2371,8 @@ function vAimkt() {
     (selAsset ? "" : '<div style="font-size:12px;color:#7A5600;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
     "</div></div></div>";
 
-  const can = selN > 0 && campMsg.trim();
+  const selEligible = !reg[selProd] || reg[selProd].eligible !== false;
+  const can = selN > 0 && campMsg.trim() && selEligible;
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
     '<label style="font-size:12px;font-weight:600;color:#14161A;flex:none;">اسم الحملة</label>' +
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:14px;font-weight:600;color:#14161A;border:1.5px solid #ECEEF2;border-radius:11px;padding:11px 14px;">' +
@@ -2382,6 +2395,7 @@ function vAimkt() {
     // State what will actually be sent, next to the button that sends it.
     (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
         '<div class="lsub" style="font-size:12px;color:#656B76;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
+    (selEligible ? "" : '<span style="font-size:12px;color:#7A5600;max-width:240px;">' + esc(reg[selProd].why || "لا يبيعه المساعد") + ' — <a href="#product/' + encodeURIComponent(selName) + '/knowledge" style="color:#1A47BE;font-weight:600;">افتح المنتج</a></span>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
@@ -4266,6 +4280,8 @@ function render(fetchNew) {
   _viewSig = sig;
   stamp();
   nav();
+  // #kb and #kb/<name> were «معرفة الخدمة»; it merged into المنتجات (V5). Rewrites the hash in place.
+  pxRedirectLegacy();
   const af = document.activeElement;
   const afId = af && af.tagName === "INPUT" ? af.id || af.getAttribute("data-fid") : null;
   const afPos = afId && af.selectionStart != null ? af.selectionStart : null;
@@ -4299,7 +4315,9 @@ function render(fetchNew) {
     // The tail is REJOINED, not [1]: «تكامل الأنظمة (HIS/ERP)» contains a slash, and splitting on
     // it would look up a product that does not exist. Same shape as #kb.
     const nm = decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "");
-    b.innerHTML = cur === "product" ? vProductDrill(nm) : vSectorDrill(nm);
+    // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
+    const pr = cur === "product" ? pxParseProductRoute() : null;
+    b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
   } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
@@ -4307,7 +4325,6 @@ function render(fetchNew) {
     // was already «جهات الاستهداف». Until this split the sidebar said العملاء and the screen showed
     // the importer, and there was no list to click a customer FROM.
     b.innerHTML = cur === "aimkt" ? vAimkt()
-      : cur === "kb" ? (kbProd ? vKbProduct(kbProd) : vKb())
       : cur === "targets" ? vTargetsCrm()
       : cur === "perf" ? vSalesPerf()
       : cur === "opps" ? vOppsCrm()
@@ -4675,6 +4692,7 @@ ${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${OPPS_DOMAIN_JS}
+${PRODUCT_DOMAIN_JS}
 ${SALES_DOMAIN_JS}
 ${OPPS_CRM_JS}
 ${SALES_CRM_JS}

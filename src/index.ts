@@ -19,6 +19,7 @@ import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
 import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
+import * as pd from "./product-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -289,9 +290,262 @@ app.get("/admin/sales/sectors", async (req, reply) => {
   };
 });
 
+// ---- «المنتجات» V5 --------------------------------------------------------------------------
+//
+// One registry (tags), every file and figure overlaid by name, and ONE eligibility rule shared
+// with the assistant's runtime. Errors on the new routes are RFC 9457 problem+json (STANDARDS §7);
+// the client reads `error`. Product names travel in the query or the body, never in the path —
+// «تكامل الأنظمة (HIS/ERP)» has a slash in it.
+
+/** The product row every products read and write answers with — the catalogue row plus the two
+ *  runtime facts the screens must not derive for themselves: `eligible` (the pure rule over the
+ *  stored state) and `inAssistantKnowledge` (what the agent's live prompt actually holds). */
+async function productRows(): Promise<Record<string, unknown>[]> {
+  const live = new Set(agent.runtimeKnowledgeProducts());
+  return (await db.productCatalogue()).map((c) => {
+    const kbState = c.kb ? pd.kbStateOf(c.kb.md, c.kb.approvedAt) : "none";
+    const embedded = pd.isEmbeddedProduct(c.product);
+    return {
+      product: c.product, sector: c.sector, sectorId: c.sectorId, sectorAssumed: c.sectorAssumed,
+      owner: c.owner, pricingNote: c.pricingNote,
+      packages: c.packages, retiredPackageCount: c.retiredPackageCount,
+      archived: c.archived, archivedAt: c.archivedAt,
+      embedded,
+      eligible: pd.isRuntimeEligible({ exists: true, archived: c.archived, kbState, embedded }),
+      inAssistantKnowledge: live.has(c.product),
+      kb: c.kb
+        ? { state: kbState, source: c.kb.source, approvedBy: c.kb.approvedBy, approvedAt: c.kb.approvedAt, updatedAt: c.kb.updatedAt }
+        : { state: "none", source: null, approvedBy: null, approvedAt: null, updatedAt: null },
+      draft: c.draft ? { source: c.draft.source, by: c.draft.by, at: c.draft.at, hash: db.sha256Hex(c.draft.md) } : null,
+      asset: c.asset,
+      createdAt: c.createdAt,
+    };
+  });
+}
+
+async function productRow(name: string): Promise<Record<string, unknown> | null> {
+  return (await productRows()).find((r) => r.product === name) ?? null;
+}
+
+/** Four fiscal quarters of one year, the same bounds /admin/sales/quarters uses. */
+function yearBounds(year: number): { quarter: number; startMs: number; endMs: number }[] {
+  const fsm = fiscalStartMonth();
+  return [1, 2, 3, 4].map((quarter) => {
+    const b = sales.riyadhPeriodBounds(year, quarter, fsm);
+    return { quarter, startMs: b.startMs, endMs: b.endMs };
+  });
+}
+
+/** The product named by ?product= or the body, or null — one place, so every route trims alike. */
+function productParam(req: any): string {
+  const q = String((req.query as any)?.product ?? "").trim();
+  return q || String((req.body as any)?.product ?? "").trim();
+}
+
 app.get("/admin/products", async (req, reply) => {
-  if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
-  return { ok: true, products: await db.productCatalogue() };
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const [products, unmatched, skill, sectors] = await Promise.all([
+    productRows(), db.unmatchedFiles(), db.skillAsset(), db.listSectors(),
+  ]);
+  return { ok: true, products, unmatched, skill, sectors };
+});
+
+app.get("/admin/products/performance", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const fsm = fiscalStartMonth();
+  const now = sales.riyadhFiscalPeriod(Date.now(), fsm);
+  const year = Number((req.query as any)?.year) || now.year;
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) return problem(reply, 400, "invalid_field", "سنة غير صالحة", "year");
+  return { ok: true, year, byProduct: await db.productPerformance(year, yearBounds(year)) };
+});
+
+app.get("/admin/products/knowledge", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const product = productParam(req);
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  const [state, row] = await Promise.all([db.tagState(product), db.knowledgeOf(product)]);
+  // A kb row with no tag is an «غير مطابق» file and still readable, so the reconcile row can show it.
+  if (!state.exists && !row) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
+  const md = row?.md ?? "";
+  const draftMd = row?.draft_md ?? null;
+  return {
+    ok: true, product, md, mdHash: db.sha256Hex(md),
+    state: pd.kbStateOf(md, row?.approved_at ?? null),
+    approvedBy: row?.approved_by ?? null, approvedAt: row?.approved_at ?? null,
+    source: row?.source_filename ?? null, updatedAt: row?.updated_at ?? null,
+    draftMd, draftHash: draftMd == null ? null : db.sha256Hex(draftMd),
+    draftSource: row?.draft_source ?? null, draftBy: row?.draft_by ?? null, draftAt: row?.draft_at ?? null,
+    changeSummary: draftMd == null ? null : pd.changeSummary(md, draftMd),
+  };
+});
+
+app.get("/admin/products/impact", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const product = productParam(req);
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  if (!(await db.tagState(product)).exists) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
+  return { ok: true, product, embedded: pd.isEmbeddedProduct(product), ...(await db.impactOf(product)) };
+});
+
+/** Shared field rules for a package body. Returns the clean shape or the offending field. */
+function readPackageBody(b: Record<string, unknown>):
+  { name: string; listPrice: number; years: number; scope: string | null } | { bad: string } {
+  const name = String(b.name ?? "").trim().replace(/\s+/g, " ");
+  if (!name || name.length > 60) return { bad: "name" };
+  const listPrice = Number(b.listPrice);
+  if (!Number.isInteger(listPrice) || listPrice < 0 || listPrice > 1e12) return { bad: "listPrice" };
+  const years = Number(b.years ?? 1);
+  if (!Number.isInteger(years) || years < 1 || years > 10) return { bad: "years" };
+  const scopeRaw = b.scope == null ? "" : String(b.scope).trim();
+  if (scopeRaw.length > 120) return { bad: "scope" };
+  return { name, listPrice, years, scope: scopeRaw || null };
+}
+
+app.post("/admin/products", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const named = pd.normalizeProductName(b.name);
+  if (!named.ok) return problem(reply, 400, "invalid_name", named.reason, "name");
+  const owner = b.owner == null ? null : String(b.owner).trim().replace(/\s+/g, " ") || null;
+  if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من ٦٠ حرفًا", "owner");
+  const pricingNote = b.pricingNote == null ? null : String(b.pricingNote).trim() || null;
+  if (pricingNote && pricingNote.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من ١٢٠ حرفًا", "pricingNote");
+  let sectorId: number | null = null;
+  if (b.sectorId != null && b.sectorId !== "") {
+    sectorId = Number(b.sectorId);
+    if (!Number.isInteger(sectorId) || !(await db.listSectors()).some((s) => s.id === sectorId)) {
+      return problem(reply, 400, "invalid_field", "قطاع غير معروف", "sectorId");
+    }
+  }
+  let firstPackage: { name: string; listPrice: number; years: number; scope: string | null } | null = null;
+  if (b.firstPackage != null && typeof b.firstPackage === "object") {
+    const pk = readPackageBody(b.firstPackage as Record<string, unknown>);
+    if ("bad" in pk) return problem(reply, 400, "invalid_field", "حقل الباقة غير صالح: " + pk.bad, "firstPackage." + pk.bad);
+    firstPackage = pk;
+  }
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const r = await db.createProduct({ name: named.name, sectorId, owner, pricingNote, firstPackage }, adminName(req));
+  if (r === "exists") return problem(reply, 409, "name_exists", "الاسم مستخدم لمنتج آخر", "name");
+  if (r === "unknown_sector") return problem(reply, 400, "invalid_field", "قطاع غير معروف", "sectorId");
+  // A create can match files already uploaded under this name (spec F) — the assistant must see them.
+  await agent.refreshKb();
+  const row = await productRow(named.name);
+  reply.code(201).header("Location", "/admin/products?product=" + encodeURIComponent(named.name));
+  return { ok: true, product: row };
+});
+
+app.patch("/admin/products", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const product = productParam(req);
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const patch: { sectorId?: number | null; owner?: string | null; pricingNote?: string | null } = {};
+  if ("sectorId" in b) {
+    if (b.sectorId == null || b.sectorId === "") patch.sectorId = null;
+    else {
+      const id = Number(b.sectorId);
+      if (!Number.isInteger(id) || !(await db.listSectors()).some((s) => s.id === id)) {
+        return problem(reply, 400, "invalid_field", "قطاع غير معروف", "sectorId");
+      }
+      patch.sectorId = id;
+    }
+  }
+  if ("owner" in b) {
+    const owner = b.owner == null ? null : String(b.owner).trim().replace(/\s+/g, " ") || null;
+    if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من ٦٠ حرفًا", "owner");
+    patch.owner = owner;
+  }
+  if ("pricingNote" in b) {
+    const note = b.pricingNote == null ? null : String(b.pricingNote).trim() || null;
+    if (note && note.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من ١٢٠ حرفًا", "pricingNote");
+    patch.pricingNote = note;
+  }
+  if (!(await db.tagState(product)).exists) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
+  if (Object.keys(patch).length && !(await db.patchProductMeta(product, patch))) {
+    return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  }
+  return { ok: true, product: await productRow(product) };
+});
+
+app.post("/admin/products/archive", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  if (typeof b.archived !== "boolean") return problem(reply, 400, "invalid_field", "archived يجب أن يكون true أو false", "archived");
+  // Their names are coupled to agent.ts PRODUCTS, the product lock and the boot seed (spec C, D).
+  if (pd.isEmbeddedProduct(product)) {
+    return problem(reply, 409, "embedded_product", "مضمَّن في كتالوج المساعد — الأرشفة تتطلب تحديث الكتالوج", "product");
+  }
+  if (!(await db.tagState(product)).exists) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
+  await db.setArchived(product, b.archived);
+  // The assistant stops (or resumes) using this product's knowledge and PDF now, not at restart.
+  await agent.refreshKb();
+  const impact = { embedded: false, ...(await db.impactOf(product)) };
+  return { ok: true, product, archived: b.archived, impact };
+});
+
+app.post("/admin/products/knowledge/approve", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  const draftHash = String(b.draftHash ?? "").trim().toLowerCase();
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  if (!/^[0-9a-f]{64}$/.test(draftHash)) return problem(reply, 400, "invalid_field", "draftHash مطلوب", "draftHash");
+  const r = await db.approveKbDraft(product, draftHash, adminName(req));
+  if (r === "no_draft") return problem(reply, 404, "no_draft", "لا مسودة لهذا المنتج", "product");
+  if (r === "stale") return problem(reply, 409, "stale_draft", "تغيّرت المسودة منذ فتحها", "draftHash");
+  await agent.refreshKb();
+  return { ok: true };
+});
+
+app.post("/admin/products/knowledge/approve-current", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const product = String(b.product ?? "").trim();
+  const contentHash = String(b.contentHash ?? "").trim().toLowerCase();
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  if (!/^[0-9a-f]{64}$/.test(contentHash)) return problem(reply, 400, "invalid_field", "contentHash مطلوب", "contentHash");
+  const r = await db.approveKbCurrent(product, contentHash, adminName(req));
+  if (r === "no_knowledge") return problem(reply, 404, "no_knowledge", "لا نص معرفة لهذا المنتج", "product");
+  if (r === "stale") return problem(reply, 409, "stale_content", "تغيّر النص منذ فتحه", "contentHash");
+  await agent.refreshKb();
+  return { ok: true };
+});
+
+app.post("/admin/products/knowledge/discard", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const product = String((req.body as any)?.product ?? "").trim();
+  if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
+  if (!(await db.discardKbDraft(product))) return problem(reply, 404, "no_draft", "لا مسودة لهذا المنتج", "product");
+  await agent.refreshKb();   // a no-op for the runtime, kept so every knowledge write ends the same way
+  return { ok: true };
+});
+
+app.post("/admin/products/reconcile", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const from = String(b.from ?? "").trim();
+  const to = String(b.to ?? "").trim();
+  const kind = String(b.kind ?? "");
+  if (!from) return problem(reply, 400, "invalid_field", "المصدر مطلوب", "from");
+  if (kind !== "kb" && kind !== "asset") return problem(reply, 400, "invalid_field", "kind يجب أن يكون kb أو asset", "kind");
+  const target = await db.tagState(to);
+  if (!to || to.startsWith("__") || !target.exists || target.archived) {
+    return problem(reply, 400, "invalid_target", "الوجهة يجب أن تكون منتجًا فعّالًا", "to");
+  }
+  const r = await db.reconcileFile(from, to, kind);
+  if (r === "unknown_source") return problem(reply, 404, "unknown_source", "لا ملف بهذا الاسم", "from");
+  if (r === "target_has") {
+    return problem(reply, 409, kind === "kb" ? "target_has_kb" : "target_has_asset",
+      kind === "kb" ? "المنتج الوجهة لديه ملف معرفة بالفعل" : "المنتج الوجهة لديه ملف تعريفي بالفعل", "to");
+  }
+  await agent.refreshKb();
+  return { ok: true };
 });
 
 app.get("/admin/sectors", async (req, reply) => {
@@ -385,15 +639,22 @@ app.post("/admin/sales/targets", async (req, reply) => {
     // The count, not the catalogue: an error body is not a place to enumerate the product line.
     return reply.code(400).send({ ok: false, error: "unknown_product", product, knownCount: known.size });
   }
-  const year = Number(b.year), quarter = Number(b.quarter), amount = Number(b.amount);
+  const year = Number(b.year), quarter = Number(b.quarter);
   if (!Number.isFinite(year) || year < 2020 || year > 2100) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "year" });
   }
   if (!Number.isInteger(quarter) || quarter < 1 || quarter > 4) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "quarter" });
   }
-  // A negative target is not a stretch goal, it is a typo that would flip every colour on the board.
-  if (!Number.isFinite(amount) || amount < 0 || amount > 1e12) {
+  // null REMOVES the row: «بلا مستهدف» is a missing target, which is not a target of zero.
+  if (b.amount === null) {
+    const deleted = await db.deleteTarget(product, year, quarter);
+    return { ok: true, product, year, quarter, deleted };
+  }
+  const amount = Number(b.amount);
+  // Integer SAR, bounded. A negative target is not a stretch goal, it is a typo that would flip
+  // every colour on the board; a fractional one is a number no invoice has ever carried.
+  if (!Number.isInteger(amount) || amount < 0 || amount > 1e12) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "amount" });
   }
   const ok = await db.setTarget(product, year, quarter, amount, adminName(req));
@@ -533,6 +794,18 @@ app.post("/admin/packages", async (req, reply) => {
   // Null means the product is not in the catalogue. Same guard the targets endpoint uses: a
   // package for a product that does not exist would be invisible on every screen.
   if (!row) return reply.code(400).send({ ok: false, error: "unknown_product", product });
+  return { ok: true, package: row };
+});
+
+app.patch("/admin/packages/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as { id: string }).id);
+  if (!Number.isInteger(id) || id <= 0) return problem(reply, 400, "bad_id", "معرّف غير صالح", "id");
+  const pk = readPackageBody((req.body ?? {}) as Record<string, unknown>);
+  if ("bad" in pk) return problem(reply, 400, "invalid_field", "حقل الباقة غير صالح: " + pk.bad, pk.bad);
+  const row = await db.updatePackage(id, pk);
+  if (row === "name_exists") return problem(reply, 409, "name_exists", "اسم الباقة مستخدم لباقة أخرى في هذا المنتج", "name");
+  if (!row) return problem(reply, 404, "not_found", "لا باقة بهذا المعرّف", "id");
   return { ok: true, package: row };
 });
 
@@ -704,6 +977,14 @@ function adminName(req: any): string {
   return authorize(req)?.actor ?? "اللوحة";
 }
 
+/** RFC 9457 problem+json (STANDARDS §7, D-5 exit step 2) for the routes built since the rule
+ *  bound. `error` is the machine code the client switches on; `detail` is what a person reads. */
+function problem(reply: any, status: number, error: string, detail?: string, field?: string) {
+  return reply.code(status).type("application/problem+json").send({
+    type: "about:blank", title: error, status, detail, error, ...(field ? { field } : {}),
+  });
+}
+
 app.get("/admin/state", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   return { ...tracker.snapshot(), notifyNumber: cfg.notifyNumber };
@@ -805,37 +1086,59 @@ app.get("/admin/tags", async (req, reply) => {
 
 app.post("/admin/tags", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const name = String((req.body as { name?: string })?.name ?? "").trim().replace(/\s+/g, " ");
-  if (!name) return reply.code(400).send({ error: "name is required" });
-  if (name.length > 60) return reply.code(400).send({ error: "too_long" });
-  const created = await db.createTag(name, "portal");
-  return { status: "ok", name, created };
+  // The ONE name rule (spec E): a tag IS a product, so it obeys the product's name rule.
+  const named = pd.normalizeProductName((req.body as { name?: string })?.name);
+  if (!named.ok) return problem(reply, 400, "invalid_name", named.reason, "name");
+  const created = await db.createTag(named.name, "portal");
+  return { status: "ok", name: named.name, created };
 });
 
 app.post("/admin/tags/rename", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const { from, to } = (req.body ?? {}) as { from?: string; to?: string };
   const a = String(from ?? "").trim();
-  const b = String(to ?? "").trim().replace(/\s+/g, " ");
-  if (!a || !b) return reply.code(400).send({ error: "body: { from, to }" });
-  if (b.length > 60) return reply.code(400).send({ error: "too_long" });
+  if (!a) return reply.code(400).send({ error: "body: { from, to }" });
+  const named = pd.normalizeProductName(to);
+  if (!named.ok) return problem(reply, 400, "invalid_name", named.reason, "to");
+  const b = named.name;
   if (a === b) return { status: "ok", renamed: false };
+  // The six embedded products are named in agent.ts PRODUCTS, the product lock's patterns and the
+  // boot seed. A database rename would leave the code pointing at a name that no longer exists —
+  // and the seed would recreate the old one at the next restart (spec D).
+  if (pd.isEmbeddedProduct(a)) {
+    return problem(reply, 409, "embedded_product", "مضمَّن في كتالوج المساعد — إعادة التسمية تتطلب تحديث الكتالوج", "from");
+  }
   // A rename ONTO an existing tag would merge two vocabularies; that is a different decision with a
   // different blast radius, so it is refused here rather than done silently.
   if ((await db.listTags()).some((t) => t.name === b)) {
     return reply.code(409).send({ error: "tag_exists" });
   }
+  // Counted BEFORE the move, on the old name — after it there is nothing left to count.
+  const counts = await db.impactOf(a);
   const r = await db.renameTag(a, b);
   if (!r.ok) return reply.code(404).send({ error: "unknown_tag" });
+  // After COMMIT: the in-memory readings follow the durable ones, and the assistant's knowledge
+  // and files are reloaded under the new name in the same request.
+  const contacts = tracker.renameTagProduct(a, b);
+  await agent.refreshKb();
   // The per-table counts, not «تم». A rename touches ten tables and used to touch one; reporting
   // what actually moved is how the caller can tell those two apart.
-  return { status: "ok", renamed: true, from: a, to: b, moved: r.moved };
+  return { status: "ok", renamed: true, from: a, to: b, moved: r.moved, counts: { ...counts, embedded: false, contacts } };
 });
 
 app.post("/admin/tags/delete", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const name = String((req.body as { name?: string })?.name ?? "").trim();
   if (!name) return reply.code(400).send({ error: "name is required" });
+  // Delete used to remove the tag and leave its kb, asset, packages, targets and deals orphaned
+  // (spec J). A referenced product is archived, never deleted.
+  const refs = await db.productReferences(name);
+  if (refs.total > 0) {
+    return reply.code(409).type("application/problem+json").send({
+      type: "about:blank", title: "referenced", status: 409, error: "referenced",
+      detail: "المنتج مستخدم في سجلات أخرى — أرشفه بدلًا من حذفه", counts: refs.counts,
+    });
+  }
   const r = await db.deleteTag(name);
   if (!r.ok) return reply.code(404).send({ error: "unknown_tag" });
   return { status: "ok", name, cleared: r.cleared };
@@ -889,6 +1192,12 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   // A template whose service variable cannot be resolved must not go out with an empty hole in it.
   if (/\{\{1\}\}|\{product\}/.test(message) && !(product || "").trim())
     return reply.code(400).send({ error: "القالب يحتوي {{1}} ولم تُحدَّد الخدمة — اختر الخدمة قبل الإطلاق" });
+  // BEFORE ANY SEND (spec B′ rule 4): a campaign about a product the assistant cannot sell —
+  // unknown, archived, or with no approved or embedded knowledge — would open conversations the
+  // agent then cannot hold. The wizard shows the same reason; a UI-only guard is not enough.
+  if ((product || "").trim() && !agent.isEligibleNow((product || "").trim())) {
+    return problem(reply, 400, "product_not_eligible", "لا يبيعه المساعد — يلزم اعتماد ملف المعرفة أو استعادة المنتج أولًا", "product");
+  }
   const campName = (name || "").trim() ||
     `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
   const assets = await db.listAssets();
@@ -1001,8 +1310,11 @@ app.get("/assets/:pid", async (req, reply) => {
 
 app.get("/admin/product-assets", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
   return db.listAssets();
 });
+
+const ASSET_MAX_BYTES = 10 * 1024 * 1024;
 
 // Upload the product's intro PDF (the file the agent SENDS — separate from knowledge decks).
 app.post("/admin/product-asset/upload", async (req, reply) => {
@@ -1012,12 +1324,27 @@ app.post("/admin/product-asset/upload", async (req, reply) => {
   const product = (String((file.fields?.product as any)?.value ?? "").trim() ||
     String((req.query as any)?.product ?? "").trim());
   if (!product) return reply.code(400).send({ error: "product required (multipart field before file, or ?product=)" });
+  const isSkill = product === "__skill__";
+  if (!isSkill) {
+    // A product file goes to a CUSTOMER, by URL, from a public route. So: a live product only, a
+    // real PDF only (the bytes say so, not the extension), and bounded. A failed check keeps the
+    // current file — nothing is written until every check passes.
+    if (product.startsWith("__")) return problem(reply, 400, "unknown_product", "لا منتج بهذا الاسم", "product");
+    const state = await db.tagState(product);
+    if (!state.exists) return problem(reply, 400, "unknown_product", "لا منتج بهذا الاسم", "product");
+    if (state.archived) return problem(reply, 400, "archived_product", "المنتج مؤرشف — استعده أولًا", "product");
+  }
   const buf = await file.toBuffer();
+  if (!isSkill) {
+    if (buf.length > ASSET_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من ١٠ م.ب", "file");
+    if (buf.subarray(0, 4).toString("latin1") !== "%PDF") return problem(reply, 400, "invalid_file", "الملف ليس PDF", "file");
+  }
   const publicId = randomBytes(9).toString("hex");
-  await db.saveAsset(product, publicId, file.filename || "intro.pdf", file.mimetype || "application/pdf", buf);
+  await db.saveAsset(product, publicId, file.filename || "intro.pdf",
+    isSkill ? (file.mimetype || "application/zip") : "application/pdf", buf);
   await agent.refreshKb();
   log({ at: "assets", msg: "intro file saved", product, publicId, size: buf.length });
-  return { product, publicId, filename: file.filename };
+  return { ok: true, product, publicId, filename: file.filename, size: buf.length };
 });
 
 // Portal takeover toggle: human=true mutes the agent for this chat; false resumes it.
@@ -1038,7 +1365,10 @@ app.post("/admin/compose", async (req, reply) => {
     const text = await agent.composeOpener(String(product), String(audience || ""), String(angle || ""));
     return { message: text };
   } catch (e) {
-    return reply.code(502).send({ error: String(e instanceof Error ? e.message : e).slice(0, 200) });
+    const msg = String(e instanceof Error ? e.message : e);
+    // The eligibility rule, not a model failure: the wizard reads `not_eligible` and shows why.
+    if (msg === "not_eligible") return problem(reply, 400, "not_eligible", "لا يبيعه المساعد — يلزم اعتماد ملف المعرفة أو استعادة المنتج أولًا", "product");
+    return reply.code(502).send({ error: msg.slice(0, 200) });
   }
 });
 
@@ -1543,11 +1873,17 @@ app.post("/admin/opps", async (req, reply) => {
   if (!lines.length) return reply.code(400).send({ ok: false, error: "invalid_field", field: "lines" });
   if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
   const known = new Set((await db.listTags()).map((t) => t.name));
+  const active = new Set(await db.activeTagNames());
   for (const l of lines) {
     const bad = db.validateOppLine(l);
     if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
     if (!known.has(String(l.product).trim())) {
       return reply.code(400).send({ ok: false, error: "unknown_product", product: l.product, known: [...known] });
+    }
+    // Archived, not eligibility (spec B′ rule 5): a rep may record a deal for a product the
+    // assistant cannot sell, but not for one the company has shelved. Existing lines stay editable.
+    if (!active.has(String(l.product).trim())) {
+      return problem(reply, 400, "archived_product", "المنتج مؤرشف — استعده قبل تسجيل فرصة جديدة", "product");
     }
   }
   const rows = await db.createOppLines(
@@ -1635,25 +1971,46 @@ app.get("/admin/campaigns", async (req, reply) => {
 
 app.get("/admin/kb", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
   return db.listKb();
 });
 
+const KB_MAX_BYTES = 15 * 1024 * 1024;
+const KB_FILE_RE = /\.(pdf|docx|pptx|xlsx|md|txt)$/i;
+
+/**
+ * Knowledge upload → DRAFT. The product is REQUIRED and must be a live tag: the model no longer
+ * names a product from any UI, because a typo in its answer used to create a pseudo-product that
+ * the boot seed then promoted to a tag. What the model extracts lands in draft_*; the assistant
+ * reads md, and md moves only through «اعتماد المعرفة» (spec A, A′).
+ */
 app.post("/admin/kb/upload", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const file = await (req as any).file();
-  if (!file) return reply.code(400).send({ error: "multipart file required" });
+  if (!file) return problem(reply, 400, "invalid_file", "الملف مطلوب", "file");
+  // The multipart field must PRECEDE the file part, or it is not parsed yet when the file arrives.
+  const product = (String((file.fields?.product as any)?.value ?? "").trim() ||
+    String((req.query as any)?.product ?? "").trim());
+  if (!product) return problem(reply, 400, "unknown_product", "اسم المنتج مطلوب (حقل product قبل الملف أو ?product=)", "product");
+  if (product.startsWith("__")) return problem(reply, 400, "unknown_product", "لا منتج بهذا الاسم", "product");
+  const state = await db.tagState(product);
+  if (!state.exists) return problem(reply, 400, "unknown_product", "لا منتج بهذا الاسم", "product");
+  if (state.archived) return problem(reply, 400, "archived_product", "المنتج مؤرشف — استعده أولًا", "product");
+  const filename = String(file.filename || "");
+  if (!KB_FILE_RE.test(filename)) return problem(reply, 400, "invalid_file", "الأنواع المقبولة: pdf docx pptx xlsx md txt", "file");
   const buf = await file.toBuffer();
-  // Optional multipart field "product": scope the upload to an existing product page
-  // (overrides the extracted name so the doc lands under the product the user is viewing).
-  const productOverride = (String((file.fields?.product as any)?.value ?? "").trim() ||
-    String((req.query as any)?.product ?? "").trim()) || undefined;
+  if (buf.length > KB_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من ١٥ م.ب", "file");
   try {
-    const out = await kb.processDeck(buf, file.filename || "deck.pdf", productOverride);
-    await agent.refreshKb();
-    return out;
+    // processDeck writes the draft (db.saveKb writes draft_* only) under the product given here.
+    await kb.processDeck(buf, filename, product);
   } catch (e) {
-    return reply.code(422).send({ error: String(e).slice(0, 300) });
+    // The existing draft and the approved text are untouched: nothing was written.
+    return problem(reply, 502, "extraction_failed", String(e instanceof Error ? e.message : e).slice(0, 300), "file");
   }
+  await db.setKbDraftBy(product, adminName(req));
+  const row = await db.knowledgeOf(product);
+  const draftMd = row?.draft_md ?? "";
+  return { ok: true, product, draftHash: db.sha256Hex(draftMd), changeSummary: pd.changeSummary(row?.md ?? "", draftMd) };
 });
 
 // Outbound smoke tests — e.g. verify the source number once it's configured.
@@ -1705,11 +2062,11 @@ const main = async () => {
     // Seed the tag vocabulary from Lean's own catalogue, once and idempotently, so the registry
     // starts where the hard-coded list left off and nothing an operator already tagged stops
     // validating. Everything added after this is theirs.
+    // SERVICE_CATALOGUE ONLY. Seeding from product_kb names as well meant a rename or an
+    // unmatched upload recreated a product at every restart (spec D); an off-registry file is now
+    // an «غير مطابق» row the operator reconciles, not a product the boot invents.
     const have = new Set((await db.listTags()).map((t) => t.name));
-    const seed = [
-      ...(insights.SERVICE_CATALOGUE as readonly string[]),
-      ...(await db.listKb()).map((d) => d.product).filter((p) => p && p !== "__skill__"),
-    ];
+    const seed = [...(insights.SERVICE_CATALOGUE as readonly string[])];
     let added = 0;
     for (const name of seed) if (!have.has(name) && await db.createTag(name, "seed")) added++;
     if (added) log({ at: "boot", msg: `tag registry seeded with ${added} name(s)` });

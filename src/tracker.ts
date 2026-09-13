@@ -543,6 +543,32 @@ export function setTest(phone: string, test: boolean) {
   logEvent(test ? "marked_test" : "unmarked_test", phone, "");
 }
 
+/**
+ * After a product rename COMMITS, the readings held in memory must follow it. interest_tags moved
+ * inside the database transaction, but the tracker is the read path (architecture §5) and would
+ * otherwise show the old name on every contact until the next restart rehydrated it — a filter
+ * on the new name finding nobody, while the count on the record said otherwise.
+ *
+ * Memory only, on purpose: the durable copy already moved. Returns how many contacts changed, so
+ * the rename response can report it beside the per-table counts.
+ */
+export function renameTagProduct(from: string, to: string): number {
+  let changed = 0;
+  for (const c of contacts.values()) {
+    if (!(c.tags || []).some((t) => t.product === from)) continue;
+    changed++;
+    const merged = new Map<string, Tag>();
+    for (const t of c.tags) {
+      const product = t.product === from ? to : t.product;
+      const prior = merged.get(product);
+      // A contact already carrying the destination name keeps ONE reading — the newer one.
+      if (!prior || t.ts > prior.ts) merged.set(product, { product, level: t.level, ts: t.ts });
+    }
+    c.tags = [...merged.values()];
+  }
+  return changed;
+}
+
 /** Full contacts, untruncated. snapshot() caps each transcript at the last 30 turns for the
  *  portal payload — segmentation counts reply occurrences, so it must not read a truncated one. */
 export function listContacts(): readonly Contact[] {

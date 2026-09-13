@@ -47,7 +47,7 @@ ROUTES = [
     # «المنتجات» and «التقارير» stopped being «قريبًا» placeholders. Both landmarks render from the
     # data, so they go red if the endpoint behind the screen breaks — which is the whole reason
     # these two screens exist.
-    ("#products", "الكتالوج"),
+    ("#products", "جاهزية المساعد"),
     ("#reports", "الخسائر بسبب التكامل"),
     ("#tasks", "الأولوية"),
     ("#notes", "ملاحظة"),
@@ -56,7 +56,8 @@ ROUTES = [
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
     # topbar renders even when the view body is broken.
-    ("#kb", "منها بمعرفة معتمدة"),
+    # «معرفة الخدمة» merged into المنتجات (V5); #kb now redirects. The record is its landmark.
+    ("#product/الإجازات المرضية", "جاهزية المساعد"),
     # The most-edited surface, and the one the blank-page class would hit hardest.
     # The landmark below is the enrichment panel's sub-line, «ما تكتبه هنا لا يستطيع المساعد
     # تغييره». Repointed in the crm-record cycle from vSalesPath's heading «مسار البيع مع هذا
