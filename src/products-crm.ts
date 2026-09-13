@@ -366,6 +366,21 @@ export const PRODUCTS_CRM_CSS = `
 .px-lk .v b { color:var(--ink); font-weight:600; font-size:var(--t-sm); }
 .px-foot { font-size:var(--t-xs); color:var(--muted); padding-inline:var(--s1); }
 
+/* The readiness band, which replaces the tab strip on a product record. It lives inside .subnav
+   (36px), so it is one line that scrolls sideways rather than a block that grows the header. */
+.px-band { display:flex; align-items:center; gap:var(--s2); height:100%; min-width:0; white-space:nowrap; }
+.px-band .w { font-size:var(--t-sm); font-weight:600; color:var(--ink); display:inline-flex; align-items:center; gap:var(--s2); flex:none; }
+.px-band .w.no { color:var(--s-attn-text); } .px-band .w.ok { color:var(--s-issued-text); }
+.px-band .sep { width:1px; height:14px; background:var(--line); flex:none; margin-inline:2px; }
+.px-band .it { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); color:var(--muted); flex:none; }
+.px-band .it b { font-weight:500; color:var(--ink-2); }
+.px-band .it i { width:14px; height:6px; border-radius:var(--r-sm); background:var(--s-issued); display:block; flex:none; }
+.px-band .it i.miss { background-color:var(--surface-2); background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
+.px-band .it i.pend { background:var(--s-attn-mark); }
+.px-band .go { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:transparent;
+  border:none; cursor:pointer; padding-inline:4px; border-radius:var(--r-sm); min-height:26px; }
+.px-band .go:hover { text-decoration:underline; }
+
 /* drawer + modal (own classes: the opportunities drawer owns .ox-dr and its keyboard handler) */
 .px-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(520px,100vw); background:var(--paper);
   border-inline-end:1px solid var(--line); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); z-index:var(--z-modal);
@@ -989,22 +1004,43 @@ function pxKnowledgeSection(p) {
   }
   return pxSection("knowledge", "المعرفة والملفات", "", b);
 }
-function pxSide(p, rd) {
-  var name = p.product;
-  var labels = { knowledge: "معرفة المساعد", asset: "ملف تعريفي", price: "سعر منشور", lock: "يميّزه المساعد في المحادثة" };
+var PX_RD_LABELS = { knowledge: "معرفة المساعد", asset: "ملف تعريفي", price: "سعر منشور", lock: "يميّزه المساعد في المحادثة" };
+var PX_RD_GOTO = { knowledge: "knowledge", asset: "knowledge", price: "pricing", lock: "" };
+function pxReadinessState(p) {
   var kst = (p.kb && p.kb.state) || "none";
-  var stateOf = {
+  return {
     knowledge: kst === "approved" ? "معتمدة" : p.draft ? "مسودة بانتظار الاعتماد" : kst === "legacy" ? "بانتظار اعتماد النص الحالي" : p.embedded ? "مدمجة فقط — لا ملف" : "لا معرفة",
     asset: p.asset ? "مرفق" : "غير مرفق",
     price: pxPrice(p).kind === "package" ? pxNPkg(pxPrice(p).count) : pxPrice(p).kind === "note" ? "ملاحظة تسعير" : "لا سعر",
     lock: p.embedded ? "ضمن كتالوج المساعد" : "يتطلب تحديث كتالوج المساعد"
   };
-  var goTo = { knowledge: "knowledge", asset: "knowledge", price: "pricing", lock: "" };
-  var h = '<section class="px-sec" aria-labelledby="pxrd_h"><div class="px-sech"><h2 id="pxrd_h">جاهزية المساعد</h2></div><div class="px-secb" style="gap:0"><div class="px-rd">' +
-    rd.cells.map(function (c) {
-      return '<div class="px-rdr"><i class="' + (c.state === "missing" ? "miss" : c.state === "pending" ? "pend" : "") + '"></i><div><div class="n">' + labels[c.key] + '</div><div class="st">' + esc(stateOf[c.key]) + "</div></div>" +
-        (goTo[c.key] && c.state !== "done" ? '<button class="go" data-px="jump" data-s="' + goTo[c.key] + '">' + (c.key === "price" ? "أضف سعرًا" : "رفع") + "</button>" : "<span></span>") + "</div>";
-    }).join("") + '</div><div class="px-rdf ' + pxWordCls(rd) + '">' + esc(rd.word) + "</div></div></section>";
+}
+/* The record's own strip: on a product record this REPLACES the tab row. The first question a
+   product record answers is «does the assistant sell this, and what is missing?» — not «which
+   screen am I on». render() calls it; the readiness rule is the same one the list row and the
+   campaign wizard read, so three surfaces cannot disagree. */
+function pxReadinessBand() {
+  if (!pcCat) return "";
+  var r = typeof pxParseProductRoute === "function" ? pxParseProductRoute() : null;
+  var p = r && r.name ? pxRow(r.name) : null;
+  if (!p) return "";
+  var rd = pxReadiness(p), st = pxReadinessState(p);
+  var h = '<div class="px-band" role="status" aria-label="جاهزية المساعد">';
+  h += '<span class="w ' + pxWordCls(rd) + '">' + pxCellsHtml(rd) + esc(rd.word) + "</span>";
+  h += rd.cells.map(function (c) {
+    return '<span class="sep" aria-hidden="true"></span><span class="it' + (c.state === "done" ? " done" : "") + '">' +
+      '<i class="' + (c.state === "missing" ? "miss" : c.state === "pending" ? "pend" : "") + '"></i>' +
+      PX_RD_LABELS[c.key] + '<b>' + esc(st[c.key]) + "</b>" +
+      (PX_RD_GOTO[c.key] && c.state !== "done" ? '<button class="go" data-px="jump" data-s="' + PX_RD_GOTO[c.key] + '">' + (c.key === "price" ? "أضف سعرًا" : "أكمله") + "</button>" : "") + "</span>";
+  }).join("");
+  return h + "</div>";
+}
+function pxSide(p, rd) {
+  var name = p.product;
+  // Readiness lives in the band above the record now (pxReadinessBand): the same four rows twice on
+  // one screen is not two answers, it is one answer said twice.
+  void rd;
+  var h = "";
   var open = pxOpenLines(name), openVal = open.reduce(function (n, o) { return n + (opPriced(o) ? opValue(o) : 0); }, 0);
   var link = function (act, label, count, extra) {
     return '<button class="px-lk" data-px="' + act + '" data-nm="' + esc(name) + '"><span class="l">' + label + '</span><span class="v"><b>' + fmtN(count) + "</b>" + (extra || "") + pxIco("chevS") + "</span></button>";

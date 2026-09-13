@@ -1033,17 +1033,21 @@ function nav() {
   // The tab strip. Rendered only where a door actually has more than one destination, so a single
   // -destination door does not grow a strip of one tab that looks interactive and does nothing.
   const subs = SUBS[cur] || [];
-  document.getElementById("subnav").innerHTML = subs.length > 1
+  // A PRODUCT RECORD gets the assistant-readiness band here instead of the tab row (founder, Sep 13):
+  // «الهيكل التنظيمي» is a door, and a record's strip should answer whether the assistant can sell
+  // THIS product. The band comes from products-crm so one readiness rule serves list, record and wizard.
+  const band = raw === "product" && typeof pxReadinessBand === "function" ? pxReadinessBand() : "";
+  document.getElementById("subnav").innerHTML = band || (subs.length > 1
     ? subs.map((sx) => {
         const sb = badges[sx[0]];
         return '<button class="sub' + (sx[0] === raw ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
           (sb ? '<span class="sbdg">' + sb[0] + "</span>" : "") + "</button>";
       }).join("")
-    : "";
+    : "");
   const sn = document.getElementById("subnav");
-  if (subs.length > 1) sn.insertAdjacentHTML("beforeend", '<i class="ind"></i>');
-  sn.style.display = subs.length > 1 ? "" : "none";
-  moveInd(sn);
+  if (!band && subs.length > 1) sn.insertAdjacentHTML("beforeend", '<i class="ind"></i>');
+  sn.style.display = band || subs.length > 1 ? "" : "none";
+  if (!band) moveInd(sn);
   // TITLE reads raw, not cur. The alias above exists to keep the sidebar item highlighted on a
   // detail view; feeding the same variable to the heading printed «جهات الاستهداف · استورد جهات
   // الاستهداف وأدرها للحملات» — the import list's title — above every CLIENT RECORD, and made
