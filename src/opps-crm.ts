@@ -1037,7 +1037,9 @@ function opDetailDrawer(l) {
 
 function opCreateDrawer() {
   var d = opSheet;
-  var reg = tagList();
+  // Archived products are not offered for new work; the server refuses them too (400), but a picker
+  // that offers what the save will reject is a dead control.
+  var reg = tagList().filter(function (t) { return !t.archived; });
   var head = '<div class="tt"><h2 id="oxdrt" tabindex="-1">إضافة فرصة</h2><div class="st">جهة واحدة، ومنتج أو أكثر — ومن أين جاءت</div></div>';
   var errOf = function (f) { return opErrFld === f ? ' aria-invalid="true"' : ""; };
   var b = '<section class="ox-sec"><div class="ox-sech">الجهة</div>';

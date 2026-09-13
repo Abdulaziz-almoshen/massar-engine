@@ -793,7 +793,12 @@ export async function init(): Promise<void> {
     // /admin/campaigns minutes after every deploy, 500s in the dashboard, and the pool latched to
     // memory-only until the 30s reprobe. Closing idle clients ourselves after 10s means a request
     // opens a fresh socket instead of inheriting one the server already dropped.
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 8000,
+    // max 3 (DB_POOL_MAX overrides): massar-db is a 256MB machine with ~40MB free; every extra
+    // backend a dashboard burst opens is memory it does not have, and at 5 the VM spent 2–3s of
+    // every 10 waiting on memory and dropped every connection (fly logs, 2026-09-13). Queuing a
+    // request for a few ms in the engine is cheaper than a stalled database.
+    const poolMax = Math.max(1, Math.min(10, Number(process.env.DB_POOL_MAX) || 3));
+    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: poolMax, connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 10_000, keepAlive: true });
     // node-pg emits 'error' on idle clients if the backend drops mid-life; unhandled it
     // kills the process. Log, flip connected so /health tells the truth; writes no-op.
@@ -1201,12 +1206,16 @@ export async function setProductTag(ids: number[], product: string, add: boolean
 }
 
 // --------------------------------------------------------------------------- tag registry
-export type TagRow = { id: number; name: string; created_at: number; created_by: string | null };
+export type TagRow = { id: number; name: string; created_at: number; created_by: string | null; archived: boolean };
 
 export async function listTags(): Promise<TagRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, created_at, created_by FROM tags ORDER BY name`);
-  return r.rows.map((x) => ({ ...x, id: Number(x.id), created_at: Number(x.created_at) }));
+  // archived rides along so every picker that offers a product for NEW work (the opps drawer) can
+  // leave archived ones out, while filters over existing data still see them (spec: archive, not delete).
+  const r = await pool.query(
+    `SELECT t.id, t.name, t.created_at, t.created_by, (m.archived_at IS NOT NULL) AS archived
+       FROM tags t LEFT JOIN product_meta m ON m.product = t.name ORDER BY t.name`);
+  return r.rows.map((x) => ({ ...x, id: Number(x.id), created_at: Number(x.created_at), archived: !!x.archived }));
 }
 
 /** Idempotent. Returns false when the name already exists — a duplicate is not an error, it is a
@@ -2731,7 +2740,9 @@ export type ProductPerformanceRow = {
  *    the window — the salesPerformance rule, so this screen reconciles to «المستهدفات والأداء».
  *  · won / lost lines: same predicate per terminal stage, over the fiscal year.
  *  · open value: UNWEIGHTED, all periods, PRICED lines only; unpriced lines are counted, not summed,
- *    because «٠ ر.س» over a line nobody priced is a claim, not a figure. No weighted number leaves
+ *    because «٠ ر.س» over a line nobody priced is a claim, not a figure. open_lines counts EVERY open
+ *    line (priced or not) — the same predicate as impactOf and the opps list, so the record's
+ *    «بند واحد · ١ بلا تسعير» and its «الفرص المفتوحة ٢» link can no longer disagree. No weighted number leaves
  *    this function — the home band keeps its own and labels it «المرجَّح».
  *  · target: NULL when no row, so «بلا مستهدف» is distinguishable from an explicit zero.
  */
@@ -2776,7 +2787,7 @@ export async function productPerformance(
      openv AS (
        SELECT o.product,
               COALESCE(SUM(${OPP_VALUE_SQL}) FILTER (WHERE o.sale_price > 0), 0) AS open_value,
-              COUNT(*) FILTER (WHERE o.sale_price > 0)  AS open_lines,
+              COUNT(*)                                  AS open_lines,
               COUNT(*) FILTER (WHERE o.sale_price <= 0) AS unpriced
          FROM opportunities o
         WHERE o.stage NOT IN ('won','lost')

@@ -527,6 +527,8 @@ export const DASHBOARD_HTML = `<!doctype html>
      font-size declarations — the declaration is the thing that is missing. */
   .prod { text-align: right; font-family: inherit; font-size: 14px; background: #fff; border: 1.5px solid #ECEEF2; border-radius: 16px; padding: 18px; cursor: pointer; }
   .prod.on { background: #EAF1FE; border-color: #5B8DEF; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
+  .prod.prod-off { cursor: pointer; background-color: #F7F8FA; background-image: repeating-linear-gradient(115deg, #E5E8EE 0 1px, transparent 1px 6px); }
+  .prod.prod-off .pn { color: var(--ink-2); }
   .prod .pn { font-size: 14px; font-weight: 600; color: #14161A; margin-bottom: 12px; }
   .prod .sc { font-size: 22px; font-weight: 600; }
   .prod .scl { font-size: 12px; color: #656B76; }
@@ -769,7 +771,7 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let cache = null; let selProd = 0;
+let cache = null; let selProd = 0; let selProdName = "";
 // Behavioural segmentation. audMode «file» keeps the existing column-chip picker; «behaviour»
 // builds a live segment over the ledger. The two are modes of ONE step, not separate screens:
 // a behavioural audience is by definition outside WhatsApp's 24h window, so it can only be
@@ -1826,7 +1828,7 @@ function affinityProducts() {
 function tagList() {
   const n = {};
   entities.forEach((e) => (e.productTags || []).forEach((t) => { n[t] = (n[t] || 0) + 1; }));
-  return tagReg.map((t) => ({ name: t.name, count: n[t.name] || 0 }));
+  return tagReg.map((t) => ({ name: t.name, count: n[t.name] || 0, archived: !!t.archived }));
 }
 function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate); }
 function entMatchesProduct(e) {
@@ -1919,10 +1921,15 @@ window.composeMsg = async () => {
   finally { const b2 = document.getElementById("cmpbtn"); if (b2) { b2.disabled = false; } }
 };
 window.campNameSet = (el) => { campName = el.value; };
-window.pick = (i) => { selProd = i; render(false); };
+// Selection is held by NAME: the list re-orders when the catalogue loads, and an index alone would
+// silently swap the product a campaign is about to sell. A product the assistant cannot sell is not
+// selectable at all (V5 checklist 22/28).
+window.wizOpenProd = (name) => { location.hash = "#product/" + encodeURIComponent(name) + "/knowledge"; };
+window.pick = (i) => { const r = wizProducts(); if (!r[i] || r[i].eligible === false) return; selProd = i; selProdName = r[i].name; render(false); };
 window.launchWithProduct = (name) => {
   const reg = wizProducts();
   const i = reg.findIndex((x) => x.name === name);
+  selProdName = name;
   if (i >= 0) selProd = i;
   retargetCohort = null;
   location.hash = "aimkt";
@@ -2248,7 +2255,9 @@ window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest:
 // products section and the launch endpoint enforce — so a product created in المنتجات appears here,
 // and one the assistant cannot sell is shown but cannot be launched (V5 spec B′).
 function wizProducts() {
-  if (typeof pcCat === "undefined" || !pcCat) return kbRegistry();
+  // No fallback to the embedded six: while the catalogue is loading (or failed) step 1 says so and
+  // nothing can launch, instead of offering a list that omits every product the operator created.
+  if (typeof pcCat === "undefined" || !pcCat) return [];
   return pcCat.filter((p) => !p.archived).map((p) => ({
     name: p.product, sc: null, seed: !!p.embedded,
     hub: p.kb && p.kb.state === "approved" ? { product: p.product, source_filename: p.kb.source } : null,
@@ -2258,7 +2267,12 @@ function wizProducts() {
 function vAimkt() {
   if (typeof pcLoad === "function") pcLoad(false);
   const reg = wizProducts();
-  if (selProd >= reg.length) selProd = 0;
+  const byName = selProdName ? reg.findIndex((x) => x.name === selProdName) : -1;
+  if (byName >= 0) selProd = byName;
+  if (!reg[selProd] || reg[selProd].eligible === false) {
+    const firstOk = reg.findIndex((x) => x.eligible !== false);
+    selProd = firstOk >= 0 ? firstOk : 0;
+  }
   const m = entMatches();
   const selN = launchTargets().length;
   const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));
@@ -2267,7 +2281,12 @@ function vAimkt() {
   const selName = reg[selProd] ? reg[selProd].name : "";
   const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">القائمة تشمل خدمات Product Hub المرفوعة بملفاتها — لا تقتصر على الخدمات المدمجة.</div></div></div><div class="prods">' +
+  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">كل منتجات قسم «المنتجات» غير المؤرشفة — ما لا يبيعه المساعد يظهر بسببه ولا يُختار.</div></div></div>' +
+    (!reg.length
+      ? (typeof pcFailed !== "undefined" && pcFailed
+        ? '<div role="alert" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--t-sm);color:var(--s-fail-text);padding:12px 0;">تعذّر تحميل المنتجات — لا يمكن اختيار منتج ولا الإطلاق حتى تُحمَّل. <button class="btn btn-ghost" onclick="pcLoad(true)">أعد المحاولة</button></div>'
+        : '<div aria-busy="true" style="font-size:var(--t-sm);color:#656B76;padding:12px 0;">جارٍ تحميل المنتجات…</div>')
+      : "") + '<div class="prods">' +
     reg.map((x, i) => {
       // Say which knowledge this service actually has. Removing the invented scores collapsed
       // every card onto the «Product Hub» branch, which claimed uploaded knowledge for six
@@ -2277,7 +2296,10 @@ function vAimkt() {
         : x.hub ? '<span class="chip c-teal">معرفة معتمدة ✓</span>'
         : '<span class="chip c-grey">معرفة مدمجة</span>');
       const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
-      return '<button class="prod' + (i === selProd ? " on" : "") + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
+      if (x.eligible === false) {
+        return '<button class="prod prod-off" aria-disabled="true" title="' + esc(x.why || "لا يبيعه المساعد") + '" data-prod="' + esc(x.name) + '" onclick="wizOpenProd(this.dataset.prod)"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + '<div style="font-size:var(--t-xs);color:#1A47BE;font-weight:600;margin-top:6px;">افتح المنتج لإكماله</div></button>';
+      }
+      return '<button class="prod' + (i === selProd ? " on" : "") + '" aria-pressed="' + (i === selProd) + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
 
   h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
@@ -2368,10 +2390,10 @@ function vAimkt() {
     // the launch route reads. It used to draw three hardcoded titles that no template used.
     tplButtons().map((b) => '<div style="text-align:center;background:#fff;border-radius:8px;padding:8px;font-size:12px;font-weight:600;color:#1E5FCC;box-shadow:0 1px 1px rgba(16,38,68,.08);">' + esc(b) + "</div>").join("") +
     "</div></div>" +
-    (selAsset ? "" : '<div style="font-size:12px;color:#7A5600;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من معرفة الخدمة.</div>') +
+    (selAsset ? "" : '<div style="font-size:12px;color:#7A5600;margin-top:8px;">لا ملف تعريفيًا لهذه الخدمة بعد — إن طلبه العميل فلن نجد ما نرسله. أضفه من سجل المنتج في «المنتجات».</div>') +
     "</div></div></div>";
 
-  const selEligible = !reg[selProd] || reg[selProd].eligible !== false;
+  const selEligible = !!reg[selProd] && reg[selProd].eligible !== false;
   const can = selN > 0 && campMsg.trim() && selEligible;
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
     '<label style="font-size:12px;font-weight:600;color:#14161A;flex:none;">اسم الحملة</label>' +
@@ -2395,7 +2417,10 @@ function vAimkt() {
     // State what will actually be sent, next to the button that sends it.
     (selAsset ? " · الملف عند الطلب" : "") + "</div>" +
         '<div class="lsub" style="font-size:12px;color:#656B76;margin-top:4px;">ساندبوكس: يستلم فعليًا من انضم للرقم التجريبي — البقية تظهر «فشل الإرسال» بشفافية.</div></div>') +
-    (selEligible ? "" : '<span style="font-size:12px;color:#7A5600;max-width:240px;">' + esc(reg[selProd].why || "لا يبيعه المساعد") + ' — <a href="#product/' + encodeURIComponent(selName) + '/knowledge" style="color:#1A47BE;font-weight:600;">افتح المنتج</a></span>') +
+    (selEligible ? "" : !reg[selProd]
+      // No product at all: the catalogue is loading or failed, and step 1 already says which.
+      ? '<span style="font-size:12px;color:#7A5600;max-width:240px;">لا منتج محدد — القائمة أعلاه تقول لماذا.</span>'
+      : '<span style="font-size:12px;color:#7A5600;max-width:240px;">' + esc(reg[selProd].why || "لا يبيعه المساعد") + ' — <a href="#product/' + encodeURIComponent(selName) + '/knowledge" style="color:#1A47BE;font-weight:600;">افتح المنتج</a></span>') +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 

@@ -295,10 +295,12 @@ d("db integration", () => {
     // products exist in production.
     it("returns a row for a tag with no product_meta, carrying a null sector", async () => {
       await pool.query(
-        `INSERT INTO tags (name, created_at, created_by) VALUES ('صحة أعمال Plus', $1, 'test')
+        `INSERT INTO tags (name, created_at, created_by) VALUES ('منتج بلا تعريف', $1, 'test')
          ON CONFLICT (name) DO NOTHING`, [Date.now()]);
       const cat = await db.productCatalogue();
-      const row = cat.find((c) => c.product === "صحة أعمال Plus");
+      // Not «صحة أعمال Plus»: commit 00a9169 seeds a sector for it at boot, so it no longer
+      // exercises the no-product_meta path this test is about.
+      const row = cat.find((c) => c.product === "منتج بلا تعريف");
       expect(row).toBeDefined();
       expect(row!.sector).toBeNull();
       expect(row!.packages).toEqual([]);

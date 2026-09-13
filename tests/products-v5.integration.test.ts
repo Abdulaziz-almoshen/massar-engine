@@ -170,6 +170,17 @@ d("products v5 (db)", () => {
     expect(perf2.achieved).toBe(0);
     expect(perf2.openValue).toBe(4200 + 18000);
     expect(perf2.openLines).toBe(2);
+
+    // An unpriced open line is COUNTED in open lines (same predicate as impactOf and #opps) but
+    // never summed into the open value.
+    await db.createOppLines(
+      { account_name: "مستشفى ٢", phone: null, source: "call", source_ref: null, created_by: "test" },
+      [{ product: P, sale_price: 0 } as never]);
+    const perf3 = (await db.productPerformance(now.year, bounds)).find((r) => r.product === P)!;
+    expect(perf3.openLines).toBe(3);
+    expect(perf3.unpricedOpenLines).toBe(1);
+    expect(perf3.openValue).toBe(4200 + 18000);
+    expect((await db.impactOf(P)).openLines).toBe(perf3.openLines);
   });
 
   it("reconcileFile moves a stray kb row whole and refuses an occupied target", async () => {

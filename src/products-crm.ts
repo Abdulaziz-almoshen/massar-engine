@@ -237,10 +237,29 @@ export const PRODUCTS_CRM_CSS = `
 .px-menu button[aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
 .px-menu .why { font-size:var(--t-xs); color:var(--muted); padding:0 12px 8px; line-height:1.5; }
 .px-rec { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); align-items:start; }
-.px-side { display:flex; flex-direction:column; gap:var(--s3); }
+/* Below the two-column breakpoint the readiness and related links come straight after the header:
+   they answer «can the assistant sell this?» before any figure does (spec §record, phone). */
+.px-side { display:flex; flex-direction:column; gap:var(--s3); order:-1; }
 @container pxw (min-width: 1100px) {
   .px-rec { grid-template-columns:minmax(0,1fr) 320px; }
-  .px-side { position:sticky; inset-block-start:var(--s3); }
+  .px-side { position:sticky; inset-block-start:var(--s3); order:0; }
+}
+/* The shared summary panel narrows on the opportunities container (oxw); this section is its own
+   container (pxw), so the same narrow rules are restated here or the phone summary never stacks. */
+@container pxw (max-width: 760px) {
+  .px .ox-sum { grid-template-columns:minmax(0,1fr); padding:var(--s3); gap:var(--s3); }
+  .px .ox-mets { width:100%; }
+  .px .ox-met { flex:1 1 0; min-width:0; padding:6px var(--s2); }
+  .px .ox-met .n { font-size:var(--t-lg); }
+  .px .ox-met .l { white-space:normal; line-height:1.35; }
+  .px .ox-fig { font-size:var(--t-xl); margin-block:2px var(--s2); }
+  .px .ox-figsub { display:block; margin-inline-start:0; margin-top:2px; }
+  .px .ox-leg { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:2px var(--s2); margin-top:var(--s2); }
+  .px .ox-lg { width:100%; justify-content:flex-start; border-radius:var(--r-sm); min-height:40px; padding:4px 6px; }
+  .px .ox-lg > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  /* the ZIP file name is a detail; at phone width it broke into a five-line column beside the sentence */
+  .px .px-actrow { flex-wrap:wrap; }
+  .px .px-actrow .fn { display:none; }
 }
 .px-main { display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
 .px-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); min-width:0; scroll-margin-top:var(--s4); }
@@ -418,27 +437,54 @@ function pxJson(method, url, body) {
     body: body === undefined ? undefined : JSON.stringify(body) })
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j || {} }; }); });
 }
+/* GET with a short retry on a transient failure (network, 502/503/504). The production database is a
+   256MB machine that stalls for a few seconds under a burst; one failed read then painted
+   «تعذّر تحميل…» for a blip the next request would have survived. 4xx is never retried. */
+function pxGet(url) {
+  var delays = [700, 2000];
+  var attempt = function (i) {
+    return fetch(url, pxT()).then(function (r) {
+      if (r.ok) return r.json();
+      if (i < delays.length && (r.status === 502 || r.status === 503 || r.status === 504)) {
+        return new Promise(function (res) { setTimeout(res, delays[i]); }).then(function () { return attempt(i + 1); });
+      }
+      throw new Error("HTTP " + r.status);
+    }, function (e) {
+      if (i < delays.length) return new Promise(function (res) { setTimeout(res, delays[i]); }).then(function () { return attempt(i + 1); });
+      throw e;
+    });
+  };
+  return attempt(0);
+}
 function pxEnc(name) { return encodeURIComponent(name); }
 function pxMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v) || 0)) + " ر.س</bdi>"; }
 function pxPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function pxNProd(n) { return pxPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function pxNLine(n) { return pxPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
+function pxNRowTxt(n) { return pxPl(n, "سطر واحد", "سطران", "أسطر", "سطرًا"); }
+function pxNRead(n) { return pxPl(n, "قراءة واحدة", "قراءتان", "قراءات", "قراءة"); }
+function pxNQtr(n) { return pxPl(n, "ربع واحد", "ربعان", "أرباع", "ربعًا"); }
 function pxNPkg(n) { return pxPl(n, "باقة واحدة", "باقتان", "باقات", "باقة"); }
 function pxNCamp(n) { return pxPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
 function pxNEnt(n) { return pxPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
 function pxIco(n, cls) { return typeof opIco === "function" ? opIco(n, cls) : ""; }
 function pxToast(msg, bad, act, fn) { if (typeof opToast === "function") opToast(msg, bad, act, fn); else moToast(msg); }
 
+/* The shared product registry (tagReg) feeds the opps drawer, the customers/targets filters and the
+   palette. Every create / archive / restore / rename refreshes it so those pickers change without a
+   reload (spec: «every mutation updates the shared stores»). */
+function pxTagsRefresh() {
+  if (typeof tagReg === "undefined") return;
+  fetch("/admin/tags", pxT()).then(function (x) { return x.ok ? x.json() : null; })
+    .then(function (t) { if (Array.isArray(t)) { tagReg = t; render(false); } }).catch(function () {});
+}
 function pcLoad(force) {
   if (pcLoading) return;
   if (pcCat && !force) return;
   if (pcFailed && !force) return;
   pcLoading = true;
   var h = pxT();
-  fetch("/admin/products", h).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    return r.json();
-  }).then(function (j) {
+  pxGet("/admin/products").then(function (j) {
     pcCat = j.products || []; pcUnmatched = j.unmatched || []; pcSkill = j.skill || null;
     pcSectorList = j.sectors || []; pcFailed = false;
   }).catch(function () { pcFailed = true; })
@@ -458,9 +504,7 @@ function pcPerfLoad(year, force) {
   if (pcPerf[year] && !force) return;
   if (pcPerfFailed[year] && !force) return;
   pcPerfLoading[year] = true;
-  fetch("/admin/products/performance?year=" + year, pxT()).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
-  }).then(function (j) {
+  pxGet("/admin/products/performance?year=" + year).then(function (j) {
     var by = {}; (j.byProduct || []).forEach(function (x) { by[x.product] = x; });
     pcPerf[year] = by; pcPerfFailed[year] = false;
   }).catch(function () { pcPerfFailed[year] = true; })
@@ -471,9 +515,7 @@ function pxKnowLoad(name, force) {
   if (pxKnow[name] && !force) return;
   if (pxKnowFailed[name] && !force) return;
   pxKnowLoading[name] = true;
-  fetch("/admin/products/knowledge?product=" + pxEnc(name), pxT()).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status); return r.json();
-  }).then(function (j) { pxKnow[name] = j; pxKnowFailed[name] = false; })
+  pxGet("/admin/products/knowledge?product=" + pxEnc(name)).then(function (j) { pxKnow[name] = j; pxKnowFailed[name] = false; })
     .catch(function () { pxKnowFailed[name] = true; })
     .then(function () { pxKnowLoading[name] = false; render(false); });
 }
@@ -563,7 +605,7 @@ function pxSummary() {
       if (x.annualTarget !== null && x.annualTarget !== undefined) { anyT = true; tgt += Number(x.annualTarget) || 0; }
       if ((Number(x.achieved) || 0) > 0) won.push({ n: p.product, v: Number(x.achieved) });
     });
-    var cov = anyT ? coveragePct(ach, tgt) : null;
+    var cov = anyT ? targetCoveragePct(ach, tgt) : null;
     h += '<div class="ox-fig">' + pxMoney(ach) + '<span class="ox-figsub">' +
       (anyT ? "من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + fmtN(cov) + "٪") : "بلا مستهدف سنوي") + "</span></div>";
     if (won.length || (anyT && tgt > 0)) {
@@ -621,8 +663,9 @@ function pxToolbar() {
   return h + "</div>";
 }
 function pxSkillLink(label) {
-  if (!pcSkill) return '<span class="fn">المهارة غير مرفوعة بعد</span>';
-  return '<a href="/assets/' + esc(pcSkill.publicId) + '" download>' + pxIco("chevD") + label + "</a>";
+  if (!pcSkill) return '<span class="fn" data-pxskill="missing">المهارة غير مرفوعة بعد</span>';
+  // a download arrow, not a chevron: a chevron beside a link read as a dropdown
+  return '<a href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="list"><svg class="ox-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>' + label + "</a>";
 }
 function pxActionRows() {
   var h = "";
@@ -663,13 +706,13 @@ function pxListRow(p) {
       : ps.kind === "note" ? '<span style="color:var(--ink-2);font-size:var(--t-sm);white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(p.pricingNote) + "</span>"
       : '<span class="none" style="font-size:var(--t-sm);">لا سعر منشور</span>') + "</div>";
   var tgt = perf ? perf.annualTarget : null;
-  h += '<div class="px-num px-c-tg" role="cell">' + (!perf ? '<span class="none">—</span>' : tgt === null || tgt === undefined ? '<span class="none">بلا مستهدف</span>' : "<b>" + pxMoney(tgt) + "</b>" + (perf.targetQuarters < 4 ? "<span>" + fmtN(perf.targetQuarters) + " من ٤ أرباع</span>" : "")) + "</div>";
-  var cov = perf ? coveragePct(perf.achieved, tgt) : null;
+  h += '<div class="px-num px-c-tg" role="cell">' + (!perf ? '<span class="none">—</span>' : tgt === null || tgt === undefined ? '<span class="none">بلا مستهدف</span>' : "<b>" + pxMoney(tgt) + "</b>" + (perf.targetQuarters < 4 ? "<span>" + pxNQtr(perf.targetQuarters) + " من أربعة</span>" : "")) + "</div>";
+  var cov = perf ? targetCoveragePct(perf.achieved, tgt) : null;
   h += '<div class="px-num px-c-ach" role="cell">' + (!perf ? '<span class="none">—</span>' :
     "<b>" + pxMoney(perf.achieved) + "</b><span>" + (cov === null ? "—" : fmtN(cov) + "٪ من المستهدف") +
     '<span class="px-tgsub">' + (tgt ? " · من " + pxMoney(tgt) : "") + "</span></span>") + "</div>";
   h += '<div class="px-num px-c-op" role="cell">' + (!perf ? '<span class="none">—</span>' :
-    (perf.openLines ? "<b>" + (perf.openValue ? pxMoney(perf.openValue) : "لم تُسعَّر") + "</b><span>" + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + fmtN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span>" : '<span class="none">لا بنود مفتوحة</span>')) + "</div>";
+    (perf.openLines ? "<b>" + (perf.openValue ? pxMoney(perf.openValue) : "لم تُسعَّر") + "</b><span>" + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLine(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span>" : '<span class="none">لا بنود مفتوحة</span>')) + "</div>";
   h += '<div class="px-c-go" role="cell"><button class="ox-go" data-px="open" data-nm="' + nm + '" aria-label="فتح سجل ' + nm + '">' + pxIco("chevS") + "</button></div>";
   return h + "</div>";
 }
@@ -706,7 +749,7 @@ function vProductsCrm() {
     var perf = pcPerf[pcPerfYear] || {};
     var ach = rows.reduce(function (n, p) { return n + (Number((perf[p.product] || {}).achieved) || 0); }, 0);
     h += '<div class="ox-foot"><span class="pgrange"><b>١–' + fmtN(rows.length) + "</b> من " + pxNProd(rows.length) + "</span>" +
-      '<span class="tot">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" + (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; }) ? ' · <a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download>مهارة إعداد العرض ↓</a>' : "") + "</span></div>";
+      '<span class="tot">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" + (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; }) ? ' · <a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="footer">مهارة إعداد العرض ↓</a>' : "") + "</span></div>";
   }
   h += "</section></div>";
   if (pxListScroll) { var y = pxListScroll; pxListScroll = 0; setTimeout(function () { window.scrollTo(0, y); }, 0); }
@@ -780,20 +823,23 @@ function pxSheetSubmit() {
     var name = (r.j.product && r.j.product.product) || nc.name;
     pxSheet = null; pxDrShown = false;
     pcLoad(true); pcPerfLoad(pcPerfYear, true);
-    if (typeof tagReg !== "undefined") { try { fetch("/admin/tags", pxT()).then(function (x) { return x.json(); }).then(function (t) { if (Array.isArray(t)) tagReg = t; else if (t && t.tags) tagReg = t.tags; }); } catch (e) {} }
+    pxTagsRefresh();
     location.hash = "product/" + pxEnc(name);
     pxToast("أُنشئ «" + name + "» — أضف ملف المعرفة ليبيعه المساعد", false);
   }).catch(function () { pxSheetBusy = false; pxSheetErr = "تعذّر الاتصال — لم يُنشأ المنتج."; render(false); });
 }
 
 /* ================================ RECORD ================================ */
-function pxStatusSlot(key) {
+/* forId: the input this slot reports on — the slot takes id forId_st and the input carries
+   aria-describedby to it, so a screen reader hears «تعذّر الحفظ» on the field, not somewhere nearby. */
+function pxStatusSlot(key, forId) {
   var st = pxFState[key];
-  if (!st) return '<span class="ox-fs" aria-live="polite"></span>';
-  if (st.s === "pending") return '<span class="ox-fs pend" aria-live="polite">جارٍ الحفظ…</span>';
-  if (st.s === "saved") return '<span class="ox-fs ok" aria-live="polite">' + pxIco("check") + "حُفظ</span>";
-  if (st.s === "invalid") return '<span class="ox-fs bad" aria-live="assertive">' + pxIco("warn") + esc(st.m) + "</span>";
-  return '<span class="ox-fs bad" aria-live="assertive">' + pxIco("warn") + "تعذّر الحفظ" +
+  var ida = forId ? ' id="' + forId + '_st"' : "";
+  if (!st) return '<span class="ox-fs"' + ida + ' aria-live="polite"></span>';
+  if (st.s === "pending") return '<span class="ox-fs pend"' + ida + ' aria-live="polite">جارٍ الحفظ…</span>';
+  if (st.s === "saved") return '<span class="ox-fs ok"' + ida + ' aria-live="polite">' + pxIco("check") + "حُفظ</span>";
+  if (st.s === "invalid") return '<span class="ox-fs bad"' + ida + ' aria-live="assertive">' + pxIco("warn") + esc(st.m) + "</span>";
+  return '<span class="ox-fs bad"' + ida + ' aria-live="assertive">' + pxIco("warn") + "تعذّر الحفظ" +
     '<button data-px="fretry" data-k="' + esc(key) + '">أعد المحاولة</button><button data-px="fdiscard" data-k="' + esc(key) + '">تجاهل</button></span>';
 }
 function pxEmbedded(name) { return (typeof PRODUCTS_FULL !== "undefined" ? PRODUCTS_FULL : []).filter(function (x) { return x.n === name; })[0] || null; }
@@ -808,19 +854,19 @@ function pxPerfSection(p) {
       ? '<div class="ox-state" role="alert">تعذّر تحميل الأداء.<button class="btn btn-ghost" data-px="perfretry">أعد المحاولة</button></div>'
       : moSkeleton(3, ["w60", "w80", "w40"]));
   }
-  var cov = coveragePct(perf.achieved, perf.annualTarget);
+  var cov = targetCoveragePct(perf.achieved, perf.annualTarget);
   var b = '<div><div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + '</div><div class="px-fig">' + pxMoney(perf.achieved) +
     '<span class="ox-figsub">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "بلا مستهدف سنوي" :
-      "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + fmtN(cov) + "٪") + (perf.targetQuarters < 4 ? " · مجموع " + fmtN(perf.targetQuarters) + " أرباع مدخلة" : "")) + "</span></div></div>";
+      "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + fmtN(cov) + "٪") + (perf.targetQuarters < 4 ? " · مُدخل في " + pxNQtr(perf.targetQuarters) + " من أربعة" : "")) + "</span></div></div>";
   b += '<div class="px-qbar">' + (perf.quarters || []).map(function (q) {
     var has = q.target !== null && q.target !== undefined && Number(q.target) > 0;
     var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
     return '<div class="px-qc"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + pct + '%"></i>' : "") + "</div>" +
       '<div class="l"><span>الربع ' + fmtN(q.quarter) + "</span><span>" + (has ? pxMoney(q.achieved) : "—") + "</span></div></div>";
   }).join("") + "</div>";
-  b += '<div class="px-stats"><div class="px-stat"><span class="l">المفتوح الآن</span><span class="v">' + (perf.openValue ? pxMoney(perf.openValue) : "—") + '</span><span class="l">' + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + fmtN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span></div>" +
-    '<div class="px-stat"><span class="l">مربوحة ' + arYear(pcPerfYear) + '</span><span class="v">' + fmtN(perf.wonLines) + '</span><span class="l">بنود</span></div>' +
-    '<div class="px-stat"><span class="l">خاسرة ' + arYear(pcPerfYear) + '</span><span class="v">' + fmtN(perf.lostLines) + '</span><span class="l">بنود</span></div></div>';
+  b += '<div class="px-stats"><div class="px-stat"><span class="l">المفتوح الآن</span><span class="v">' + (perf.openValue ? pxMoney(perf.openValue) : "—") + '</span><span class="l">' + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLine(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span></div>" +
+    '<div class="px-stat"><span class="l">مربوحة ' + arYear(pcPerfYear) + '</span><span class="v">' + (perf.wonLines ? pxNLine(perf.wonLines) : "لا بنود") + '</span></div>' +
+    '<div class="px-stat"><span class="l">خاسرة ' + arYear(pcPerfYear) + '</span><span class="v">' + (perf.lostLines ? pxNLine(perf.lostLines) : "لا بنود") + "</span></div></div>";
   var open = pxOpenLines(name).slice().sort(function (a, b2) { return opValue(b2) - opValue(a); }).slice(0, 3);
   if (open.length) {
     b += '<div class="ox-lbl">أعلى الفرص المفتوحة</div><div class="px-list">' + open.map(function (o) {
@@ -863,7 +909,7 @@ function pxPricingSection(p) {
     }).join("")) + "</div>";
   }
   var nk = name + "|pricingNote";
-  b += '<div class="ox-fld"><div class="ox-lr"><label for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk) + '</div><input class="inp" id="pxf_note" maxlength="120" value="' +
+  b += '<div class="ox-fld"><div class="ox-lr"><label for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk, "pxf_note") + '</div><input class="inp" id="pxf_note" aria-describedby="pxf_note_st" maxlength="120" value="' +
     esc(pxFState[nk] && pxFState[nk].s !== "saved" ? pxFState[nk].v : (p.pricingNote || "")) + '" data-pxfield="pricingNote" placeholder="لا ملاحظة تسعير"><span class="px-note">تُعرض حين لا توجد باقة منشورة.</span></div>';
   return pxSection("pricing", "الأسعار والباقات", "", b);
 }
@@ -880,10 +926,10 @@ function pxTargetsSection(p) {
     var saved = q.target === null || q.target === undefined ? "" : String(q.target);
     var val = st && st.s !== "saved" ? st.v : saved;
     var has = saved !== "" && Number(saved) > 0;
-    var cov = coveragePct(q.achieved, q.target);
+    var cov = targetCoveragePct(q.achieved, q.target);
     b += '<div class="px-q"><span class="lb">الربع ' + fmtN(q.quarter) + "</span>" +
       '<div class="px-qf"><label class="sr" for="pxq_' + q.quarter + '" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">مستهدف الربع ' + fmtN(q.quarter) + "</label>" +
-      '<input class="inp" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" + pxStatusSlot(key) + "</div>" +
+      '<input class="inp" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" + pxStatusSlot(key, "pxq_" + q.quarter) + "</div>" +
       '<span class="ach">المحقق ' + pxMoney(q.achieved) + "</span>" +
       '<div class="cov"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + Math.min(100, cov || 0) + '%"></i>' : "") + "</div><span>" + (cov === null ? "—" : fmtN(cov) + "٪") + "</span></div>";
     if (pxQConfirm[key]) {
@@ -892,7 +938,7 @@ function pxTargetsSection(p) {
     b += "</div>";
   });
   b += "</div>";
-  b += '<div class="px-note">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "لا مستهدفات مدخلة لهذه السنة." : "مجموع المستهدفات المدخلة " + pxMoney(perf.annualTarget) + (perf.targetQuarters < 4 ? " · " + fmtN(4 - perf.targetQuarters) + " " + (4 - perf.targetQuarters === 1 ? "ربع" : "أرباع") + " بلا مستهدف" : "")) + " · القيم نفسها في «المستهدفات والأداء».</div>";
+  b += '<div class="px-note">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "لا مستهدفات مدخلة لهذه السنة." : "مجموع المستهدفات المدخلة " + pxMoney(perf.annualTarget) + (perf.targetQuarters < 4 ? " · " + pxNQtr(4 - perf.targetQuarters) + " بلا مستهدف" : "")) + " · القيم نفسها في «المستهدفات والأداء».</div>";
   return pxSection("targets", "المستهدفات", "", b, extra);
 }
 function pxKnowledgeSection(p) {
@@ -902,9 +948,9 @@ function pxKnowledgeSection(p) {
   b += '<div class="px-file"><span class="px-cells"><i class="' + (p.asset ? "" : "miss") + '"></i></span><div><div class="t">الملف التعريفي (PDF)</div><div class="d">يُرسله المساعد للعميل عند طلب التفاصيل' +
     (p.asset ? ' · <bdi>' + esc(p.asset.filename) + "</bdi>" + (p.asset.size ? " · " + fmtN(Math.max(1, Math.round(p.asset.size / 1024))) + " ك.ب" : "") + (p.asset.updatedAt ? " · " + fmtD(p.asset.updatedAt) : "") : " · لا ملف مرفق") +
     (upA && upA.s === "busy" ? ' · <span class="ox-fs pend">جارٍ الرفع…</span>' : upA && upA.s === "failed" ? ' · <span class="px-err">' + esc(upA.m) + "</span>" : "") + '</div></div><div class="acts">' +
-    (p.asset ? '<a class="btn btn-ghost" href="/assets/' + esc(p.asset.publicId) + '" target="_blank" rel="noopener" style="text-decoration:none;">معاينة</a>' : (pcSkill ? '<a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download>أنشئه بمهارة إعداد العرض ↓</a>' : "")) +
+    (p.asset ? '<a class="btn btn-ghost" href="/assets/' + esc(p.asset.publicId) + '" target="_blank" rel="noopener" style="text-decoration:none;">معاينة</a>' : (pcSkill ? '<a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="record">أنشئه بمهارة إعداد العرض ↓</a>' : '<span class="px-note" data-pxskill="missing">مهارة إعداد العرض غير مرفوعة بعد</span>')) +
     '<button class="btn btn-ghost" data-px="pickasset"' + (p.archived ? " disabled" : "") + ">" + (p.asset ? "استبدال" : "رفع PDF") + "</button>" +
-    '<input id="pxasset" type="file" accept="application/pdf,.pdf" style="display:none" data-pxupload="asset"></div></div>';
+    '<input id="pxasset" type="file" accept="application/pdf,.pdf" aria-label="اختر ملفًا تعريفيًا (PDF)" style="display:none" data-pxupload="asset"></div></div>';
   /* knowledge */
   var kst = (p.kb && p.kb.state) || "none";
   var sub = kst === "approved" ? "اعتُمدت" + (p.kb.approvedBy ? " · " + esc(p.kb.approvedBy) : "") + (p.kb.approvedAt ? " · " + fmtD(p.kb.approvedAt) : "") + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
@@ -913,13 +959,13 @@ function pxKnowledgeSection(p) {
   b += '<div class="px-file"><span class="px-cells"><i class="' + (kst === "approved" ? "" : kst === "legacy" || p.draft ? "pend" : "miss") + '"></i></span><div><div class="t">ملف المعرفة</div><div class="d">يقرأه المساعد ليجيب عن الأسعار والاعتراضات · ' + sub +
     (upK && upK.s === "busy" ? ' · <span class="ox-fs pend">جارٍ استخلاص المعرفة… قد يستغرق دقيقة</span>' : upK && upK.s === "failed" ? ' · <span class="px-err">' + esc(upK.m) + "</span>" : "") + '</div></div><div class="acts">' +
     '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
-    '<input id="pxkb" type="file" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb"></div></div>';
+    '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb"></div></div>';
   if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
   var ap = pxAppr[name] || {};
   if (kn && kn.draftMd) {
     b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</div>" +
       '<div class="px-note"><bdi>' + esc(kn.draftSource || "") + "</bdi>" + (kn.draftBy ? " · رُفعت · " + esc(kn.draftBy) : "") + (kn.draftAt ? " · " + fmtD(kn.draftAt) : "") +
-      (kn.changeSummary ? " · +" + fmtN(kn.changeSummary.added) + " سطرًا · −" + fmtN(kn.changeSummary.removed) + " سطرًا مقارنة بالمعتمد" : "") + "</div>" +
+      (kn.changeSummary ? " · أُضيف " + pxNRowTxt(kn.changeSummary.added) + " · حُذف " + pxNRowTxt(kn.changeSummary.removed) + " مقارنة بالمعتمد" : "") + "</div>" +
       '<div class="px-md">' + mdRender(kn.draftMd) + "</div>" +
       (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
       '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
@@ -976,12 +1022,12 @@ function pxRenameModal() {
   var im = m.impact;
   var h = '<div class="ox-scrim in" data-px="modalclose"></div><div class="px-modal" role="dialog" aria-modal="true" aria-labelledby="pxmt"><div class="box">';
   h += '<h2 id="pxmt" tabindex="-1">إعادة تسمية «' + esc(m.product) + "»</h2>";
-  h += '<div class="px-fl"><label for="pxm_to">الاسم الجديد</label><input class="inp" id="pxm_to" maxlength="60" value="' + esc(m.to) + '" data-pxmodal="to"' + (m.err ? ' aria-invalid="true"' : "") + "></div>";
+  h += '<div class="px-fl"><label for="pxm_to">الاسم الجديد</label><input class="inp" id="pxm_to" maxlength="60" value="' + esc(m.to) + '" data-pxmodal="to"' + (m.err ? ' aria-invalid="true" aria-describedby="pxm_err"' : "") + "></div>";
   h += '<div class="px-note">' + (!im ? "جارٍ حساب ما سيتغيّر…" : "سيُغيَّر الاسم في: " + [
     im.openLines ? pxNLine(im.openLines) + " مفتوحة" : "", im.campaigns ? pxNCamp(im.campaigns) : "", im.kb ? "ملف المعرفة" : "", im.asset ? "الملف التعريفي" : "",
-    im.packages ? pxNPkg(im.packages) : "", im.targetedEntities ? pxNEnt(im.targetedEntities) + " مستهدفة" : "", im.interestReadings ? fmtN(im.interestReadings) + " قراءة للمساعد" : ""
+    im.packages ? pxNPkg(im.packages) : "", im.targetedEntities ? pxNEnt(im.targetedEntities) + " مستهدفة" : "", im.interestReadings ? pxNRead(im.interestReadings) + " للمساعد" : ""
   ].filter(Boolean).join(" · ") + ".") + "</div>";
-  if (m.err) h += '<span class="px-err" role="alert">' + pxIco("warn") + esc(m.err) + "</span>";
+  if (m.err) h += '<span class="px-err" id="pxm_err" role="alert">' + pxIco("warn") + esc(m.err) + "</span>";
   h += '<div class="acts"><button class="btn btn-teal" data-px="renamesave"' + (m.busy || !im ? " disabled" : "") + ">" + (m.busy ? "جارٍ الحفظ…" : "حفظ الاسم") + '</button><button class="btn btn-ghost" data-px="modalclose">إلغاء</button></div>';
   return h + "</div></div>";
 }
@@ -1005,11 +1051,11 @@ function vProductDrill(name, section) {
   var approvePrimary = !!(kn && (kn.draftMd || (kn.state === "legacy" && kn.md)));
   var h = '<div class="px">' + back;
   h += '<div class="px-head"><div class="tt"><h1>' + esc(p.product) + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</h1>" +
-    '<div class="meta"><span class="px-fi"><label for="pxf_sector">القطاع</label><select id="pxf_sector" data-pxfield="sectorId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قطاع</option>' +
+    '<div class="meta"><span class="px-fi"><label for="pxf_sector">القطاع</label><select id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
-    (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId") + "</span>" +
-    '<span class="px-fi"><label for="pxf_owner">المسؤول</label><input id="pxf_owner" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "")) + '" data-pxfield="owner"' + (p.archived ? " disabled" : "") + ">" +
-    pxStatusSlot(name + "|owner") + "</span>" +
+    (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span>" +
+    '<span class="px-fi"><label for="pxf_owner">المسؤول</label><input id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "")) + '" data-pxfield="owner"' + (p.archived ? " disabled" : "") + ">" +
+    pxStatusSlot(name + "|owner", "pxf_owner") + "</span>" +
     '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
     (p.createdAt ? "<span>أُنشئ " + fmtD(p.createdAt) + "</span>" : "") + "</div></div>";
   h += '<div class="end">';
@@ -1019,7 +1065,7 @@ function vProductDrill(name, section) {
     h += (!rd.eligible ? '<span class="px-why" id="pxwhy">' + esc(rd.reason || rd.word) + "</span>" : "") +
       '<button class="btn ' + (approvePrimary ? "btn-ghost" : "btn-teal") + '" data-px="launch" data-nm="' + esc(p.product) + '"' + (rd.eligible ? "" : ' disabled aria-disabled="true" aria-describedby="pxwhy"') + ">أطلق حملة بهذا المنتج</button>";
   }
-  h += '<button class="btn btn-ghost" data-px="menu" aria-haspopup="menu" aria-expanded="' + pxMenuOpen + '" aria-label="إجراءات أخرى">⋯</button>';
+  h += '<button class="btn btn-ghost" id="pxmenu" data-px="menu" aria-haspopup="menu" aria-expanded="' + pxMenuOpen + '" aria-label="إجراءات أخرى">⋯</button>';
   if (pxMenuOpen) {
     h += '<div class="px-menu" role="menu">' + (p.embedded
       ? '<button role="menuitem" aria-disabled="true">إعادة تسمية</button><button role="menuitem" aria-disabled="true">أرشفة المنتج</button><div class="why">مضمَّن في كتالوج المساعد — إعادة التسمية والأرشفة تتطلبان تحديث الكتالوج.</div>'
@@ -1148,13 +1194,13 @@ window.pxDiscard = function (name) {
 window.pxArchive = function (name) {
   pxJson("POST", "/admin/products/archive", { product: name, archived: true }).then(function (r) {
     if (!r.ok || r.j.ok === false) { pxToast(r.j.error === "embedded_product" ? "منتج مضمَّن في كتالوج المساعد — لا يُؤرشف" : "تعذّر أرشفة المنتج", true); return; }
-    pcLoad(true); pxToast("أُرشف «" + name + "» — توقف المساعد عن استخدام معرفته", false, "تراجع", function () { pxRestore(name); });
+    pcLoad(true); pxTagsRefresh(); pxToast("أُرشف «" + name + "» — توقف المساعد عن استخدام معرفته", false, "تراجع", function () { pxRestore(name); });
   }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
 };
 function pxRestore(name) {
   pxJson("POST", "/admin/products/archive", { product: name, archived: false }).then(function (r) {
     if (!r.ok || r.j.ok === false) { pxToast("تعذّر استعادة المنتج", true); return; }
-    pcLoad(true); pxToast("استُعيد «" + name + "»", false);
+    pcLoad(true); pxTagsRefresh(); pxToast("استُعيد «" + name + "»", false);
   }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
 }
 function pxOpenRename(name) {
@@ -1165,6 +1211,8 @@ function pxOpenRename(name) {
     if (pxModal && pxModal.product === name) { pxModal.impact = j || { openLines: 0 }; if (!j) pxModal.err = "تعذّر حساب ما سيتغيّر."; render(false); var f = document.getElementById("pxm_to"); if (f) f.focus(); }
   });
 }
+/* A closed dialog hands focus back to the control that opened it (the record's ⋯ menu). */
+function pxFocusMenu() { var b = document.getElementById("pxmenu"); if (b) b.focus(); }
 function pxRenameSave() {
   var m = pxModal; if (!m || m.busy) return;
   var nc = normalizeProductName(m.to || "");
@@ -1174,9 +1222,10 @@ function pxRenameSave() {
   pxJson("POST", "/admin/tags/rename", { from: m.product, to: nc.name }).then(function (r) {
     m.busy = false;
     if (!r.ok || r.j.ok === false) { m.err = r.status === 409 && r.j.error !== "embedded_product" ? "الاسم مستخدم لمنتج آخر." : r.j.error === "embedded_product" ? "منتج مضمَّن في كتالوج المساعد — لا تُعاد تسميته." : r.j.detail || "تعذّرت إعادة التسمية (" + fmtN(r.status) + ")"; render(false); return; }
-    pxModal = null; pxKnow = {}; pcLoad(true); pcPerf = {}; pcPerfLoad(pcPerfYear, true);
+    pxModal = null; pxKnow = {}; pcLoad(true); pcPerf = {}; pcPerfLoad(pcPerfYear, true); pxTagsRefresh();
+    if (typeof opLoad === "function") opLoad(true);
     try { history.replaceState(null, "", "#product/" + pxEnc(nc.name)); } catch (e) {}
-    render(false);
+    render(false); pxFocusMenu();
     pxToast("أُعيدت التسمية إلى «" + nc.name + "»", false);
   }).catch(function () { m.busy = false; m.err = "تعذّر الاتصال — لم يتغيّر شيء."; render(false); });
 }
@@ -1259,7 +1308,7 @@ document.addEventListener("click", function (ev) {
   else if (a === "menu") { pxMenuOpen = !pxMenuOpen; render(false); }
   else if (a === "rename") { pxOpenRename(cur); }
   else if (a === "renamesave") { pxRenameSave(); }
-  else if (a === "modalclose") { pxModal = null; render(false); }
+  else if (a === "modalclose") { pxModal = null; render(false); pxFocusMenu(); }
   else if (a === "archivejump") { render(false); var s = document.getElementById("pxsec_archive"); if (s) { s.scrollIntoView({ block: "center" }); var hb = s.querySelector(".rv-hold"); if (hb) hb.focus(); } }
   else if (a === "restore") { pxRestore(cur); }
   else if (a === "launch") { if (typeof launchWithProduct === "function") launchWithProduct(nm); }
@@ -1319,7 +1368,7 @@ document.addEventListener("keydown", function (ev) {
   if (ev.key === "Escape") {
     if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) return;
     ev.preventDefault();
-    if (pxModal) { pxModal = null; render(false); } else { pxSheet = null; pxDrShown = false; render(false); var o = document.getElementById(pxOpener || "pxadd"); if (o) o.focus(); }
+    if (pxModal) { pxModal = null; render(false); pxFocusMenu(); } else { pxSheet = null; pxDrShown = false; render(false); var o = document.getElementById(pxOpener || "pxadd"); if (o) o.focus(); }
     return;
   }
   if (ev.key !== "Tab") return;
@@ -1462,7 +1511,7 @@ function vExecBand() {
   if (targeted.length) {
     h += '<div class="sh-sec card3"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
       '<div class="sh-hs">الأقل إنجازًا أولًا' +
-      (untargeted ? ' · ' + fmtN(untargeted) + ' منتجًا بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="sh-cards">';
+      (untargeted ? ' · ' + pxNProd(untargeted) + ' بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="sh-cards">';
     targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
       var c = p.coveragePct;
       var cls = c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad");

@@ -11,7 +11,7 @@ import {
   RESERVED_SECTIONS,
   changeSummary,
   checkProductDomainClosure,
-  coveragePct,
+  targetCoveragePct,
   isEmbeddedProduct,
   isRuntimeEligible,
   kbStateOf,
@@ -156,20 +156,20 @@ describe("readinessOf — the word follows eligibility first", () => {
   });
 });
 
-describe("coveragePct — null, never «٠٪» over no target", () => {
+describe("targetCoveragePct — null, never «٠٪» over no target", () => {
   it("null when target is null, 0, negative or NaN", () => {
-    expect(coveragePct(100, null)).toBeNull();
-    expect(coveragePct(100, undefined)).toBeNull();
-    expect(coveragePct(100, 0)).toBeNull();
-    expect(coveragePct(100, -5)).toBeNull();
-    expect(coveragePct(100, "x")).toBeNull();
+    expect(targetCoveragePct(100, null)).toBeNull();
+    expect(targetCoveragePct(100, undefined)).toBeNull();
+    expect(targetCoveragePct(100, 0)).toBeNull();
+    expect(targetCoveragePct(100, -5)).toBeNull();
+    expect(targetCoveragePct(100, "x")).toBeNull();
   });
   it("rounds to a whole percent and tolerates a missing achieved", () => {
-    expect(coveragePct(34000, 34000)).toBe(100);
-    expect(coveragePct(1, 3)).toBe(33);
-    expect(coveragePct(0, 500)).toBe(0);
-    expect(coveragePct(null, 500)).toBe(0);
-    expect(coveragePct(1000, 500)).toBe(200);
+    expect(targetCoveragePct(34000, 34000)).toBe(100);
+    expect(targetCoveragePct(1, 3)).toBe(33);
+    expect(targetCoveragePct(0, 500)).toBe(0);
+    expect(targetCoveragePct(null, 500)).toBe(0);
+    expect(targetCoveragePct(1000, 500)).toBe(200);
   });
 });
 
@@ -207,10 +207,10 @@ describe("the browser seam", () => {
     expect(checkProductDomainClosure()).toEqual([]);
   });
   it("PRODUCT_DOMAIN_JS evaluates in a bare scope and answers like Node", () => {
-    const api = new Function(PRODUCT_DOMAIN_JS + "\nreturn { normalizeProductName, readinessOf, isRuntimeEligible, coveragePct, priceSummary, EMBEDDED_PRODUCTS, RESERVED_SECTIONS };")();
+    const api = new Function(PRODUCT_DOMAIN_JS + "\nreturn { normalizeProductName, readinessOf, isRuntimeEligible, targetCoveragePct, priceSummary, EMBEDDED_PRODUCTS, RESERVED_SECTIONS };")();
     expect(api.normalizeProductName("  x  ")).toEqual({ ok: true, name: "x" });
     expect(api.isRuntimeEligible({ exists: true, archived: false, kbState: "legacy", embedded: false })).toBe(false);
-    expect(api.coveragePct(1, 0)).toBeNull();
+    expect(api.targetCoveragePct(1, 0)).toBeNull();
     expect(api.EMBEDDED_PRODUCTS).toEqual([...EMBEDDED_PRODUCTS]);
     expect(api.RESERVED_SECTIONS).toEqual([...RESERVED_SECTIONS]);
     expect(api.readinessOf({ archived: false, kbState: "none", hasDraft: false, embedded: false, hasAsset: false, hasPrice: false, eligible: false }).word)

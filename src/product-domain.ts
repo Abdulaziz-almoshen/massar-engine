@@ -138,7 +138,7 @@ export function readinessOf(p: {
 
 /** null, not 0. «بلا مستهدف» must never render as «٠٪» — a product nobody set a target for has no
  *  coverage, which is not zero coverage. */
-export function coveragePct(achieved: unknown, target: unknown): number | null {
+export function targetCoveragePct(achieved: unknown, target: unknown): number | null {
   const t = Number(target);
   if (target == null || !Number.isFinite(t) || t <= 0) return null;
   const a = Number(achieved) || 0;
@@ -201,7 +201,7 @@ export function changeSummary(oldMd: unknown, newMd: unknown): { added: number; 
 
 const DOMAIN_FNS = [
   normalizeProductName, isEmbeddedProduct, kbStateOf, isRuntimeEligible, readinessOf,
-  coveragePct, priceSummary, changeSummary,
+  targetCoveragePct, priceSummary, changeSummary,
 ] as const;
 
 /** The compiled source of the constants and rules above, as one script the dashboard

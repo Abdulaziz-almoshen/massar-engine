@@ -90,6 +90,12 @@ app.setErrorHandler((err: any, req, reply) => {
       at: "http", level: "error", msg: "unhandled route error",
       url: String(req.url || "").split("?")[0], err: String(err?.message ?? err).slice(0, 300),
     }));
+    // A dropped database connection is «unavailable», not «the request is broken»: the dashboard
+    // renders 503 db_unavailable as a retryable failed state, and a bare 500 as a generic error.
+    // Seen on production 2026-09-13 whenever the 256MB Postgres hit its memory limit mid-request.
+    if (/Connection terminated|ECONNRESET|ECONNREFUSED|timeout exceeded when trying to connect|Client has encountered a connection error/i.test(String(err?.message ?? ""))) {
+      return reply.code(503).send({ ok: false, error: "db_unavailable" });
+    }
     return reply.code(status).send({ status: "error", error: "تعذّر تنفيذ الطلب." });
   }
   // 4xx is the app's own deliberate answer (auth, validation, the rate limiter) — pass it through.
