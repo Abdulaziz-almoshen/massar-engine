@@ -57,7 +57,9 @@ ROUTES = [
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
     # topbar renders even when the view body is broken.
     # «معرفة الخدمة» merged into المنتجات (V5); #kb now redirects. The record is its landmark.
-    ("#product/الإجازات المرضية", "جاهزية المساعد"),
+    # inside #body: readiness moved to the strip ABOVE the body (the record's band), and smoke
+    # asserts against #body only — a landmark outside it would pass on a blank record.
+    ("#product/الإجازات المرضية", "المرتبط بهذا المنتج"),
     # The most-edited surface, and the one the blank-page class would hit hardest.
     # The landmark below is the enrichment panel's sub-line, «ما تكتبه هنا لا يستطيع المساعد
     # تغييره». Repointed in the crm-record cycle from vSalesPath's heading «مسار البيع مع هذا
