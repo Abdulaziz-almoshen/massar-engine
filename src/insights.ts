@@ -150,7 +150,8 @@ const SYSTEM = [
   "استخرج فقط ما تدعمه المحادثة نصًا. لا تستنتج نية أو اعتراضًا دون دليل، واكتب بفصحى واضحة وموجزة.",
   "intent: high = طلب صريح للسعر أو بدء الاشتراك أو تنسيق موعد؛ medium = أسئلة محددة عن المتطلبات أو التفاصيل؛ low = ردود عامة لا تدل على تقدم؛ none = لا توجد إشارة مدعومة نصيًا.",
   "next_action: إجراء واحد محدد ينفذه مدير المبيعات الآن، مثل «تواصل اليوم لمناقشة باقة المنشآت» أو «أرسل عرض الأسعار التفصيلي». why: سطر موجز يربط الإجراء بكلام ممثل المنشأة.",
-  "best_time: حدّد نافذة تواصل واقعية ضمن أيام العمل في السعودية من ٩ص إلى ٥م، استنادًا إلى أوقات رسائل ممثل المنشأة عند توفرها. عند غياب الدليل، اقترح صباح يوم العمل التالي.",
+  // gate-skip: prompt text, never rendered — the MODEL reads this line, no screen does
+  "best_time: حدّد نافذة تواصل واقعية ضمن أيام العمل في السعودية من 9ص إلى 5م، استنادًا إلى أوقات رسائل ممثل المنشأة عند توفرها. عند غياب الدليل، اقترح صباح يوم العمل التالي.",
   "stage: حدّد أين يقف العميل على مسار البيع، واختر حصريًا من: تعارف · تشخيص الاحتياج · عرض الحل · معالجة الاعتراض · تنسيق العرض التعريفي · الإغلاق. stage_reason: سطر واحد يبرر الاختيار من كلام العميل.",
   "حكم الصفقة deal_state: won = التزم صراحة بالاشتراك/الاجتماع النهائي؛ lost = رفض نهائيًا أو انسحب؛ stalled = توقف التفاعل بعد اهتمام (صمت > يومين بعد آخر رسالة منا)؛ active = الحوار مستمر طبيعيًا.",
   "إذا كانت deal_state تساوي lost أو stalled، فاختر loss_cause حصرًا من: التكلفة، التوقيت، عدم ملاءمة الخدمة، عدم وضوح التواصل، عدم وضوح الملف التعريفي، لا استجابة، عدم ملاءمة الجهة، طلب التواصل مع مختص. اجعل evidence اقتباسًا حرفيًا من ممثل المنشأة، أو وصفًا دقيقًا لغياب الرد، واجعل fix_suggestion إجراءً واقعيًا قد يدعم استئناف الصفقة أو إغلاقها.",
@@ -188,10 +189,10 @@ export function windowState(c: Contact | undefined, now = Date.now()): {
   const age = now - last;
   if (age < SESSION_WINDOW_MS) {
     return { state: "open", lastInboundAt: last, hoursLeft: Math.floor((SESSION_WINDOW_MS - age) / 3600e3),
-      reason: "راسلَنا خلال ٢٤ ساعة — الرسالة الحرة مسموحة الآن." };
+      reason: "راسلَنا خلال 24 ساعة — الرسالة الحرة مسموحة الآن." };
   }
   return { state: "closed", lastInboundAt: last, hoursLeft: 0,
-    reason: "آخر رسالة منه تجاوزت ٢٤ ساعة — واتساب لا يقبل إلا قالبًا معتمدًا." };
+    reason: "آخر رسالة منه تجاوزت 24 ساعة — واتساب لا يقبل إلا قالبًا معتمدًا." };
 }
 
 /** Split a target list into what can actually be sent now. Arithmetic over the ledger: no network,
@@ -375,7 +376,7 @@ export function contextScore(c: Contact, entity: EntityRow | null): { score: num
     { label: "محادثة مكتملة الحد الأدنى (رسالتان أو أكثر)", got: inbound >= 2, pts: 20 },
     { label: "ردّ على حملة", got: Boolean((c.statusTimes || {}).replied || inbound >= 1), pts: 10 },
     { label: "اهتمام مصنّف", got: (c.tags || []).length > 0, pts: 15 },
-    { label: "تفاعل خلال ٣ أيام", got: Date.now() - (c.lastEventAt || 0) < 72 * 3600e3, pts: 10 },
+    { label: "تفاعل خلال 3 أيام", got: Date.now() - (c.lastEventAt || 0) < 72 * 3600e3, pts: 10 },
     { label: "استلم الملف التعريفي", got: (c.transcript || []).some((t) => t.text.includes("أُرسل الملف التعريفي") || t.text.includes("[مرفق")), pts: 10 },
   ];
   return { score: parts.reduce((s, p) => s + (p.got ? p.pts : 0), 0), parts };

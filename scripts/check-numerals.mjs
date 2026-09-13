@@ -12,8 +12,13 @@
 // Usage:  npm run check:numerals   → exit 1 and print file:line for each raw concat.
 import { readFileSync } from "node:fs";
 
-// Server-side Arabic reaches the UI verbatim, so segments.ts is subject to the same rule.
-const FILES = ["src/dashboard.ts", "src/segments.ts", "src/campaigns-crm.ts", "src/opps-crm.ts"];
+// Server-side Arabic reaches the UI verbatim, so segments.ts is subject to the same rule — and so is
+// insights.ts, whose windowState().reason is forwarded by the launch route and printed on the launch
+// note. It was the one string the 2026-09-13 sweep missed, and the gate could not see it because the
+// file was not on this list.
+const FILES = ["src/dashboard.ts", "src/segments.ts", "src/campaigns-crm.ts", "src/opps-crm.ts",
+  "src/insights.ts", "src/products-crm.ts", "src/settings-crm.ts", "src/targets-crm.ts",
+  "src/customers-crm.ts", "src/sales-crm.ts", "src/activity-crm.ts", "src/tasks-crm.ts"];
 const FILE = FILES[0];
 const src = FILES.flatMap((f) => readFileSync(f, "utf8").split("\n"));
 
@@ -137,6 +142,33 @@ try {
     hits.push([i + 1, "orphaned string literal in a concat chain — ASI will truncate the statement", ln.trim().slice(0, 70)]);
   });
 } catch (e) { /* the import-failure case is already reported by the parse check above */ }
+
+// ONE NUMERAL SYSTEM, AND IT IS THE WESTERN ONE (founder, 2026-09-13). A literal «٢٤» inside an
+// Arabic sentence is invisible to every check above — it is not a concat, not a raw number, just a
+// string. Three review rounds each found another one by reading. So the digits themselves are the
+// assertion now, per file, skipping the two legitimate uses: a digit-mapping table
+// («٠١٢٣٤٥٦٧٨٩») and a character-class that PARSES both systems («٠-٩»).
+const numeralHits = [];
+{
+  const arabicIndic = /[\u0660-\u0669]/;
+  for (const f of FILES) {
+    readFileSync(f, "utf8").split("\n").forEach((ln, i) => {
+      if (!arabicIndic.test(ln)) return;
+      if (ln.includes("٠١٢٣٤٥٦٧٨٩") || ln.includes("٠-٩")) return;   // mapping table / parser class
+      // Comments quote the old strings on purpose («shipped as ٥ أيام») — the rule is about what
+      // the screen PRINTS, and a comment prints nothing.
+      const t = ln.trimStart();
+      if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) return;
+      numeralHits.push([f, i + 1, ln.trim().slice(0, 90)]);
+    });
+  }
+}
+if (numeralHits.length) {
+  console.error(`western-numeral check failed — ${numeralHits.length} Arabic-Indic digit site(s):\n`);
+  for (const [f, ln, text] of numeralHits) console.error(`  ${f}:${ln}\n     ${text}\n`);
+  console.error("Every figure the dashboard prints is western (founder, 2026-09-13). A digit-mapping\ntable («٠١٢٣٤٥٦٧٨٩») and a parser class («٠-٩») are the two legitimate uses and are skipped.");
+  process.exit(1);
+}
 
 if (hits.length) {
   console.error(`numeral-consistency check failed — ${hits.length} site(s) in ${FILE}:\n`);

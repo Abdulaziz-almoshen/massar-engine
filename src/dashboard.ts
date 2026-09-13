@@ -2297,8 +2297,15 @@ function vAimkt() {
   // eligible product, which is the exact substitution this block exists to prevent. selLost lives at
   // module scope and is cleared only by pick(), i.e. by the operator choosing again.
   const byName = selProdName ? reg.findIndex((x) => x.name === selProdName) : -1;
-  if (selProdName && byName < 0) { selLost = selProdName; selProdName = ""; selProd = -1; }
+  // Loss is only decidable against a LOADED catalogue: while the registry is empty (loading, or a
+  // failed read) a product is not gone, it is unknown, and clearing the choice there would blame the
+  // operator for a network blip.
+  const catalogueKnown = reg.length > 0;
+  if (catalogueKnown && selProdName && byName < 0) { selLost = selProdName; selProdName = ""; selProd = -1; }
   else if (byName >= 0 && reg[byName].eligible === false) { selLost = selProdName; selProdName = ""; selProd = -1; }
+  // A product that comes BACK (restored, or its knowledge approved) ends the notice: the thing it
+  // warned about is no longer true.
+  if (selLost && reg.some((x) => x.name === selLost && x.eligible !== false)) selLost = "";
   else if (byName >= 0) selProd = byName;
   else if (!selProdName && !selLost) {
     // Nothing chosen YET (never chosen, and nothing lost): land on the first sellable product.
