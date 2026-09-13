@@ -67,11 +67,11 @@ export const DEFAULT_COOLDOWN_DAYS = 2;
 
 const DAY = 86_400_000;
 
-/** Arabic-Indic digits with correct number agreement — 3-10 take the plural («٥ أيام»), 11+ the
- *  singular accusative («١٤ يومًا»). Server-side strings reach the UI verbatim, so the portal's
- *  numeral rule has to hold here too; the source guard only reads dashboard.ts. */
+/** Correct number agreement — 3-10 take the plural («5 أيام»), 11+ the singular accusative
+ *  («14 يومًا»). Western digits since 2026-09-13, like every other figure the dashboard prints:
+ *  these strings reach the UI verbatim, and one screen with two numeral systems is the defect. */
 export function arDays(n: number): string {
-  const d = String(n).replace(/[0-9]/g, (x) => "٠١٢٣٤٥٦٧٨٩"[Number(x)]);
+  const d = String(n);
   return n >= 11 ? `${d} يومًا` : `${d} أيام`;
 }
 
@@ -180,8 +180,7 @@ export function evaluate(def: SegmentDef, contacts: Contact[], now = Date.now())
     const lastOut = Math.max(Number((c.statusTimes || {}).sent || 0), Number((c.statusTimes || {}).delivered || 0));
     if (cooldown > 0 && lastOut && now - lastOut < cooldown * DAY) {
       const hours = Math.round((now - lastOut) / 3_600_000);
-      const ar = String(hours).replace(/[0-9]/g, (x) => "٠١٢٣٤٥٦٧٨٩"[Number(x)]);
-      res.suppressed.push({ phone: c.phone, name, reason: `رُوسلت قبل ${ar} ساعة` });
+      res.suppressed.push({ phone: c.phone, name, reason: `رُوسلت قبل ${hours} ساعة` });
       continue;
     }
     res.matched.push(c);

@@ -1182,6 +1182,8 @@ function pxSaveTarget(name, quarter, raw, confirmed) {
   pxFState[key] = { s: "pending", v: raw }; render(false);
   pxJson("POST", "/admin/sales/targets", { product: name, year: pcPerfYear, quarter: quarter, amount: s === "" ? null : Number(s) }).then(function (r) {
     if (r.ok && r.j.ok !== false) { pxFState[key] = { s: "saved", v: raw }; pcPerfLoad(pcPerfYear, true); pcQuarters = null; pcLoad(true);
+      /* «المستهدفات والأداء» holds the same rows in perfState — invalidate it, in both directions. */
+      if (typeof perfState !== "undefined" && perfState) { perfState.data = null; perfState.year = 0; }
       setTimeout(function () { if (pxFState[key] && pxFState[key].s === "saved") { delete pxFState[key]; render(false); } }, 1600); }
     else pxFState[key] = { s: "failed", v: raw };
     render(false);
@@ -1301,7 +1303,8 @@ function pxUmCreate(i) {
   var u = pcUnmatched[i]; if (!u) return;
   pxJson("POST", "/admin/products", { name: u.name }).then(function (r) {
     if (!r.ok || r.j.ok === false) { pxToast(r.j.error === "name_exists" ? "يوجد منتج بهذا الاسم — استخدم «ربط»" : r.j.detail || "تعذّر إنشاء المنتج", true); return; }
-    pcLoad(true); pxToast("أُنشئ «" + u.name + "» وارتبطت ملفاته", false);
+    pcLoad(true); pxTagsRefresh();   /* a product created from a stray file is still a new product */
+    pxToast("أُنشئ «" + u.name + "» وارتبطت ملفاته", false);
   }).catch(function () { pxToast("تعذّر الاتصال — لم يتغيّر شيء", true); });
 }
 

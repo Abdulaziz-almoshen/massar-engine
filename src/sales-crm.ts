@@ -180,6 +180,9 @@ window.perfSetTarget = async function (product) {
   });
   var d = await r.json().catch(function () { return {}; });
   if (!r.ok || !d.ok) { alertBar("تعذّر الحفظ: " + esc(d.error || r.status), true); return; }
+  /* The product record keeps its own copy of the same rows. Drop it, or «المستهدفات والأداء» and
+     the record show two different targets for one quarter until a reload. */
+  if (typeof pcPerf !== "undefined") { pcPerf = {}; pcPerfFailed = {}; }
   alertBar("حُفظ المستهدف — " + perfMoney(amount), false);
   perfLoad(perfState.year, perfState.quarter);
 };

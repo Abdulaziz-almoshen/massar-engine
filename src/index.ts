@@ -627,7 +627,7 @@ app.delete("/admin/config/stages/:key", async (req, reply) => {
   const stages = await db.listStages();
   const current = stages.find((s) => s.key === key);
   if (!current) return problem(reply, 404, "unknown_stage", "لا مرحلة بهذا المعرّف", "key");
-  const checked = sysCfg.checkStageDelete(key, current.openLines);
+  const checked = sysCfg.checkStageDelete(key, current.openLines, db.SEEDED_STAGE_KEYS);
   if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
   await db.deleteStage(key);
   log({ at: "config", msg: "stage deleted", key, by: adminName(req) });
@@ -1413,7 +1413,9 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     return problem(reply, 400, "product_not_eligible", "لا يبيعه المساعد — يلزم اعتماد ملف المعرفة أو استعادة المنتج أولًا", "product");
   }
   const campName = (name || "").trim() ||
-    `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA")}`;
+    // Western digits and the gregorian calendar: this name is read on the dashboard beside every
+    // other date, and a Hijri date in Arabic-Indic digits was the one string that disagreed.
+    `حملة ${(product || "").trim() || "واتساب"} — ${new Date().toLocaleDateString("ar-SA-u-ca-gregory-nu-latn")}`;
   const assets = await db.listAssets();
   const pa = assets.find((a) => a.product === (product || "").trim());
   const introAsset = pa ? { url: `${cfg.publicBaseUrl}/assets/${pa.public_id}.pdf`, filename: pa.filename } : null;
@@ -2088,7 +2090,9 @@ app.post("/admin/opps", async (req, reply) => {
   if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
   const known = new Set((await db.listTags()).map((t) => t.name));
   const active = new Set(await db.activeTagNames());
-  const liveStages = await db.stageKeys();
+  // NEW lines may only start on an ACTIVE rung; an existing line keeps whatever rung it is on
+  // (see the PATCH route below, which allows the line's own stage too).
+  const liveStages = await db.activeStageKeys();
   for (const l of lines) {
     const bad = db.validateOppLine(l, liveStages);
     if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
@@ -2124,7 +2128,12 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   // A PATCH carries a subset, so only what is present is validated — merged onto a product because
   // validateOppLine's first obligation is that one exists.
-  const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, await db.stageKeys());
+  // Stages an EDIT may land on: the active ones, plus the rung this line already sits on — pausing a
+  // rung must not trap the deals on it, and must not become a way to move new deals onto it either
+  // (config-domain.isStageSelectable, the same rule the picker uses).
+  const current = (await db.listOpps()).find((o) => Number(o.id) === id);
+  const allowedStages = [...new Set([...(await db.activeStageKeys()), ...(current ? [String(current.stage)] : [])])];
+  const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, allowedStages);
   if (bad && !(bad === "product" && b.product === undefined)) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
   }

@@ -2790,6 +2790,10 @@ export async function patchProductMeta(product: string, patch: {
 // «إعدادات النظام» — the ladder, the divisions, the team, and what was escalated.
 // ===========================================================================
 
+/** The rungs the boot seed re-creates. Deleting one would come back on the next restart, so the
+ *  config route refuses it and offers «أوقفها» instead. */
+export const SEEDED_STAGE_KEYS: readonly string[] = SALES_STAGES.map((s) => s.key);
+
 export type StageRow = {
   key: string; label: string; weightPct: number; position: number;
   slaDays: number | null; active: boolean; dot: string; terminal: "won" | "lost" | null;
@@ -2833,6 +2837,12 @@ function compiledStages(): StageRow[] {
  *  valid row, and a write that refused it would strand it. */
 export async function stageKeys(): Promise<string[]> {
   return (await listStages()).map((s) => s.key);
+}
+
+/** The keys NEW work may start on. A paused rung is not offered and not accepted — the picker and
+ *  the write agree, which is the whole point of pausing one. */
+export async function activeStageKeys(): Promise<string[]> {
+  return (await listStages()).filter((s) => s.active).map((s) => s.key);
 }
 
 async function defaultPipelineId(): Promise<number | null> {

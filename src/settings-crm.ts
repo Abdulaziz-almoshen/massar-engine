@@ -38,7 +38,8 @@ export const SETTINGS_CRM_CSS = `
 .cf-pill.off { background:var(--surface-2); color:var(--muted); }
 .cf-pill.lock { background:var(--accent-tint); color:var(--accent-deep); }
 .cf-acts { display:flex; gap:var(--s2); justify-content:flex-end; flex-wrap:wrap; }
-.cf-acts .btn { height:32px; padding-inline:10px; font-size:var(--t-xs); }
+.cf-acts .btn, .cf-acts .rv-hold { height:32px; padding-inline:10px; font-size:var(--t-xs); }
+.cf-acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
 .cf-ed { border-top:1px solid var(--line-soft); background:var(--accent-wash); padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
 .cf-g { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:var(--s3); }
 .cf-fl { display:flex; flex-direction:column; gap:4px; min-width:0; }
@@ -111,6 +112,9 @@ function cfLoad(force) {
       render(false);
     });
 }
+/* The engine re-seeds these on every boot, so «حذف» on one would undo itself at the next restart. */
+var CF_SEEDED = ["contact", "discover", "present", "tech", "quote", "negotiate", "won", "lost"];
+function cfSeeded(key) { return CF_SEEDED.indexOf(key) >= 0; }
 function cfStage(key) { return (cfStages || []).filter(function (s) { return s.key === key; })[0] || null; }
 function cfMember(id) { return cfTeam.filter(function (m) { return String(m.id) === String(id); })[0] || null; }
 function cfDivision(id) { return cfDivs.filter(function (d) { return String(d.id) === String(id); })[0] || null; }
@@ -132,6 +136,15 @@ function cfSelect(id, label, k, value, opts, hint) {
   return '<div class="cf-fl"><label for="' + id + '">' + label + '</label><select id="' + id + '" data-cfset="' + k + '">' +
     opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
     "</select>" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+}
+/* DELETE IS A HOLD, like every other destructive control in this product (DESIGN.md 8.5): one
+   click must not remove a stage, a division or a person. And it is only OFFERED where it would
+   succeed — a rung with opportunities on it, a division that still owns products or people, and a
+   member who has been escalated to say so instead, because a button that always refuses is a lie. */
+function cfHold(fn, arg, idle) {
+  return '<button class="rv-hold" data-do="' + fn + '" data-arg="' + esc(String(arg)) + '" data-idle="' + idle +
+    '" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف" aria-pressed="false" title="اضغط مع الاستمرار للحذف">' +
+    '<span class="rv-fill"></span><span class="rv-lbl">' + idle + "</span></button>";
 }
 function cfEditorActions(saveLabel) {
   return '<div class="cf-acts" style="justify-content:flex-start">' +
@@ -179,7 +192,9 @@ function cfStagesView() {
     h += '<span class="cf-num">' + (s.openLines ? cfNOpp(s.openLines) : '<span class="cf-sub">لا فرص</span>') + "</span>";
     h += '<span class="cf-acts">' +
       '<button class="btn btn-ghost" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
-      (terminal ? "" : '<button class="btn btn-ghost" data-cf="delstage" data-k="' + esc(s.key) + '">حذف</button>') + "</span>";
+      (terminal || cfSeeded(s.key) ? '<span class="cf-sub" title="مرحلة أساسية في المحرك — أوقفها بدل حذفها">أساسية</span>'
+        : s.openLines ? '<span class="cf-sub" title="أوقفها بدل حذفها">عليها فرص</span>'
+        : cfHold("cfDeleteStage", s.key, "حذف")) + "</span>";
     h += "</div>";
     if (editing) h += cfStageEditor();
   });
@@ -217,7 +232,8 @@ function cfDivisionsView() {
     h += '<span class="cf-num">' + (d.members ? cfNMember(d.members) : '<span class="cf-sub">لا أعضاء</span>') + "</span>";
     h += "<span>" + (d.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
     h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editdiv" data-i="' + d.id + '">تعديل</button>' +
-      '<button class="btn btn-ghost" data-cf="deldiv" data-i="' + d.id + '">حذف</button></span></div>';
+      (d.products || d.members ? '<span class="cf-sub" title="انقل منتجاته وأعضاءه أولًا، أو أوقفه">مرتبط</span>'
+        : cfHold("cfDeleteDivision", d.id, "حذف")) + "</span></div>";
     if (editing) h += cfDivisionEditor();
   });
   return h + "</div></section>";
@@ -254,7 +270,8 @@ function cfTeamView() {
     h += "<span>" + (m.division ? esc(m.division) : '<span class="cf-sub">بلا قسم</span>') + "</span>";
     h += "<span>" + (m.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
     h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editmember" data-i="' + m.id + '">تعديل</button>' +
-      '<button class="btn btn-ghost" data-cf="delmember" data-i="' + m.id + '">حذف</button></span></div>';
+      (m.escalations ? '<span class="cf-sub" title="عليه تصعيدات مسجّلة — أوقفه بدل حذفه">عليه تصعيدات</span>'
+        : cfHold("cfDeleteMember", m.id, "حذف")) + "</span></div>";
     if (editing) h += cfMemberEditor();
   });
   return h + "</div></section>";
@@ -295,15 +312,15 @@ function cfSaveStage() {
     cfToast(e.id ? "حُفظت المرحلة" : "أُضيفت المرحلة «" + checked.value.label + "»", false);
   }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
 }
-function cfDeleteStage(key) {
+window.cfDeleteStage = function (key) {
   var s = cfStage(key); if (!s) return;
-  var checked = checkStageDelete(key, s.openLines);
+  var checked = checkStageDelete(key, s.openLines, CF_SEEDED);
   if (!checked.ok) { cfToast(checked.reason, true); return; }
   cfJson("DELETE", "/admin/config/stages/" + encodeURIComponent(key)).then(function (r) {
     if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
     cfLoad(true); cfToast("حُذفت المرحلة «" + s.label + "»", false);
   }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
-}
+};
 function cfSaveDivision() {
   var e = cfEdit, d = e.d;
   var owner = d.ownerMemberId ? cfMember(d.ownerMemberId) : null;
@@ -321,7 +338,8 @@ function cfSaveDivision() {
     cfToast(e.id ? "حُفظ القسم" : "أُضيف القسم «" + checked.value.name + "»", false);
   }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
 }
-function cfDeleteDivision(id) {
+window.cfDeleteDivision = function (id) {
+  id = Number(id);
   var d = cfDivision(id); if (!d) return;
   var checked = checkDivisionDelete(d.products, d.members);
   if (!checked.ok) { cfToast(checked.reason, true); return; }
@@ -330,7 +348,7 @@ function cfDeleteDivision(id) {
     cfLoad(true); if (typeof pcLoad === "function") pcLoad(true);
     cfToast("حُذف القسم «" + d.name + "»", false);
   }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
-}
+};
 function cfSaveMember() {
   var e = cfEdit, d = e.d;
   var checked = checkMember({ name: d.name, email: d.email, role: d.role, divisionId: d.divisionId, active: !!d.active });
@@ -345,14 +363,15 @@ function cfSaveMember() {
     cfToast(e.id ? "حُفظ العضو" : "أُضيف «" + checked.value.name + "» إلى الفريق", false);
   }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
 }
-function cfDeleteMember(id) {
+window.cfDeleteMember = function (id) {
+  id = Number(id);
   var m = cfMember(id); if (!m) return;
   if (m.escalations) { cfToast("عليه تصعيدات مسجّلة — أوقفه بدل حذفه.", true); return; }
   cfJson("DELETE", "/admin/config/team/" + id).then(function (r) {
     if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
     cfLoad(true); cfToast("حُذف «" + m.name + "» من الفريق", false);
   }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
-}
+};
 
 /* ---- one delegated listener, like every other CRM surface here ---- */
 document.addEventListener("click", function (ev) {
@@ -371,21 +390,21 @@ document.addEventListener("click", function (ev) {
     cfOpen("stage", s.key, { label: s.label, weightPct: s.weightPct, position: s.position, slaDays: s.slaDays == null ? "" : s.slaDays, active: s.active, exitCriterion: s.exitCriterion || "" });
     setTimeout(function () { var f = document.getElementById("cf_label"); if (f) f.focus(); }, 0); return;
   }
-  if (a === "delstage") { cfDeleteStage(t.getAttribute("data-k")); return; }
+
   if (a === "adddiv") { cfOpen("division", 0, { name: "", ownerMemberId: "", active: true }); setTimeout(function () { var f = document.getElementById("cf_dname"); if (f) f.focus(); }, 0); return; }
   if (a === "editdiv") {
     var d = cfDivision(Number(t.getAttribute("data-i"))); if (!d) return;
     cfOpen("division", d.id, { name: d.name, ownerMemberId: d.ownerMemberId == null ? "" : d.ownerMemberId, active: d.active });
     setTimeout(function () { var f = document.getElementById("cf_dname"); if (f) f.focus(); }, 0); return;
   }
-  if (a === "deldiv") { cfDeleteDivision(Number(t.getAttribute("data-i"))); return; }
+
   if (a === "addmember") { cfOpen("member", 0, { name: "", email: "", role: "sales", divisionId: "", active: true }); setTimeout(function () { var f = document.getElementById("cf_mname"); if (f) f.focus(); }, 0); return; }
   if (a === "editmember") {
     var m = cfMember(Number(t.getAttribute("data-i"))); if (!m) return;
     cfOpen("member", m.id, { name: m.name, email: m.email, role: m.role, divisionId: m.divisionId == null ? "" : m.divisionId, active: m.active });
     setTimeout(function () { var f = document.getElementById("cf_mname"); if (f) f.focus(); }, 0); return;
   }
-  if (a === "delmember") { cfDeleteMember(Number(t.getAttribute("data-i"))); return; }
+
   if (a === "cancel") { cfClose(); return; }
   if (a === "save") {
     if (!cfEdit) return;

@@ -2289,12 +2289,21 @@ function wizProducts() {
 function vAimkt() {
   if (typeof pcLoad === "function") pcLoad(false);
   const reg = wizProducts();
+  // A NAMED selection that is gone (archived, renamed, or no longer sellable) clears itself and says
+  // so — it is never replaced by whatever product now sits at that index. Substituting one silently
+  // is how a campaign gets launched for the wrong service.
   const byName = selProdName ? reg.findIndex((x) => x.name === selProdName) : -1;
-  if (byName >= 0) selProd = byName;
-  if (!reg[selProd] || reg[selProd].eligible === false) {
+  let lostSelection = "";
+  if (selProdName && byName < 0) { lostSelection = selProdName; selProdName = ""; selProd = -1; }
+  else if (byName >= 0 && reg[byName].eligible === false) { lostSelection = selProdName; selProdName = ""; selProd = -1; }
+  else if (byName >= 0) selProd = byName;
+  else if (!selProdName) {
+    // Nothing chosen yet: land on the first product the assistant can actually sell.
     const firstOk = reg.findIndex((x) => x.eligible !== false);
-    selProd = firstOk >= 0 ? firstOk : 0;
+    selProd = firstOk;
+    selProdName = firstOk >= 0 ? reg[firstOk].name : "";
   }
+  if (selProd >= 0 && (!reg[selProd] || reg[selProd].eligible === false)) { selProd = -1; selProdName = ""; }
   const m = entMatches();
   const selN = launchTargets().length;
   const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));
@@ -2308,6 +2317,9 @@ function vAimkt() {
       ? (typeof pcFailed !== "undefined" && pcFailed
         ? '<div role="alert" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--t-sm);color:var(--s-fail-text);padding:12px 0;">تعذّر تحميل المنتجات — لا يمكن اختيار منتج ولا الإطلاق حتى تُحمَّل. <button class="btn btn-ghost" onclick="pcLoad(true)">أعد المحاولة</button></div>'
         : '<div aria-busy="true" style="font-size:var(--t-sm);color:#656B76;padding:12px 0;">جارٍ تحميل المنتجات…</div>')
+      : "") +
+    (lostSelection
+      ? '<div role="alert" style="font-size:var(--t-sm);color:#7A5600;padding:10px 0;">لم يعد «' + esc(lostSelection) + '» متاحًا للحملات — اختر خدمة أخرى.</div>'
       : "") + '<div class="prods">' +
     reg.map((x, i) => {
       // Say which knowledge this service actually has. Removing the invented scores collapsed
@@ -2725,7 +2737,10 @@ window.entManualSave = async () => {
   const rows = manualRows.filter((r) => r.name.trim() || r.phone.trim());
   const st = document.getElementById("entstat");
   if (!rows.length) { if (st) st.innerHTML = '<span class="chip c-warn">أدخل جهة واحدة على الأقل</span>'; return; }
-  const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-90-9]/g, "").length < 9);
+  // BOTH numeral systems: the screen prints western digits now, but a pasted phone may still carry
+  // Arabic-Indic ones, and the importer normalises both. A sweep that turned «[^0-9٠-٩]» into
+  // «[^0-90-9]» silently refused those numbers — caught in review, not by any test.
+  const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-9\u0660-\u0669]/g, "").length < 9);
   if (bad.length) { if (st) st.innerHTML = '<span class="chip c-bad">تحقّق من الاسم والجوال في ' + fmtN(bad.length) + ' صف</span>'; return; }
   if (st) st.innerHTML = '<span class="chip c-teal">جارٍ الحفظ…</span>';
   const text = rows.map((r) => [r.name.trim(), r.phone.trim(), r.size.trim(), r.city.trim()].filter(Boolean).join("، ")).join("\\n");

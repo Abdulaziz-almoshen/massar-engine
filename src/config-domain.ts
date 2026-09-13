@@ -117,9 +117,14 @@ export function checkStage(input: StageInput, taken: readonly string[], existing
 
 /** Why a stage may not be deleted, in the words the screen shows. Deleting a rung that holds
  *  opportunities would orphan them — the ledger keeps their history under a key nothing defines. */
-export function checkStageDelete(key: unknown, openLines: unknown): { ok: true } | Rejection {
+export function checkStageDelete(key: unknown, openLines: unknown, seededKeys?: readonly string[]): { ok: true } | Rejection {
   if (isTerminalStageKey(key)) {
     return { ok: false, code: "terminal_stage", reason: "مرحلتا الربح والخسارة جزء من المحرك — لا تُحذفان.", field: "key" };
+  }
+  // A rung the engine SEEDS comes back on the next boot, so deleting it is a lie that lasts until a
+  // restart. Pausing it is the honest form, and it survives every deploy.
+  if (seededKeys && seededKeys.indexOf(String(key)) >= 0) {
+    return { ok: false, code: "seeded_stage", reason: "مرحلة أساسية في المحرك — أوقفها بدل حذفها (الحذف يعود عند إعادة التشغيل).", field: "key" };
   }
   const n = Number(openLines) || 0;
   if (n > 0) {

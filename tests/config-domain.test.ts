@@ -93,6 +93,13 @@ describe("deleting a stage", () => {
   it("allows an empty custom rung", () => {
     expect(checkStageDelete("legal_review", 0)).toEqual({ ok: true });
   });
+  it("refuses a SEEDED rung, because the next boot would bring it back", () => {
+    const seeded = ["contact", "discover", "present", "tech", "quote", "negotiate", "won", "lost"];
+    const out = checkStageDelete("quote", 0, seeded);
+    expect(out).toMatchObject({ ok: false, code: "seeded_stage" });
+    if (!out.ok) expect(out.reason).toContain("أوقفها");
+    expect(checkStageDelete("legal_review", 0, seeded)).toEqual({ ok: true });
+  });
 });
 
 describe("a paused stage never traps the deals already on it", () => {

@@ -490,7 +490,12 @@ var opDrScroll = 0;
 var opKCap = {};             /* kanban: per-stage render cap */
 var opDelErr = "";
 
-var OPP_ST = OPP_STAGES;
+/* The compiled ladder is the FALLBACK shape, and it must carry the same fields the live one does:
+   isStageSelectable reads .active, and an undefined there would make every stage unselectable until
+   «إعدادات النظام» had been loaded once. */
+var OPP_ST = OPP_STAGES.map(function (s) {
+  return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: true, slaDays: null, terminal: null };
+});
 var OPP_SRC = OPP_SOURCES;
 var OPP_KCAP = 50;
 
@@ -510,6 +515,11 @@ function opStage(k) {
   return OPP_ST[0];
 }
 function opOpenStages() { return OPP_ST.filter(function (s) { return isOpenStage(s.key); }); }
+/* A paused rung is not offered for new work, but never traps a line already on it (config-domain's
+   isStageSelectable, the same rule the server applies on the write). */
+function opSelectableStages(current) {
+  return OPP_ST.filter(function (s) { return isStageSelectable(s, current); });
+}
 function opWonKey() { var s = OPP_ST.filter(function (x) { return isWonStage(x.key); })[0]; return s ? s.key : "won"; }
 function opLostKey() { var s = OPP_ST.filter(function (x) { return isLostStage(x.key); })[0]; return s ? s.key : "lost"; }
 /* ONE colour per stage, used by the summary bar, the legend, the row dot, the kanban header and
@@ -536,7 +546,17 @@ function opIsWon(o) { return isWonStage(o.stage); }
 function opIsLost(o) { return isLostStage(o.stage); }
 function opIsOpen(o) { return isOpenStage(o.stage); }
 function opDays(o) { return daysInStage(opFacts(o), Date.now()); }
-function opStalled(o) { return isLineStalled(opFacts(o), Date.now()); }
+/* The stage's own SLA decides «متأخرة» once an admin has set one in «إعدادات النظام»; the compiled
+   two-rung / 14-day rule is the fallback for a ladder that carries no SLA at all. */
+function opStageSla(o) {
+  var st = opStage(o.stage);
+  return st && st.slaDays ? Number(st.slaDays) : null;
+}
+function opStalled(o) {
+  var sla = opStageSla(o);
+  if (sla === null) return isLineStalled(opFacts(o), Date.now());
+  return isOpenStage(o.stage) && opDays(o) >= sla;
+}
 function opValue(o) { return calculateLineValue(opFacts(o)); }
 function opPriced(l) { return isLinePriced(opFacts(l)); }
 function opSumLive(ls) { return sumLiveValue(ls.map(opFacts)); }
@@ -766,7 +786,7 @@ function opToolbar() {
     h += '<span class="ox-selc">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
     h += '<span class="ox-f"><select id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
       '<option value="">نقل إلى مرحلة…</option>' +
-      OPP_ST.map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
+      opSelectableStages().map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
     h += '<input class="ox-bulk" id="oxb_owner" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
     h += '<datalist id="oxowners">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
     var pg = pageSlice("opps", opSorted());
@@ -902,7 +922,9 @@ function opListView() {
 function opKanbanView() {
   var rows = opLines();
   var h = '<div class="ox-kb" role="list" aria-label="لوحة المراحل">';
-  OPP_ST.forEach(function (st) {
+  var withLines = {};
+  (oppRows || []).forEach(function (o) { withLines[o.stage] = 1; });
+  OPP_ST.filter(function (st) { return st.active !== false || withLines[st.key]; }).forEach(function (st) {
     /* The same ordering the list uses, applied inside each column, so switching views never reorders
        what the reader already scanned. */
     var inStage = {}; rows.forEach(function (l) { if (l.stage === st.key) inStage[l.id] = 1; });
@@ -977,14 +999,19 @@ function opField(l, key, label, type) {
 var opEsc = null;          /* { oppId, kind, memberId, reason, err, field, busy } */
 var opEscRows = {};        /* oppId -> rows */
 var opEscLoading = {};
+var opEscFailed = {};      /* a failed read STAYS failed until asked again */
+/* A failure that is only swallowed is a failure that repeats: the drawer re-renders, finds no rows,
+   and fires the same request again, forever. The failed state is remembered and shown with a retry,
+   the same contract the ledger and the products list hold. */
 function opEscLoad(oppId, force) {
   if (opEscLoading[oppId]) return;
   if (opEscRows[oppId] && !force) return;
+  if (opEscFailed[oppId] && !force) return;
   opEscLoading[oppId] = true;
   fetch("/admin/escalations?opp=" + oppId, { headers: { "x-admin-token": TOKEN } })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) { if (j && j.escalations) opEscRows[oppId] = j.escalations; })
-    .catch(function () {})
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (j) { opEscRows[oppId] = (j && j.escalations) || []; opEscFailed[oppId] = false; })
+    .catch(function () { opEscFailed[oppId] = true; })
     .then(function () { opEscLoading[oppId] = false; opRender(); });
 }
 function opEscCandidates(kind) {
@@ -998,13 +1025,14 @@ function opEscSection(l) {
   opEscLoad(l.id, false);
   var rows = opEscRows[l.id] || [];
   var open = rows.filter(function (r) { return !r.resolvedAt; });
+  var failed = !!opEscFailed[l.id] && !opEscRows[l.id];
   var b = '<section class="ox-sec" aria-labelledby="oxsec_e"><div class="ox-sech" id="oxsec_e">التصعيد والدعم' +
     (open.length ? '<span class="ox-cnt">' + fmtN(open.length) + " مفتوح</span>" : "") + "</div>";
   if (!opEsc || opEsc.oppId !== l.id) {
     b += '<div class="ox-escacts">' +
       '<button class="btn btn-ghost" data-op="escalate" data-i="' + l.id + '">' + opIco("up") + "تصعيد</button>" +
       '<button class="btn btn-ghost" data-op="support" data-i="' + l.id + '">' + opIco("help") + "طلب دعم</button>" +
-      '<span class="ox-hint2">يُسجَّل على الفرصة ويظهر لمن اخترته — لا يُرسل شيء للعميل.</span></div>';
+      '<span class="ox-hint2">يُسجَّل على الفرصة باسم من اخترته — لا بريد بعد، ولا يُرسل شيء للعميل.</span></div>';
   } else {
     var cands = opEscCandidates(opEsc.kind);
     b += '<div class="ox-escform">';
@@ -1026,6 +1054,10 @@ function opEscSection(l) {
       (opEsc.busy ? "جارٍ التسجيل…" : opEsc.kind === "support" ? "سجّل طلب الدعم" : "سجّل التصعيد") + "</button>" +
       '<button class="btn btn-ghost" data-op="esccancel">إلغاء</button>' +
       (opEsc.err ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opEsc.err) + "</span>" : "") + "</div></div>";
+  }
+  if (failed) {
+    b += '<div class="ox-hint2" role="alert">' + opIco("warn") + "تعذّر تحميل سجل التصعيد — لم يُعرض شيء لأن الطلب فشل." +
+      '<button class="btn btn-ghost" data-op="escretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
   }
   if (rows.length) {
     b += '<div class="ox-esclist">' + rows.map(function (r) {
@@ -1097,9 +1129,9 @@ function opDetailDrawer(l) {
     }).join("") + "</div>";
     b += '<div class="ox-stnow">' + opDot(l.stage) + "<b>" + esc(st.label) + "</b>" +
       '<span class="ox-sub">المرحلة ' + fmtN(idx + 1) + " من " + fmtN(open.length) + "، " + opAgo(l) + "</span>" +
-      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(OPP_STALL_DAYS) + "</span>" : "") + "</div>";
+      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") + "</div>";
     b += '<div class="ox-strow">' +
-      opSelect("oxd_stage_" + l.id, "نقل إلى مرحلة", l.stage, OPP_ST.map(function (s) { return [s.key, s.label]; }), false, "opSetStageSel") +
+      opSelect("oxd_stage_" + l.id, "نقل إلى مرحلة", l.stage, opSelectableStages(l.stage).map(function (s) { return [s.key, s.label] ; }), false, "opSetStageSel") +
       '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
       '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
   } else {
@@ -1282,6 +1314,9 @@ function opToast(msg, bad, act, actFn) {
 /* ================================ THE VIEW ================================ */
 function vOppsCrm() {
   opLoad(false);
+  /* The LADDER, not just the lines: an admin may have added or paused a rung, and until «إعدادات
+     النظام» had been opened the board rendered a custom stage as OPP_ST[0] («تواصل أولي»). */
+  if (typeof cfLoad === "function") cfLoad(false);
   /* #opps/<id> is the shareable record URL: it opens that line's drawer. */
   var hid = Number(((location.hash || "").split("/")[1]) || 0);
   if (hid && oppRows && opOpen !== hid && !opSheet) {
@@ -1436,6 +1471,7 @@ document.addEventListener("click", function (ev) {
   if (a === "esccancel") { opEsc = null; opRender(); return; }
   if (a === "escsave") { opEscSave(); return; }
   if (a === "escdone") { opEscResolve(Number(t.getAttribute("data-i")), Number(t.getAttribute("data-o"))); return; }
+  if (a === "escretry") { var oid = Number(t.getAttribute("data-i")); opEscFailed[oid] = false; opEscLoad(oid, true); return; }
 });
 document.addEventListener("input", function (ev) {
   var t = ev.target; if (!t || !t.getAttribute) return;

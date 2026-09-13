@@ -536,7 +536,9 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
       .map((p: any) => ({ product: canonicalService(String(p?.product ?? "")), level: lvl(p?.level) })).filter((p) => p.product),
     next_action: String(parsed.next_action || "").slice(0, 160) || "راجع المحادثة للتحقق من الإجراء المناسب.",
     why: String(parsed.why || "").slice(0, 200),
-    best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (٩–١١ص)",
+    // Western digits, like every figure the dashboard prints (founder, 2026-09-13). The PROMPT above
+    // may still say «٩ص» — that is the model's instruction text, not a string any screen renders.
+    best_time: String(parsed.best_time || "").slice(0, 100) || "صباح يوم العمل القادم (9–11ص)",
     deal_state: ds,
     stage: (SALES_STAGES as readonly string[]).includes(String(parsed.stage)) ? String(parsed.stage) : (ds === "won" ? "الإغلاق" : "تعارف"),
     stage_reason: String(parsed.stage_reason || "").slice(0, 160),
