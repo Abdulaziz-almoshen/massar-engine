@@ -613,6 +613,18 @@ ALTER TABLE product_kb ADD COLUMN IF NOT EXISTS approved_at  BIGINT;
 ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS archived_at BIGINT;
 `,
   },
+  {
+    version: "008-asset-size-column",
+    sql: `
+-- THE SIZE IS STORED, NOT MEASURED. The products list showed each PDF's size with
+-- octet_length(bytes), which DETOASTS every stored file on every read — and the asset list loads on
+-- every dashboard page. On the 256MB production database that turned a smoke run into
+-- «instance has hit resource limits» and dropped connections (2026-09-13 07:34 and 07:37 UTC).
+-- The size is written once at upload and backfilled here once.
+ALTER TABLE product_assets ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+UPDATE product_assets SET size_bytes = octet_length(bytes) WHERE size_bytes IS NULL;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -674,7 +686,7 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   sectors: ["id", "name"],
   product_meta: ["product", "sector_id", "archived_at"],
   product_kb: ["product", "md", "source_filename", "updated_at", "draft_md", "draft_source", "draft_by", "draft_at", "approved_by", "approved_at"],
-  product_assets: ["product", "public_id", "filename", "content_type", "bytes", "updated_at"],
+  product_assets: ["product", "public_id", "filename", "content_type", "bytes", "updated_at", "size_bytes"],
   targets: ["product", "year", "quarter", "amount"],
   engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
   packages: ["id", "product", "name", "list_price", "years", "scope", "retired_at", "created_at"],
@@ -2386,17 +2398,18 @@ export async function deleteOpp(id: number): Promise<boolean> {
 export async function saveAsset(product: string, publicId: string, filename: string, contentType: string, bytes: Buffer): Promise<void> {
   if (!pool || !connected) throw new Error("db not connected");
   await pool.query(
-    `INSERT INTO product_assets (product, public_id, filename, content_type, bytes, updated_at) VALUES ($1,$2,$3,$4,$5,$6)
+    `INSERT INTO product_assets (product, public_id, filename, content_type, bytes, updated_at, size_bytes) VALUES ($1,$2,$3,$4,$5,$6,$7)
      ON CONFLICT (product) DO UPDATE SET public_id = EXCLUDED.public_id, filename = EXCLUDED.filename,
-       content_type = EXCLUDED.content_type, bytes = EXCLUDED.bytes, updated_at = EXCLUDED.updated_at`,
-    [product, publicId, filename, contentType, bytes, Date.now()]);
+       content_type = EXCLUDED.content_type, bytes = EXCLUDED.bytes, updated_at = EXCLUDED.updated_at,
+       size_bytes = EXCLUDED.size_bytes`,
+    [product, publicId, filename, contentType, bytes, Date.now(), bytes.length]);
 }
 
 export async function listAssets():
   Promise<{ product: string; public_id: string; filename: string; size: number; updated_at: number }[]> {
   if (!pool || !connected) return [];
   return (await pool.query(
-    `SELECT product, public_id, filename, octet_length(bytes) AS size, updated_at FROM product_assets ORDER BY product`))
+    `SELECT product, public_id, filename, COALESCE(size_bytes, 0) AS size, updated_at FROM product_assets ORDER BY product`))
     .rows.map((x: any) => ({
       product: String(x.product), public_id: String(x.public_id), filename: String(x.filename),
       size: Number(x.size) || 0, updated_at: Number(x.updated_at) || 0,
@@ -2497,7 +2510,7 @@ export async function productCatalogue(): Promise<CatalogueRow[]> {
             k.md AS kb_md, k.source_filename AS kb_source, k.approved_by, k.approved_at, k.updated_at AS kb_updated_at,
             k.draft_md, k.draft_source, k.draft_by, k.draft_at,
             a.filename AS asset_filename, a.public_id AS asset_public_id,
-            octet_length(a.bytes) AS asset_size, a.updated_at AS asset_updated_at
+            COALESCE(a.size_bytes, 0) AS asset_size, a.updated_at AS asset_updated_at
        FROM tags t
        LEFT JOIN product_meta pm   ON pm.product = t.name
        LEFT JOIN sectors s         ON s.id = pm.sector_id
