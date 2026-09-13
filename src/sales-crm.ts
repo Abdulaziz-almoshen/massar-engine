@@ -91,11 +91,11 @@ export const SALES_CRM_JS = `
 /* ===== sales-crm (generated from src/sales-crm.ts) ===== */
 var perfState = { year: 0, quarter: 0, data: null, loading: false };
 
-/* A YEAR IS NOT A QUANTITY. fmtN is Number.toLocaleString("ar-SA"), which groups, so ٢٠٢٦ came out
-   as ٢٬٠٢٦ — in the «المستهدف» tile at rest, not just in the dialog. DESIGN.md asks for Arabic-Indic
+/* A YEAR IS NOT A QUANTITY. fmtN is Number.toLocaleString("ar-SA"), which groups, so 2026 came out
+   as 2٬026 — in the «المستهدف» tile at rest, not just in the dialog. DESIGN.md asks for Arabic-Indic
    numerals, which is about digit SHAPE; grouping is a separate decision and it is wrong for a year. */
 function arYear(n) {
-  return new Intl.NumberFormat("ar-SA", { useGrouping: false }).format(Number(n) || 0);
+  return new Intl.NumberFormat("ar-SA-u-nu-latn", { useGrouping: false }).format(Number(n) || 0);
 }
 
 function perfMoney(n) {
@@ -114,7 +114,7 @@ function perfRag(attain, elapsed) {
 }
 
 function perfBar(attain, elapsed) {
-  // «—», not an empty track. DESIGN.md chart rule 6: "Zero denominators render «—», never «٠٪».
+  // «—», not an empty track. DESIGN.md chart rule 6: "Zero denominators render «—», never «0٪».
   // A rate over nothing is unmeasured, not zero." The numeric cells in this same row honour that;
   // an empty grey track contradicted them, and read almost identically to a real 0%.
   if (attain === null) return '<span class="perf-sec">—</span>';

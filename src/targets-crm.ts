@@ -217,7 +217,7 @@ function tgtImportBox() {
   return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
     'style="background:#fff;border:1px solid #ECEEF2;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
     '<summary style="font-size:12px;color:#33373E;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
-    '<div style="font-size:12px;color:#656B76;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام ٠٥ تتحول إلى ٩٦٦</div>' +
+    '<div style="font-size:12px;color:#656B76;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام 05 تتحول إلى 966</div>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
     '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
     '<button class="btn btn-dark" onclick="entManualSave()">حفظ الجهات ←</button>' +
@@ -243,7 +243,7 @@ function vTargetsCrm() {
       '<div id="entfstat">' + entImportSummary + "</div>" +
       '<div class="empty" style="padding:56px 20px;"><div class="ic"><span></span></div>' +
       '<div class="t">لا جهات في قائمتك بعد</div>' +
-      '<div class="s" style="line-height:2;">ارفع ملفك كما هو: عمود اسم + عمود جوال. كل عمود إضافي — المدينة، الحجم، القطاع — يصبح شريحة استهداف تختار بها في «إنشاء حملة». التكرار يُحدَّث ولا يُضاعف، وأرقام ٠٥ تتحول إلى ٩٦٦ تلقائيًا.</div></div>' +
+      '<div class="s" style="line-height:2;">ارفع ملفك كما هو: عمود اسم + عمود جوال. كل عمود إضافي — المدينة، الحجم، القطاع — يصبح شريحة استهداف تختار بها في «إنشاء حملة». التكرار يُحدَّث ولا يُضاعف، وأرقام 05 تتحول إلى 966 تلقائيًا.</div></div>' +
       tgtImportBox();
   }
   var rows = tgtMatches();
@@ -472,7 +472,7 @@ window.tgtTag = function (add) {
  *
  * IT SKIPS WHAT ALREADY EXISTS. Opening a second line on the same (account, service) while the
  * first is still live is the fastest way to make a pipeline total lie — the same deal counted
- * twice. The skip is reported, not silent, because a bar that says «فُتحت ١١» when it opened 7 is
+ * twice. The skip is reported, not silent, because a bar that says «فُتحت 11» when it opened 7 is
  * the invented-number defect this product keeps paying for.
  *
  * oppRows may be null here: #targets never loads the board. It is fetched first rather than

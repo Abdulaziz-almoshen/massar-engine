@@ -286,7 +286,7 @@ function campPerfState(c, st) {
   return crmPerf("silent");
 }
 /* A rate with no denominator is not zero, it is unknown. Returning null (rendered «—») is the whole
-   point: base=Math.max(1,targeted) used to print a confident ٠٪ for a campaign with no audience. */
+   point: base=Math.max(1,targeted) used to print a confident 0٪ for a campaign with no audience. */
 function crmRate(a, b) { return b ? Math.round(a / b * 100) : null; }
 /* Delivery rates for a campaign that was never sent are undefined, not zero. */
 function crmDeliveryRate(a, st) { return crmWasSent(st) ? crmRate(a, st.targeted) : null; }
@@ -318,7 +318,7 @@ function crmSelPhones() {
 }
 /* The campaign verdict must not describe an event that did not occur. A campaign with no audience
    was never sent, so «أُرسلت، وبانتظار الرد الأول» is an invented state — the same class as the
-   fabricated ٠٪ removed from the rates beside it. */
+   fabricated 0٪ removed from the rates beside it. */
 function crmVerdict(st) {
   if (!st.targeted) return "لا جهات استهداف لهذه الحملة — لم يُرسل شيء.";
   if (st.replied) {
@@ -329,7 +329,7 @@ function crmVerdict(st) {
   return "لم يُسجَّل إرسال لهذه الحملة بعد.";
 }
 
-/* Drop the selection and say so. Silence here is how «٢ محدَّدة» survives onto a screen showing
+/* Drop the selection and say so. Silence here is how «2 محدَّدة» survives onto a screen showing
    two different campaigns' rows. */
 function crmDropSel(which) {
   var n = which === "targets" ? Object.keys(crmSelD).length : Object.keys(crmSel).length;
@@ -338,7 +338,7 @@ function crmDropSel(which) {
 }
 
 function crmMonth(ts) {
-  return new Date(Number(ts)).toLocaleDateString("ar-SA", { month: "long", year: "numeric" });
+  return new Date(Number(ts)).toLocaleDateString("ar-SA-u-nu-latn", { month: "long", year: "numeric" });
 }
 /* Group/board keys are restricted to fields that EXIST. There is no stage, owner, value or close
    date on a campaign, so nothing here invents one; «حالة الأداء» is explicitly labelled as computed
@@ -519,9 +519,9 @@ function crmGroups(withStAll) {
     by[k].push(x);
   });
   /* A group that exists in the vocabulary but holds nothing is a FACT, not an absence: render it
-     empty rather than hiding it, so «تجريبية: ٠» is visible instead of silently missing. */
-  /* Only seed an empty group the CURRENT filter could actually contain. Seeding «تجريبية ٠» while
-     the فعلية pill reads «تجريبية (١)» puts two different counts of the same thing on one screen. */
+     empty rather than hiding it, so «تجريبية: 0» is visible instead of silently missing. */
+  /* Only seed an empty group the CURRENT filter could actually contain. Seeding «تجريبية 0» while
+     the فعلية pill reads «تجريبية (1)» puts two different counts of the same thing on one screen. */
   if (crmActiveKey() === "class") {
     ["فعلية", "تجريبية"].forEach(function (k) {
       var excluded = (campTab === "real" && k === "تجريبية") || (campTab === "test" && k === "فعلية");
@@ -706,7 +706,7 @@ function vKmonDetailCrm(id, d) {
     '<div style="font-size:14px;font-weight:500;color:#14161A;margin-top:6px;line-height:1.6;">' +
     crmVerdict(st) + '</div></div>' +
     '<div style="display:flex;gap:28px;flex-wrap:wrap;">' +
-    [["نسبة المشاهدة", crmDeliveryRate(st.seen, st)], ["نسبة الردود", crmDeliveryRate(st.replied, st)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
+    [["نسبة المشاهدة", crmDeliveryRate(st.seen, st)], ["نسبة الردود", crmDeliveryRate(st.replied, st)], ["جهات مهتمة لكل 100", yieldPer100]]
       .map(function (x) {
         return '<div><div style="font-size:18px;font-weight:600;color:#14161A;font-variant-numeric:tabular-nums;">' +
           (x[1] === null ? "—" : fmtN(x[1]) + '<span style="font-size:12px;color:#656B76;">٪</span>') +
@@ -748,7 +748,7 @@ function vKmonDetailCrm(id, d) {
   setTimeout(crmPaintCrumb, 0);
 
 
-  /* A «(٠)» beside «الخطوة التالية» reads as a broken counter rather than as "nothing to do"; the
+  /* A «(0)» beside «الخطوة التالية» reads as a broken counter rather than as "nothing to do"; the
      panel itself says so in words. Show the count only when there is one. */
   var tabs = [["targets", "جهات الاستهداف", rows.length], ["perf", "الأداء", null], ["next", "الخطوة التالية", moves.length || null]];
   h += '<div class="ctabs rise">' + tabs.map(function (t) {
@@ -756,10 +756,10 @@ function vKmonDetailCrm(id, d) {
   }).join("") + '</div>';
 
   if (crmDetailTab === "perf") {
-    /* THE ASYMMETRY IS DELIBERATE. أُرسلت and وصلت describe the SEND itself, so «٠٪ من جهات
+    /* THE ASYMMETRY IS DELIBERATE. أُرسلت and وصلت describe the SEND itself, so «0٪ من جهات
        الاستهداف» on them is an honest statement about a send that did not happen. شوهدت / ردّوا /
        جهات مهتمة describe what the RECIPIENTS did, and those are undefined until something was
-       sent — a ٠٪ there asserts that a delivered message went unseen. Flag per card (c[3]). */
+       sent — a 0٪ there asserts that a delivered message went unseen. Flag per card (c[3]). */
     var cards = [["جهات الاستهداف", st.targeted, "#1E5FCC", false], ["أُرسلت", st.sent, "#1E5FCC", false],
       ["وصلت", st.delivered, "#5B8DEF", false], ["شوهدت", st.seen, "#5B8DEF", true],
       ["ردّوا", st.replied, "#1E5FCC", true], ["جهات مهتمة", st.interested, "#1E9E63", true]];
@@ -1030,7 +1030,7 @@ window.crmBulkClass = async function (test) {
   for (var i = 0; i < Math.min(LANES, targets.length); i++) lanes.push(lane());
   await Promise.all(lanes);
   crmBulkBusy = false;
-  /* Keep the failures selected. «تعذّر ٣ — أعد المحاولة» with an empty selection is an instruction
+  /* Keep the failures selected. «تعذّر 3 — أعد المحاولة» with an empty selection is an instruction
      the operator cannot follow: they would have to work out which three. */
   crmSel = {};
   failed.forEach(function (id) { crmSel[id] = true; });

@@ -97,11 +97,12 @@ export function bandOf(score: number): { band: SeriousnessBand; label: string } 
 
 const DAY_MS = 24 * 3600e3;
 
-/** ONE numeral system. Every digit this module puts into an Arabic sentence is Arabic-Indic, the
- *  same as the portal's own `fmtN` — a mixed-numeral screen is the defect `check-numerals` exists
- *  to stop, and a server-composed sentence lands on that screen too. */
+/** ONE numeral system, and since 2026-09-13 it is the WESTERN one (founder: «make all numbers in
+ *  english numerals») — the same as the portal's own `fmtN`. A mixed-numeral screen is the defect
+ *  `check-numerals` exists to stop, and a server-composed sentence lands on that screen too. */
 function arN(value: number): string {
-  return Number(value || 0).toLocaleString("ar-SA");
+  // Western digits, like every other figure the dashboard prints (founder, 2026-09-13).
+  return Number(value || 0).toLocaleString("ar-SA-u-nu-latn");
 }
 
 function arDays(n: number): string {
@@ -219,7 +220,7 @@ export function activityByDay(
  * How serious this prospect is, 0–100, from what the ledger witnessed.
  *
  * The ceiling is 100 and the floor is 0, and both are reached: a clamped score is honest where a
- * raw sum is not, because «١٢٠٪ جاد» tells a reader the scale is invented.
+ * raw sum is not, because «120٪ جاد» tells a reader the scale is invented.
  */
 export function readSeriousness(input: SeriousnessInput): SeriousnessRead {
   const { now } = input;

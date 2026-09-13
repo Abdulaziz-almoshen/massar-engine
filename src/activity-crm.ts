@@ -115,7 +115,7 @@ function actControlBar(n) {
   }).join("");
   h += '<span style="flex:1"></span><span class="hair"></span>';
   h += '<select onchange="actSetWin(this.value)" class="crmsel">' +
-    [[1, "آخر يوم"], [7, "آخر ٧ أيام"], [30, "آخر ٣٠ يومًا"], [0, "كل الفترة"]].map(function (w) {
+    [[1, "آخر يوم"], [7, "آخر 7 أيام"], [30, "آخر 30 يومًا"], [0, "كل الفترة"]].map(function (w) {
       return '<option value="' + w[0] + '"' + (String(actWin) === String(w[0]) ? " selected" : "") + '>' + w[1] + '</option>';
     }).join("") + '</select>';
   h += '<span class="cntpill">' + fmtN(n) + " حدث</span></div>";

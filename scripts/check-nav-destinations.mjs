@@ -35,7 +35,10 @@ const DETAIL_VIEWS = new Set(["customer"]);
 const titleKeys = [...titleBlk.matchAll(/([a-z]+):\s*\[/g)].map((m) => m[1])
   .filter((k) => !DETAIL_VIEWS.has(k));
 
-c("the rail has exactly six doors", navIds.length === 6, navIds.join(", "));
+// Seven since «الإعدادات» (2026-09-13): six working doors plus the admin one, which is last and
+// deliberately not a daily destination. The count is asserted rather than left open because a rail
+// that grows a door per feature is how a nav becomes a menu nobody reads.
+c("the rail has exactly seven doors", navIds.length === 7, navIds.join(", "));
 
 const reachable = new Set([...navIds, ...subIds]);
 const orphans = titleKeys.filter((k) => !reachable.has(k));
@@ -53,7 +56,7 @@ c("every door with tabs is in the rail", strayDoors.length === 0, strayDoors.joi
 // tab is not selected.
 const firstTabWrong = [...subsBlock.matchAll(/^\s{2}([a-z]+):\s*\[\["([a-z]+)"/gm)]
   .filter((m) => m[1] !== m[2]).map((m) => m[1] + " lands on " + m[2]);
-c("each door's first tab is the door itself", firstTabWrong.length === 0, firstTabWrong.join(", ") || "all six aligned");
+c("each door's first tab is the door itself", firstTabWrong.length === 0, firstTabWrong.join(", ") || "all aligned");
 
 // A route in two doors would highlight whichever DOOR_OF happened to build last.
 const dupes = subIds.filter((r, i) => subIds.indexOf(r) !== i);

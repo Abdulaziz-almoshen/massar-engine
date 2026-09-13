@@ -19,6 +19,7 @@ import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
 import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
+import * as sysCfg from "./config-domain.js";
 import * as pd from "./product-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -314,6 +315,8 @@ async function productRows(): Promise<Record<string, unknown>[]> {
     return {
       product: c.product, sector: c.sector, sectorId: c.sectorId, sectorAssumed: c.sectorAssumed,
       owner: c.owner, pricingNote: c.pricingNote,
+      // «القسم» — the company unit that owns it; the market sector is separate, above.
+      divisionId: c.divisionId, division: c.division,
       packages: c.packages, retiredPackageCount: c.retiredPackageCount,
       archived: c.archived, archivedAt: c.archivedAt,
       embedded,
@@ -417,9 +420,9 @@ app.post("/admin/products", async (req, reply) => {
   const named = pd.normalizeProductName(b.name);
   if (!named.ok) return problem(reply, 400, "invalid_name", named.reason, "name");
   const owner = b.owner == null ? null : String(b.owner).trim().replace(/\s+/g, " ") || null;
-  if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من ٦٠ حرفًا", "owner");
+  if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من 60 حرفًا", "owner");
   const pricingNote = b.pricingNote == null ? null : String(b.pricingNote).trim() || null;
-  if (pricingNote && pricingNote.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من ١٢٠ حرفًا", "pricingNote");
+  if (pricingNote && pricingNote.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من 120 حرفًا", "pricingNote");
   let sectorId: number | null = null;
   if (b.sectorId != null && b.sectorId !== "") {
     sectorId = Number(b.sectorId);
@@ -449,7 +452,7 @@ app.patch("/admin/products", async (req, reply) => {
   const product = productParam(req);
   if (!product) return problem(reply, 400, "invalid_field", "اسم المنتج مطلوب", "product");
   const b = (req.body ?? {}) as Record<string, unknown>;
-  const patch: { sectorId?: number | null; owner?: string | null; pricingNote?: string | null } = {};
+  const patch: { sectorId?: number | null; owner?: string | null; pricingNote?: string | null; divisionId?: number | null } = {};
   if ("sectorId" in b) {
     if (b.sectorId == null || b.sectorId === "") patch.sectorId = null;
     else {
@@ -462,13 +465,24 @@ app.patch("/admin/products", async (req, reply) => {
   }
   if ("owner" in b) {
     const owner = b.owner == null ? null : String(b.owner).trim().replace(/\s+/g, " ") || null;
-    if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من ٦٠ حرفًا", "owner");
+    if (owner && owner.length > 60) return problem(reply, 400, "invalid_field", "اسم المسؤول أطول من 60 حرفًا", "owner");
     patch.owner = owner;
   }
   if ("pricingNote" in b) {
     const note = b.pricingNote == null ? null : String(b.pricingNote).trim() || null;
-    if (note && note.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من ١٢٠ حرفًا", "pricingNote");
+    if (note && note.length > 120) return problem(reply, 400, "invalid_field", "ملاحظة التسعير أطول من 120 حرفًا", "pricingNote");
     patch.pricingNote = note;
+  }
+  // «القسم»: the company unit that owns this product (divisions), not «القطاع» (sectors) above.
+  if ("divisionId" in b) {
+    if (b.divisionId == null || b.divisionId === "") patch.divisionId = null;
+    else {
+      const id = Number(b.divisionId);
+      if (!Number.isInteger(id) || !(await db.listDivisions()).some((d) => d.id === id)) {
+        return problem(reply, 400, "invalid_field", "قسم غير معروف", "divisionId");
+      }
+      patch.divisionId = id;
+    }
   }
   if (!(await db.tagState(product)).exists) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
   if (Object.keys(patch).length && !(await db.patchProductMeta(product, patch))) {
@@ -557,6 +571,200 @@ app.post("/admin/products/reconcile", async (req, reply) => {
 app.get("/admin/sectors", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   return { ok: true, sectors: await db.listSectors() };
+});
+
+// ---- «إعدادات النظام»: the ladder, the divisions, the team -------------------------------
+// Every write goes through config-domain, which the browser also runs — so a control the screen
+// disables and a write the server refuses give the SAME reason, in the same words.
+
+app.get("/admin/config", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const [stages, divisions, team] = await Promise.all([db.listStages(), db.listDivisions(), db.listMembers()]);
+  return { ok: true, stages, divisions, team };
+});
+
+app.post("/admin/config/stages", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const stages = await db.listStages();
+  const checked = sysCfg.checkStage((req.body ?? {}) as sysCfg.StageInput, stages.map((s) => s.key));
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const made = await db.createStage(checked.value);
+  if (!made) return problem(reply, 409, "key_exists", "توجد مرحلة بهذا المعرّف", "key");
+  log({ at: "config", msg: "stage added", key: checked.value.key, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/stages/" + encodeURIComponent(checked.value.key))
+    .send({ ok: true, stage: checked.value });
+});
+
+app.patch("/admin/config/stages/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const stages = await db.listStages();
+  const current = stages.find((s) => s.key === key);
+  if (!current) return problem(reply, 404, "unknown_stage", "لا مرحلة بهذا المعرّف", "key");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  // A PATCH carries only what changed; the rest is the row as it stands, so a single field edit
+  // cannot blank the others.
+  const merged: sysCfg.StageInput = {
+    label: "label" in body ? body.label : current.label,
+    weightPct: "weightPct" in body ? body.weightPct : current.weightPct,
+    position: "position" in body ? body.position : current.position,
+    slaDays: "slaDays" in body ? body.slaDays : current.slaDays,
+    active: "active" in body ? body.active : current.active,
+    exitCriterion: "exitCriterion" in body ? body.exitCriterion : current.exitCriterion,
+  };
+  const checked = sysCfg.checkStage(merged, stages.map((s) => s.key), key);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const ok = await db.updateStage(key, checked.value);
+  if (!ok) return problem(reply, 404, "unknown_stage", "لا مرحلة بهذا المعرّف", "key");
+  log({ at: "config", msg: "stage edited", key, by: adminName(req) });
+  return { ok: true, stage: { ...checked.value, key } };
+});
+
+app.delete("/admin/config/stages/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const stages = await db.listStages();
+  const current = stages.find((s) => s.key === key);
+  if (!current) return problem(reply, 404, "unknown_stage", "لا مرحلة بهذا المعرّف", "key");
+  const checked = sysCfg.checkStageDelete(key, current.openLines);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  await db.deleteStage(key);
+  log({ at: "config", msg: "stage deleted", key, by: adminName(req) });
+  return { ok: true, key };
+});
+
+app.post("/admin/config/divisions", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const body = (req.body ?? {}) as sysCfg.DivisionInput;
+  const [divisions, owner] = await Promise.all([
+    db.listDivisions(),
+    body.ownerMemberId ? db.memberById(Number(body.ownerMemberId)) : Promise.resolve(null),
+  ]);
+  const checked = sysCfg.checkDivision(body, divisions.map((d) => d.name), owner);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const id = await db.createDivision(checked.value);
+  if (id == null) return problem(reply, 409, "name_exists", "يوجد قسم بهذا الاسم", "name");
+  log({ at: "config", msg: "division added", id, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/divisions/" + id).send({ ok: true, id, division: checked.value });
+});
+
+app.patch("/admin/config/divisions/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const divisions = await db.listDivisions();
+  const current = divisions.find((d) => d.id === id);
+  if (!current) return problem(reply, 404, "unknown_division", "لا قسم بهذا المعرّف", "id");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const merged: sysCfg.DivisionInput = {
+    name: "name" in body ? body.name : current.name,
+    ownerMemberId: "ownerMemberId" in body ? body.ownerMemberId : current.ownerMemberId,
+    active: "active" in body ? body.active : current.active,
+  };
+  const owner = merged.ownerMemberId ? await db.memberById(Number(merged.ownerMemberId)) : null;
+  const checked = sysCfg.checkDivision(merged, divisions.map((d) => d.name), owner, current.name);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const ok = await db.updateDivision(id, checked.value);
+  if (!ok) return problem(reply, 404, "unknown_division", "لا قسم بهذا المعرّف", "id");
+  return { ok: true, id, division: checked.value };
+});
+
+app.delete("/admin/config/divisions/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const current = (await db.listDivisions()).find((d) => d.id === id);
+  if (!current) return problem(reply, 404, "unknown_division", "لا قسم بهذا المعرّف", "id");
+  const checked = sysCfg.checkDivisionDelete(current.products, current.members);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  await db.deleteDivision(id);
+  return { ok: true, id };
+});
+
+app.post("/admin/config/team", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const checked = sysCfg.checkMember((req.body ?? {}) as sysCfg.MemberInput);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  if (checked.value.divisionId != null && !(await db.listDivisions()).some((d) => d.id === checked.value.divisionId)) {
+    return problem(reply, 400, "unknown_division", "لا قسم بهذا المعرّف", "divisionId");
+  }
+  const id = await db.createMember(checked.value);
+  if (id == null) return problem(reply, 409, "email_exists", "هذا البريد مسجّل لعضو آخر", "email");
+  log({ at: "config", msg: "team member added", id, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/team/" + id).send({ ok: true, id, member: checked.value });
+});
+
+app.patch("/admin/config/team/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const current = await db.memberById(id);
+  if (!current) return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const merged: sysCfg.MemberInput = {
+    name: "name" in body ? body.name : current.name,
+    email: "email" in body ? body.email : current.email,
+    role: "role" in body ? body.role : current.role,
+    divisionId: "divisionId" in body ? body.divisionId : current.divisionId,
+    active: "active" in body ? body.active : current.active,
+  };
+  const checked = sysCfg.checkMember(merged);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const out = await db.updateMember(id, checked.value);
+  if (out === "email_taken") return problem(reply, 409, "email_exists", "هذا البريد مسجّل لعضو آخر", "email");
+  if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
+  return { ok: true, id, member: checked.value };
+});
+
+app.delete("/admin/config/team/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const out = await db.deleteMember(id);
+  if (out === "referenced") return problem(reply, 409, "member_referenced", "عليه تصعيدات مسجّلة — أوقفه بدل حذفه", "id");
+  if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
+  return { ok: true, id };
+});
+
+// ---- escalation and «طلب دعم» ------------------------------------------------------------
+// RECORDED, NOT SENT (founder, 2026-09-13): no mail sender is configured, so the row carries
+// delivery:"recorded" and the screen says so. Nothing here contacts a customer — the recipient is
+// an employee in the team directory, and even that is not messaged yet.
+
+app.get("/admin/escalations", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const q = (req.query as any) || {};
+  const oppId = q.opp === undefined || q.opp === "" ? undefined : Number(q.opp);
+  if (oppId !== undefined && !Number.isInteger(oppId)) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "opp");
+  return { ok: true, escalations: await db.listEscalations(oppId), emailConfigured: false };
+});
+
+app.post("/admin/opps/:id/escalate", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const oppId = Number((req.params as any).id);
+  if (!Number.isInteger(oppId)) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "id");
+  const line = (await db.listOpps()).find((o) => Number(o.id) === oppId);
+  if (!line) return problem(reply, 404, "unknown_opp", "لا فرصة بهذا الرقم", "id");
+  const body = (req.body ?? {}) as sysCfg.EscalationInput;
+  const member = body.memberId ? await db.memberById(Number(body.memberId)) : null;
+  const checked = sysCfg.checkEscalation(body, member);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const row = await db.createEscalation({
+    oppId, kind: checked.value.kind, reason: checked.value.reason,
+    member: { id: member!.id, name: member!.name, email: member!.email },
+    by: adminName(req), delivery: "recorded",
+  });
+  if (!row) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  log({ at: "escalation", msg: "recorded", kind: checked.value.kind, opp: oppId, to: member!.email, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/escalations?opp=" + oppId)
+    .send({ ok: true, escalation: row, emailConfigured: false });
+});
+
+app.post("/admin/escalations/:id/resolve", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  if (!Number.isInteger(id)) return problem(reply, 400, "invalid_field", "رقم غير صحيح", "id");
+  const ok = await db.resolveEscalation(id, adminName(req));
+  if (!ok) return problem(reply, 404, "unknown_escalation", "لا تصعيد مفتوح بهذا الرقم", "id");
+  return { ok: true, id };
 });
 
 // ---- the four named reports (R11) and the four-quarter view (R13) -------------------------
@@ -1232,7 +1440,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     const win = insights.windowState(contact);
     if (win.state !== "open") {
       results.push({ phone, ok: false, error: win.state === "closed" ? "outside_window" : "no_inbound_ever", reason: win.reason });
-      tracker.recordSystem(phone, `[لم تُرسل: ${win.state === "closed" ? "خارج نافذة ٢٤ ساعة" : "لم يراسلنا من قبل"}]`);
+      tracker.recordSystem(phone, `[لم تُرسل: ${win.state === "closed" ? "خارج نافذة 24 ساعة" : "لم يراسلنا من قبل"}]`);
       continue;
     }
     // {{1}} is the service variable in the founder's Meta template shape. Resolved here as well as
@@ -1342,7 +1550,7 @@ app.post("/admin/product-asset/upload", async (req, reply) => {
   }
   const buf = await file.toBuffer();
   if (!isSkill) {
-    if (buf.length > ASSET_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من ١٠ م.ب", "file");
+    if (buf.length > ASSET_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من 10 م.ب", "file");
     if (buf.subarray(0, 4).toString("latin1") !== "%PDF") return problem(reply, 400, "invalid_file", "الملف ليس PDF", "file");
   }
   const publicId = randomBytes(9).toString("hex");
@@ -1395,7 +1603,7 @@ app.get("/admin/insights", async (req, reply) => {
   return (await db.listInsights()).map((r: any) => ({ ...r, data: insights.normalizeCached(r.data) }));
 });
 
-// العميل ٣٦٠ — one person, fully assembled: identity + timeline + فهم المساعد + context score.
+// العميل 360 — one person, fully assembled: identity + timeline + فهم المساعد + context score.
 app.get("/admin/customer/:phone", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const phone = String((req.params as any).phone || "").replace(/\D/g, "");
@@ -1666,7 +1874,7 @@ app.post("/admin/segments/preview", async (req, reply) => {
   if (!def || !Array.isArray(def.conditions) || !def.conditions.length) {
     return reply.code(400).send({ error: "body: { def: { match, conditions: [...] } }" });
   }
-  if (def.conditions.length > 8) return reply.code(400).send({ error: "بحد أقصى ٨ شروط" });
+  if (def.conditions.length > 8) return reply.code(400).send({ error: "بحد أقصى 8 شروط" });
   // Refuse shapes that would silently evaluate to nobody. A zero the founder cannot distinguish
   // from an unsupported query is the failure this product exists to avoid.
   const SINGLE_SHOT = ["delivered", "read", "failed"];
@@ -1713,7 +1921,7 @@ app.post("/admin/segments/preview", async (req, reply) => {
     poolSize: pool.length,
     // Never a silent truncation: say so when the scan was bounded.
     scanTruncated: truncated,
-    // The tenure forecast the benchmarked tools omit: «٠ مطابقة» on a book younger than the
+    // The tenure forecast the benchmarked tools omit: «0 مطابقة» on a book younger than the
     // window is a not-yet audience, not an empty one. One definition, shared with evaluate().
     requiredDays: segments.requiredTenureDays(def),
   };
@@ -1737,7 +1945,7 @@ app.get("/admin/segments/presets", async (req, reply) => {
   // synchronously, in the process that also serves the Gupshup webhook — which carries «إيقاف».
   const pool = tracker.listContacts().filter((c: any) => !c.test).slice(0, 20000);
   const oldestDays = pool.reduce((m: number, c: any) => Math.max(m, (Date.now() - (c.firstSeenAt || Date.now())) / 86_400_000), 0);
-  // Report the same three numbers the preview does. A preset reading «٠» while three contacts
+  // Report the same three numbers the preview does. A preset reading «0» while three contacts
   // are merely cooling down is the silent zero this feature exists to prevent.
   return segments.presets(win).map((p) => {
     const r = segments.evaluate(p.def, pool);
@@ -1880,8 +2088,9 @@ app.post("/admin/opps", async (req, reply) => {
   if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
   const known = new Set((await db.listTags()).map((t) => t.name));
   const active = new Set(await db.activeTagNames());
+  const liveStages = await db.stageKeys();
   for (const l of lines) {
-    const bad = db.validateOppLine(l);
+    const bad = db.validateOppLine(l, liveStages);
     if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
     if (!known.has(String(l.product).trim())) {
       return reply.code(400).send({ ok: false, error: "unknown_product", product: l.product, known: [...known] });
@@ -1915,7 +2124,7 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   // A PATCH carries a subset, so only what is present is validated — merged onto a product because
   // validateOppLine's first obligation is that one exists.
-  const bad = db.validateOppLine({ product: b.product ?? "x", ...b });
+  const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, await db.stageKeys());
   if (bad && !(bad === "product" && b.product === undefined)) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
   }
@@ -2005,7 +2214,7 @@ app.post("/admin/kb/upload", async (req, reply) => {
   const filename = String(file.filename || "");
   if (!KB_FILE_RE.test(filename)) return problem(reply, 400, "invalid_file", "الأنواع المقبولة: pdf docx pptx xlsx md txt", "file");
   const buf = await file.toBuffer();
-  if (buf.length > KB_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من ١٥ م.ب", "file");
+  if (buf.length > KB_MAX_BYTES) return problem(reply, 400, "invalid_file", "الملف أكبر من 15 م.ب", "file");
   try {
     // processDeck writes the draft (db.saveKb writes draft_* only) under the product given here.
     await kb.processDeck(buf, filename, product);

@@ -117,7 +117,7 @@ export function isOpenStage(stage: string): boolean {
 }
 
 /**
- * سعر البيع × السنوات × الكمية × (١ − الخصم). The prototype's arithmetic, and the ONE definition of
+ * سعر البيع × السنوات × الكمية × (1 − الخصم). The prototype's arithmetic, and the ONE definition of
  * what a line is worth — the card total, the stage strip, the list footer and the create form's
  * live preview all resolve here, so no two numbers on one screen can be computed differently.
  */
@@ -131,7 +131,7 @@ export function calculateLineValue(line: OppLineFacts): number {
 
 /**
  * An UNPRICED line is not a worthless one. The assistant opens lines from a conversation that
- * contains no number, and rendering those as «٠ ر.س» claims a deal is worth nothing when the truth
+ * contains no number, and rendering those as «0 ر.س» claims a deal is worth nothing when the truth
  * is that nobody has priced it. Every total and every cell asks this before printing money.
  */
 export function isLinePriced(line: OppLineFacts): boolean {
@@ -192,8 +192,8 @@ export function groupStatusKey(lines: readonly OppLineFacts[]): string {
 }
 
 /**
- * Arabic counted nouns are four-way, not `n + noun`: مفرد · مثنى · جمع القلة (٣–١٠) · تمييز مفرد
- * (١١+, and zero). The board first shipped «١ منتجات» and «٥ جهة» — broken grammar in the product's
+ * Arabic counted nouns are four-way, not `n + noun`: مفرد · مثنى · جمع القلة (3–10) · تمييز مفرد
+ * (11+, and zero). The board first shipped «1 منتجات» and «5 جهة» — broken grammar in the product's
  * own language, on the two lines a reader's eye lands on first. `formatNumber` is passed in rather
  * than imported because digit rendering is a presentation concern and this tier must not own one.
  */

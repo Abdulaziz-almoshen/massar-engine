@@ -425,6 +425,7 @@ function pcBar(pct, cap) {
    tier, PRODUCT_DOMAIN_JS, so the list, the record, the wizard and the server agree by construction. */
 var pcCat = null, pcSectors = null, pcQuarters = null, pcLoading = false, pcFailed = false;
 var pcUnmatched = [], pcSkill = null, pcSectorList = [];
+var pxDivF = "all";     /* «القسم» — the company unit that owns the product, not its market sector */
 var pcPerf = {}, pcPerfLoading = {}, pcPerfFailed = {};
 var pcPerfYear = new Date().getFullYear();
 var pcUnmatchedOpen = false;
@@ -448,7 +449,10 @@ var pxOpener = "";
 
 function pxT() { return { headers: { "x-admin-token": TOKEN } }; }
 function pxJson(method, url, body) {
-  return fetch(url, { method: method, headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+  /* No Content-Type without a body: Fastify answers 400 «Body cannot be empty when
+     content-type is set to application/json» — which is how a DELETE silently did nothing. */
+  var headers = body === undefined ? { "x-admin-token": TOKEN } : { "x-admin-token": TOKEN, "Content-Type": "application/json" };
+  return fetch(url, { method: method, headers: headers,
     body: body === undefined ? undefined : JSON.stringify(body) })
     .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j || {} }; }); });
 }
@@ -570,6 +574,8 @@ function pxBaseRows() {
     if (!!p.archived !== pxArchived) return false;
     if (pxSector === "__none" && p.sectorId) return false;
     if (pxSector !== "all" && pxSector !== "__none" && String(p.sectorId) !== pxSector) return false;
+    if (pxDivF === "__none" && p.divisionId) return false;
+    if (pxDivF !== "all" && pxDivF !== "__none" && String(p.divisionId) !== pxDivF) return false;
     if (q && p.product.indexOf(q) === -1 && String(p.owner || "").indexOf(q) === -1) return false;
     return true;
   });
@@ -599,7 +605,7 @@ function pxRows() {
     return a.product.localeCompare(b.product, "ar");
   });
 }
-function pxFiltered() { return pxQ.trim() || pxSector !== "all" || pxReadyF !== "all" || pxShort || pxOnly; }
+function pxFiltered() { return pxQ.trim() || pxSector !== "all" || pxDivF !== "all" || pxReadyF !== "all" || pxShort || pxOnly; }
 
 var PX_RAMP = ["var(--accent-deep)", "var(--accent-press)", "var(--accent)", "var(--accent-mark)", "var(--blue-light)", "var(--s-review-text)"];
 function pxSummary() {
@@ -666,6 +672,13 @@ function pxToolbar() {
     '<input id="pxq" class="inp" type="search" value="' + esc(pxQ) + '" data-pxinput="q" aria-label="ابحث باسم المنتج" placeholder="ابحث باسم المنتج"></span>';
   h += '<span class="ox-filt">';
   h += pxSelect("pxf_sector", "القطاع", pxSector, [["all", "كل القطاعات"], ["__none", "بلا قطاع"]].concat(pcSectorList.map(function (s) { return [String(s.id), s.name]; })), pxSector !== "all");
+  // «القسم» is the company unit that owns the product; «القطاع» above is the market it sells into.
+  // Two different questions, two selects, and the labels are deliberately not interchangeable.
+  var divs = (typeof cfDivs !== "undefined" ? cfDivs : []);
+  if (divs.length) {
+    h += pxSelect("pxf_div", "القسم", pxDivF, [["all", "كل الأقسام"], ["__none", "بلا قسم"]]
+      .concat(divs.map(function (d) { return [String(d.id), d.name]; })), pxDivF !== "all");
+  }
   h += pxSelect("pxf_ready", "الجاهزية", pxReadyF, [["all", "كل الحالات"], ["notSelling", "لا يبيعها المساعد"], ["gaps", "يبيعها وتنقصها أشياء"], ["ready", "جاهزة للمساعد"]], pxReadyF !== "all");
   h += pxSelect("pxf_sort", "ترتيب", pxSort, [["name", "حسب الاسم"], ["achieved", "الأعلى تحقيقًا"], ["open", "الأعلى مفتوحًا"], ["readiness", "غير الجاهزة أولًا"]], false);
   h += '<button class="px-toggle" aria-pressed="' + pxArchived + '" data-px="archived">' + (pxArchived ? pxIco("check") : "") + "المؤرشفة" + (nArch ? " (" + fmtN(nArch) + ")" : "") + "</button>";
@@ -714,6 +727,7 @@ function pxListRow(p) {
   var h = '<div class="ox-r" role="row" data-pxrow="' + nm + '">';
   h += '<div class="px-c-nm" role="cell"><span class="px-nm" title="' + nm + '">' + nm + "</span>" +
     '<span class="px-sub">' + (p.sector ? esc(p.sector) : "بلا قطاع") + (p.sectorAssumed ? '<span class="px-read">مُستنتَج</span>' : "") +
+    (p.division ? " · " + esc(p.division) : "") +
     (p.owner ? " · " + esc(p.owner) : "") + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</span></div>";
   h += '<div class="px-ready px-c-rd" role="cell" title="' + esc(rd.word) + '">' + pxCellsHtml(rd) + '<span class="px-rw ' + pxWordCls(rd) + '">' + esc(rd.word) + "</span></div>";
   h += '<div class="px-price px-c-pr" role="cell">' + (ps.kind === "package"
@@ -733,6 +747,7 @@ function pxListRow(p) {
 }
 function vProductsCrm() {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
+  if (typeof cfLoad === "function") cfLoad(false);   /* the division filter needs «إعدادات النظام» */
   if (typeof opLoad === "function") opLoad(false);
   var h = '<div class="px">';
   if (pcCat === null && !pcFailed) {
@@ -763,7 +778,7 @@ function vProductsCrm() {
   if (rows.length) {
     var perf = pcPerf[pcPerfYear] || {};
     var ach = rows.reduce(function (n, p) { return n + (Number((perf[p.product] || {}).achieved) || 0); }, 0);
-    h += '<div class="ox-foot"><span class="pgrange"><b>١–' + fmtN(rows.length) + "</b> من " + pxNProd(rows.length) + "</span>" +
+    h += '<div class="ox-foot"><span class="pgrange"><b>1–' + fmtN(rows.length) + "</b> من " + pxNProd(rows.length) + "</span>" +
       '<span class="tot">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" + (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; }) ? ' · <a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="footer">مهارة إعداد العرض ↓</a>' : "") + "</span></div>";
   }
   h += "</section></div>";
@@ -824,8 +839,8 @@ function pxSheetSubmit() {
   if (d.pricingNote.trim()) body.pricingNote = d.pricingNote.trim();
   if (d.pkgName.trim()) {
     var price = Number(d.pkgPrice), years = Number(d.pkgYears || 1);
-    if (String(d.pkgPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { pxSheetErr = "سعر الباقة عدد صحيح من ٠ فأكثر."; render(false); return; }
-    if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { pxSheetErr = "مدة الباقة من ١ إلى ١٠ سنوات."; render(false); return; }
+    if (String(d.pkgPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { pxSheetErr = "سعر الباقة عدد صحيح من 0 فأكثر."; render(false); return; }
+    if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { pxSheetErr = "مدة الباقة من 1 إلى 10 سنوات."; render(false); return; }
     body.firstPackage = { name: d.pkgName.trim(), listPrice: price, years: years, scope: d.pkgScope.trim() };
   }
   pxSheetBusy = true; pxSheetErr = ""; render(false);
@@ -926,7 +941,9 @@ function pxPricingSection(p) {
   var nk = name + "|pricingNote";
   b += '<div class="ox-fld"><div class="ox-lr"><label for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk, "pxf_note") + '</div><input class="inp" id="pxf_note" aria-describedby="pxf_note_st" maxlength="120" value="' +
     esc(pxFState[nk] && pxFState[nk].s !== "saved" ? pxFState[nk].v : (p.pricingNote || "")) + '" data-pxfield="pricingNote" placeholder="لا ملاحظة تسعير"><span class="px-note">تُعرض حين لا توجد باقة منشورة.</span></div>';
-  return pxSection("pricing", "الأسعار والباقات", "", b);
+  // The founder's rule, stated on the screen that would break it: a price is a committee decision,
+  // so the section says so BEFORE the «إضافة باقة» control, not in a tooltip afterwards.
+  return pxSection("pricing", "الأسعار والباقات", "لا بُدّ أن يتم الموافقة عليها مسبقًا من اللجنة قبل إضافة السعر", b);
 }
 function pxTargetsSection(p) {
   var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
@@ -1069,6 +1086,7 @@ function pxRenameModal() {
 }
 function vProductDrill(name, section) {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
+  if (typeof cfLoad === "function") cfLoad(false);
   if (typeof opLoad === "function") opLoad(false);
   var back = '<a class="px-back" href="#products">' + pxIco("back") + "كل المنتجات</a>";
   if (pcCat === null) {
@@ -1090,6 +1108,11 @@ function vProductDrill(name, section) {
     '<div class="meta"><span class="px-fi"><label for="pxf_sector">القطاع</label><select id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
     (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span>" +
+    (typeof cfDivs !== "undefined" && cfDivs.length
+      ? '<span class="px-fi"><label for="pxf_division">القسم</label><select id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قسم</option>' +
+        cfDivs.map(function (d) { return '<option value="' + d.id + '"' + (String(p.divisionId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; }).join("") +
+        "</select>" + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span>"
+      : "") +
     '<span class="px-fi"><label for="pxf_owner">المسؤول</label><input id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "")) + '" data-pxfield="owner"' + (p.archived ? " disabled" : "") + ">" +
     pxStatusSlot(name + "|owner", "pxf_owner") + "</span>" +
     '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
@@ -1128,9 +1151,9 @@ function pxUpdateRow(row) {
 function pxSaveMeta(name, field, raw) {
   var key = name + "|" + field;
   var val = raw;
-  if (field === "sectorId") val = raw === "" ? null : Number(raw);
-  else { val = String(raw || "").trim(); if (field === "owner" && val.length > 60) { pxFState[key] = { s: "invalid", v: raw, m: "٦٠ حرفًا كحدٍّ أقصى." }; render(false); return; }
-    if (field === "pricingNote" && val.length > 120) { pxFState[key] = { s: "invalid", v: raw, m: "١٢٠ حرفًا كحدٍّ أقصى." }; render(false); return; }
+  if (field === "sectorId" || field === "divisionId") val = raw === "" ? null : Number(raw);
+  else { val = String(raw || "").trim(); if (field === "owner" && val.length > 60) { pxFState[key] = { s: "invalid", v: raw, m: "60 حرفًا كحدٍّ أقصى." }; render(false); return; }
+    if (field === "pricingNote" && val.length > 120) { pxFState[key] = { s: "invalid", v: raw, m: "120 حرفًا كحدٍّ أقصى." }; render(false); return; }
     if (val === "") val = null; }
   pxFState[key] = { s: "pending", v: raw }; render(false);
   var body = {}; body[field] = val;
@@ -1153,7 +1176,7 @@ function pxSaveTarget(name, quarter, raw, confirmed) {
     if (!confirmed) { pxQConfirm[key] = true; pxFState[key] = { s: "invalid", v: "", m: "بانتظار تأكيد الإزالة" }; render(false); return; }
   } else {
     var n = Number(s);
-    if (!isFinite(n) || n < 0 || Math.floor(n) !== n) { pxFState[key] = { s: "invalid", v: raw, m: "عدد صحيح من ٠ فأكثر." }; render(false); return; }
+    if (!isFinite(n) || n < 0 || Math.floor(n) !== n) { pxFState[key] = { s: "invalid", v: raw, m: "عدد صحيح من 0 فأكثر." }; render(false); return; }
   }
   delete pxQConfirm[key];
   pxFState[key] = { s: "pending", v: raw }; render(false);
@@ -1168,8 +1191,8 @@ function pxPkgSave() {
   var ed = pxPkgEdit; if (!ed || ed.busy) return;
   var d = ed.d, price = Number(d.listPrice), years = Number(d.years);
   if (!String(d.name).trim()) { ed.err = "اسم الباقة مطلوب."; render(false); return; }
-  if (String(d.listPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { ed.err = "السعر السنوي عدد صحيح من ٠ فأكثر."; render(false); return; }
-  if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { ed.err = "المدة من ١ إلى ١٠ سنوات."; render(false); return; }
+  if (String(d.listPrice).trim() === "" || !isFinite(price) || price < 0 || Math.floor(price) !== price) { ed.err = "السعر السنوي عدد صحيح من 0 فأكثر."; render(false); return; }
+  if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) { ed.err = "المدة من 1 إلى 10 سنوات."; render(false); return; }
   ed.busy = true; ed.err = ""; render(false);
   var body = { name: String(d.name).trim(), listPrice: price, years: years, scope: String(d.scope || "").trim() };
   var req = ed.id ? pxJson("PATCH", "/admin/packages/" + ed.id, body) : pxJson("POST", "/admin/packages", Object.assign({ product: ed.product }, body));
@@ -1188,8 +1211,8 @@ function pxRetire(id, retire) {
 function pxUpload(name, kind, input) {
   var f = input.files && input.files[0]; if (!f) return;
   var key = name + "|" + kind;
-  if (kind === "asset" && (f.size > 10 * 1024 * 1024 || !/\.pdf$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "PDF فقط وبحد ١٠ م.ب." }; input.value = ""; render(false); return; }
-  if (kind === "kb" && (f.size > 15 * 1024 * 1024 || !/\.(pdf|docx|pptx|xlsx|md|txt)$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "الأنواع المسموحة: PDF وWord وPowerPoint وExcel وMarkdown ونص، بحد ١٥ م.ب." }; input.value = ""; render(false); return; }
+  if (kind === "asset" && (f.size > 10 * 1024 * 1024 || !/\.pdf$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "PDF فقط وبحد 10 م.ب." }; input.value = ""; render(false); return; }
+  if (kind === "kb" && (f.size > 15 * 1024 * 1024 || !/\.(pdf|docx|pptx|xlsx|md|txt)$/i.test(f.name))) { pxUp[key] = { s: "failed", m: "الأنواع المسموحة: PDF وWord وPowerPoint وExcel وMarkdown ونص، بحد 15 م.ب." }; input.value = ""; render(false); return; }
   pxUp[key] = { s: "busy" }; render(false);
   var fd = new FormData(); fd.append("product", name); fd.append("file", f);
   var url = kind === "asset" ? "/admin/product-asset/upload" : "/admin/kb/upload?product=" + pxEnc(name);
@@ -1331,7 +1354,7 @@ document.addEventListener("click", function (ev) {
   else if (a === "only") { pxOnly = pxOnly === nm ? "" : nm; render(false); }
   else if (a === "short") { pxShort = pxShort === nm ? "" : nm; render(false); }
   else if (a === "archived") { pxArchived = !pxArchived; render(false); }
-  else if (a === "clear") { pxQ = ""; pxSector = "all"; pxReadyF = "all"; pxShort = ""; pxOnly = ""; render(false); }
+  else if (a === "clear") { pxQ = ""; pxSector = "all"; pxDivF = "all"; pxReadyF = "all"; pxShort = ""; pxOnly = ""; render(false); }
   else if (a === "retry") { pcFailed = false; pcLoad(true); render(false); }
   else if (a === "perfretry") { pcPerfFailed[pcPerfYear] = false; pcPerfLoad(pcPerfYear, true); }
   else if (a === "knowretry") { pxKnowFailed[cur] = false; pxKnowLoad(cur, true); }
@@ -1379,6 +1402,7 @@ document.addEventListener("change", function (ev) {
   var cur = (location.hash || "").slice(1).split("/")[0] === "product" ? pxParseProductRoute().name : "";
   var ch = t.getAttribute("data-pxchange");
   if (ch === "pxf_sector") { pxSector = t.value; render(false); return; }
+  if (ch === "pxf_div") { pxDivF = t.value; render(false); return; }
   if (ch === "pxf_ready") { pxReadyF = t.value; render(false); return; }
   if (ch === "pxf_sort") { pxSort = t.value; render(false); return; }
   var fld = t.getAttribute("data-pxfield");
@@ -1625,7 +1649,7 @@ function pcSectorChart(secs) {
    draws a hatched baseline and says so in words.
 
    Time runs right to left, like the language (DESIGN.md 6.3): quarters render in order and the
-   RTL row places الربع ١ at the inline-start, which is the right. */
+   RTL row places الربع 1 at the inline-start, which is the right. */
 function pcQuarterChart(qs) {
   var list = qs.quarters || [];
   var mx = 1;
@@ -1645,7 +1669,7 @@ function pcQuarterChart(qs) {
         (ach > 0 ? '<span class="ach" style="height:' + Math.max(aPct, 2) + '%"></span>' : "")
       : '<span class="notgt"></span>';
     // The figure above the column is the ACHIEVED. Zero achieved against a real target is a true
-    // «٠»; no target at all is «—», because there is no denominator to be zero against.
+    // «0»; no target at all is «—», because there is no denominator to be zero against.
     var top = tgt > 0 ? pcMoney(ach) : "—";
     var sub = tgt > 0
       ? "من " + pcMoney(tgt) + (q.coveragePct === null ? "" : " · " + fmtN(q.coveragePct) + "٪")

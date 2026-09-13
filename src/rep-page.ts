@@ -164,19 +164,15 @@ try {
   TOKEN = localStorage.getItem("massar_rep_token") || "";
 } catch (e) { TOKEN = ""; }
 
-var AR = ["٠","١","٢","٣","٤","٥","٦","٧","٨","٩"];
 // PARITY WITH THE DASHBOARD. This page's fmtN did the digit swap and stopped there, so money
-// rendered «٦٠٠٠٠» while the same figure on /dashboard rendered «٦٠٬٠٠٠» — one product, two ways of
-// writing a number. toLocaleString("ar-SA") is what dashboard.ts:1092 uses; the manual swap stays
+// rendered «60000» while the same figure on /dashboard rendered «60٬000» — one product, two ways of
+// writing a number. toLocaleString("ar-SA-u-nu-latn") is what dashboard.ts uses; the manual swap stays
 // as the fallback for an engine without the ar-SA data. Nothing here prints a YEAR, which is the
-// one case that must NOT be grouped (DESIGN.md 4: «٢٠٢٦» must never become «٢٬٠٢٦»).
+// one case that must NOT be grouped (DESIGN.md 4: «2026» must never become «2٬026»).
 function fmtN(n){
   var v = Math.round(Number(n) || 0);
-  try {
-    var out = v.toLocaleString("ar-SA");
-    if (/[٠-٩]/.test(out)) return out;
-  } catch (e) {}
-  return String(v).replace(/[0-9]/g, function(d){ return AR[+d]; });
+  try { return v.toLocaleString("ar-SA-u-nu-latn"); } catch (e) {}
+  return String(v);
 }
 function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -191,7 +187,7 @@ function repPl(n, one, two, few, many){
 }
 function nDay(n){ return repPl(n, "يوم", "يومين", "أيام", "يومًا"); }
 // The KPI split: the figure is drawn big and the noun beside it, so the noun must be the TAMYIZ
-// form, not the full phrase. Two is the exception — «٢ جهتان» duplicates the count, so the dual
+// form, not the full phrase. Two is the exception — «2 جهتان» duplicates the count, so the dual
 // carries itself and the numeral is dropped.
 function nJihaNoun(n){
   n = Number(n) || 0;
@@ -266,7 +262,7 @@ function paint(){
   }
   // The leading figure on a phone is HOW MANY CALLS ARE OWED, not money — that is what the rep
   // acts on. Value supports it, and renders «—» when nothing on the queue is priced, because a
-  // total of «٠ ر.س» over unpriced lines is a number nobody wrote (DESIGN.md 4, honest absence).
+  // total of «0 ر.س» over unpriced lines is a number nobody wrote (DESIGN.md 4, honest absence).
   var total = 0, priced = 0;
   for (var a = 0; a < STATE.rows.length; a++) {
     for (var b = 0; b < STATE.rows[a].lines.length; b++) {

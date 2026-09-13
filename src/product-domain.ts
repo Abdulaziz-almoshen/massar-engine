@@ -62,7 +62,7 @@ export type Readiness = {
 export function normalizeProductName(raw: unknown): NameResult {
   const name = String(raw == null ? "" : raw).replace(/\s+/g, " ").trim();
   if (!name) return { ok: false, code: "empty", reason: "اسم المنتج مطلوب" };
-  if (name.length > 60) return { ok: false, code: "too_long", reason: "الاسم أطول من ٦٠ حرفًا" };
+  if (name.length > 60) return { ok: false, code: "too_long", reason: "الاسم أطول من 60 حرفًا" };
   if (name.slice(0, 2) === "__") return { ok: false, code: "reserved_prefix", reason: "الأسماء التي تبدأ بـ __ محجوزة للنظام" };
   if (/[#?%]/.test(name)) return { ok: false, code: "invalid_chars", reason: "لا يمكن أن يحتوي الاسم على # أو ? أو %" };
   const segments = name.split("/");
@@ -136,7 +136,7 @@ export function readinessOf(p: {
   return { cells, eligible: true, word: "جاهز للمساعد", reason: null };
 }
 
-/** null, not 0. «بلا مستهدف» must never render as «٠٪» — a product nobody set a target for has no
+/** null, not 0. «بلا مستهدف» must never render as «0٪» — a product nobody set a target for has no
  *  coverage, which is not zero coverage. */
 export function targetCoveragePct(achieved: unknown, target: unknown): number | null {
   const t = Number(target);

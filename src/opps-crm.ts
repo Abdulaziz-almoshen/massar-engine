@@ -17,7 +17,7 @@
 // THE MODEL IS UNCHANGED, and so is every rule that makes a figure on this page true:
 // «فرصة = عميل + عدة منتجات». One row in the ledger is ONE PRODUCT LINE; its stage is STORED (a deal's
 // stage is a fact about a meeting nobody here witnessed), its SOURCE says where it came from, and
-// its value is سعر × سنوات × كمية × (١−خصم). Those rules live in src/opps-domain.ts, which ships its
+// its value is سعر × سنوات × كمية × (1−خصم). Those rules live in src/opps-domain.ts, which ships its
 // compiled source into this scope (OPP_STAGES, OPP_SOURCES, isOpenStage, calculateLineValue …), so
 // the UI restates none of them.
 //
@@ -72,7 +72,7 @@ export const OPPS_CRM_CSS = `
   .ox-lg b { font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
   .ox-lg.on b { color:var(--accent-deep); }
   /* The count sits behind a hairline, never a «·»: beside Arabic-Indic digits a middle dot reads as
-     a zero («٠»), and «· ٥» rendered as «٥٠» in the first screenshot of this legend. */
+     a zero («0»), and «· 5» rendered as «50» in the first screenshot of this legend. */
   .ox-lg .n { color:var(--muted); font-variant-numeric:tabular-nums; padding-inline-start:6px; border-inline-start:1px solid var(--line); line-height:14px; }
   .ox-lg.zero b, .ox-lg.zero { color:var(--muted); font-weight:450; }
   .ox-mets { display:flex; align-items:stretch; border:1px solid var(--line-soft); border-radius:var(--r-md); }
@@ -403,6 +403,25 @@ export const OPPS_CRM_CSS = `
     border-top:1px solid var(--line-soft); background:var(--paper); flex-wrap:wrap; }
   .ox-df .sp { flex:1; }
   .ox-df .btn { height:38px; font-size:var(--t-sm); }
+  .ox-escacts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; padding-block:var(--s1); }
+  .ox-escacts .btn { height:36px; font-size:var(--t-sm); }
+  .ox-hint2 { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
+  .ox-escform { display:flex; flex-direction:column; gap:var(--s2); }
+  .ox-escbtns { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
+  .ox-escbtns .btn { height:36px; font-size:var(--t-sm); }
+  .ox-esclist { display:flex; flex-direction:column; margin-top:var(--s2); }
+  .ox-escr { display:grid; grid-template-columns:64px minmax(0,1fr) auto auto; gap:var(--s2); align-items:start;
+    padding:var(--s2) 0; border-top:1px solid var(--line-soft); font-size:var(--t-xs); color:var(--muted); }
+  .ox-escr .k { font-weight:600; color:var(--accent-deep); }
+  .ox-escr .t { color:var(--ink-2); min-width:0; }
+  .ox-escr .t b { color:var(--ink); font-weight:600; }
+  .ox-escr .t .why { display:block; color:var(--muted); line-height:1.6; overflow-wrap:anywhere; }
+  .ox-escr .m { text-align:end; white-space:nowrap; }
+  .ox-escr .m .dl { display:block; color:var(--s-attn-text); }
+  .ox-escr .ok { color:var(--s-issued-text); font-weight:600; display:inline-flex; align-items:center; gap:4px; }
+  .ox-escr.done { opacity:.7; }
+  .ox-escr .btn { height:28px; padding-inline:10px; font-size:var(--t-xs); }
+  .ox-cnt { font-size:var(--t-xs); font-weight:600; color:var(--s-attn-text); margin-inline-start:var(--s2); }
   .ox-df .rv-hold { height:38px; padding-inline:16px; font-size:var(--t-sm); }
   .ox-df .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
   .ox-df .rv-hold:hover { background:var(--s-fail-soft); }
@@ -525,8 +544,8 @@ function opHasLost(ls) { return hasLostLine(ls.map(opFacts)); }
 function opKey(o) { return accountKey(o.account_name, o.phone); }
 var OPP_UNPRICED = "لم تُسعَّر";
 
-/* A ROW SHOWS THE WHOLE FIGURE. «٤ ألف ر.س» was both rounded (the line is ٤٬٢٠٠) and a counted-noun
-   error (٣–١٠ take آلاف). Full amounts in rows and the drawer; the compact form only where space
+/* A ROW SHOWS THE WHOLE FIGURE. «4 ألف ر.س» was both rounded (the line is 4٬200) and a counted-noun
+   error (3–10 take آلاف). Full amounts in rows and the drawer; the compact form only where space
    genuinely forbids it (kanban headers, legend), and with the right noun. */
 function opMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v || 0))) + " ر.س</bdi>"; }
 function opMoneyShort(v) {
@@ -565,7 +584,9 @@ var OPP_ICO = {
   warn: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>',
   check: '<path d="M5 12l5 5 9-10"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
-  back: '<path d="M9 6l6 6-6 6"/>'
+  back: '<path d="M9 6l6 6-6 6"/>',
+  up: '<path d="M12 20V6"/><path d="M6 12l6-6 6 6"/>',
+  help: '<circle cx="12" cy="12" r="8.4"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.2 2.3c-.7.3-.8.8-.8 1.5"/><path d="M12 16.6v.4"/>'
 };
 function opIco(n, cls) {
   return '<svg class="ox-ico' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" aria-hidden="true">' + (OPP_ICO[n] || "") + "</svg>";
@@ -916,11 +937,11 @@ function opKanbanView() {
 function opValidate(key, v) {
   var s = String(v == null ? "" : v).trim();
   if (key === "sale_price") { if (s === "") return ""; var p = Number(s); return isFinite(p) && p >= 0 ? "" : "أدخل سعرًا صفرًا أو أكبر."; }
-  if (key === "years") { var y = Number(s); return s !== "" && Math.floor(y) === y && y >= 1 && y <= 20 ? "" : "السنوات عدد صحيح من ١ إلى ٢٠."; }
-  if (key === "qty") { var q = Number(s); return s !== "" && Math.floor(q) === q && q >= 1 ? "" : "الكمية عدد صحيح من ١ فأكثر."; }
-  if (key === "discount") { if (s === "") return ""; var d = Number(s); return isFinite(d) && d >= 0 && d <= 100 ? "" : "الخصم بين ٠ و١٠٠."; }
-  if (key === "owner") return s.length <= 60 ? "" : "اسم المسؤول أطول من ٦٠ حرفًا.";
-  if (key === "next_step") return s.length <= 300 ? "" : "الخطوة أطول من ٣٠٠ حرف.";
+  if (key === "years") { var y = Number(s); return s !== "" && Math.floor(y) === y && y >= 1 && y <= 20 ? "" : "السنوات عدد صحيح من 1 إلى 20."; }
+  if (key === "qty") { var q = Number(s); return s !== "" && Math.floor(q) === q && q >= 1 ? "" : "الكمية عدد صحيح من 1 فأكثر."; }
+  if (key === "discount") { if (s === "") return ""; var d = Number(s); return isFinite(d) && d >= 0 && d <= 100 ? "" : "الخصم بين 0 و100."; }
+  if (key === "owner") return s.length <= 60 ? "" : "اسم المسؤول أطول من 60 حرفًا.";
+  if (key === "next_step") return s.length <= 300 ? "" : "الخطوة أطول من 300 حرف.";
   return "";
 }
 function opFieldStatus(sk, id) {
@@ -948,6 +969,106 @@ function opField(l, key, label, type) {
     ' value="' + esc(val) + '"' + (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
     ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"></div>';
 }
+/* ===== التصعيد وطلب الدعم =====
+   Recorded, never sent: no mail sender is configured (founder, 2026-09-13), so the row says
+   «مسجّل — لم يُرسل بريد بعد» rather than claiming an email left the building. Recipients come from
+   the team directory in «إعدادات النظام»; the role rule (support → الدعم الفني / الإدارة,
+   escalation → الإدارة / مبيعات) is config-domain's, which the server enforces on the same write. */
+var opEsc = null;          /* { oppId, kind, memberId, reason, err, field, busy } */
+var opEscRows = {};        /* oppId -> rows */
+var opEscLoading = {};
+function opEscLoad(oppId, force) {
+  if (opEscLoading[oppId]) return;
+  if (opEscRows[oppId] && !force) return;
+  opEscLoading[oppId] = true;
+  fetch("/admin/escalations?opp=" + oppId, { headers: { "x-admin-token": TOKEN } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { if (j && j.escalations) opEscRows[oppId] = j.escalations; })
+    .catch(function () {})
+    .then(function () { opEscLoading[oppId] = false; opRender(); });
+}
+function opEscCandidates(kind) {
+  var roles = (typeof ESCALATION_ROLES !== "undefined" && ESCALATION_ROLES[kind]) || [];
+  return (typeof cfTeam !== "undefined" ? cfTeam : []).filter(function (m) {
+    return m.active && roles.indexOf(m.role) >= 0;
+  });
+}
+function opEscSection(l) {
+  if (typeof cfLoad === "function") cfLoad(false);
+  opEscLoad(l.id, false);
+  var rows = opEscRows[l.id] || [];
+  var open = rows.filter(function (r) { return !r.resolvedAt; });
+  var b = '<section class="ox-sec" aria-labelledby="oxsec_e"><div class="ox-sech" id="oxsec_e">التصعيد والدعم' +
+    (open.length ? '<span class="ox-cnt">' + fmtN(open.length) + " مفتوح</span>" : "") + "</div>";
+  if (!opEsc || opEsc.oppId !== l.id) {
+    b += '<div class="ox-escacts">' +
+      '<button class="btn btn-ghost" data-op="escalate" data-i="' + l.id + '">' + opIco("up") + "تصعيد</button>" +
+      '<button class="btn btn-ghost" data-op="support" data-i="' + l.id + '">' + opIco("help") + "طلب دعم</button>" +
+      '<span class="ox-hint2">يُسجَّل على الفرصة ويظهر لمن اخترته — لا يُرسل شيء للعميل.</span></div>';
+  } else {
+    var cands = opEscCandidates(opEsc.kind);
+    b += '<div class="ox-escform">';
+    b += '<div class="ox-fld"><label for="opesc_to">' + (opEsc.kind === "support" ? "إلى مسؤول الدعم" : "تصعيد إلى") + "</label>";
+    if (!cands.length) {
+      b += '<div class="ox-hint2">لا أحد مسجّل لهذا الدور — أضِفه في <a class="ox-lnk" href="#team">إعدادات النظام · الفريق</a>.</div>';
+    } else {
+      b += '<select id="opesc_to" data-opesc="memberId"><option value="">اختر الشخص…</option>' +
+        cands.map(function (m) {
+          return '<option value="' + m.id + '"' + (String(opEsc.memberId) === String(m.id) ? " selected" : "") + ">" +
+            esc(m.name) + " · " + esc(TEAM_ROLE_LABELS[m.role] || m.role) + (m.division ? " · " + esc(m.division) : "") + "</option>";
+        }).join("") + "</select>";
+    }
+    b += "</div>";
+    b += '<div class="ox-fld"><label for="opesc_why">' + (opEsc.kind === "support" ? "ما الذي تحتاجه؟" : "سبب التصعيد") + "</label>" +
+      '<input class="inp" id="opesc_why" maxlength="300" value="' + esc(opEsc.reason || "") + '" data-opesc="reason" placeholder="' +
+      (opEsc.kind === "support" ? "مثال: العميل يسأل عن تكامل HIS ويحتاج مهندسًا" : "مثال: العميل ينتظر قرار تسعير منذ أسبوع") + '"></div>';
+    b += '<div class="ox-escbtns"><button class="btn btn-teal" data-op="escsave"' + (opEsc.busy ? ' disabled aria-busy="true"' : "") + ">" +
+      (opEsc.busy ? "جارٍ التسجيل…" : opEsc.kind === "support" ? "سجّل طلب الدعم" : "سجّل التصعيد") + "</button>" +
+      '<button class="btn btn-ghost" data-op="esccancel">إلغاء</button>' +
+      (opEsc.err ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opEsc.err) + "</span>" : "") + "</div></div>";
+  }
+  if (rows.length) {
+    b += '<div class="ox-esclist">' + rows.map(function (r) {
+      return '<div class="ox-escr' + (r.resolvedAt ? " done" : "") + '"><span class="k">' + esc(ESCALATION_LABELS[r.kind] || r.kind) + "</span>" +
+        '<span class="t"><b>' + esc(r.toName) + "</b> · <bdi>" + esc(r.toEmail) + '</bdi><span class="why">' + esc(r.reason) + "</span></span>" +
+        '<span class="m">' + (r.createdAt ? fmtD(r.createdAt) : "") + (r.createdBy ? " · " + esc(r.createdBy) : "") +
+        '<span class="dl">' + esc((typeof DELIVERY_LABELS !== "undefined" && DELIVERY_LABELS[r.delivery]) || r.delivery) + "</span></span>" +
+        (r.resolvedAt ? '<span class="ok">' + opIco("check") + "أُغلق</span>"
+          : '<button class="btn btn-ghost" data-op="escdone" data-i="' + r.id + '" data-o="' + r.oppId + '">تم</button>') + "</div>";
+    }).join("") + "</div>";
+  }
+  return b + "</section>";
+}
+function opEscOpen(oppId, kind) {
+  opEsc = { oppId: oppId, kind: kind, memberId: "", reason: "", err: "", field: "", busy: false };
+  if (typeof cfLoad === "function") cfLoad(false);
+  opRender();
+  setTimeout(function () { var f = document.getElementById("opesc_to") || document.getElementById("opesc_why"); if (f) f.focus(); }, 0);
+}
+function opEscSave() {
+  var e = opEsc; if (!e || e.busy) return;
+  var member = (typeof cfTeam !== "undefined" ? cfTeam : []).filter(function (m) { return String(m.id) === String(e.memberId); })[0] || null;
+  var checked = checkEscalation({ kind: e.kind, memberId: Number(e.memberId), reason: e.reason }, member);
+  if (!checked.ok) { e.err = checked.reason; e.field = checked.field; opRender(); return; }
+  e.busy = true; e.err = ""; opRender();
+  fetch("/admin/opps/" + e.oppId + "/escalate", {
+    method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: checked.value.kind, memberId: checked.value.memberId, reason: checked.value.reason }),
+  }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); })
+    .then(function (r) {
+      e.busy = false;
+      if (!r.ok) { e.err = r.j.detail || "تعذّر التسجيل (" + fmtN(r.status) + ")"; e.field = r.j.field || ""; opRender(); return; }
+      var oppId = e.oppId; opEsc = null;
+      opEscLoad(oppId, true);
+      opToast((checked.value.kind === "support" ? "سُجّل طلب الدعم إلى " : "سُجّل التصعيد إلى ") + member.name + " — لم يُرسل بريد بعد", false);
+    }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُسجَّل شيء."; opRender(); });
+}
+function opEscResolve(id, oppId) {
+  fetch("/admin/escalations/" + id + "/resolve", { method: "POST", headers: { "x-admin-token": TOKEN } })
+    .then(function (r) { if (!r.ok) throw new Error("http"); opEscLoad(oppId, true); opToast("أُغلق البند", false); })
+    .catch(function () { opToast("تعذّر الإغلاق", true); });
+}
+
 function opDrawerShell(labelId, head, body, foot) {
   var cls = opDrShown ? " in" : "";
   return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
@@ -993,7 +1114,7 @@ function opDetailDrawer(l) {
   b += opPriced(l)
     ? '<div class="ox-vfig">' + opMoney(opValue(l)) + "</div>" +
       '<div class="ox-form"><bdi>' + fmtN(Number(l.sale_price)) + " ر.س سنويًا × " + opNYear(Number(l.years || 1)) + " × " + fmtN(Number(l.qty || 1)) +
-      (disc ? " × (١ − " + fmtN(disc) + "٪)" : "") + "</bdi></div>"
+      (disc ? " × (1 − " + fmtN(disc) + "٪)" : "") + "</bdi></div>"
     : '<div class="ox-vfig unp">' + OPP_UNPRICED + '</div><div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
   b += '<div class="ox-g2">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
     opField(l, "qty", "الكمية", "number") + opField(l, "discount", "الخصم ٪", "number") + "</div>";
@@ -1016,6 +1137,7 @@ function opDetailDrawer(l) {
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
     "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
+  b += opEscSection(l);
   /* بنود أخرى لهذه الجهة */
   var key = opKey(l);
   var rel = (oppRows || []).filter(function (o) { return o.id !== l.id && opKey(o) === key; });
@@ -1050,7 +1172,7 @@ function opCreateDrawer() {
   b += '<datalist id="opaccts">' + accts.map(function (e) { return '<option value="' + esc(e.name) + '"></option>'; }).join("") + "</datalist>";
   b += '<div class="ox-g2"><div class="ox-fld"><label for="opd_phone">الجوال (اختياري)</label>' +
     '<input class="inp" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr"' + errOf("phone") + ' oninput="opDraft(&quot;phone&quot;,this.value)"></div>' +
-    '<div class="ox-fld"><label for="opd_owner">المسؤول (اختياري)</label>' +
+    '<div class="ox-fld"><label for="opd_owner">مسؤول المبيعات (اختياري)</label>' +
     '<input class="inp" id="opd_owner" list="oxowners2" value="' + esc(d.owner || "") + '" placeholder="بلا مسؤول" oninput="opDraft(&quot;owner&quot;,this.value)"></div></div>' +
     '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
   b += "</section>";
@@ -1084,7 +1206,7 @@ function opCreateDrawer() {
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
       '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>" +
       '<div class="ox-g2">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
-      numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "٠") + "</div>" +
+      numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "0") + "</div>" +
       '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoney(v) : OPP_UNPRICED) + "</span></div></div>";
   });
   b += '<button class="ox-arow" onclick="opLineAdd()">' + opIco("plus") + "منتج آخر</button>";
@@ -1302,6 +1424,29 @@ window.opRetryField = function (id, key) {
 window.opDiscardField = function (id, key) { delete opFState[id + ":" + key]; opRender(); };
 window.opSetStage = function (id, stage) { return window.opSaveField(id, "stage", stage); };
 window.opSetStageSel = function (v) { if (opOpen) void window.opSaveField(opOpen, "stage", v); };
+
+/* The escalation controls are delegated rather than inline-onclick: they live inside a drawer that
+   re-renders on every keystroke, and an inline handler would be re-parsed on each paint. */
+document.addEventListener("click", function (ev) {
+  var t = ev.target && ev.target.closest ? ev.target.closest("[data-op]") : null;
+  if (!t) return;
+  var a = t.getAttribute("data-op");
+  if (a === "escalate") { opEscOpen(Number(t.getAttribute("data-i")), "escalation"); return; }
+  if (a === "support") { opEscOpen(Number(t.getAttribute("data-i")), "support"); return; }
+  if (a === "esccancel") { opEsc = null; opRender(); return; }
+  if (a === "escsave") { opEscSave(); return; }
+  if (a === "escdone") { opEscResolve(Number(t.getAttribute("data-i")), Number(t.getAttribute("data-o"))); return; }
+});
+document.addEventListener("input", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var k = t.getAttribute("data-opesc"); if (!k || !opEsc) return;
+  opEsc[k] = t.value; opEsc.err = "";
+});
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var k = t.getAttribute("data-opesc"); if (!k || !opEsc) return;
+  opEsc[k] = t.value; opEsc.err = ""; opRender();
+});
 
 window.opDel = async function (id) {
   id = Number(id); opDelErr = "";

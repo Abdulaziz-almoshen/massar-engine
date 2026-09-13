@@ -499,7 +499,7 @@ CREATE TABLE IF NOT EXISTS packages (
   -- Per YEAR. The published reference, never what was negotiated.
   list_price  BIGINT NOT NULL CHECK (list_price >= 0),
   years       INT    NOT NULL DEFAULT 1 CHECK (years > 0),
-  -- What actually differentiates this package from its siblings: «فرع واحد», «حتى ١٠ فروع».
+  -- What actually differentiates this package from its siblings: «فرع واحد», «حتى 10 فروع».
   -- Text on purpose — the axis differs per product and inventing a numeric one would be a guess.
   scope       TEXT,
   -- Lifecycle is RETIRE, never delete. A won deal must keep pointing at the package it was sold
@@ -532,7 +532,7 @@ INSERT INTO packages (product, name, list_price, years, scope, created_at)
 SELECT 'الإجازات المرضية', 'الباقة القياسية', 18000, 1, 'فرع واحد', $NOW$
 WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'الباقة القياسية');
 INSERT INTO packages (product, name, list_price, years, scope, created_at)
-SELECT 'الإجازات المرضية', 'باقة المؤسسات', 95000, 1, 'حتى ١٠ فروع', $NOW$
+SELECT 'الإجازات المرضية', 'باقة المؤسسات', 95000, 1, 'حتى 10 فروع', $NOW$
 WHERE NOT EXISTS (SELECT 1 FROM packages WHERE product = 'الإجازات المرضية' AND name = 'باقة المؤسسات');
 
 -- For the five products that are quoted case by case, the verbatim wording, so a screen can say
@@ -625,6 +625,90 @@ ALTER TABLE product_assets ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
 UPDATE product_assets SET size_bytes = octet_length(bytes) WHERE size_bytes IS NULL;
 `,
   },
+  {
+    version: "009-system-configuration",
+    sql: `
+-- THE LADDER BECOMES THE ADMIN'S, WITHOUT LOSING ITS SPINE.
+--
+-- Founder, 2026-09-13: an admin adds lead stages with an SLA, renames them, and turns them on and
+-- off. Until now SALES_STAGES was code-owned truth and the boot seed DRAGGED the table back to it
+-- on every deploy — an edit made on Sunday would vanish on Monday. The ownership line is now:
+-- code owns key/dot/terminal (identity — a key change orphans every stored opportunity and every
+-- ledger event), the admin owns label/weight/position/sla/active. See src/config-domain.ts.
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS sla_days INT;
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS active   BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS dot      TEXT;
+ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS terminal TEXT;
+
+-- A stage the admin ADDS is a stage no CHECK constraint knows about. The constraint listed the
+-- eight compiled keys, so the first custom rung would be rejected by the database with a message
+-- no screen could translate. Validation moves into code, against the live ladder (db.stageKeys()).
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_stage_check;
+
+-- DIVISIONS: the company's own units. NOT «القطاع» (the market a product sells into) — this is who
+-- inside the company owns it. A product belongs to one; a team member sits in one.
+CREATE TABLE IF NOT EXISTS divisions (
+  id              BIGSERIAL PRIMARY KEY,
+  name            TEXT NOT NULL UNIQUE,
+  owner_member_id BIGINT,
+  active          BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      BIGINT NOT NULL,
+  updated_at      BIGINT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS team_members (
+  id          BIGSERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  email       TEXT NOT NULL UNIQUE,
+  role        TEXT NOT NULL CHECK (role IN ('sales','support','manager')),
+  division_id BIGINT REFERENCES divisions(id) ON DELETE SET NULL,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+-- Guarded: ADD CONSTRAINT has no IF NOT EXISTS, and a migration that cannot be re-run is a
+-- migration that turns a retried boot into memory-only mode (measured here, 2026-09-13).
+DO $$ BEGIN
+  ALTER TABLE divisions ADD CONSTRAINT divisions_owner_fk
+    FOREIGN KEY (owner_member_id) REFERENCES team_members(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE product_meta ADD COLUMN IF NOT EXISTS division_id BIGINT REFERENCES divisions(id) ON DELETE SET NULL;
+
+-- ESCALATIONS AND SUPPORT REQUESTS. delivery is RECORDED, never «sent», until a mail sender is
+-- chosen (founder, 2026-09-13). The recipient's name and email are COPIED onto the row: the record
+-- of who was asked must survive that person later leaving the directory.
+CREATE TABLE IF NOT EXISTS escalations (
+  id           BIGSERIAL PRIMARY KEY,
+  opp_id       BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  kind         TEXT NOT NULL CHECK (kind IN ('escalation','support')),
+  to_member_id BIGINT REFERENCES team_members(id) ON DELETE SET NULL,
+  to_name      TEXT NOT NULL,
+  to_email     TEXT NOT NULL,
+  reason       TEXT NOT NULL,
+  delivery     TEXT NOT NULL DEFAULT 'recorded',
+  created_by   TEXT,
+  created_at   BIGINT NOT NULL,
+  resolved_at  BIGINT,
+  resolved_by  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_escalations_opp ON escalations (opp_id);
+
+-- The two rungs sales-domain already called stalling keep their 14 days as an SLA, so the board's
+-- «متوقفة» does not silently become «never late» the moment it starts reading sla_days.
+UPDATE pipeline_stages SET sla_days = 14
+ WHERE sla_days IS NULL AND key IN ('tech','negotiate');
+`,
+  },
+  {
+    version: "010-western-numerals",
+    sql: `
+-- ONE NUMERAL SYSTEM (founder, 2026-09-13: «make all numbers in english numerals»). The screens
+-- now format every figure with «ar-SA-u-nu-latn», but SEEDED TEXT carries its own digits — the
+-- package scope «حتى ١٠ فروع» was written by migration 004 and renders as data, not as a number the
+-- formatter ever sees. Only rows this repo seeded are touched; anything a human typed is theirs.
+UPDATE packages SET scope = translate(scope, '٠١٢٣٤٥٦٧٨٩', '0123456789')
+ WHERE scope ~ '[٠-٩]' AND product IN ('الإجازات المرضية');
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -680,11 +764,14 @@ async function runMigrations(p: pg.Pool): Promise<void> {
  * `/health` reports ok:false in that state, so the failure is visible rather than silent. */
 const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   pipelines: ["id", "name", "product", "created_at"],
-  pipeline_stages: ["id", "pipeline_id", "key", "label", "weight_pct", "position"],
+  pipeline_stages: ["id", "pipeline_id", "key", "label", "weight_pct", "position", "sla_days", "active"],
+  divisions: ["id", "name", "owner_member_id", "active"],
+  team_members: ["id", "name", "email", "role", "division_id", "active"],
+  escalations: ["id", "opp_id", "kind", "to_member_id", "to_name", "to_email", "reason", "delivery", "created_at"],
   track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
   actions: ["id", "opp_id", "dept", "title", "state", "created_at"],
   sectors: ["id", "name"],
-  product_meta: ["product", "sector_id", "archived_at"],
+  product_meta: ["product", "sector_id", "archived_at", "division_id"],
   product_kb: ["product", "md", "source_filename", "updated_at", "draft_md", "draft_source", "draft_by", "draft_at", "approved_by", "approved_at"],
   product_assets: ["product", "public_id", "filename", "content_type", "bytes", "updated_at", "size_bytes"],
   targets: ["product", "year", "quarter", "amount"],
@@ -771,13 +858,17 @@ async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
     id = Number(ins.rows[0].id);
   }
   for (const st of SALES_STAGES) {
+    // INSERT-IF-ABSENT for everything the admin owns (label, weight, position, SLA, active), and
+    // DO UPDATE only for what code owns (dot, terminal). Before «إعدادات النظام» this statement
+    // overwrote label/weight/position on every boot, which would have silently undone every edit
+    // an admin made — the seed would have been the loudest bug in the feature.
     await client.query(
-      `INSERT INTO pipeline_stages (pipeline_id, key, label, weight_pct, position, exit_criterion)
-       VALUES ($1,$2,$3,$4,$5,$6)
+      `INSERT INTO pipeline_stages (pipeline_id, key, label, weight_pct, position, exit_criterion, sla_days, active, dot, terminal)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,TRUE,$8,$9)
        ON CONFLICT (pipeline_id, key) DO UPDATE
-         SET label = EXCLUDED.label, weight_pct = EXCLUDED.weight_pct,
-             position = EXCLUDED.position, exit_criterion = EXCLUDED.exit_criterion`,
-      [id, st.key, st.label, st.weightPct, st.position, st.exitCriterion]);
+         SET dot = EXCLUDED.dot, terminal = EXCLUDED.terminal`,
+      [id, st.key, st.label, st.weightPct, st.position, st.exitCriterion,
+        st.stalls ? sales.STALL_DAYS : null, st.dot, st.terminal]);
   }
 }
 
@@ -1802,9 +1893,13 @@ export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", 
  *  bad value is a 400 naming its field rather than a 500 — the same contract validateTask holds.
  *  The numbers are bounded rather than merely typed: a discount of 400 would render a NEGATIVE
  *  pipeline value, and «قيمة الفرصة» is a number the founder reads as money. */
-export function validateOppLine(l: Record<string, unknown>): string | null {
+export function validateOppLine(l: Record<string, unknown>, allowedStages?: readonly string[]): string | null {
   if (typeof l.product !== "string" || !l.product.trim()) return "product";
-  if (l.stage != null && !(OPP_STAGES as readonly string[]).includes(String(l.stage))) return "stage";
+  // The LIVE ladder when the caller passes it (an admin may have added a rung since this file was
+  // compiled), the compiled list when it does not. The Postgres CHECK that used to be the backstop
+  // was dropped in migration 009 precisely because it could not know about a stage added at runtime.
+  const stages = allowedStages && allowedStages.length ? allowedStages : (OPP_STAGES as readonly string[]);
+  if (l.stage != null && stages.indexOf(String(l.stage)) === -1) return "stage";
   // ABSENT IS THE DEFAULT, NOT ZERO. Reading a missing years as 0 rejected every line that simply
   // did not carry the field — and because years is checked before product, it rejected them with
   // the wrong field name, which hid an unknown product behind a complaint about a number nobody
@@ -1849,7 +1944,7 @@ export async function listOpps(): Promise<OppRow[]> {
 }
 
 /** One account, N product lines, ONE write. The lines of a deal are created together on the board
- *  and must arrive together: a partial insert would paint a card whose «٣ منتجات» is a lie. */
+ *  and must arrive together: a partial insert would paint a card whose «3 منتجات» is a lie. */
 export async function createOppLines(head: {
   account_name: string; phone: string | null; source: string; source_ref: string | null; created_by: string | null;
 }, lines: Partial<OppRow>[]): Promise<OppRow[]> {
@@ -1888,7 +1983,7 @@ export async function createOppLines(head: {
   return out;
 }
 
-/** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ ١٨ يومًا» counts days in the
+/** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ 18 يومًا» counts days in the
  *  stage and not days since anyone last touched the row — editing a next step must not reset a
  *  stall the board exists to show. */
 export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: string): Promise<OppRow | null> {
@@ -2483,6 +2578,8 @@ export async function getAssetByPublicId(publicId: string):
 export type CatalogueRow = {
   product: string; sector: string | null; sectorId: number | null; sectorAssumed: boolean;
   owner: string | null; pricingNote: string | null;
+  /** The company unit that owns this product — «القسم», not «القطاع» (the market it sells into). */
+  divisionId: number | null; division: string | null;
   packages: { id: number; name: string; listPrice: number; years: number; scope: string | null }[];
   retiredPackageCount: number;
   archived: boolean; archivedAt: number | null;
@@ -2508,7 +2605,7 @@ export async function productCatalogue(): Promise<CatalogueRow[]> {
   const r = await pool.query(
     `SELECT t.name AS product, t.created_at, s.name AS sector, pm.sector_id,
             COALESCE(pm.sector_assumed, false) AS sector_assumed,
-            pm.owner, pm.pricing_note, pm.archived_at,
+            pm.owner, pm.pricing_note, pm.archived_at, pm.division_id, d.name AS division,
             COALESCE(
               (SELECT json_agg(json_build_object(
                         'id', p.id, 'name', p.name, 'listPrice', p.list_price,
@@ -2523,6 +2620,7 @@ export async function productCatalogue(): Promise<CatalogueRow[]> {
        FROM tags t
        LEFT JOIN product_meta pm   ON pm.product = t.name
        LEFT JOIN sectors s         ON s.id = pm.sector_id
+       LEFT JOIN divisions d       ON d.id = pm.division_id
        LEFT JOIN product_kb k      ON k.product = t.name
        LEFT JOIN product_assets a  ON a.product = t.name
       WHERE t.name NOT LIKE '\\_\\_%'
@@ -2534,6 +2632,8 @@ export async function productCatalogue(): Promise<CatalogueRow[]> {
     sectorAssumed: Boolean(x.sector_assumed),
     owner: x.owner ? String(x.owner) : null,
     pricingNote: x.pricing_note ? String(x.pricing_note) : null,
+    divisionId: x.division_id == null ? null : Number(x.division_id),
+    division: x.division ? String(x.division) : null,
     packages: (x.packages ?? []).map((p: any) => ({
       id: Number(p.id), name: String(p.name), listPrice: Number(p.listPrice),
       years: Number(p.years), scope: p.scope ? String(p.scope) : null,
@@ -2664,23 +2764,267 @@ export async function createProduct(p: {
  * same value — is a human confirming it, so the «مُستنتَج» flag clears.
  */
 export async function patchProductMeta(product: string, patch: {
-  sectorId?: number | null; owner?: string | null; pricingNote?: string | null;
+  sectorId?: number | null; owner?: string | null; pricingNote?: string | null; divisionId?: number | null;
 }): Promise<boolean> {
   if (!(await reprobe()) || !pool) return false;
   const sendSector = patch.sectorId !== undefined;
   const sendOwner = patch.owner !== undefined;
   const sendNote = patch.pricingNote !== undefined;
+  const sendDivision = patch.divisionId !== undefined;
   const r = await pool.query(
-    `INSERT INTO product_meta (product, sector_id, owner, pricing_note, sector_assumed, updated_at)
-     VALUES ($1, $2, $3, $4, false, $8)
+    `INSERT INTO product_meta (product, sector_id, owner, pricing_note, division_id, sector_assumed, updated_at)
+     VALUES ($1, $2, $3, $4, $5, false, $10)
      ON CONFLICT (product) DO UPDATE SET
-       sector_id      = CASE WHEN $5::boolean THEN EXCLUDED.sector_id    ELSE product_meta.sector_id END,
-       sector_assumed = CASE WHEN $5::boolean THEN false                 ELSE product_meta.sector_assumed END,
-       owner          = CASE WHEN $6::boolean THEN EXCLUDED.owner        ELSE product_meta.owner END,
-       pricing_note   = CASE WHEN $7::boolean THEN EXCLUDED.pricing_note ELSE product_meta.pricing_note END,
+       sector_id      = CASE WHEN $6::boolean THEN EXCLUDED.sector_id    ELSE product_meta.sector_id END,
+       sector_assumed = CASE WHEN $6::boolean THEN false                 ELSE product_meta.sector_assumed END,
+       owner          = CASE WHEN $7::boolean THEN EXCLUDED.owner        ELSE product_meta.owner END,
+       pricing_note   = CASE WHEN $8::boolean THEN EXCLUDED.pricing_note ELSE product_meta.pricing_note END,
+       division_id    = CASE WHEN $9::boolean THEN EXCLUDED.division_id  ELSE product_meta.division_id END,
        updated_at     = EXCLUDED.updated_at`,
-    [product, patch.sectorId ?? null, patch.owner ?? null, patch.pricingNote ?? null,
-      sendSector, sendOwner, sendNote, Date.now()]);
+    [product, patch.sectorId ?? null, patch.owner ?? null, patch.pricingNote ?? null, patch.divisionId ?? null,
+      sendSector, sendOwner, sendNote, sendDivision, Date.now()]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+// ===========================================================================
+// «إعدادات النظام» — the ladder, the divisions, the team, and what was escalated.
+// ===========================================================================
+
+export type StageRow = {
+  key: string; label: string; weightPct: number; position: number;
+  slaDays: number | null; active: boolean; dot: string; terminal: "won" | "lost" | null;
+  exitCriterion: string | null; openLines: number;
+};
+
+/** The LIVE ladder: what the board, the wizard and every stage select must read. Falls back to the
+ *  compiled SALES_STAGES when the database is unreachable — a screen with no stages is a screen
+ *  where no deal can be moved, and that is worse than a stale ladder. */
+export async function listStages(): Promise<StageRow[]> {
+  if (!(await reprobe()) || !pool) return compiledStages();
+  const r = await pool.query(
+    `SELECT ps.key, ps.label, ps.weight_pct, ps.position, ps.sla_days, ps.active, ps.dot, ps.terminal,
+            ps.exit_criterion,
+            (SELECT COUNT(*) FROM opportunities o WHERE o.stage = ps.key) AS open_lines
+       FROM pipeline_stages ps
+       JOIN pipelines p ON p.id = ps.pipeline_id AND p.product IS NULL
+      ORDER BY ps.position, ps.id`);
+  if (!r.rowCount) return compiledStages();
+  return r.rows.map((x: any) => ({
+    key: String(x.key), label: String(x.label),
+    weightPct: Number(x.weight_pct) || 0, position: Number(x.position) || 0,
+    slaDays: x.sla_days == null ? null : Number(x.sla_days),
+    active: x.active !== false,
+    dot: x.dot ? String(x.dot) : "#A2A9B4",
+    terminal: x.terminal === "won" || x.terminal === "lost" ? x.terminal : null,
+    exitCriterion: x.exit_criterion == null ? null : String(x.exit_criterion),
+    openLines: Number(x.open_lines) || 0,
+  }));
+}
+
+function compiledStages(): StageRow[] {
+  return SALES_STAGES.map((st) => ({
+    key: st.key, label: st.label, weightPct: st.weightPct, position: st.position,
+    slaDays: st.stalls ? sales.STALL_DAYS : null, active: true, dot: st.dot, terminal: st.terminal,
+    exitCriterion: st.exitCriterion ?? null, openLines: 0,
+  }));
+}
+
+/** Every key a line may be stored on, active or not: an existing deal on a paused rung is still a
+ *  valid row, and a write that refused it would strand it. */
+export async function stageKeys(): Promise<string[]> {
+  return (await listStages()).map((s) => s.key);
+}
+
+async function defaultPipelineId(): Promise<number | null> {
+  if (!pool) return null;
+  const r = await pool.query("SELECT id FROM pipelines WHERE product IS NULL ORDER BY id LIMIT 1");
+  return r.rowCount ? Number(r.rows[0].id) : null;
+}
+
+export async function createStage(v: {
+  key: string; label: string; weightPct: number; position: number;
+  slaDays: number | null; active: boolean; exitCriterion: string | null;
+}): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const id = await defaultPipelineId();
+  if (id == null) return false;
+  const r = await pool.query(
+    `INSERT INTO pipeline_stages (pipeline_id, key, label, weight_pct, position, exit_criterion, sla_days, active, dot, terminal)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL) ON CONFLICT (pipeline_id, key) DO NOTHING`,
+    [id, v.key, v.label, v.weightPct, v.position, v.exitCriterion, v.slaDays, v.active, "#656B76"]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function updateStage(key: string, v: {
+  label: string; weightPct: number; position: number; slaDays: number | null;
+  active: boolean; exitCriterion: string | null;
+}): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(
+    `UPDATE pipeline_stages ps SET label = $2, weight_pct = $3, position = $4, sla_days = $5,
+            active = $6, exit_criterion = $7
+       FROM pipelines p
+      WHERE ps.pipeline_id = p.id AND p.product IS NULL AND ps.key = $1`,
+    [key, v.label, v.weightPct, v.position, v.slaDays, v.active, v.exitCriterion]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function deleteStage(key: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(
+    `DELETE FROM pipeline_stages ps USING pipelines p
+      WHERE ps.pipeline_id = p.id AND p.product IS NULL AND ps.key = $1`, [key]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export type DivisionRow = {
+  id: number; name: string; ownerMemberId: number | null; ownerName: string | null;
+  ownerEmail: string | null; active: boolean; products: number; members: number;
+};
+
+export async function listDivisions(): Promise<DivisionRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT d.id, d.name, d.owner_member_id, d.active, m.name AS owner_name, m.email AS owner_email,
+            (SELECT COUNT(*) FROM product_meta pm WHERE pm.division_id = d.id) AS products,
+            (SELECT COUNT(*) FROM team_members tm WHERE tm.division_id = d.id) AS members
+       FROM divisions d LEFT JOIN team_members m ON m.id = d.owner_member_id
+      ORDER BY d.name`);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), name: String(x.name),
+    ownerMemberId: x.owner_member_id == null ? null : Number(x.owner_member_id),
+    ownerName: x.owner_name ? String(x.owner_name) : null,
+    ownerEmail: x.owner_email ? String(x.owner_email) : null,
+    active: x.active !== false,
+    products: Number(x.products) || 0, members: Number(x.members) || 0,
+  }));
+}
+
+export async function createDivision(v: { name: string; ownerMemberId: number | null; active: boolean }): Promise<number | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO divisions (name, owner_member_id, active, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$4) ON CONFLICT (name) DO NOTHING RETURNING id`,
+    [v.name, v.ownerMemberId, v.active, now]);
+  return r.rowCount ? Number(r.rows[0].id) : null;
+}
+
+export async function updateDivision(id: number, v: { name: string; ownerMemberId: number | null; active: boolean }): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(
+    `UPDATE divisions SET name = $2, owner_member_id = $3, active = $4, updated_at = $5 WHERE id = $1`,
+    [id, v.name, v.ownerMemberId, v.active, Date.now()]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function deleteDivision(id: number): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query("DELETE FROM divisions WHERE id = $1", [id]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export type MemberRow = {
+  id: number; name: string; email: string; role: string;
+  divisionId: number | null; division: string | null; active: boolean; escalations: number;
+};
+
+export async function listMembers(): Promise<MemberRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT m.id, m.name, m.email, m.role, m.division_id, m.active, d.name AS division,
+            (SELECT COUNT(*) FROM escalations e WHERE e.to_member_id = m.id) AS escalations
+       FROM team_members m LEFT JOIN divisions d ON d.id = m.division_id
+      ORDER BY m.name`);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), name: String(x.name), email: String(x.email), role: String(x.role),
+    divisionId: x.division_id == null ? null : Number(x.division_id),
+    division: x.division ? String(x.division) : null,
+    active: x.active !== false, escalations: Number(x.escalations) || 0,
+  }));
+}
+
+export async function memberById(id: number): Promise<MemberRow | null> {
+  const all = await listMembers();
+  return all.find((m) => m.id === id) ?? null;
+}
+
+export async function createMember(v: { name: string; email: string; role: string; divisionId: number | null; active: boolean }): Promise<number | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO team_members (name, email, role, division_id, active, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$6) ON CONFLICT (email) DO NOTHING RETURNING id`,
+    [v.name, v.email, v.role, v.divisionId, v.active, now]);
+  return r.rowCount ? Number(r.rows[0].id) : null;
+}
+
+export async function updateMember(id: number, v: { name: string; email: string; role: string; divisionId: number | null; active: boolean }): Promise<"ok" | "missing" | "email_taken"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const clash = await pool.query("SELECT 1 FROM team_members WHERE email = $1 AND id <> $2", [v.email, id]);
+  if (clash.rowCount) return "email_taken";
+  const r = await pool.query(
+    `UPDATE team_members SET name = $2, email = $3, role = $4, division_id = $5, active = $6, updated_at = $7 WHERE id = $1`,
+    [id, v.name, v.email, v.role, v.divisionId, v.active, Date.now()]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+/** A member who has been escalated to is never deleted — the record of who was asked outlives the
+ *  directory entry. The caller turns that into «أوقفه بدل حذفه». */
+export async function deleteMember(id: number): Promise<"ok" | "missing" | "referenced"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const used = await pool.query("SELECT 1 FROM escalations WHERE to_member_id = $1 LIMIT 1", [id]);
+  if (used.rowCount) return "referenced";
+  const r = await pool.query("DELETE FROM team_members WHERE id = $1", [id]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+export type EscalationRow = {
+  id: number; oppId: number; kind: string; toMemberId: number | null; toName: string; toEmail: string;
+  reason: string; delivery: string; createdBy: string | null; createdAt: number;
+  resolvedAt: number | null; resolvedBy: string | null;
+  account: string | null; product: string | null;
+};
+
+export async function listEscalations(oppId?: number): Promise<EscalationRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT e.*, o.account_name, o.product
+       FROM escalations e LEFT JOIN opportunities o ON o.id = e.opp_id
+      WHERE ($1::bigint IS NULL OR e.opp_id = $1)
+      ORDER BY e.created_at DESC LIMIT 500`, [oppId ?? null]);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), oppId: Number(x.opp_id), kind: String(x.kind),
+    toMemberId: x.to_member_id == null ? null : Number(x.to_member_id),
+    toName: String(x.to_name), toEmail: String(x.to_email), reason: String(x.reason),
+    delivery: String(x.delivery), createdBy: x.created_by ? String(x.created_by) : null,
+    createdAt: Number(x.created_at) || 0,
+    resolvedAt: x.resolved_at == null ? null : Number(x.resolved_at),
+    resolvedBy: x.resolved_by ? String(x.resolved_by) : null,
+    account: x.account_name ? String(x.account_name) : null,
+    product: x.product ? String(x.product) : null,
+  }));
+}
+
+export async function createEscalation(v: {
+  oppId: number; kind: string; member: { id: number; name: string; email: string };
+  reason: string; by: string; delivery: string;
+}): Promise<EscalationRow | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const r = await pool.query(
+    `INSERT INTO escalations (opp_id, kind, to_member_id, to_name, to_email, reason, delivery, created_by, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+    [v.oppId, v.kind, v.member.id, v.member.name, v.member.email, v.reason, v.delivery, v.by, Date.now()]);
+  if (!r.rowCount) return null;
+  const rows = await listEscalations(v.oppId);
+  return rows.find((e) => e.id === Number(r.rows[0].id)) ?? null;
+}
+
+export async function resolveEscalation(id: number, by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(
+    "UPDATE escalations SET resolved_at = $2, resolved_by = $3 WHERE id = $1 AND resolved_at IS NULL",
+    [id, Date.now(), by]);
   return (r.rowCount ?? 0) > 0;
 }
 
@@ -2718,7 +3062,7 @@ export async function updatePackage(id: number, p: { name: string; listPrice: nu
   }
 }
 
-/** «إزالة مستهدف الربع»: the row goes, so the quarter reads «بلا مستهدف» rather than «٠». */
+/** «إزالة مستهدف الربع»: the row goes, so the quarter reads «بلا مستهدف» rather than «0». */
 export async function deleteTarget(product: string, year: number, quarter: number): Promise<boolean> {
   if (!(await reprobe()) || !pool) return false;
   const r = await pool.query(`DELETE FROM targets WHERE product = $1 AND year = $2 AND quarter = $3`, [product, year, quarter]);
@@ -2740,9 +3084,9 @@ export type ProductPerformanceRow = {
  *    the window — the salesPerformance rule, so this screen reconciles to «المستهدفات والأداء».
  *  · won / lost lines: same predicate per terminal stage, over the fiscal year.
  *  · open value: UNWEIGHTED, all periods, PRICED lines only; unpriced lines are counted, not summed,
- *    because «٠ ر.س» over a line nobody priced is a claim, not a figure. open_lines counts EVERY open
+ *    because «0 ر.س» over a line nobody priced is a claim, not a figure. open_lines counts EVERY open
  *    line (priced or not) — the same predicate as impactOf and the opps list, so the record's
- *    «بند واحد · ١ بلا تسعير» and its «الفرص المفتوحة ٢» link can no longer disagree. No weighted number leaves
+ *    «بند واحد · 1 بلا تسعير» and its «الفرص المفتوحة 2» link can no longer disagree. No weighted number leaves
  *    this function — the home band keeps its own and labels it «المرجَّح».
  *  · target: NULL when no row, so «بلا مستهدف» is distinguishable from an explicit zero.
  */

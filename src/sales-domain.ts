@@ -325,7 +325,7 @@ export const SALES_DOMAIN_JS: string = [
  *
  *  Returns NULL when there is no quoted reference, and that is the common case rather than an edge
  *  one: five of the six products publish no price at all («يحدده المختص» — quoted case by case).
- *  A screen must render «لم يُحدَّد» for those, never ٠٪, because zero percent off list is a claim
+ *  A screen must render «لم يُحدَّد» for those, never 0٪, because zero percent off list is a claim
  *  and no-published-price is the absence of one. */
 export function offListPct(
   value: number, quotedListPrice: number | null, quantity: number, quotedYears: number | null,
@@ -410,8 +410,8 @@ export function gateAVerdict(
 ): { verdict: "pass" | "fail" | "unmeasured"; reasons: string[] } {
   if (median === null) return { verdict: "unmeasured", reasons: ["لا أيام عمل في المدة المختارة"] };
   const reasons: string[] = [];
-  if (median < GATE_A_MIN_MEDIAN) reasons.push("الوسيط أقل من ٣ تفاعلات في يوم العمل");
-  if (loggedPct !== null && loggedPct < GATE_A_MIN_LOGGED_PCT) reasons.push("أقل من نصف التفاعلات سُجّلت خلال ٢٤ ساعة");
+  if (median < GATE_A_MIN_MEDIAN) reasons.push("الوسيط أقل من 3 تفاعلات في يوم العمل");
+  if (loggedPct !== null && loggedPct < GATE_A_MIN_LOGGED_PCT) reasons.push("أقل من نصف التفاعلات سُجّلت خلال 24 ساعة");
   return { verdict: reasons.length ? "fail" : "pass", reasons };
 }
 

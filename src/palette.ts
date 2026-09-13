@@ -163,7 +163,7 @@ function palPaint() {
             '<span class="ph">' + esc(r.phone) + "</span>";
         } else if (r.kind === "route") {
           /* The rail's live counts again, here — the launcher is where you look before you decide
-             where to go, so «فرص البيع ٤» belongs in it as much as on the row itself. */
+             where to go, so «فرص البيع 4» belongs in it as much as on the row itself. */
           tail = r.badge ? '<span class="st"><span class="d" style="background:#7A5600;"></span>' + r.badge + "</span>" : "";
         } else if (r.sub) {
           tail = '<span class="ph">' + esc(clip(r.sub, 34)) + "</span>";

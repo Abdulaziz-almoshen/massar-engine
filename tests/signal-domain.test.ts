@@ -163,7 +163,8 @@ describe("readSeriousness", () => {
     expect(silence?.points).toBeLessThan(0);
     // 8, not 9: the customer spoke a minute INTO the ninth day back, and only fully elapsed days
     // are counted. Reporting the partial day as whole would overstate a silence by a day.
-    expect(silence?.evidence).toContain("٨ أيام");
+    // Western digits since 2026-09-13 (founder: «make all numbers in english numerals»).
+    expect(silence?.evidence).toContain("8 أيام");
     expect(read.daysSilent).toBe(8);
   });
 

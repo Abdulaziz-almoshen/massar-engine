@@ -1,0 +1,415 @@
+// settings-crm.ts — «إعدادات النظام»: the sales ladder, the company's divisions, and the team
+// directory escalations point at. Three tables, one shape.
+//
+// Everything here is an ADMIN surface: it changes what every other screen shows. So each table
+// states the consequence next to the control — how many opportunities sit on a stage before it can
+// be paused, how many products a division owns before it can be deleted — rather than letting the
+// operator discover it from a rejected write.
+//
+// The rules come from config-domain (serialised into the page), so a control this screen disables
+// and a write the server refuses give the same reason in the same words.
+//
+// NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
+
+export const SETTINGS_CRM_CSS = `
+.cf { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:cfw; }
+.cf-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
+.cf-h { display:flex; align-items:center; gap:var(--s3); min-height:56px; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
+.cf-h h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
+.cf-h .s { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
+.cf-h .sp { flex:1; }
+.cf-t { display:flex; flex-direction:column; }
+.cf-hr, .cf-r { display:grid; gap:var(--s3); align-items:center; padding:var(--s2) var(--s4); }
+.cf-hr { min-height:40px; background:var(--surface); font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+.cf-r { min-height:56px; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
+.cf-r:hover { background:var(--accent-wash); }
+.cf-r.off { color:var(--muted); }
+.cf-stages .cf-hr, .cf-stages .cf-r { grid-template-columns:44px minmax(0,1.6fr) 92px 104px 128px minmax(0,1fr) auto; }
+.cf-divs .cf-hr, .cf-divs .cf-r { grid-template-columns:minmax(0,1.4fr) minmax(0,1.4fr) 96px 96px 110px auto; }
+.cf-team .cf-hr, .cf-team .cf-r { grid-template-columns:minmax(0,1.2fr) minmax(0,1.6fr) 110px minmax(0,1fr) 110px auto; }
+.cf-nm { font-weight:500; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cf-sub { font-size:var(--t-xs); color:var(--muted); }
+.cf-num { font-variant-numeric:tabular-nums; }
+.cf-pos { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:var(--r-sm);
+  background:var(--surface-2); font-size:var(--t-xs); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.cf-dot { width:10px; height:10px; border-radius:var(--r-pill); display:inline-block; flex:none; margin-inline-end:8px; vertical-align:middle; }
+.cf-pill { font-size:var(--t-xs); font-weight:600; border-radius:var(--r-pill); padding:3px 10px; display:inline-flex; align-items:center; gap:5px; }
+.cf-pill.on { background:var(--s-issued-wash, #ECFAF3); color:var(--s-issued-text); }
+.cf-pill.off { background:var(--surface-2); color:var(--muted); }
+.cf-pill.lock { background:var(--accent-tint); color:var(--accent-deep); }
+.cf-acts { display:flex; gap:var(--s2); justify-content:flex-end; flex-wrap:wrap; }
+.cf-acts .btn { height:32px; padding-inline:10px; font-size:var(--t-xs); }
+.cf-ed { border-top:1px solid var(--line-soft); background:var(--accent-wash); padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
+.cf-g { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:var(--s3); }
+.cf-fl { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.cf-fl label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+.cf-fl .inp, .cf-fl select { font-family:inherit; width:100%; height:38px; min-height:38px; font-size:var(--t-sm); color:var(--ink);
+  background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:10px; }
+.cf-fl .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
+.cf-fl .inp[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
+.cf-fl .inp:focus, .cf-fl select:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); outline:none; }
+.cf-fl .hint { font-size:var(--t-xs); color:var(--muted); }
+.cf-err { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; }
+.cf-note { font-size:var(--t-xs); color:var(--muted); line-height:1.7; padding:var(--s3) var(--s4); }
+.cf-state { padding:var(--s4); font-size:var(--t-sm); color:var(--muted); display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
+.cf :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@container cfw (max-width: 900px) {
+  .cf-stages .cf-hr, .cf-divs .cf-hr, .cf-team .cf-hr { display:none; }
+  .cf-stages .cf-r, .cf-divs .cf-r, .cf-team .cf-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
+  .cf-r > * { min-width:0; }
+  .cf-acts { grid-column:1 / -1; justify-content:flex-start; }
+}
+`;
+
+export const SETTINGS_CRM_JS = `
+/* ================= «إعدادات النظام» ================= */
+var cfStages = null, cfDivs = [], cfTeam = [], cfLoading = false, cfFailed = false;
+var cfEdit = null;      /* { kind:"stage"|"division"|"member", id, d:{}, err, field, busy } */
+var cfShowOff = false;  /* paused rows are hidden by default: the ladder people work is the live one */
+
+function cfT() { return { headers: { "x-admin-token": TOKEN } }; }
+function cfJson(method, url, body) {
+  /* No Content-Type without a body: Fastify answers 400 «Body cannot be empty when
+     content-type is set to application/json» — which is how a DELETE silently did nothing. */
+  var headers = body === undefined ? { "x-admin-token": TOKEN } : { "x-admin-token": TOKEN, "Content-Type": "application/json" };
+  return fetch(url, { method: method, headers: headers,
+    body: body === undefined ? undefined : JSON.stringify(body) })
+    .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j || {} }; }); });
+}
+function cfIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
+function cfToast(m, bad) { if (typeof opToast === "function") opToast(m, bad); else if (typeof moToast === "function") moToast(m); }
+function cfPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
+function cfNOpp(n) { return cfPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
+function cfNProd(n) { return cfPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
+function cfNMember(n) { return cfPl(n, "عضو واحد", "عضوان", "أعضاء", "عضوًا"); }
+function cfNDay(n) { return cfPl(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
+
+var cfPending = false;   /* a forced reload asked for WHILE one is in flight */
+function cfLoad(force) {
+  /* A write finishes, asks for a reload, and gets dropped because a read was already running — so
+     the screen keeps showing the row the server just deleted. Remember the request instead. */
+  if (cfLoading) { if (force) cfPending = true; return; }
+  if (cfStages && !force) return;
+  if (cfFailed && !force) return;
+  cfLoading = true;
+  fetch("/admin/config", cfT()).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (j) {
+    cfStages = j.stages || []; cfDivs = j.divisions || []; cfTeam = j.team || []; cfFailed = false;
+    /* The board, the drawer and every stage select read the LIVE ladder from here on: an admin who
+       adds a rung sees it on the board without a reload, and a paused rung stops being offered. */
+    if (typeof OPP_ST !== "undefined") {
+      OPP_ST = cfStages.map(function (s) {
+        return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: s.active, slaDays: s.slaDays, terminal: s.terminal };
+      });
+    }
+  }).catch(function () { cfFailed = true; })
+    .then(function () {
+      cfLoading = false;
+      if (cfPending) { cfPending = false; cfLoad(true); return; }
+      render(false);
+    });
+}
+function cfStage(key) { return (cfStages || []).filter(function (s) { return s.key === key; })[0] || null; }
+function cfMember(id) { return cfTeam.filter(function (m) { return String(m.id) === String(id); })[0] || null; }
+function cfDivision(id) { return cfDivs.filter(function (d) { return String(d.id) === String(id); })[0] || null; }
+function cfRoleLabel(r) { return TEAM_ROLE_LABELS[r] || r; }
+
+/* ---- one editor for all three tables: same shape, same keyboard, same error line ---- */
+function cfOpen(kind, id, d) { cfEdit = { kind: kind, id: id, d: d, err: "", field: "", busy: false }; render(false); }
+function cfClose() { cfEdit = null; render(false); }
+function cfSet(k, v) { if (cfEdit) { cfEdit.d[k] = v; cfEdit.err = ""; cfEdit.field = ""; } }
+function cfFieldErr(f) { return cfEdit && cfEdit.field === f ? ' aria-invalid="true"' : ""; }
+function cfInput(id, label, value, extra, hint) {
+  return '<div class="cf-fl"><label for="' + id + '">' + label + '</label><input class="inp' + (extra && extra.num ? " num" : "") + '" id="' + id +
+    '" data-cfset="' + (extra && extra.k) + '" value="' + esc(value == null ? "" : String(value)) + '"' +
+    (extra && extra.type ? ' type="' + extra.type + '"' : "") + (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") +
+    (extra && extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : "") + cfFieldErr(extra && extra.k) + ">" +
+    (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+}
+function cfSelect(id, label, k, value, opts, hint) {
+  return '<div class="cf-fl"><label for="' + id + '">' + label + '</label><select id="' + id + '" data-cfset="' + k + '">' +
+    opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
+    "</select>" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+}
+function cfEditorActions(saveLabel) {
+  return '<div class="cf-acts" style="justify-content:flex-start">' +
+    '<button class="btn btn-teal" data-cf="save"' + (cfEdit.busy ? ' disabled aria-busy="true"' : "") + ">" + (cfEdit.busy ? "جارٍ الحفظ…" : saveLabel) + "</button>" +
+    '<button class="btn btn-ghost" data-cf="cancel">إلغاء</button>' +
+    (cfEdit.err ? '<span class="cf-err" role="alert">' + cfIco("warn") + esc(cfEdit.err) + "</span>" : "") + "</div>";
+}
+
+/* ================= the ladder ================= */
+function cfStageEditor() {
+  var d = cfEdit.d, isNew = !cfEdit.id;
+  var terminal = !isNew && isTerminalStageKey(cfEdit.id);
+  var h = '<div class="cf-ed">';
+  h += '<div class="cf-g">' +
+    cfInput("cf_label", "اسم المرحلة", d.label, { k: "label", max: 40, ph: "مثال: مراجعة قانونية" }) +
+    cfInput("cf_weight", "الوزن ٪", d.weightPct, { k: "weightPct", num: true, type: "number" }, terminal ? "وزن مرحلتي الربح والخسارة ثابت" : "احتمال الإغلاق على هذه المرحلة") +
+    cfInput("cf_pos", "الترتيب", d.position, { k: "position", num: true, type: "number" }) +
+    cfInput("cf_sla", "مدة الالتزام (أيام)", d.slaDays, { k: "slaDays", num: true, type: "number", ph: "بلا مدة" }, "بعدها تُعلَّم الفرصة «متأخرة» — اتركها فارغة بلا التزام") +
+    cfSelect("cf_active", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّلة"], ["", "موقوفة"]], terminal ? "لا تُوقف" : "الموقوفة لا تُعرض للاختيار") +
+    "</div>";
+  h += '<div class="cf-fl">' + cfInput("cf_exit", "شرط الانتقال منها", d.exitCriterion, { k: "exitCriterion", max: 200, ph: "ما الذي يجب أن يتحقق قبل نقل الفرصة من هنا؟" }) + "</div>";
+  return h + cfEditorActions(isNew ? "أضف المرحلة" : "احفظ التغييرات") + "</div>";
+}
+function cfStagesView() {
+  var h = '<section class="cf-sec cf-stages"><div class="cf-h"><div><h2>مراحل البيع</h2>' +
+    '<div class="s">الترتيب والأوزان تُستخدم في اللوحة والتوقعات · «مدة الالتزام» تحدد متى تُعلَّم الفرصة متأخرة</div></div><span class="sp"></span>' +
+    '<button class="px-toggle" aria-pressed="' + cfShowOff + '" data-cf="showoff">' + (cfShowOff ? cfIco("check") : "") + "إظهار الموقوفة</button>" +
+    (cfEdit && cfEdit.kind === "stage" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة مرحلة</button>"
+      : '<button class="btn btn-teal" id="cfaddstage" data-cf="addstage">' + cfIco("plus") + "إضافة مرحلة</button>") + "</div>";
+  if (cfEdit && cfEdit.kind === "stage" && !cfEdit.id) h += cfStageEditor();
+  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>#</span><span>المرحلة</span><span>الوزن</span><span>مدة الالتزام</span><span>الحالة</span><span>الفرص عليها</span><span></span></div>';
+  var rows = (cfStages || []).filter(function (s) { return cfShowOff || s.active || s.openLines; });
+  if (!rows.length) h += '<div class="cf-state">لا مراحل مطابقة.</div>';
+  rows.forEach(function (s) {
+    var editing = cfEdit && cfEdit.kind === "stage" && cfEdit.id === s.key;
+    var terminal = isTerminalStageKey(s.key);
+    h += '<div class="cf-r' + (s.active ? "" : " off") + '" data-cfrow="' + esc(s.key) + '">';
+    h += '<span class="cf-pos">' + fmtN(s.position) + "</span>";
+    h += '<span class="cf-nm"><i class="cf-dot" style="background:' + esc(s.dot || "#A2A9B4") + '"></i>' + esc(s.label) +
+      (s.exitCriterion ? '<span class="cf-sub"> · ' + esc(s.exitCriterion) + "</span>" : "") + "</span>";
+    h += '<span class="cf-num">' + fmtN(s.weightPct) + "٪</span>";
+    h += "<span>" + (s.slaDays ? cfNDay(s.slaDays) : '<span class="cf-sub">بلا مدة</span>') + "</span>";
+    h += "<span>" + (terminal ? '<span class="cf-pill lock">' + cfIco("check") + "أساسية</span>"
+      : s.active ? '<span class="cf-pill on">مفعّلة</span>' : '<span class="cf-pill off">موقوفة</span>') + "</span>";
+    h += '<span class="cf-num">' + (s.openLines ? cfNOpp(s.openLines) : '<span class="cf-sub">لا فرص</span>') + "</span>";
+    h += '<span class="cf-acts">' +
+      '<button class="btn btn-ghost" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
+      (terminal ? "" : '<button class="btn btn-ghost" data-cf="delstage" data-k="' + esc(s.key) + '">حذف</button>') + "</span>";
+    h += "</div>";
+    if (editing) h += cfStageEditor();
+  });
+  h += "</div>";
+  h += '<div class="cf-note">مفتاح المرحلة (' + esc((cfStages || []).map(function (s) { return s.key; }).slice(0, 3).join(" · ")) +
+    ' …) لا يتغيّر بعد إنشائها: الفرص المسجّلة وسجل التحركات تشير إليه. الاسم والوزن والترتيب والمدة والحالة تُعدَّل متى شئت.</div>';
+  return h + "</section>";
+}
+
+/* ================= divisions ================= */
+function cfDivisionEditor() {
+  var d = cfEdit.d;
+  var owners = [["", "بلا مسؤول"]].concat(cfTeam.filter(function (m) { return m.active; }).map(function (m) { return [String(m.id), m.name + " · " + cfRoleLabel(m.role)]; }));
+  var h = '<div class="cf-ed"><div class="cf-g">' +
+    cfInput("cf_dname", "اسم القسم", d.name, { k: "name", max: 60, ph: "مثال: قسم الصحة" }) +
+    cfSelect("cf_downer", "مسؤول القسم", "ownerMemberId", d.ownerMemberId == null ? "" : String(d.ownerMemberId), owners, "من سجل الفريق") +
+    cfSelect("cf_dactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّل"], ["", "موقوف"]]) +
+    "</div>";
+  return h + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف القسم") + "</div>";
+}
+function cfDivisionsView() {
+  var h = '<section class="cf-sec cf-divs"><div class="cf-h"><div><h2>الأقسام</h2>' +
+    '<div class="s">وحدات الشركة — كل منتج يتبع قسمًا، وكل عضو فريق يعمل داخل قسم. غير «القطاع»، الذي يصف سوق المنتج.</div></div><span class="sp"></span>' +
+    (cfEdit && cfEdit.kind === "division" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة قسم</button>"
+      : '<button class="btn btn-teal" id="cfadddiv" data-cf="adddiv">' + cfIco("plus") + "إضافة قسم</button>") + "</div>";
+  if (cfEdit && cfEdit.kind === "division" && !cfEdit.id) h += cfDivisionEditor();
+  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>القسم</span><span>المسؤول</span><span>المنتجات</span><span>الأعضاء</span><span>الحالة</span><span></span></div>';
+  if (!cfDivs.length) h += '<div class="cf-state">لا أقسام بعد.<span class="cf-sub">أضف قسمًا ثم اربط به منتجاته وأعضاءه.</span></div>';
+  cfDivs.forEach(function (d) {
+    var editing = cfEdit && cfEdit.kind === "division" && cfEdit.id === d.id;
+    h += '<div class="cf-r' + (d.active ? "" : " off") + '" data-cfrow="div' + d.id + '">';
+    h += '<span class="cf-nm">' + esc(d.name) + "</span>";
+    h += "<span>" + (d.ownerName ? esc(d.ownerName) + '<span class="cf-sub"> · <bdi>' + esc(d.ownerEmail || "") + "</bdi></span>" : '<span class="cf-sub">بلا مسؤول</span>') + "</span>";
+    h += '<span class="cf-num">' + (d.products ? cfNProd(d.products) : '<span class="cf-sub">لا منتجات</span>') + "</span>";
+    h += '<span class="cf-num">' + (d.members ? cfNMember(d.members) : '<span class="cf-sub">لا أعضاء</span>') + "</span>";
+    h += "<span>" + (d.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
+    h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editdiv" data-i="' + d.id + '">تعديل</button>' +
+      '<button class="btn btn-ghost" data-cf="deldiv" data-i="' + d.id + '">حذف</button></span></div>';
+    if (editing) h += cfDivisionEditor();
+  });
+  return h + "</div></section>";
+}
+
+/* ================= the team ================= */
+function cfMemberEditor() {
+  var d = cfEdit.d;
+  var divs = [["", "بلا قسم"]].concat(cfDivs.map(function (x) { return [String(x.id), x.name]; }));
+  var roles = TEAM_ROLES.map(function (r) { return [r, cfRoleLabel(r)]; });
+  var h = '<div class="cf-ed"><div class="cf-g">' +
+    cfInput("cf_mname", "الاسم", d.name, { k: "name", max: 60 }) +
+    cfInput("cf_memail", "البريد", d.email, { k: "email", max: 120, type: "email", ph: "name@company.com" }, "إليه يذهب التصعيد وطلب الدعم") +
+    cfSelect("cf_mrole", "الدور", "role", d.role, roles, "الدعم يستقبل طلبات الدعم · الإدارة تستقبل التصعيد") +
+    cfSelect("cf_mdiv", "القسم", "divisionId", d.divisionId == null ? "" : String(d.divisionId), divs) +
+    cfSelect("cf_mactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّل"], ["", "موقوف"]]) +
+    "</div>";
+  return h + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف العضو") + "</div>";
+}
+function cfTeamView() {
+  var h = '<section class="cf-sec cf-team"><div class="cf-h"><div><h2>الفريق</h2>' +
+    '<div class="s">الأشخاص الذين يُصعَّد إليهم ويُطلب منهم الدعم — الاسم والبريد والدور والقسم.</div></div><span class="sp"></span>' +
+    (cfEdit && cfEdit.kind === "member" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة عضو</button>"
+      : '<button class="btn btn-teal" id="cfaddmember" data-cf="addmember">' + cfIco("plus") + "إضافة عضو</button>") + "</div>";
+  if (cfEdit && cfEdit.kind === "member" && !cfEdit.id) h += cfMemberEditor();
+  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>الاسم</span><span>البريد</span><span>الدور</span><span>القسم</span><span>الحالة</span><span></span></div>';
+  if (!cfTeam.length) h += '<div class="cf-state">لا أعضاء بعد.<span class="cf-sub">التصعيد وطلب الدعم يحتاجان شخصًا مسجّلًا ببريده.</span></div>';
+  cfTeam.forEach(function (m) {
+    var editing = cfEdit && cfEdit.kind === "member" && cfEdit.id === m.id;
+    h += '<div class="cf-r' + (m.active ? "" : " off") + '" data-cfrow="mem' + m.id + '">';
+    h += '<span class="cf-nm">' + esc(m.name) + "</span>";
+    h += '<span class="cf-nm"><bdi>' + esc(m.email) + "</bdi></span>";
+    h += "<span>" + esc(cfRoleLabel(m.role)) + "</span>";
+    h += "<span>" + (m.division ? esc(m.division) : '<span class="cf-sub">بلا قسم</span>') + "</span>";
+    h += "<span>" + (m.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
+    h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editmember" data-i="' + m.id + '">تعديل</button>' +
+      '<button class="btn btn-ghost" data-cf="delmember" data-i="' + m.id + '">حذف</button></span></div>';
+    if (editing) h += cfMemberEditor();
+  });
+  return h + "</div></section>";
+}
+
+function vSettings(which) {
+  cfLoad(false);
+  var h = '<div class="cf">';
+  if (cfStages === null && !cfFailed) {
+    return h + '<section class="cf-sec"><div class="cf-state" aria-busy="true">جارٍ تحميل الإعدادات…</div></section></div>';
+  }
+  if (cfFailed && cfStages === null) {
+    return h + '<section class="cf-sec"><div class="cf-state" role="alert">تعذّر تحميل الإعدادات.' +
+      '<button class="btn btn-ghost" data-cf="retry">أعد المحاولة</button></div></section></div>';
+  }
+  if (cfFailed) h += '<section class="cf-sec"><div class="cf-state" role="alert">' + cfIco("warn") +
+    'تعذّر التحديث — المعروض آخر نسخة محمّلة.<button class="btn btn-ghost" data-cf="retry">أعد المحاولة</button></div></section>';
+  h += which === "divisions" ? cfDivisionsView() : which === "team" ? cfTeamView() : cfStagesView();
+  return h + "</div>";
+}
+
+/* ---- writes ---- */
+function cfSaveStage() {
+  var e = cfEdit, d = e.d;
+  var taken = (cfStages || []).map(function (s) { return s.key; });
+  var checked = checkStage({
+    label: d.label, weightPct: Number(d.weightPct), position: Number(d.position),
+    slaDays: d.slaDays, active: !!d.active, exitCriterion: d.exitCriterion,
+  }, taken, e.id || undefined);
+  if (!checked.ok) { e.err = checked.reason; e.field = checked.field; render(false); return; }
+  e.busy = true; render(false);
+  var req = e.id ? cfJson("PATCH", "/admin/config/stages/" + encodeURIComponent(e.id), checked.value)
+    : cfJson("POST", "/admin/config/stages", checked.value);
+  req.then(function (r) {
+    e.busy = false;
+    if (!r.ok) { e.err = r.j.detail || "تعذّر الحفظ (" + fmtN(r.status) + ")"; e.field = r.j.field || ""; render(false); return; }
+    cfEdit = null; cfLoad(true);
+    cfToast(e.id ? "حُفظت المرحلة" : "أُضيفت المرحلة «" + checked.value.label + "»", false);
+  }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
+}
+function cfDeleteStage(key) {
+  var s = cfStage(key); if (!s) return;
+  var checked = checkStageDelete(key, s.openLines);
+  if (!checked.ok) { cfToast(checked.reason, true); return; }
+  cfJson("DELETE", "/admin/config/stages/" + encodeURIComponent(key)).then(function (r) {
+    if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
+    cfLoad(true); cfToast("حُذفت المرحلة «" + s.label + "»", false);
+  }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
+}
+function cfSaveDivision() {
+  var e = cfEdit, d = e.d;
+  var owner = d.ownerMemberId ? cfMember(d.ownerMemberId) : null;
+  var checked = checkDivision({ name: d.name, ownerMemberId: d.ownerMemberId, active: !!d.active },
+    cfDivs.map(function (x) { return x.name; }), owner, e.id ? (cfDivision(e.id) || {}).name : undefined);
+  if (!checked.ok) { e.err = checked.reason; e.field = checked.field; render(false); return; }
+  e.busy = true; render(false);
+  var req = e.id ? cfJson("PATCH", "/admin/config/divisions/" + e.id, checked.value)
+    : cfJson("POST", "/admin/config/divisions", checked.value);
+  req.then(function (r) {
+    e.busy = false;
+    if (!r.ok) { e.err = r.j.detail || "تعذّر الحفظ (" + fmtN(r.status) + ")"; e.field = r.j.field || ""; render(false); return; }
+    cfEdit = null; cfLoad(true);
+    if (typeof pcLoad === "function") pcLoad(true);
+    cfToast(e.id ? "حُفظ القسم" : "أُضيف القسم «" + checked.value.name + "»", false);
+  }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
+}
+function cfDeleteDivision(id) {
+  var d = cfDivision(id); if (!d) return;
+  var checked = checkDivisionDelete(d.products, d.members);
+  if (!checked.ok) { cfToast(checked.reason, true); return; }
+  cfJson("DELETE", "/admin/config/divisions/" + id).then(function (r) {
+    if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
+    cfLoad(true); if (typeof pcLoad === "function") pcLoad(true);
+    cfToast("حُذف القسم «" + d.name + "»", false);
+  }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
+}
+function cfSaveMember() {
+  var e = cfEdit, d = e.d;
+  var checked = checkMember({ name: d.name, email: d.email, role: d.role, divisionId: d.divisionId, active: !!d.active });
+  if (!checked.ok) { e.err = checked.reason; e.field = checked.field; render(false); return; }
+  e.busy = true; render(false);
+  var req = e.id ? cfJson("PATCH", "/admin/config/team/" + e.id, checked.value)
+    : cfJson("POST", "/admin/config/team", checked.value);
+  req.then(function (r) {
+    e.busy = false;
+    if (!r.ok) { e.err = r.j.detail || "تعذّر الحفظ (" + fmtN(r.status) + ")"; e.field = r.j.field || ""; render(false); return; }
+    cfEdit = null; cfLoad(true);
+    cfToast(e.id ? "حُفظ العضو" : "أُضيف «" + checked.value.name + "» إلى الفريق", false);
+  }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
+}
+function cfDeleteMember(id) {
+  var m = cfMember(id); if (!m) return;
+  if (m.escalations) { cfToast("عليه تصعيدات مسجّلة — أوقفه بدل حذفه.", true); return; }
+  cfJson("DELETE", "/admin/config/team/" + id).then(function (r) {
+    if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
+    cfLoad(true); cfToast("حُذف «" + m.name + "» من الفريق", false);
+  }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
+}
+
+/* ---- one delegated listener, like every other CRM surface here ---- */
+document.addEventListener("click", function (ev) {
+  var t = ev.target && ev.target.closest ? ev.target.closest("[data-cf]") : null;
+  if (!t) return;
+  var a = t.getAttribute("data-cf");
+  if (a === "retry") { cfFailed = false; cfLoad(true); return; }
+  if (a === "showoff") { cfShowOff = !cfShowOff; render(false); return; }
+  if (a === "addstage") {
+    var nextPos = ((cfStages || []).reduce(function (n, s) { return Math.max(n, s.position); }, 0)) + 1;
+    cfOpen("stage", "", { label: "", weightPct: 50, position: nextPos, slaDays: "", active: true, exitCriterion: "" });
+    setTimeout(function () { var f = document.getElementById("cf_label"); if (f) f.focus(); }, 0); return;
+  }
+  if (a === "editstage") {
+    var s = cfStage(t.getAttribute("data-k")); if (!s) return;
+    cfOpen("stage", s.key, { label: s.label, weightPct: s.weightPct, position: s.position, slaDays: s.slaDays == null ? "" : s.slaDays, active: s.active, exitCriterion: s.exitCriterion || "" });
+    setTimeout(function () { var f = document.getElementById("cf_label"); if (f) f.focus(); }, 0); return;
+  }
+  if (a === "delstage") { cfDeleteStage(t.getAttribute("data-k")); return; }
+  if (a === "adddiv") { cfOpen("division", 0, { name: "", ownerMemberId: "", active: true }); setTimeout(function () { var f = document.getElementById("cf_dname"); if (f) f.focus(); }, 0); return; }
+  if (a === "editdiv") {
+    var d = cfDivision(Number(t.getAttribute("data-i"))); if (!d) return;
+    cfOpen("division", d.id, { name: d.name, ownerMemberId: d.ownerMemberId == null ? "" : d.ownerMemberId, active: d.active });
+    setTimeout(function () { var f = document.getElementById("cf_dname"); if (f) f.focus(); }, 0); return;
+  }
+  if (a === "deldiv") { cfDeleteDivision(Number(t.getAttribute("data-i"))); return; }
+  if (a === "addmember") { cfOpen("member", 0, { name: "", email: "", role: "sales", divisionId: "", active: true }); setTimeout(function () { var f = document.getElementById("cf_mname"); if (f) f.focus(); }, 0); return; }
+  if (a === "editmember") {
+    var m = cfMember(Number(t.getAttribute("data-i"))); if (!m) return;
+    cfOpen("member", m.id, { name: m.name, email: m.email, role: m.role, divisionId: m.divisionId == null ? "" : m.divisionId, active: m.active });
+    setTimeout(function () { var f = document.getElementById("cf_mname"); if (f) f.focus(); }, 0); return;
+  }
+  if (a === "delmember") { cfDeleteMember(Number(t.getAttribute("data-i"))); return; }
+  if (a === "cancel") { cfClose(); return; }
+  if (a === "save") {
+    if (!cfEdit) return;
+    if (cfEdit.kind === "stage") cfSaveStage();
+    else if (cfEdit.kind === "division") cfSaveDivision();
+    else cfSaveMember();
+  }
+});
+document.addEventListener("input", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var k = t.getAttribute("data-cfset"); if (!k || !cfEdit) return;
+  cfSet(k, t.value);
+});
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var k = t.getAttribute("data-cfset"); if (!k || !cfEdit) return;
+  cfSet(k, k === "active" ? !!t.value : t.value);
+});
+document.addEventListener("keydown", function (ev) {
+  if (!cfEdit) return;
+  if (ev.key === "Escape") { ev.preventDefault(); cfClose(); return; }
+  if (ev.key === "Enter" && ev.target && ev.target.getAttribute && ev.target.getAttribute("data-cfset")) {
+    ev.preventDefault();
+    if (cfEdit.kind === "stage") cfSaveStage(); else if (cfEdit.kind === "division") cfSaveDivision(); else cfSaveMember();
+  }
+});
+`;

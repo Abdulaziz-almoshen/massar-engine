@@ -29,6 +29,8 @@ import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
 import { SALES_DOMAIN_JS } from "./sales-domain.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
+import { CONFIG_DOMAIN_JS } from "./config-domain.js";
+import { SETTINGS_CRM_CSS, SETTINGS_CRM_JS } from "./settings-crm.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -334,7 +336,7 @@ export const DASHBOARD_HTML = `<!doctype html>
   .kcard .kv { font-size: 28px; font-weight: 600; color: #14161A; line-height: 1.2;
     font-variant-numeric: tabular-nums; margin-top: 6px; }
   /* Arrow + word + colour. Never colour alone (DESIGN.md 3.0b), and a still week says so in the
-     off channel rather than showing a green «+٠». */
+     off channel rather than showing a green «+0». */
   .kcard .kd { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px;
     font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
   .kcard .kd.up { background: #E4F5EC; color: #12633F; }
@@ -701,6 +703,7 @@ ${TASKS_CRM_CSS}
 ${PRODUCTS_CRM_CSS}
 ${REPORTS_CRM_CSS}
 ${TARGETS_CRM_CSS}
+${SETTINGS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${PALETTE_CSS}
@@ -725,6 +728,7 @@ ${HOLD_CSS}
 <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 3v4h4M9 12h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.2v2.3M12 18.5v2.3M4.8 12H2.5M21.5 12h-2.3M6.9 6.9 5.3 5.3M18.7 18.7l-1.6-1.6M6.9 17.1l-1.6 1.6M18.7 5.3l-1.6 1.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </defs></svg>
 <div class="app">
@@ -787,7 +791,7 @@ let manualOpen = false; let manualStat = ""; let oppTab = "scheduled"; let oppQ 
  *  reaches a write always came from a name the write path will accept. */
 let tagReg = [];
 // Elapsed time in the unit a person would say it in. Below two days an hour count is what the
-// operator acts on («٩ ساعات بلا متابعة»); above it, hours stop being information.
+// operator acts on («9 ساعات بلا متابعة»); above it, hours stop being information.
 function fmtAgo(ms) {
   if (!ms || ms < 0) return "";
   const h = Math.round(ms / 3600e3);
@@ -824,7 +828,7 @@ function pageSlice(key, rows) {
   const m = pageOf(key, rows.length);
   return rows.slice((m.p - 1) * m.size, m.p * m.size);
 }
-// The range and the total are ALWAYS stated, even on one page — «٦١–١٢٠ من ١٬٧٠٠» is the sentence
+// The range and the total are ALWAYS stated, even on one page — «61–120 من 1٬700» is the sentence
 // that tells the reader the list continues, and its absence is what made truncation look complete.
 function pageBar(key, total, unit) {
   const m = pageOf(key, total);
@@ -858,7 +862,7 @@ let showTest = false;         // sandbox separation: test traffic hidden from re
 // not the first thing on the screen. Defaulting to «الكل» made the list read as clutter.
 let campQ = ""; let campTab = "real"; let campSortKey = "new";   // campaigns list controls
 let showTestDecided = false;
-let profileData = null;       // العميل ٣٦٠ payload for the open #customer/<phone> route
+let profileData = null;       // العميل 360 payload for the open #customer/<phone> route
 let profilePhone = "";        // phone the loaded profile belongs to
 let profileCampaign = "";     // campaign id the read is scoped to ("" = lifetime)
 // ملف العميل — the ONE field open in the editor, never a whole-form mode: { key, val, err, sel }.
@@ -868,7 +872,7 @@ let insCache = {};            // phone → cached فهم المساعد (list ro
 let winloss = null;           // «لماذا نكسب ولماذا نخسر» aggregate (cached reads only)
 let retargetCohort = null;    // {label, campaign, targets:[{phone,name}]} — set from a campaign's filtered cohort
 let lastDetailCohort = null;  // captured at render time by vKmonDetail (current filter + search)
-let campMsg = "في أغلب المنشآت الصحية، إصدار {product} يمر بخطوات ورقية متكررة بين النظام الداخلي والجهات الرسمية.\\n\\nما نقدمه في لِين هو ربط مباشر مع نظام HIS لديكم: الإجراء يُنفَّذ من داخل نظامكم بتوثيق رسمي معتمد، فيقل زمن الإصدار بنسبة تصل إلى ٧٠٪ ويختفي الإدخال المزدوج.\\n\\nأرفقنا ملفًا موجزًا يوضح آلية الربط والخطوات.\\n\\nسؤال واحد لنعرف ما يناسبكم: كم فرعًا لديكم تقريبًا؟";
+let campMsg = "في أغلب المنشآت الصحية، إصدار {product} يمر بخطوات ورقية متكررة بين النظام الداخلي والجهات الرسمية.\\n\\nما نقدمه في لِين هو ربط مباشر مع نظام HIS لديكم: الإجراء يُنفَّذ من داخل نظامكم بتوثيق رسمي معتمد، فيقل زمن الإصدار بنسبة تصل إلى 70٪ ويختفي الإدخال المزدوج.\\n\\nأرفقنا ملفًا موجزًا يوضح آلية الربط والخطوات.\\n\\nسؤال واحد لنعرف ما يناسبكم: كم فرعًا لديكم تقريبًا؟";
 
 // SIX DOORS, NOT FIFTEEN. The rule from the design record: what is not an independent noun in the
 // user's work is not a door in the rail. Fifteen items was accumulation, not information
@@ -885,6 +889,9 @@ const NAV = [
   { id: "products",  l: "المنتجات",  i: "flame" },
   { id: "kmon",      l: "الحملات",   i: "send" },
   { id: "reports",   l: "التقارير",  i: "chart" },
+  // «الإعدادات» is an ADMIN door, so it sits last: the ladder, the divisions and the team decide
+  // what every screen above it shows, and none of them is a daily destination.
+  { id: "settings",  l: "الإعدادات",  i: "gear" },
 ];
 
 // Sub-destinations per door, in tab order. The FIRST entry is the door's own landing route, so a
@@ -901,6 +908,7 @@ const SUBS = {
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
+  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"]],
 };
 
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
@@ -927,6 +935,9 @@ const TITLES = {
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
+  divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
+  team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
@@ -1006,7 +1017,7 @@ function nav() {
   // request, and nothing that can be stale in a way the screen behind it is not.
   //   فرص البيع  — appointments confirmed for today: the calls you owe before the day ends.
   //   المهام     — tasks past due, only once the tasks route has actually loaded them; a badge
-  //                that guesses «٠» before the fetch is a lie for the whole session.
+  //                that guesses «0» before the fetch is a lie for the whole session.
   const badges = PAL_BADGES();
   // A door carries the badge of ANY route beneath it, because the count is of work owed and the
   // work did not move when the rail shrank. Summed, not replaced: المهام sits under العملاء now,
@@ -1062,7 +1073,7 @@ function nav() {
 }
 
 // win scopes the delivery chip to a campaign. On a campaign screen the row chip read «ردّ» from
-// lifetime state while the counter beside it correctly read «ردّوا ٠» — the same screen
+// lifetime state while the counter beside it correctly read «ردّوا 0» — the same screen
 // contradicting itself, which is precisely what the founder catches. Default 0 keeps every
 // contact-centric caller lifetime-scoped, explicitly.
 function chipRow(c, win) {
@@ -1082,7 +1093,12 @@ function chipRow(c, win) {
   if (!out.length) out.push('<span class="chip c-grey">جديد</span>');
   return out.join(" ");
 }
-const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+/* ONE NUMERAL SYSTEM, AND IT IS THE WESTERN ONE (founder, 2026-09-13: «make all numbers in
+   english numerals»). The locale below keeps the Arabic words — month and weekday names,
+   grouping — and «-u-nu-latn» switches only the digits, so nothing re-orders and no string is
+   hand-mapped. It is written out at each site rather than shared: check-props.mjs LIFTS
+   fmtDay() out of this file and executes it alone, and a shared constant is not in that slice. */
+const fmtT = (ts) => new Date(ts).toLocaleTimeString("ar-SA-u-nu-latn", { hour: "2-digit", minute: "2-digit" });
 const fills = ["#1E5FCC", "#1E5FCC", "#5B8DEF", "#5B8DEF", "#1E5FCC", "#1E9E63"];
 
 function funnelData(d) {
@@ -1109,7 +1125,7 @@ function contactByPhone(phone) {
 }
 // EVERY campaign number is windowed to that campaign's launch. Without this a campaign inherits the
 // contact's whole history: two contacts who had replied hours earlier made a campaign sent minutes
-// ago report «ردّوا ٢ · شوهدت ٢ · مهتم» before the customers had even opened it. statusTimes holds
+// ago report «ردّوا 2 · شوهدت 2 · مهتم» before the customers had even opened it. statusTimes holds
 // ONE latest timestamp per status, and tags/outcome are lifetime — none of them are per-campaign,
 // so reading them raw attributes every past success to the newest send.
 function campWin(camp) {
@@ -1173,7 +1189,7 @@ function campStats(camp) {
 }
 function clip(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
 /** Arabic-Indic digits, matching every other number on these screens. */
-function fmtN(n) { return Number(n || 0).toLocaleString("ar-SA"); }
+function fmtN(n) { return Number(n || 0).toLocaleString("ar-SA-u-nu-latn"); }
 function interestChips(c) {
   if (!c) return '<span style="color:#D8DCE3;">—</span>';
   const lv = { hot: ["c-ok", "نية مرتفعة"], warm: ["c-warn", "مهتم"], cold: ["c-grey", "فاتر"] };
@@ -1205,7 +1221,7 @@ function interestChips(c) {
   if (c.outcome === "not_interested") return '<span class="chip c-grey">غير مهتم</span>';
   return '<span style="color:#D8DCE3;">—</span>';
 }
-function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { day: "numeric", month: "long" }); }
+function fmtD(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA-u-nu-latn", { day: "numeric", month: "long" }); }
 // --- THE APPOINTMENT — one moment, one reader ------------------------------
 // M3. c.scheduledAt is the ONLY stored appointment moment: tracker.writeProp writes it whenever a
 // human types a day into الخطوة التالية, and tracker.setSchedule never overwrites a day a human
@@ -1229,7 +1245,7 @@ function appt(c) {
 // The DAY a human typed, and ONLY the day. dayToMs stores 09:00 Riyadh because a day needs an hour
 // to sort by; printing that hour back would be a time no human ever typed — a fabricated fact
 // wearing a human signature, which is the exact class this cycle exists to kill.
-function fmtDay(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" }); }
+function fmtDay(ts) { return new Date(Number(ts)).toLocaleDateString("ar-SA-u-nu-latn", { weekday: "long", day: "numeric", month: "long" }); }
 // --- end appointment -------------------------------------------------------
 function contactRowsHtml(rows, win) {
   let h = "";
@@ -1404,7 +1420,7 @@ function vKmon(d) {
   });
   if (!withSt.length) {
     // Say which of the two reasons this is: an empty class, or a search that matched nothing.
-    // Rendering «لا نتائج مطابقة» beside a «تعرض ٠ حملة فعلية» explainer gave two answers at once.
+    // Rendering «لا نتائج مطابقة» beside a «تعرض 0 حملة فعلية» explainer gave two answers at once.
     h += campQ.trim()
       ? '<div style="padding:44px;text-align:center;color:#656B76;font-size:14px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#656B76;">امسح البحث أو جرّب تبويبًا آخر.</span></div>'
       : (campTab === "real"
@@ -1458,7 +1474,7 @@ function vKmonDetail(id, d) {
   const cwin = campWin(camp);   // every number on this screen is scoped to THIS campaign
   const rows = camp.targets.map((t) => ({ phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }));
   // A rate with no denominator is unknown, not zero: Math.max(1, targeted) used to print a
-  // confident ٠٪ on a campaign that never had an audience. null renders «—».
+  // confident 0٪ on a campaign that never had an audience. null renders «—».
   const pct = (v) => st.targeted ? Math.round(v / st.targeted * 100) : null;
   const pctTxt = (v) => { const r = pct(v); return r === null ? "—" : fmtN(r) + "٪"; };
   const rate = (a, b) => b ? Math.round(a / b * 100) : 0;
@@ -1472,7 +1488,7 @@ function vKmonDetail(id, d) {
     '<div style="font-size:16px;font-weight:600;margin-top:7px;line-height:1.7;">' +
     (st.replied ? "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" + (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + "." : "أُرسلت، وبانتظار الرد الأول.") + "</div></div>" +
     '<div style="display:flex;gap:30px;flex-wrap:wrap;">' +
-    [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل ١٠٠", yieldPer100]]
+    [["نسبة المشاهدة", rate(st.seen, st.targeted)], ["نسبة الردود", rate(st.replied, st.targeted)], ["جهات مهتمة لكل 100", yieldPer100]]
       .map((x) => '<div><div style="font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;">' + fmtN(x[1]) + '<span style="font-size:14px;color:#656B76;">٪</span></div><div style="font-size:12px;color:#656B76;margin-top:3px;">' + x[0] + "</div></div>").join("") +
     "</div></div>";
   const cards = [
@@ -1567,7 +1583,7 @@ function vHome(d) {
   const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
   const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
   // The leading figure and its fourteen-day series, now carried by the first card of the strip.
-  // support it. «+٢٤ خلال ٧ أيام» is a COUNT of contacts newly qualified inside that window — not a
+  // support it. «+24 خلال 7 أيام» is a COUNT of contacts newly qualified inside that window — not a
   // percentage change against a period nobody chose, and not a projection.
   const WEEK = 7 * 864e5;
   const series = qualSeries(cs, 14);
@@ -1595,7 +1611,7 @@ function vHome(d) {
   // defect as a column of «لم تُحدَّد خطوة»: text that repeats down a page ranks nothing, and the
   // reader stops seeing all five.
   const kflat = allFlat
-    ? '<span class="ksflat">لا تغيّر خلال ' + (kpiDays === 7 ? "آخر ٧ أيام" : "آخر " + fmtN(kpiDays) + " يومًا") + "</span>"
+    ? '<span class="ksflat">لا تغيّر خلال ' + (kpiDays === 7 ? "آخر 7 أيام" : "آخر " + fmtN(kpiDays) + " يومًا") + "</span>"
     : "";
   const kd = (v) => (allFlat ? null : v);
   const kstrip = '<div class="kshead"><h2>الإحصاءات</h2>' + kflat +
@@ -2102,7 +2118,7 @@ function vSegBuilder() {
     if ((pv.suppressed || []).length) notes.push("مستبعد بالتبريد: " + fmtN(pv.suppressed.length) + " (رُوسلوا حديثًا)");
     if ((pv.tooNew || []).length) notes.push("أحدث من النافذة: " + fmtN(pv.tooNew.length));
     if (pv.scanTruncated) notes.push("فُحصت أحدث " + fmtN(pv.poolSize) + " جهة فقط");
-    if (pv.overLaunchCap) notes.push("حد الدفعة الواحدة ٥٠ جهة — سترسل لأول " + fmtN(50) + " والباقي في دفعة تالية");
+    if (pv.overLaunchCap) notes.push("حد الدفعة الواحدة 50 جهة — سترسل لأول " + fmtN(50) + " والباقي في دفعة تالية");
     if (notes.length) h += '<div style="font-size:12px;color:#7A5600;margin-top:8px;line-height:1.9;">' + esc(notes.join(" · ")) + "</div>";
     h += "</div>";
     // The tenure state: a book younger than the window is a not-yet audience, not an empty one.
@@ -2111,7 +2127,7 @@ function vSegBuilder() {
         "<div><b>لا تطابق بعد — البيانات أحدث من النافذة.</b><br>أقدم جهة لديكم مضى عليها " + fmtN(pv.oldestContactDays) +
         " يومًا، والشرط يطلب " + fmtN(pv.requiredDays) + (pv.requiredDays >= 11 ? " يومًا" : " أيام") +
         ". أول تطابق متوقع بعد " + fmtN(Math.max(0, pv.requiredDays - pv.oldestContactDays)) + " أيام. " +
-        '<span class="lnk" onclick="segSetWindow(3)">اضبط النافذة إلى ٣ أيام</span></div></div>';
+        '<span class="lnk" onclick="segSetWindow(3)">اضبط النافذة إلى 3 أيام</span></div></div>';
     } else if (!pv.matched && !(pv.suppressed || []).length) {
       h += '<div class="sparse">' + ic("eye", 16, "#656B76") + "<div>لا جهة تطابق هذه الشروط. راجعوا الحدث أو وسّعوا النافذة.</div></div>";
     }
@@ -2120,7 +2136,7 @@ function vSegBuilder() {
   h += '<div style="display:flex;gap:10px;align-items:flex-start;background:#EFF1F5;border:1px solid #ECEEF2;border-inline-start:3px solid #7A5600;border-radius:10px;padding:12px 15px;font-size:12px;color:#33373E;line-height:1.9;">' +
     ic("clock", 16, "#7A5600") +
     "<div><b>الإطلاق من هذه الشريحة غير متاح بعد.</b><br>" +
-    "الجهة التي لم تردّ منذ أيام تقع خارج نافذة الـ٢٤ ساعة، ولا يصلها إلا قالب معتمد من Meta. " +
+    "الجهة التي لم تردّ منذ أيام تقع خارج نافذة الـ24 ساعة، ولا يصلها إلا قالب معتمد من Meta. " +
     "مسار الإطلاق الحالي يرسل رسائل جلسة، فلو أُتيح الزر هنا لرفضت واتساب الإرسال. " +
     "الشريحة جاهزة ومحسوبة، وينتظر ربطها بقوالب الرقم الإنتاجي.</div></div>";
   return h;
@@ -2157,7 +2173,7 @@ window.confirmLaunch = async () => {
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
     // The launch endpoint has always returned a per-recipient "failed" array carrying WHY each one
     // did not go out (opted out, outside the 24h window, never wrote to us, invalid number). This
-    // screen read only d.sent and d.requested, so the operator saw "أُرسلت ٤٧ من ٥٠" and was never
+    // screen read only d.sent and d.requested, so the operator saw "أُرسلت 47 من 50" and was never
     // told what happened to the other three. A refusal the system computed and then hid is the
     // project recurring defect: an emitted value nobody can read back.
     var failedRows = Array.isArray(d.failed) ? d.failed : [];
@@ -2287,7 +2303,7 @@ function vAimkt() {
   const selName = reg[selProd] ? reg[selProd].name : "";
   const selAsset = prodAssets.find((a) => a.product === selName);
 
-  let h = '<div class="step"><div class="hd"><span class="num done">١</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">كل منتجات قسم «المنتجات» غير المؤرشفة — ما لا يبيعه المساعد يظهر بسببه ولا يُختار.</div></div></div>' +
+  let h = '<div class="step"><div class="hd"><span class="num done">1</span><div><div class="ht">أي خدمة يبيعها المساعد؟</div><div class="hs">كل منتجات قسم «المنتجات» غير المؤرشفة — ما لا يبيعه المساعد يظهر بسببه ولا يُختار.</div></div></div>' +
     (!reg.length
       ? (typeof pcFailed !== "undefined" && pcFailed
         ? '<div role="alert" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:var(--t-sm);color:var(--s-fail-text);padding:12px 0;">تعذّر تحميل المنتجات — لا يمكن اختيار منتج ولا الإطلاق حتى تُحمَّل. <button class="btn btn-ghost" onclick="pcLoad(true)">أعد المحاولة</button></div>'
@@ -2308,7 +2324,7 @@ function vAimkt() {
       return '<button class="prod' + (i === selProd ? " on" : "") + '" aria-pressed="' + (i === selProd) + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
 
-  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">٢</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#EAF1FE;border:1px solid #DCE8FC;border-radius:11px;padding:9px 16px;"><span style="font-size:18px;font-weight:600;color:#2563EB;">' + fmtN(selN) + '</span><span style="font-size:12px;color:#2563EB;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
   if (!retargetCohort) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
@@ -2359,7 +2375,7 @@ function vAimkt() {
   }
   h += "</div>";
 
-  h += '<div class="step"><div class="hd"><span class="num">٣</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">اختر قالبًا معتمدًا، أو اكتب رسالتك. استخدم {name} لاسم الجهة و{{1}} لاسم الخدمة. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">اختر قالبًا معتمدًا، أو اكتب رسالتك. استخدم {name} لاسم الجهة و{{1}} لاسم الخدمة. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
     // The template picker. Each card states WHO it is for, because the two templates open on
     // different premises — one on a pain we assume, one on usage we already observed. Sending the
     // «استخدام مرتفع» opener to a facility that has never used the service is a visible lie.
@@ -2413,7 +2429,7 @@ function vAimkt() {
   h += '<div class="step lbar" style="position:sticky;bottom:0;margin-bottom:-56px;z-index:var(--z-sticky);display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(15,37,64,.13);border:1px solid #e2e8f1;border-bottom:none;">' +
     // In behaviour mode there is nothing to launch and the reason is not «you picked nobody» —
     // it is that this audience needs an approved template the send path does not yet use. Saying
-    // «٠ جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
+    // «0 جهة استهداف» beside a live-looking button is a dead control, which is its own defect.
     (audMode === "behaviour" && !retargetCohort
       ? '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:500;color:#14161A;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
         '<div style="font-size:12px;color:#656B76;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
@@ -2434,7 +2450,7 @@ function vAimkt() {
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #5B8DEF;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:16px;font-weight:600;color:#14161A;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
     '<div style="font-size:14px;color:#33373E;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2563EB;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
-    (selN > 50 ? '<div style="font-size:12px;color:#B37F00;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>٥٠</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
+    (selN > 50 ? '<div style="font-size:12px;color:#B37F00;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#33373E;background:#E5E8EE;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
   return h;
@@ -2567,7 +2583,7 @@ function vKbProduct(name) {
   const pa0 = prodAssets.find((a) => a.product === name);
   // The readiness ring is DELETED. r.sc has been null on every row since round 22 scrubbed the six
   // authored knowledge scores, so the ring resolved to (r.hub ? 100 : 0) and drew a two-state
-  // boolean as a percentage — «١٠٠٪ جاهزية معرفة المساعد» meaning nothing more than «a file was
+  // boolean as a percentage — «100٪ جاهزية معرفة المساعد» meaning nothing more than «a file was
   // uploaded». A percentage that can only ever be 0 or 100 is an invented number wearing a gauge.
   // The same two states are already stated in words by the chip beside the title.
 
@@ -2709,7 +2725,7 @@ window.entManualSave = async () => {
   const rows = manualRows.filter((r) => r.name.trim() || r.phone.trim());
   const st = document.getElementById("entstat");
   if (!rows.length) { if (st) st.innerHTML = '<span class="chip c-warn">أدخل جهة واحدة على الأقل</span>'; return; }
-  const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-9٠-٩]/g, "").length < 9);
+  const bad = rows.filter((r) => !r.name.trim() || r.phone.replace(/[^0-90-9]/g, "").length < 9);
   if (bad.length) { if (st) st.innerHTML = '<span class="chip c-bad">تحقّق من الاسم والجوال في ' + fmtN(bad.length) + ' صف</span>'; return; }
   if (st) st.innerHTML = '<span class="chip c-teal">جارٍ الحفظ…</span>';
   const text = rows.map((r) => [r.name.trim(), r.phone.trim(), r.size.trim(), r.city.trim()].filter(Boolean).join("، ")).join("\\n");
@@ -2795,7 +2811,7 @@ function vMorningList() {
     ["stopped", "لا يرغب في التواصل", "#8E2A27", "توقّف الإرسال إليهم"],
   ];
   // A confirmed day decides the bucket, not c.outcome. An interested clinic whose day the operator
-  // typed was rendering «موعد مؤكَّد: الثلاثاء ٢٥ أغسطس» UNDER the heading «مهتم بلا موعد» — the
+  // typed was rendering «موعد مؤكَّد: الثلاثاء 25 أغسطس» UNDER the heading «مهتم بلا موعد» — the
   // header denying the row beneath it, on the one screen whose job is «who do I call today».
   const of = (k) => cs.filter((c) => {
     // appt() returns NULL when there is no appointment — the common case on this list. The gate
@@ -2919,7 +2935,7 @@ function daySeries(items, tsOf, days) {
 }
 /* One KPI card: label, figure, a delta chip, and a sparkline when there is a real series.
    The chip is an ARROW plus a WORD plus colour, never colour alone (DESIGN.md 3.0b), and a week
-   with no movement says so in the off channel rather than showing a green «+٠». */
+   with no movement says so in the off channel rather than showing a green «+0». */
 function kpiCard(label, value, delta, unitWord, series) {
   const spark = series && series.some((v) => v > 0)
     ? '<div class="ksp">' + sparkArea(series, 92, 30) + "</div>" : "";
@@ -2970,8 +2986,8 @@ function sparkArea(vals, w, hgt) {
 // bars this replaces could not show. The teal ramp encodes depth, which is the stage order and
 // nothing else; it is not a second meaning smuggled in as colour.
 function ratesStrip(agg) {
-  // A rate whose denominator is zero is not «٠٪», it is unmeasured. Returning null here is what
-  // stops «٠٪ من جهات الاستهداف» appearing beside a figure that honestly reads «—».
+  // A rate whose denominator is zero is not «0٪», it is unmeasured. Returning null here is what
+  // stops «0٪ من جهات الاستهداف» appearing beside a figure that honestly reads «—».
   const pct = (a, b) => (b ? Math.round(a / b * 100) : null);
   const rows = [
     ["نسبة الوصول", pct(agg.delivered, agg.sent || agg.targeted), "من التي أُرسلت"],
@@ -3030,7 +3046,7 @@ function winLossBoard() {
   for (var i = 5; i >= 0; i--) {
     var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({ t0: d.getTime(), t1: new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime(),
-      won: 0, lost: 0, label: d.toLocaleDateString("ar-SA-u-ca-gregory", { month: "short" }) });
+      won: 0, lost: 0, label: d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { month: "short" }) });
   }
   if (rows) {
     rows.forEach(function (o) {
@@ -3046,7 +3062,7 @@ function winLossBoard() {
   var mx = Math.max(1, Math.max.apply(null, months.map(function (m) { return Math.max(m.won, m.lost); })));
   var any = months.some(function (m) { return m.won || m.lost; });
   var head = '<div class="hbhead"><div><h3 style="margin:0;">الصفقات: ربح وخسارة</h3>' +
-    '<div class="hbsub">آخر ٦ أشهر · بتاريخ دخول المرحلة</div></div>' +
+    '<div class="hbsub">آخر 6 أشهر · بتاريخ دخول المرحلة</div></div>' +
     '<div class="hblg" style="margin:0"><span><i class="s-win"></i>ربح</span><span><i class="s-lose"></i>خسارة</span></div></div>';
   if (rows === null) {
     return '<div class="card" style="margin:0;">' + head + moSkeleton(3, ["w80", "w60", "w40"]) + "</div>";
@@ -3137,7 +3153,7 @@ function activityBoard(cs) {
       bars = '<i class="seg-in" style="height:' + Math.max(h, v > 0 ? 2 : 0) + '%"></i>';
     }
     var lab = (i % showEvery === 0 || isLast)
-      ? d.d.toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "numeric" }) : "";
+      ? d.d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "numeric" }) : "";
     return '<div class="hbcol' + (isLast ? " last" : "") + '">' +
       '<span class="hbval">' + (v > 0 ? fmtN(v) : "") + "</span>" +
       '<span class="hbstack">' + bars + "</span>" +
@@ -3154,13 +3170,13 @@ function activityBoard(cs) {
 function vHomeCharts(cs) {
   // The command centre is contact-centric: its KPI row, action queue and win/loss board all ask
   // «is this a real customer?». The funnel must ask the SAME question, or the two disagree on one
-  // screen — «ردّوا ٤» above «ردّوا ٠» under «بيانات فعلية فقط». Campaign-level classification is
+  // screen — «ردّوا 4» above «ردّوا 0» under «بيانات فعلية فقط». Campaign-level classification is
   // for the campaigns LIST; here a launch counts when it reached at least one real contact.
   const camps = showTest ? campaigns : campaigns.filter((cp) =>
     (cp.targets || []).some((t) => { const c = contactByPhone(t.phone); return c && !c.test; }));
   // Count PEOPLE, not target rows. One contact can sit in several launches (ياسمين is in three),
-  // so summing per-campaign stats turned four people into six and put «ردّوا ٦» under a KPI card
-  // reading «ردّوا ٤» on the same screen. The KPI row counts distinct contacts; so does this.
+  // so summing per-campaign stats turned four people into six and put «ردّوا 6» under a KPI card
+  // reading «ردّوا 4» on the same screen. The KPI row counts distinct contacts; so does this.
   const seenPhones = new Set();
   const reached = [];
   camps.forEach((cp) => (cp.targets || []).forEach((t) => {
@@ -3272,7 +3288,7 @@ function vActionQueue(cs, notifyNumber, nTest) {
   const items = [];
   hotIdle.slice(0, 4).forEach((c) => items.push({ c, dot: "#8E2A27", why: "مؤهلة وبلا متابعة منذ " + hrs(c),
     act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
-  fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#12633F", why: "فرصة جديدة · تفاعل خلال آخر ٢٤ ساعة",
+  fresh.slice(0, 4).forEach((c) => items.push({ c, dot: "#12633F", why: "فرصة جديدة · تفاعل خلال آخر 24 ساعة",
     act: (insCache[c.phone] || {}).next_action || "", href: "customer/" + c.phone }));
   if (seenNoReply.size) items.push({ c: null, icon: "eye", dot: "#7A5600", name: "شاهدوا الرسالة دون ردّ",
     why: fmtN(seenNoReply.size) + " جهة", act: "أعد التواصل برسالة تبرز أثرًا تشغيليًا مختلفًا", href: "kmon" });
@@ -3420,7 +3436,7 @@ function vSignalBoard(d) {
     '<div style="min-width:96px;"><div style="font-size:12px;font-weight:600;color:#656B76;letter-spacing:0;">' + label + "</div>" +
     '<div style="font-size:14px;font-weight:600;margin-top:3px;color:' + (ink || "#14161A") + ';">' + value + "</div></div>";
 
-  // Reply speed, in the unit a human would say it in. «١٤٤ دقيقة» is arithmetic; «ساعتين» is an
+  // Reply speed, in the unit a human would say it in. «144 دقيقة» is arithmetic; «ساعتين» is an
   // answer, and arAgo already owns that agreement for the whole portal.
   const speed = s.replyMinutes === null || s.replyMinutes === undefined
     ? '<span style="color:#656B76;font-weight:500;">لم يردّ بعد</span>'
@@ -3487,7 +3503,7 @@ function vSignalBoard(d) {
     '<span style="font-size:28px;font-weight:600;color:' + bd[0] + ';line-height:1.1;">' + fmtN(s.score) + "</span>" +
     '<span class="chip" style="background:' + bd[1] + ";color:" + bd[0] + ';font-size:12px;padding:4px 11px;">' + esc(s.bandLabel) + "</span></div>" +
     '<div style="display:flex;gap:3px;margin-top:10px;max-width:230px;">' + meter + "</div>" +
-    '<div style="font-size:12px;color:#656B76;margin-top:5px;">من ١٠٠</div></div>' +
+    '<div style="font-size:12px;color:#656B76;margin-top:5px;">من 100</div></div>' +
     // 2 — the three measured stats
     '<div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;">' +
     stat("الزخم", '<span style="color:' + mv[1] + ';">' + mv[0] + "</span> " + esc(s.momentumLabel), null) +
@@ -3515,7 +3531,7 @@ function vSignalBoard(d) {
 }
 /** Pixel counts are CSS, not Arabic prose — they must stay Latin or the style attribute is invalid.
  *  Named so check-numerals sees a formatter rather than a raw concatenation, and so the next
- *  reader cannot mistake it for fmtN and print «٣٨px» into a stylesheet. */
+ *  reader cannot mistake it for fmtN and print «38px» into a stylesheet. */
 function fmtN2(n) { return String(Number(n) || 0); }
 /** Counted days in agreeing Arabic, so the chart's own window length is never a hardcoded word
  *  that a change to the window would quietly falsify. */
@@ -3834,7 +3850,7 @@ function vFactsPanel(d) {
   let h = '<div class="card" style="margin:0;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
     '<h3 style="margin:0;">ملف العميل</h3>' +
-    // S2 — the chip read «ناقص ٥» above SIX visibly dashed rows, because سبب الاستبعاد is shown and
+    // S2 — the chip read «ناقص 5» above SIX visibly dashed rows, because سبب الاستبعاد is shown and
     // deliberately not counted. He checks a number against what he can see within seconds, so the
     // denominator is named here and the uncounted row says «· اختياري» below. The count and the
     // rows agree now without pretending an un-excluded customer is a gap.
@@ -4034,7 +4050,7 @@ function vCustomer(ph) {
     // sentence was «ماني مهتم لا تتصل علي». A percentage also implies a ceiling the conversation can
     // reach; there is none. This reports counts, whose turn it is, and the customer's own words.
     // The engagement column is DELETED. «كلمة من العميل» with a progress bar implied a ceiling
-    // that does not exist, «العميل ٢٥ · المساعد ٣٣» is not a sales signal, and the voice field picked the
+    // that does not exist, «العميل 25 · المساعد 33» is not a sales signal, and the voice field picked the
     // LONGEST customer message as their representative line — which is why «مافهمت خلاص كنسل», a
     // complaint, was being displayed as this customer's highlight. The outcome strip above shows a
     // quote sourced to the DECISION instead of to length. Whose turn it is survives, in one line.
@@ -4277,7 +4293,7 @@ window.reloadProfile = () => { profileData = null; render(false); refresh(); };
 let _viewSig = "";
 function stamp() {
   const u = document.getElementById("upd");
-  if (u) u.textContent = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  if (u) u.textContent = new Date().toLocaleTimeString("ar-SA-u-nu-latn", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 function dataSignature() {
   const cs = (cache && cache.contacts) || [];
@@ -4349,7 +4365,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4365,6 +4381,7 @@ function render(fetchNew) {
       : cur === "notes" ? vNotesCrm()
       : cur === "products" ? vProductsCrm()
       : cur === "reports" ? vReportsCrm()
+      : cur === "settings" || cur === "divisions" || cur === "team" ? vSettings(cur)
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4391,7 +4408,7 @@ function render(fetchNew) {
   }
 }
 // The count-up animation was removed. It shipped a runtime TypeError (Math.roundfmtN), then sat
-// dead for a day because the values became Arabic-Indic and its parseInt stripped ٠-٩ to NaN.
+// dead for a day because the values became Arabic-Indic and its parseInt stripped 0-9 to NaN.
 // The parse was fixed and it still could not be demonstrated running under a browser with motion
 // enabled, so it is gone rather than carried as decoration nobody can verify. The .rise entrance
 // transitions remain and are CSS-only.
@@ -4722,8 +4739,10 @@ ${PRODUCTS_CRM_JS}
 ${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
+${SETTINGS_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
+${CONFIG_DOMAIN_JS}
 ${SALES_DOMAIN_JS}
 ${OPPS_CRM_JS}
 ${SALES_CRM_JS}
