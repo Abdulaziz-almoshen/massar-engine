@@ -529,6 +529,8 @@ export const DASHBOARD_HTML = `<!doctype html>
   .prod.on { background: #EAF1FE; border-color: #5B8DEF; box-shadow: 0 0 0 3px rgba(63,182,176,.12); }
   .prod.prod-off { cursor: pointer; background-color: #F7F8FA; background-image: repeating-linear-gradient(115deg, #E5E8EE 0 1px, transparent 1px 6px); }
   .prod.prod-off .pn { color: var(--ink-2); }
+  /* the reason is a sentence, not a tag: it wraps inside the card instead of running off its edge */
+  .prod .chip { max-width: 100%; white-space: normal; line-height: 1.55; align-items: flex-start; text-align: start; }
   .prod .pn { font-size: 14px; font-weight: 600; color: #14161A; margin-bottom: 12px; }
   .prod .sc { font-size: 22px; font-weight: 600; }
   .prod .scl { font-size: 12px; color: #656B76; }
