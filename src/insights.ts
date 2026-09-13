@@ -483,7 +483,7 @@ export async function getInsights(c: Contact, entity: EntityRow | null, force = 
   const turns = (c.transcript || []).length;
   const inbound = (c.transcript || []).filter((t) => t.role === "customer").length;
   if (inbound < 2) {
-    return { summary: "لا تزال قراءة المساعد قيد التعلّم لهذه الجهة، لوجود أقل من رسالتين واردتين.", intent: "none", signals: [], objections: [], product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })), next_action: inbound === 1 ? "انتظر مزيدًا من سياق المحادثة، أو تابع برسالة مهنية بعد يوم عمل" : "أدرج الجهة في حملة تعريفية", why: "لا يتوفر سياق كافٍ لتحليل المحادثة حتى الآن.", best_time: "صباح يوم العمل القادم (٩–١١ص)", learning: true };
+    return { summary: "لا تزال قراءة المساعد قيد التعلّم لهذه الجهة، لوجود أقل من رسالتين واردتين.", intent: "none", signals: [], objections: [], product_interest: (c.tags || []).map((t) => ({ product: t.product, level: t.level === "hot" ? "high" as const : t.level === "warm" ? "medium" as const : "low" as const })), next_action: inbound === 1 ? "انتظر مزيدًا من سياق المحادثة، أو تابع برسالة مهنية بعد يوم عمل" : "أدرج الجهة في حملة تعريفية", why: "لا يتوفر سياق كافٍ لتحليل المحادثة حتى الآن.", best_time: "صباح يوم العمل القادم (9–11ص)", learning: true };
   }
   if (!force) {
     const cached = await db.getInsightsRow(c.phone);

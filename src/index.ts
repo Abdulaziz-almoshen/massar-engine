@@ -2131,8 +2131,8 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   // Stages an EDIT may land on: the active ones, plus the rung this line already sits on — pausing a
   // rung must not trap the deals on it, and must not become a way to move new deals onto it either
   // (config-domain.isStageSelectable, the same rule the picker uses).
-  const current = (await db.listOpps()).find((o) => Number(o.id) === id);
-  const allowedStages = [...new Set([...(await db.activeStageKeys()), ...(current ? [String(current.stage)] : [])])];
+  const currentStage = await db.oppStageOf(id);
+  const allowedStages = [...new Set([...(await db.activeStageKeys()), ...(currentStage ? [currentStage] : [])])];
   const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, allowedStages);
   if (bad && !(bad === "product" && b.product === undefined)) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });

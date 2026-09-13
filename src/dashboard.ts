@@ -777,7 +777,7 @@ if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token"
 let TOKEN = localStorage.getItem("massar_admin_token") || "";
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let cache = null; let selProd = 0; let selProdName = "";
+let cache = null; let selProd = 0; let selProdName = ""; let selLost = "";
 // Behavioural segmentation. audMode «file» keeps the existing column-chip picker; «behaviour»
 // builds a live segment over the ledger. The two are modes of ONE step, not separate screens:
 // a behavioural audience is by definition outside WhatsApp's 24h window, so it can only be
@@ -1947,11 +1947,11 @@ window.campNameSet = (el) => { campName = el.value; };
 // silently swap the product a campaign is about to sell. A product the assistant cannot sell is not
 // selectable at all (V5 checklist 22/28).
 window.wizOpenProd = (name) => { location.hash = "#product/" + encodeURIComponent(name) + "/knowledge"; };
-window.pick = (i) => { const r = wizProducts(); if (!r[i] || r[i].eligible === false) return; selProd = i; selProdName = r[i].name; render(false); };
+window.pick = (i) => { const r = wizProducts(); if (!r[i] || r[i].eligible === false) return; selProd = i; selProdName = r[i].name; selLost = ""; render(false); };
 window.launchWithProduct = (name) => {
   const reg = wizProducts();
   const i = reg.findIndex((x) => x.name === name);
-  selProdName = name;
+  selProdName = name; selLost = "";
   if (i >= 0) selProd = i;
   retargetCohort = null;
   location.hash = "aimkt";
@@ -2292,18 +2292,22 @@ function vAimkt() {
   // A NAMED selection that is gone (archived, renamed, or no longer sellable) clears itself and says
   // so — it is never replaced by whatever product now sits at that index. Substituting one silently
   // is how a campaign gets launched for the wrong service.
+  // The loss is STICKY. Clearing it inside one render only lasts until the next one — a keystroke in
+  // the audience box re-entered the «nothing chosen yet» branch and silently picked the first
+  // eligible product, which is the exact substitution this block exists to prevent. selLost lives at
+  // module scope and is cleared only by pick(), i.e. by the operator choosing again.
   const byName = selProdName ? reg.findIndex((x) => x.name === selProdName) : -1;
-  let lostSelection = "";
-  if (selProdName && byName < 0) { lostSelection = selProdName; selProdName = ""; selProd = -1; }
-  else if (byName >= 0 && reg[byName].eligible === false) { lostSelection = selProdName; selProdName = ""; selProd = -1; }
+  if (selProdName && byName < 0) { selLost = selProdName; selProdName = ""; selProd = -1; }
+  else if (byName >= 0 && reg[byName].eligible === false) { selLost = selProdName; selProdName = ""; selProd = -1; }
   else if (byName >= 0) selProd = byName;
-  else if (!selProdName) {
-    // Nothing chosen yet: land on the first product the assistant can actually sell.
+  else if (!selProdName && !selLost) {
+    // Nothing chosen YET (never chosen, and nothing lost): land on the first sellable product.
     const firstOk = reg.findIndex((x) => x.eligible !== false);
     selProd = firstOk;
     selProdName = firstOk >= 0 ? reg[firstOk].name : "";
   }
   if (selProd >= 0 && (!reg[selProd] || reg[selProd].eligible === false)) { selProd = -1; selProdName = ""; }
+  const lostSelection = selLost;
   const m = entMatches();
   const selN = launchTargets().length;
   const firstSel = retargetCohort ? retargetCohort.targets[0] : entities.find(e => entSel.has(e.id));

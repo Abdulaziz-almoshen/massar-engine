@@ -2839,6 +2839,15 @@ export async function stageKeys(): Promise<string[]> {
   return (await listStages()).map((s) => s.key);
 }
 
+/** One line's stage, by id — a single indexed read. The opportunity PATCH route needs it to decide
+ *  whether a move is onto the rung the line already sits on; doing that with listOpps() read the
+ *  whole table on every edit. */
+export async function oppStageOf(id: number): Promise<string | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const r = await pool.query("SELECT stage FROM opportunities WHERE id = $1", [id]);
+  return r.rowCount ? String(r.rows[0].stage) : null;
+}
+
 /** The keys NEW work may start on. A paused rung is not offered and not accepted — the picker and
  *  the write agree, which is the whole point of pausing one. */
 export async function activeStageKeys(): Promise<string[]> {

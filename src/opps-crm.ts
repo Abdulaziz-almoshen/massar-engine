@@ -512,7 +512,10 @@ function opNYear(n) { return opPl(n, "سنة واحدة", "سنتان", "سنو�
 
 function opStage(k) {
   for (var i = 0; i < OPP_ST.length; i++) if (OPP_ST[i].key === k) return OPP_ST[i];
-  return OPP_ST[0];
+  /* A key the ladder does not carry (a config read that failed, or a rung deleted while a line sat
+     on it) is shown AS ITSELF. Falling back to OPP_ST[0] labelled it «تواصل أولي» — a wrong stage
+     printed with full confidence. */
+  return { key: k, label: String(k || "—"), dot: "#A2A9B4", position: 99, active: true, slaDays: null, terminal: null };
 }
 function opOpenStages() { return OPP_ST.filter(function (s) { return isOpenStage(s.key); }); }
 /* A paused rung is not offered for new work, but never traps a line already on it (config-domain's
