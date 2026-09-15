@@ -41,6 +41,8 @@ import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
 import { OPP_WORK_DOMAIN_JS } from "./opp-work-domain.js";
 import { CAMPAIGN_RESULTS_CRM_CSS, CAMPAIGN_RESULTS_CRM_JS } from "./campaign-results-crm.js";
 import { CAMPAIGN_RESULTS_DOMAIN_JS } from "./campaign-results-domain.js";
+import { PARTNERS_CRM_CSS, PARTNERS_CRM_JS } from "./partners-crm.js";
+import { PARTNER_DOMAIN_JS } from "./partner-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -721,6 +723,7 @@ ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
 ${CAMPAIGN_RESULTS_CRM_CSS}
+${PARTNERS_CRM_CSS}
 ${PALETTE_CSS}
 /* LAST. The V3 shell and component language wins on cascade order — see revamp.ts. */
 ${REVAMP_CSS}
@@ -949,13 +952,13 @@ const DOOR_OF = (function () {
   return m;
 })();
 
-// products and reports are REAL screens now; partners and org are still placeholders.
-const PAL_SOON = { partners: 1, org: 1 };
+// products, reports and partners are REAL screens now; org is still a placeholder.
+const PAL_SOON = { org: 1 };
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
   aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
-  partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
+  partners: ["شركاء المبيعات", "مستهدفات التواصل الأولي لكل شريك ومنتج، وما انتهى إليه كل تواصل"],
   customers: ["المحادثات", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل بند من أول تواصل حتى الإغلاق"], triage: ["فرز الردود", "من ردّ، ومن لم يردّ، ومتى موعد المهتمين"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
@@ -4457,7 +4460,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4478,6 +4481,7 @@ function render(fetchNew) {
       : cur === "indicator" ? vIndicatorForm((location.hash || "").split("/").slice(1).join("/"))
       : cur === "accounts" ? vAccounts()
       : cur === "account" ? vAccount((location.hash || "").split("/")[1] || "")
+      : cur === "partners" ? vPartners()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4488,6 +4492,7 @@ function render(fetchNew) {
   // The indicators drawer adds its «in» class one frame after it is painted (indicators-crm).
   try { if (typeof inAfterPaint === "function") inAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof acAfterPaint === "function") acAfterPaint(); } catch (e) { /* never block a paint */ }
+  try { if (typeof ptAfterPaint === "function") ptAfterPaint(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
@@ -4854,6 +4859,8 @@ ${OPP_WORK_CRM_JS}
 ${OPP_WORK_DOMAIN_JS}
 ${CAMPAIGN_RESULTS_CRM_JS}
 ${CAMPAIGN_RESULTS_DOMAIN_JS}
+${PARTNERS_CRM_JS}
+${PARTNER_DOMAIN_JS}
 ${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain

@@ -57,6 +57,8 @@ ROUTES = [
     ("#indicator/new", "بيانات العملاء"),
     # The table header renders only when rows loaded: an outage or an empty read cannot match it.
     ("#accounts", "مصدر الإضافة"),
+    # Both the empty state and the loaded screen name the three results; the loading and error states do not.
+    ("#partners", "غير مهتم"),
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
@@ -81,6 +83,7 @@ ROUTES = [
 # blank render carries neither this nor the landmark, so nothing is weakened.
 EMPTY_OK = {
     "#kmon": "لا حملات بعد",
+    "#partners": "لا شركاء بعد",
 }
 MIN_CHARS = 400
 

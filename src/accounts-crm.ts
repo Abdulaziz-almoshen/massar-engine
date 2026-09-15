@@ -498,6 +498,16 @@ function vAccount(idRaw) {
         [r.product ? esc(r.product) : "", typeof INDICATOR_STATUS_LABELS !== "undefined" ? INDICATOR_STATUS_LABELS[r.status] || "" : ""].filter(Boolean).join(" · ") + "</span></span>" +
         (r.value ? '<span class="val">' + esc(r.value) + "</span>" : "") + "</div>";
     }).join("") : '<div class="empty">هذا العميل ليس في أي مؤشر استخدام.</div>');
+  /* BR-PRT-004: what each partner's contact with this customer came to, and whether it reached sales. */
+  if ((d.partnerResults || []).length) {
+    side += acCard("تواصل الشركاء", fmtN(d.partnerResults.length), '<a href="#partners">شركاء المبيعات</a>',
+      d.partnerResults.slice(0, 10).map(function (r) {
+        var lbl = typeof PARTNER_RESULT_LABELS !== "undefined" ? PARTNER_RESULT_LABELS[r.result] || r.result : r.result;
+        return '<div class="ac-li"><span class="grow"><span>' + esc(r.partnerName) + '</span><span class="sub">' + esc(r.product) + " · " + (typeof owDay === "function" ? owDay(r.contactedOn) : esc(r.contactedOn)) +
+          (r.oppId ? ' · <a href="#opps/' + r.oppId + '">حُوّل لفريق المبيعات</a>' : "") + "</span></span>" +
+          '<span class="cf-pill ' + (r.result === "interested" ? "ap-approved" : r.result === "not_interested" ? "imp-high" : "imp-low") + '">' + esc(lbl) + "</span></div>";
+      }).join(""));
+  }
   h += '<div class="ac-grid"><div class="ac-col">' + main + '</div><div class="ac-col">' + side + "</div></div>";
   return h + "</div>" + acModal() + (typeof inDrawer === "function" ? inDrawer() : "");
 }

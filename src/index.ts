@@ -26,6 +26,7 @@ import * as ind from "./indicator-domain.js";
 import * as acct from "./account-domain.js";
 import * as work from "./opp-work-domain.js";
 import * as results from "./campaign-results-domain.js";
+import * as partnerDom from "./partner-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -1742,6 +1743,158 @@ async function withDb(reply: any, fn: () => Promise<unknown>): Promise<unknown> 
   }
 }
 
+// ------------------------------ «شركاء المبيعات» (BRD §17, S5) ------------------------------
+
+function partnerBody(req: any): Record<string, unknown> {
+  const b = req.body;
+  return b && typeof b === "object" && !Array.isArray(b) ? (b as Record<string, unknown>) : {};
+}
+function weekParam(req: any): string | null {
+  const raw = (req.query as { week?: unknown } | undefined)?.week;
+  if (raw == null || raw === "") return partnerDom.weekStartOf(riyadhToday());
+  return partnerDom.isIsoDay(raw) ? partnerDom.weekStartOf(String(raw)) : null;
+}
+
+app.get("/admin/partners", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const week = weekParam(req);
+  if (!week) return problem(reply, 400, "invalid_field", "الأسبوع غير صالح", "week");
+  return withDb(reply, async () => {
+    const [partners, wk, live] = await Promise.all([db.listPartners(), db.partnerWeek(week, partnerDom.addDays(week, 6)), liveProductNames()]);
+    // Live products, plus any product this week's targets or results still name (an archived one): the tiles
+    // and the tables must count the same rows, and a target on an archived product must stay clearable.
+    const extra = [...new Set([...wk.targets.map((t) => t.product), ...wk.results.map((r) => r.product)])].filter((p) => live.indexOf(p) < 0).sort();
+    const products = live;
+    return { ok: true, week, archivedProducts: extra, weekEnd: partnerDom.addDays(week, 6), today: riyadhToday(), currentWeek: partnerDom.weekStartOf(riyadhToday()),
+      partners, products, targets: wk.targets, results: wk.results };
+  });
+});
+
+app.post("/admin/partners", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const checked = partnerDom.checkPartner(partnerBody(req));
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+  return withDb(reply, async () => {
+    const r = await db.createPartner(checked.value, adminName(req));
+    if ("exists" in r) return problem(reply, 409, "partner_exists", "يوجد شريك بهذا الاسم", "name");
+    return reply.code(201).header("Location", "/admin/partners/" + r.id).send({ ok: true, partner: await db.partnerById(r.id) });
+  });
+});
+
+app.patch("/admin/partners/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الشريك غير صحيح", "id");
+  const b = partnerBody(req);
+  const ifUpdatedAt = typeof b.ifUpdatedAt === "number" && Number.isInteger(b.ifUpdatedAt) ? b.ifUpdatedAt : null;
+  if (ifUpdatedAt == null) return problem(reply, 400, "invalid_field", "ifUpdatedAt مطلوب — نسخة الشريك التي بُني عليها التعديل", "ifUpdatedAt");
+  const status = typeof b.status === "string" ? b.status : "";
+  if ((partnerDom.PARTNER_STATUSES as readonly string[]).indexOf(status) < 0) return problem(reply, 400, "invalid_field", "حالة الشريك غير صالحة", "status");
+  const checked = partnerDom.checkPartner(b);
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+  return withDb(reply, async () => {
+    const r = await db.updatePartner(id, { ...checked.value, status }, ifUpdatedAt, adminName(req));
+    if (!r) return problem(reply, 404, "unknown_partner", "لا شريك بهذا الرقم", "id");
+    if ("stale" in r) return problem(reply, 409, "stale_partner", "عدّل شخص آخر هذا الشريك بعد أن فتحته");
+    if ("exists" in r) return problem(reply, 409, "partner_exists", "يوجد شريك بهذا الاسم", "name");
+    return { ok: true, partner: r };
+  });
+});
+
+app.put("/admin/partners/:id/targets", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الشريك غير صحيح", "id");
+  const b = partnerBody(req);
+  if (!partnerDom.isWeekStart(b.week)) return problem(reply, 400, "invalid_field", "الأسبوع يبدأ يوم الأحد (YYYY-MM-DD)", "week");
+  const list = Array.isArray(b.targets) ? b.targets : null;
+  if (!list || !list.length || list.length > 100) return problem(reply, 400, "invalid_field", "لا مستهدفات", "targets");
+  return withDb(reply, async () => {
+    const live = await liveProductNames();
+    // A target of 0 (removal) may name any product the catalogue has ever had; a new target only a live one.
+    const products = (await db.listTags()).map((t) => t.name);
+    const out: { product: string; target: number }[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < list.length; i++) {
+      const c = partnerDom.checkTarget((list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<string, unknown>, products);
+      if (!c.ok) return problem(reply, 400, "invalid_field", c.reason, "targets." + i + "." + c.field);
+      if (seen.has(c.value.product)) return problem(reply, 400, "invalid_field", "المنتج مكرر", "targets." + i + ".product");
+      if (c.value.target > 0 && live.indexOf(c.value.product) < 0) return problem(reply, 400, "archived_product", "المنتج مؤرشف — لا يُحدَّد له مستهدف جديد", "targets." + i + ".product");
+      seen.add(c.value.product); out.push(c.value);
+    }
+    const ok = await db.setPartnerTargets(id, String(b.week), out, adminName(req));
+    if (!ok) return problem(reply, 404, "unknown_partner", "لا شريك بهذا الرقم", "id");
+    return { ok: true };
+  });
+});
+
+app.post("/admin/partners/:id/results", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الشريك غير صحيح", "id");
+  const b = partnerBody(req);
+  const list = Array.isArray(b.results) ? b.results : null;
+  if (!list || !list.length) return problem(reply, 400, "invalid_field", "لا نتائج", "results");
+  if (list.length > partnerDom.RESULTS_BATCH_MAX) return problem(reply, 400, "invalid_field", "أكثر من " + partnerDom.RESULTS_BATCH_MAX + " نتيجة في طلب واحد", "results");
+  return withDb(reply, async () => {
+    const products = await liveProductNames();
+    const today = riyadhToday();
+    const values: partnerDom.ResultValue[] = [];
+    const seen = new Set<string>();
+    // All or nothing: one bad line refuses the batch and names it, so a paste never half-lands.
+    for (let i = 0; i < list.length; i++) {
+      const c = partnerDom.checkResult((list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<string, unknown>, products, today);
+      if (!c.ok) return problem(reply, 400, "invalid_field", c.reason, "results." + i + "." + c.field);
+      const phone = audience.normalizePhone(c.value.phone);
+      const key = c.value.product + "|" + phone + "|" + c.value.contactedOn;
+      if (seen.has(key)) return problem(reply, 400, "invalid_field", "المنشأة مكررة لنفس المنتج واليوم", "results." + i + ".phone");
+      seen.add(key); values.push({ ...c.value, phone });
+    }
+    const r = await db.recordPartnerResults(id, values, adminName(req), await db.defaultStageKey());
+    if (!r) return problem(reply, 404, "unknown_partner", "لا شريك بهذا الرقم", "id");
+    if ("paused" in r) return problem(reply, 409, "partner_paused", "الشريك موقوف — فعّله قبل تسجيل نتائج جديدة");
+    if (r.outcomes.some((o) => o.oppId != null && o.status !== "locked")) await accounts.refresh();
+    return { ok: true, outcomes: r.outcomes };
+  });
+});
+
+app.patch("/admin/partner-results/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم النتيجة غير صحيح", "id");
+  const b = partnerBody(req);
+  const ifUpdatedAt = typeof b.ifUpdatedAt === "number" && Number.isInteger(b.ifUpdatedAt) ? b.ifUpdatedAt : null;
+  if (ifUpdatedAt == null) return problem(reply, 400, "invalid_field", "ifUpdatedAt مطلوب", "ifUpdatedAt");
+  const result = typeof b.result === "string" ? b.result : "";
+  if ((partnerDom.PARTNER_RESULTS as readonly string[]).indexOf(result) < 0) return problem(reply, 400, "invalid_field", "اختر نتيجة التواصل", "result");
+  const note = typeof b.note === "string" ? b.note.trim() : "";
+  if (note.length > partnerDom.RESULT_NOTE_MAX) return problem(reply, 400, "invalid_field", "الملاحظة أطول من " + partnerDom.RESULT_NOTE_MAX + " حرفًا", "note");
+  return withDb(reply, async () => {
+    const r = await db.updatePartnerResult(id, { result, note: note || null }, ifUpdatedAt, adminName(req), await db.defaultStageKey());
+    if (!r) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
+    if ("refused" in r) {
+      if (r.refused === "handed_over") return problem(reply, 409, "result_handed_over", "حُوّل هذا العميل إلى فريق المبيعات — تُتابَع الفرصة من «فرص البيع»");
+      if (r.refused === "paused") return problem(reply, 409, "partner_paused", "الشريك موقوف — فعّله قبل تعديل نتائجه");
+      return problem(reply, 409, "stale_result", "عدّل شخص آخر هذه النتيجة بعد أن فتحتها");
+    }
+    if (r.oppId != null) await accounts.refresh();
+    return { ok: true, result: r.row, oppId: r.oppId, oppCreated: r.oppCreated };
+  });
+});
+
+app.delete("/admin/partner-results/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم النتيجة غير صحيح", "id");
+  return withDb(reply, async () => {
+    const r = await db.deletePartnerResult(id);
+    if (!r) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
+    if (r === "handed_over") return problem(reply, 409, "result_handed_over", "حُوّل هذا العميل إلى فريق المبيعات — لا تُحذف نتيجته");
+    if (r === "paused") return problem(reply, 409, "partner_paused", "الشريك موقوف — فعّله قبل تعديل نتائجه");
+    return { ok: true };
+  });
+});
+
 app.get("/admin/accounts", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   return withDb(reply, async () => {
@@ -1757,17 +1910,18 @@ app.get("/admin/accounts/:id", async (req, reply) => {
   return withDb(reply, async () => {
     const account = await db.accountById(id);
     if (!account) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-    const [activity, tasks, notes, indicators, team, oppActivities] = await Promise.all([
+    const [activity, tasks, notes, indicators, team, oppActivities, partnerResults] = await Promise.all([
       db.accountActivity(account.phone),
       db.listTasks({ kind: "contact", id: account.phone }),
       db.listNotes({ kind: "contact", id: account.phone }),
       db.indicatorsForPhone(account.phone),
       activeMemberIds(),
       db.activitiesForPhone(account.phone),
+      db.partnerResultsForPhone(account.phone),
     ]);
     const contact = tracker.findContact(account.phone);
     return {
-      ok: true, account, ...activity, indicators, members: team.members, activities: oppActivities,
+      ok: true, account, ...activity, indicators, members: team.members, activities: oppActivities, partnerResults,
       tasks: tasks.slice(0, 20).map((t) => ({ id: t.id, title: t.title, status: t.status, dueAt: t.due_at, assignedTo: t.assigned_to })),
       notes: notes.slice(0, 20).map((n) => ({ id: n.id, title: n.title, content: n.content.slice(0, 400), author: n.author, createdAt: n.created_at })),
       conversation: contact ? { lastEventAt: contact.lastEventAt, optedOut: contact.optedOut } : null,
@@ -2559,6 +2713,13 @@ app.post("/admin/opps", async (req, reply) => {
   if (source === "partner" && (!sourceRef || sourceRef.length > 120)) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: "source_ref", detail: "اكتب اسم الشريك" });
   }
+  // A typed name that is a registered partner links the line to its record (S5), so the partner's own
+  // screen counts the deal. An unregistered name is still accepted: the rep may know a partner before the
+  // admin has recorded it, and refusing the deal would lose it.
+  let partnerId: number | null = null;
+  if (source === "partner" && sourceRef && (await db.canRead())) {
+    try { const pr = await db.partnerByName(sourceRef); if (pr) partnerId = pr.id; } catch { /* the line is still worth recording */ }
+  }
   const lines = Array.isArray(b.lines) ? (b.lines as Record<string, unknown>[]) : [];
   if (!lines.length) return reply.code(400).send({ ok: false, error: "invalid_field", field: "lines" });
   if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
@@ -2588,7 +2749,7 @@ app.post("/admin/opps", async (req, reply) => {
     }
   }
   const rows = await db.createOppLines(
-    { account_name: name, phone: phone || null, source, source_ref: sourceRef, created_by: adminName(req) },
+    { account_name: name, phone: phone || null, source, source_ref: sourceRef, created_by: adminName(req), partner_id: partnerId },
     lines.map((l) => ({
       product: String(l.product).trim(),
       stage: (l.stage ?? undefined) as never,

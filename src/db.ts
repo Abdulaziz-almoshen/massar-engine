@@ -888,6 +888,61 @@ CREATE TABLE IF NOT EXISTS opp_quotes (
 CREATE INDEX IF NOT EXISTS idx_opp_quotes_opp ON opp_quotes (opp_id, created_at);
 `,
   },
+  {
+    version: "014-partners",
+    sql: `
+-- Sales and marketing partners (client A, BRD v1.0 §17 BR-PRT-001..004, slice S5).
+-- The contracted company. Names are unique regardless of case and surrounding spaces.
+CREATE TABLE IF NOT EXISTS partners (
+  id           BIGSERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  kind         TEXT NOT NULL CHECK (kind IN ('sales','marketing')),
+  contact_name TEXT,
+  phone        TEXT,
+  email        TEXT,
+  note         TEXT,
+  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused')),
+  created_by   TEXT,
+  created_at   BIGINT NOT NULL,
+  updated_by   TEXT,
+  updated_at   BIGINT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_partners_name ON partners (lower(btrim(name)));
+-- BR-PRT-001: a weekly contact target per partner and product. week_start is the Sunday, as typed days are.
+CREATE TABLE IF NOT EXISTS partner_targets (
+  partner_id  BIGINT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  product     TEXT NOT NULL,
+  week_start  TEXT NOT NULL,
+  target      INT NOT NULL CHECK (target > 0),
+  updated_by  TEXT,
+  updated_at  BIGINT NOT NULL,
+  PRIMARY KEY (partner_id, product, week_start)
+);
+-- BR-PRT-002/003: what each contact came to. One row per partner, product, customer and day; an interest
+-- handed to sales carries the opportunity it became, and is closed to the partner from then on.
+CREATE TABLE IF NOT EXISTS partner_results (
+  id            BIGSERIAL PRIMARY KEY,
+  partner_id    BIGINT NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+  product       TEXT NOT NULL,
+  account_name  TEXT NOT NULL,
+  phone         TEXT NOT NULL,
+  result        TEXT NOT NULL CHECK (result IN ('interested','not_interested','no_reply')),
+  contacted_on  TEXT NOT NULL,
+  note          TEXT,
+  opp_id        BIGINT REFERENCES opportunities(id) ON DELETE SET NULL,
+  handed_at     BIGINT,
+  recorded_by   TEXT,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL,
+  UNIQUE (partner_id, product, phone, contacted_on)
+);
+CREATE INDEX IF NOT EXISTS idx_partner_results_day ON partner_results (contacted_on, partner_id);
+CREATE INDEX IF NOT EXISTS idx_partner_results_phone ON partner_results (phone);
+-- BR-OPP-007 with a record behind it: the partner a deal came from, not only its name in source_ref.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS partner_id BIGINT REFERENCES partners(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_opportunities_partner ON opportunities (partner_id) WHERE partner_id IS NOT NULL;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -968,6 +1023,9 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   opportunities: ["id", "account_name", "phone", "product", "stage", "source", "source_ref", "lost_reason", "lost_note"],
   opp_activities: ["id", "opp_id", "phone", "kind", "occurred_on", "summary", "next_step", "next_on", "owner", "dept", "created_by", "created_at"],
   opp_quotes: ["id", "opp_id", "sale_price", "years", "qty", "discount", "amount", "valid_until", "note", "status", "created_by", "created_at", "status_by", "status_at"],
+  partners: ["id", "name", "kind", "contact_name", "phone", "email", "note", "status", "created_by", "created_at", "updated_by", "updated_at"],
+  partner_targets: ["partner_id", "product", "week_start", "target", "updated_by", "updated_at"],
+  partner_results: ["id", "partner_id", "product", "account_name", "phone", "result", "contacted_on", "note", "opp_id", "handed_at", "recorded_by", "created_at", "updated_at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1556,6 +1614,8 @@ export async function createTag(name: string, by: string): Promise<boolean> {
 const PRODUCT_NAME_TABLES = [
   "opportunities", "targets", "packages", "product_meta", "pipelines",
   "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb", "usage_indicators",
+  // S5: a partner's weekly target and its recorded contacts are keyed by product name too.
+  "partner_targets", "partner_results",
 ] as const;
 
 export type RenameResult = { ok: boolean; moved: Record<string, number> };
@@ -2065,6 +2125,302 @@ export async function replyTimeline(sinceMs: number): Promise<{ phone: string; r
     `SELECT m.phone, m.role, m.ts FROM messages m JOIN contacts c ON c.phone = m.phone
       WHERE c.test = false AND m.ts >= $1 AND m.role IN ('customer','agent') ORDER BY m.phone, m.ts`, [sinceMs]);
   return r.rows.map((x) => ({ phone: String(x.phone), role: String(x.role), ts: Number(x.ts) }));
+}
+
+// ------------------------------ partners (BRD §17 BR-PRT-001..004, S5) ------------------------------
+
+export type PartnerRow = {
+  id: number; name: string; kind: string; contactName: string | null; phone: string | null; email: string | null; note: string | null;
+  status: string; createdBy: string | null; createdAt: number; updatedBy: string | null; updatedAt: number;
+  handedOver: number; opps: { count: number; open: number; won: number; wonValue: number; openValue: number };
+};
+export type PartnerResultRow = {
+  id: number; partnerId: number; product: string; accountName: string; phone: string; result: string; contactedOn: string; note: string | null;
+  oppId: number | null; oppStage: string | null; oppPartnerId: number | null; handedAt: number | null; entityId: number | null; recordedBy: string | null; createdAt: number; updatedAt: number;
+};
+
+function partnerFrom(r: Record<string, any>): PartnerRow {
+  return { id: Number(r.id), name: String(r.name), kind: String(r.kind), contactName: r.contact_name ?? null, phone: r.phone ?? null, email: r.email ?? null,
+    note: r.note ?? null, status: String(r.status), createdBy: r.created_by ?? null, createdAt: Number(r.created_at), updatedBy: r.updated_by ?? null,
+    updatedAt: Number(r.updated_at), handedOver: Number(r.handed_over) || 0,
+    opps: { count: Number(r.opp_count) || 0, open: Number(r.opp_open) || 0, won: Number(r.opp_won) || 0, wonValue: Number(r.won_value) || 0, openValue: Number(r.open_value) || 0 } };
+}
+function partnerResultFrom(r: Record<string, any>): PartnerResultRow {
+  return { id: Number(r.id), partnerId: Number(r.partner_id), product: String(r.product), accountName: String(r.account_name), phone: String(r.phone),
+    result: String(r.result), contactedOn: String(r.contacted_on), note: r.note ?? null, oppId: r.opp_id == null ? null : Number(r.opp_id),
+    oppStage: r.opp_stage ?? null, oppPartnerId: r.opp_partner_id == null ? null : Number(r.opp_partner_id), handedAt: r.handed_at == null ? null : Number(r.handed_at), entityId: r.entity_id == null ? null : Number(r.entity_id),
+    recordedBy: r.recorded_by ?? null, createdAt: Number(r.created_at), updatedAt: Number(r.updated_at) };
+}
+
+const PARTNER_SELECT = `
+  SELECT p.*,
+    (SELECT COUNT(*) FROM partner_results r WHERE r.partner_id = p.id AND r.opp_id IS NOT NULL)::int AS handed_over,
+    (SELECT COUNT(*) FROM opportunities o WHERE o.partner_id = p.id)::int AS opp_count,
+    (SELECT COUNT(*) FROM opportunities o WHERE o.partner_id = p.id AND o.stage NOT IN ('won','lost'))::int AS opp_open,
+    (SELECT COUNT(*) FROM opportunities o WHERE o.partner_id = p.id AND o.stage = 'won')::int AS opp_won,
+    (SELECT COALESCE(SUM(${OPP_VALUE_SQL}),0) FROM opportunities o WHERE o.partner_id = p.id AND o.stage = 'won') AS won_value,
+    (SELECT COALESCE(SUM(${OPP_VALUE_SQL}),0) FROM opportunities o WHERE o.partner_id = p.id AND o.stage NOT IN ('won','lost')) AS open_value
+  FROM partners p`;
+
+export async function listPartners(): Promise<PartnerRow[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  return (await pool.query(`${PARTNER_SELECT} ORDER BY p.status, lower(p.name)`)).rows.map(partnerFrom);
+}
+export async function partnerById(id: number): Promise<PartnerRow | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`${PARTNER_SELECT} WHERE p.id = $1`, [id]);
+  return r.rows[0] ? partnerFrom(r.rows[0]) : null;
+}
+/** Exact, case- and space-insensitive: how a typed partner name on an opportunity finds its record. */
+export async function partnerByName(name: string): Promise<{ id: number; name: string } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`SELECT id, name FROM partners WHERE lower(btrim(name)) = lower(btrim($1))`, [name]);
+  return r.rows[0] ? { id: Number(r.rows[0].id), name: String(r.rows[0].name) } : null;
+}
+
+export async function createPartner(v: import("./partner-domain.js").PartnerValue, by: string): Promise<{ id: number } | { exists: number }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO partners (name, kind, contact_name, phone, email, note, status, created_by, created_at, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'active',$7,$8,$7,$8) ON CONFLICT DO NOTHING RETURNING id`,
+    [v.name, v.kind, v.contactName, v.phone, v.email, v.note, by, now]);
+  if (r.rows.length) return { id: Number(r.rows[0].id) };
+  const ex = await partnerByName(v.name);
+  return { exists: ex ? ex.id : 0 };
+}
+
+/** Optimistic: the edit names the version it was made on. A rename that collides answers «exists». */
+export async function updatePartner(id: number, v: import("./partner-domain.js").PartnerValue & { status: string }, ifUpdatedAt: number, by: string):
+  Promise<PartnerRow | { stale: true } | { exists: number } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const cur = await pool.query(`SELECT updated_at FROM partners WHERE id = $1`, [id]);
+  if (!cur.rows.length) return null;
+  if (Number(cur.rows[0].updated_at) !== ifUpdatedAt) return { stale: true };
+  try {
+    const r = await pool.query(
+      `UPDATE partners SET name = $2, kind = $3, contact_name = $4, phone = $5, email = $6, note = $7, status = $8, updated_by = $9,
+         updated_at = GREATEST($10, updated_at + 1) WHERE id = $1 AND updated_at = $11 RETURNING id`,
+      [id, v.name, v.kind, v.contactName, v.phone, v.email, v.note, v.status, by, Date.now(), ifUpdatedAt]);
+    if (!r.rows.length) return { stale: true };
+    // The partner's name also rides on its deals as their source reference; a rename must not leave the old one.
+    await pool.query(`UPDATE opportunities SET source_ref = $2 WHERE partner_id = $1 AND source = 'partner'`, [id, v.name]);
+  } catch (e: any) {
+    if (e && e.code === "23505") { const ex = await partnerByName(v.name); return { exists: ex ? ex.id : 0 }; }
+    throw e;
+  }
+  return partnerById(id);
+}
+
+/** BR-PRT-001. The week's targets for one partner, replaced as a set: a product given 0 has no target. */
+export async function setPartnerTargets(partnerId: number, week: string, targets: { product: string; target: number }[], by: string): Promise<boolean> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const p = await client.query(`SELECT id FROM partners WHERE id = $1 FOR UPDATE`, [partnerId]);
+    if (!p.rows.length) { await client.query("ROLLBACK"); return false; }
+    const now = Date.now();
+    for (const t of targets) {
+      if (t.target > 0) {
+        await client.query(
+          `INSERT INTO partner_targets (partner_id, product, week_start, target, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6)
+           ON CONFLICT (partner_id, product, week_start) DO UPDATE SET target = EXCLUDED.target, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at`,
+          [partnerId, t.product, week, t.target, by, now]);
+      } else {
+        await client.query(`DELETE FROM partner_targets WHERE partner_id = $1 AND product = $2 AND week_start = $3`, [partnerId, t.product, week]);
+      }
+    }
+    await client.query("COMMIT");
+    return true;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => { /* the original error is the one that matters */ });
+    throw e;
+  } finally { client.release(); }
+}
+
+/** Every target and result in one week, all partners: the screen filters by partner and product itself. */
+export async function partnerWeek(week: string, weekEnd: string): Promise<{ targets: { partnerId: number; product: string; target: number }[]; results: PartnerResultRow[] }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const [t, r] = await Promise.all([
+    pool.query(`SELECT partner_id, product, target FROM partner_targets WHERE week_start = $1`, [week]),
+    pool.query(
+      `SELECT r.*, o.stage AS opp_stage, o.partner_id AS opp_partner_id, e.id AS entity_id FROM partner_results r
+         LEFT JOIN opportunities o ON o.id = r.opp_id LEFT JOIN entities e ON e.phone = r.phone
+        WHERE r.contacted_on >= $1 AND r.contacted_on <= $2 ORDER BY r.contacted_on DESC, r.id DESC`, [week, weekEnd]),
+  ]);
+  return { targets: t.rows.map((x) => ({ partnerId: Number(x.partner_id), product: String(x.product), target: Number(x.target) })), results: r.rows.map(partnerResultFrom) };
+}
+
+/**
+ * BR-PRT-003, inside the caller's transaction: an interest becomes the sales team's. The customer gets an
+ * account if it has none («مقترح», source partner), and an opportunity line for the product unless one is
+ * already open for it — a customer two partners reached, or one reached twice, is one deal, not two. The
+ * result row then carries the line, which is what closes it to the partner.
+ */
+async function handOverInterest(client: pg.PoolClient, partner: { id: number; name: string }, row: { id: number; product: string; account_name: string; phone: string },
+  by: string, startStage: string): Promise<{ oppId: number; created: boolean }> {
+  const now = Date.now();
+  // Two partners recording the same interest at once would each find no open line (there is no row to lock
+  // yet) and open two. The caller holds the customer's lock (lockPhones) for the whole transaction.
+  const ent = await client.query(
+    `INSERT INTO entities (name, phone, created_at, updated_at, source, created_by) VALUES ($1,$2,$3,$3,'partner',$4)
+     ON CONFLICT (phone) DO NOTHING RETURNING id`, [row.account_name, row.phone, now, by]);
+  if (ent.rows.length) {
+    await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'created',$2,$3,$4)`,
+      [Number(ent.rows[0].id), JSON.stringify({ source: "partner", partner: partner.name }), by, now]);
+  }
+  const open = await client.query(
+    `SELECT id FROM opportunities WHERE phone = $1 AND product = $2 AND stage NOT IN ('won','lost') ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+    [row.phone, row.product]);
+  let oppId: number, created = false;
+  if (open.rows.length) oppId = Number(open.rows[0].id);
+  else {
+    const named = await client.query(`SELECT name FROM entities WHERE phone = $1`, [row.phone]);
+    const o = await client.query(
+      `INSERT INTO opportunities (account_name, phone, product, stage, source, source_ref, sale_price, years, qty, discount, created_by, created_at, updated_at, stage_at, partner_id)
+       VALUES ($1,$2,$3,$8,'partner',$4,0,1,1,0,$5,$6,$6,$6,$7) RETURNING id`,
+      [(named.rows[0] && named.rows[0].name) || row.account_name, row.phone, row.product, partner.name, by, now, partner.id, startStage]);
+    oppId = Number(o.rows[0].id); created = true;
+    await client.query(
+      `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor, note)
+       VALUES ($1, NULL, $5, to_timestamp($2 / 1000.0), $2, $3, $4)`,
+      [oppId, now, by, "فتح الفرصة — اهتمام سجّله " + partner.name, startStage]);
+  }
+  await client.query(`UPDATE partner_results SET opp_id = $2, handed_at = $3 WHERE id = $1`, [row.id, oppId, now]);
+  return { oppId, created };
+}
+
+export type RecordOutcome = { index: number; id: number | null; status: "created" | "updated" | "locked"; oppId: number | null; oppCreated: boolean };
+
+/** One transaction-scoped lock per customer, taken together, in one order, before any row is touched. Taken
+ *  row by row, two lists naming the same two customers in opposite orders deadlocked (review). */
+async function lockPhones(client: pg.PoolClient, phones: string[]): Promise<void> {
+  for (const ph of [...new Set(phones)].sort()) await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, ["partner-phone|" + ph]);
+}
+/** Postgres names a deadlock victim rather than hanging; a victim's whole transaction rolled back, so running
+ *  it again is safe. Twice, then the error goes to the caller. */
+async function withDeadlockRetry<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try { return await fn(); }
+    catch (e: any) { if (!(e && e.code === "40P01") || attempt >= 2) throw e; }
+  }
+}
+/** BR-PRT-003 across days: once this partner handed this customer's interest in this product to sales and the
+ *  deal is still open, nothing the partner records later for it changes the record. */
+async function handedOverOpen(client: pg.PoolClient, partnerId: number, product: string, phone: string): Promise<{ id: number; oppId: number } | null> {
+  const r = await client.query(
+    `SELECT r.id, r.opp_id FROM partner_results r JOIN opportunities o ON o.id = r.opp_id
+      WHERE r.partner_id = $1 AND r.product = $2 AND r.phone = $3 AND o.stage NOT IN ('won','lost') ORDER BY r.contacted_on DESC LIMIT 1`,
+    [partnerId, product, phone]);
+  return r.rows[0] ? { id: Number(r.rows[0].id), oppId: Number(r.rows[0].opp_id) } : null;
+}
+
+/** Records a partner's contacts, all or nothing. A row for the same customer, product and day replaces the
+ *  earlier one unless that one was already handed to sales («locked»). A paused partner records nothing. */
+export async function recordPartnerResults(partnerId: number, rows: import("./partner-domain.js").ResultValue[], by: string, startStage: string):
+  Promise<{ outcomes: RecordOutcome[] } | { paused: true } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  return withDeadlockRetry(() => recordPartnerResultsOnce(partnerId, rows, by, startStage));
+}
+async function recordPartnerResultsOnce(partnerId: number, rows: import("./partner-domain.js").ResultValue[], by: string, startStage: string):
+  Promise<{ outcomes: RecordOutcome[] } | { paused: true } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await lockPhones(client, rows.map((r) => r.phone));
+    const p = await client.query(`SELECT id, name, status FROM partners WHERE id = $1 FOR SHARE`, [partnerId]);
+    if (!p.rows.length) { await client.query("ROLLBACK"); return null; }
+    if (p.rows[0].status !== "active") { await client.query("ROLLBACK"); return { paused: true }; }
+    const partner = { id: Number(p.rows[0].id), name: String(p.rows[0].name) };
+    const now = Date.now();
+    const outcomes: RecordOutcome[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const v = rows[i];
+      const held = await handedOverOpen(client, partnerId, v.product, v.phone);
+      if (held) { outcomes.push({ index: i, id: held.id, status: "locked", oppId: held.oppId, oppCreated: false }); continue; }
+      const r = await client.query(
+        `INSERT INTO partner_results (partner_id, product, account_name, phone, result, contacted_on, note, recorded_by, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+         ON CONFLICT (partner_id, product, phone, contacted_on) DO UPDATE SET result = EXCLUDED.result, account_name = EXCLUDED.account_name,
+           note = EXCLUDED.note, recorded_by = EXCLUDED.recorded_by, updated_at = EXCLUDED.updated_at
+         WHERE partner_results.opp_id IS NULL
+         RETURNING id, product, account_name, phone, result, opp_id, (xmax = 0) AS inserted`,
+        [partnerId, v.product, v.accountName, v.phone, v.result, v.contactedOn, v.note, by, now]);
+      if (!r.rows.length) {
+        const ex = await client.query(`SELECT id, opp_id FROM partner_results WHERE partner_id = $1 AND product = $2 AND phone = $3 AND contacted_on = $4`,
+          [partnerId, v.product, v.phone, v.contactedOn]);
+        outcomes.push({ index: i, id: ex.rows[0] ? Number(ex.rows[0].id) : null, status: "locked", oppId: ex.rows[0] && ex.rows[0].opp_id != null ? Number(ex.rows[0].opp_id) : null, oppCreated: false });
+        continue;
+      }
+      const row = r.rows[0];
+      let oppId: number | null = null, oppCreated = false;
+      if (row.result === "interested") {
+        const h = await handOverInterest(client, partner, { id: Number(row.id), product: row.product, account_name: row.account_name, phone: row.phone }, by, startStage);
+        oppId = h.oppId; oppCreated = h.created;
+      }
+      outcomes.push({ index: i, id: Number(row.id), status: row.inserted ? "created" : "updated", oppId, oppCreated });
+    }
+    await client.query("COMMIT");
+    return { outcomes };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => { /* the original error is the one that matters */ });
+    throw e;
+  } finally { client.release(); }
+}
+
+/** A correction to one contact, decided on the locked row: a handed-over interest is the sales team's now. */
+export async function updatePartnerResult(id: number, patch: { result: string; note: string | null }, ifUpdatedAt: number, by: string, startStage: string):
+  Promise<{ row: PartnerResultRow; oppId: number | null; oppCreated: boolean } | { refused: "handed_over" | "stale" | "paused" } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const ph = await pool.query(`SELECT phone FROM partner_results WHERE id = $1`, [id]);
+  if (!ph.rows.length) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await lockPhones(client, [String(ph.rows[0].phone)]);
+    const cur = await client.query(
+      `SELECT r.*, p.name AS partner_name, p.status AS partner_status FROM partner_results r JOIN partners p ON p.id = r.partner_id WHERE r.id = $1 FOR UPDATE OF r`, [id]);
+    if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
+    const c = cur.rows[0];
+    if (c.opp_id != null || (await handedOverOpen(client, Number(c.partner_id), c.product, c.phone))) { await client.query("ROLLBACK"); return { refused: "handed_over" }; }
+    if (Number(c.updated_at) !== ifUpdatedAt) { await client.query("ROLLBACK"); return { refused: "stale" }; }
+    if (c.partner_status !== "active") { await client.query("ROLLBACK"); return { refused: "paused" }; }
+    await client.query(`UPDATE partner_results SET result = $2, note = $3, recorded_by = $4, updated_at = GREATEST($5, updated_at + 1) WHERE id = $1`,
+      [id, patch.result, patch.note, by, Date.now()]);
+    let oppId: number | null = null, oppCreated = false;
+    if (patch.result === "interested") {
+      const h = await handOverInterest(client, { id: Number(c.partner_id), name: String(c.partner_name) }, { id, product: c.product, account_name: c.account_name, phone: c.phone }, by, startStage);
+      oppId = h.oppId; oppCreated = h.created;
+    }
+    await client.query("COMMIT");
+    const fresh = await pool.query(
+      `SELECT r.*, o.stage AS opp_stage, e.id AS entity_id FROM partner_results r LEFT JOIN opportunities o ON o.id = r.opp_id LEFT JOIN entities e ON e.phone = r.phone WHERE r.id = $1`, [id]);
+    return { row: partnerResultFrom(fresh.rows[0]), oppId, oppCreated };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => { /* the original error is the one that matters */ });
+    throw e;
+  } finally { client.release(); }
+}
+
+export async function deletePartnerResult(id: number): Promise<"deleted" | "handed_over" | "paused" | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `DELETE FROM partner_results r USING partners p WHERE r.id = $1 AND p.id = r.partner_id AND r.opp_id IS NULL AND p.status = 'active' RETURNING r.id`, [id]);
+  if (r.rows.length) return "deleted";
+  const ex = await pool.query(`SELECT r.opp_id, p.status FROM partner_results r JOIN partners p ON p.id = r.partner_id WHERE r.id = $1`, [id]);
+  if (!ex.rows.length) return null;
+  return ex.rows[0].opp_id != null ? "handed_over" : "paused";
+}
+
+/** The partner's history on an account record and in its own drill: every contact, newest first. */
+export async function partnerResultsForPhone(phone: string): Promise<(PartnerResultRow & { partnerName: string })[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `SELECT r.*, p.name AS partner_name, o.stage AS opp_stage, NULL::bigint AS entity_id FROM partner_results r JOIN partners p ON p.id = r.partner_id
+       LEFT JOIN opportunities o ON o.id = r.opp_id WHERE r.phone = $1 ORDER BY r.contacted_on DESC, r.id DESC LIMIT 100`, [phone]);
+  return r.rows.map((x) => ({ ...partnerResultFrom(x), partnerName: String(x.partner_name) }));
 }
 
 // ------------------------------ contact insights (فهم المساعد cache) ------------------------------
@@ -2733,6 +3089,7 @@ export type OppRow = {
   source_ref: string | null;
   sale_price: number; years: number; qty: number; discount: number;
   owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null; lost_note: string | null;
+  partner_id: number | null;
   created_by: string | null; created_at: number; updated_at: number; stage_at: number;
 };
 
@@ -2785,6 +3142,7 @@ function rowToOpp(r: Record<string, unknown>): OppRow {
     close_on: r.close_on == null ? null : Number(r.close_on),
     next_step: (r.next_step as string) ?? null, lost_reason: (r.lost_reason as string) ?? null,
     lost_note: (r.lost_note as string) ?? null,
+    partner_id: r.partner_id == null ? null : Number(r.partner_id),
     created_by: (r.created_by as string) ?? null,
     created_at: Number(r.created_at), updated_at: Number(r.updated_at), stage_at: Number(r.stage_at),
   };
@@ -2807,7 +3165,7 @@ export async function listOpps(): Promise<OppRow[]> {
 /** One account, N product lines, ONE write. The lines of a deal are created together on the board
  *  and must arrive together: a partial insert would paint a card whose «3 منتجات» is a lie. */
 export async function createOppLines(head: {
-  account_name: string; phone: string | null; source: string; source_ref: string | null; created_by: string | null;
+  account_name: string; phone: string | null; source: string; source_ref: string | null; created_by: string | null; partner_id?: number | null;
 }, lines: Partial<OppRow>[]): Promise<OppRow[]> {
   if (!pool || !connected) return [];
   const now = Date.now();
@@ -2819,11 +3177,11 @@ export async function createOppLines(head: {
       const q = await client.query(
         `INSERT INTO opportunities (account_name, phone, product, stage, source, source_ref,
            sale_price, years, qty, discount, owner, close_on, next_step, created_by,
-           created_at, updated_at, stage_at)
-         VALUES ($1,$2,$3,COALESCE($4,'contact'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$15) RETURNING *`,
+           created_at, updated_at, stage_at, partner_id)
+         VALUES ($1,$2,$3,COALESCE($4,'contact'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$15,$16) RETURNING *`,
         [head.account_name, head.phone, l.product, l.stage ?? null, head.source, head.source_ref,
          l.sale_price ?? 0, l.years ?? 1, l.qty ?? 1, l.discount ?? 0, l.owner ?? null,
-         l.close_on ?? null, l.next_step ?? null, head.created_by, now]);
+         l.close_on ?? null, l.next_step ?? null, head.created_by, now, head.partner_id ?? null]);
       // The opening event, same transaction. Without it a deal created directly at a closed stage
       // (an import of already-won business, or a rep logging a deal after the fact) would never
       // appear in «المحقق» — the won CTE reads the ledger, and the migration backfill runs once

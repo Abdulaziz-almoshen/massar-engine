@@ -45,7 +45,9 @@ c("located the migration regions to exclude", migrationRanges.length >= 2,
 // values forever. Add a table here when a screen starts reading it.
 const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pipeline_stages", "pipelines", "engagements", "actions", "packages", "sectors", "product_meta", "product_kb", "product_assets",
   // client A slices S2/S3: the account record and the opportunity drawer read these.
-  "entity_contacts", "account_events", "opp_activities", "opp_quotes"];
+  "entity_contacts", "account_events", "opp_activities", "opp_quotes",
+  // S5: «شركاء المبيعات» reads these.
+  "partners", "partner_targets", "partner_results"];
 
 for (const table of MUST_HAVE_WRITERS) {
   const writers = [];
