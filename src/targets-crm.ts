@@ -187,7 +187,8 @@ function tgtRow(e) {
   var st = stageOfEntity(e);
   var c = contactByPhone(e.phone);
   var armed = tgtArm === e.id;
-  var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'style="cursor:default;"';
+  /* A customer never messaged has an account record now (BRD §9, S2), so every row opens something. */
+  var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'onclick="location.hash=&quot;account/' + Number(e.id) + '&quot;" style="cursor:pointer;"';
   return '<div class="trow km krow crow' + (tgtSel[e.id] ? " sel" : "") + '" ' + open + ">" +
     '<div class="selcell" onclick="event.stopPropagation()"><input type="checkbox"' +
       (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')"></div>' +

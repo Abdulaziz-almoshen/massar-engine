@@ -35,6 +35,8 @@ import { CONFIG_DOMAIN_JS } from "./config-domain.js";
 import { SETTINGS_CRM_CSS, SETTINGS_CRM_JS } from "./settings-crm.js";
 import { INDICATORS_CRM_CSS, INDICATORS_CRM_JS } from "./indicators-crm.js";
 import { INDICATOR_DOMAIN_JS } from "./indicator-domain.js";
+import { ACCOUNTS_CRM_CSS, ACCOUNTS_CRM_JS } from "./accounts-crm.js";
+import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -710,6 +712,7 @@ ${EXEC_REPORTS_CSS}
 ${TARGETS_CRM_CSS}
 ${SETTINGS_CRM_CSS}
 ${INDICATORS_CRM_CSS}
+${ACCOUNTS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${PALETTE_CSS}
@@ -917,7 +920,10 @@ const SUBS = {
   opps:      [["opps", "الفرص"], ["triage", "فرز الردود"], ["pipeline", "لوحة المتابعة"]],
   // «مؤشرات الاستخدام» sits under العملاء because the prototype put it there (client A, Sep 15):
   // an indicator is a statement about customers, and its list is read beside theirs.
-  customers: [["customers", "العملاء"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
+  // «الحسابات» is the BRD's customer list (§9: organisations, contacts, owner, approval); «المحادثات»
+  // is the conversation list that used to carry the name. Tab order keeps #customers as the landing
+  // route, so every existing link and the door itself still open where they did.
+  customers: [["customers", "المحادثات"], ["accounts", "الحسابات"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
@@ -929,6 +935,7 @@ const SUBS = {
 const DOOR_OF = (function () {
   const m = { customer: "customers",     // #customer/<phone> is a detail view of العملاء
               indicator: "customers",    // #indicator/new and #indicator/<id> are the indicator form
+              account: "customers",      // #account/<id> is the account record (BRD §9 «العميل 360°»)
               product: "products",       // #product/<name> and #sector/<name> are detail views
               sector: "products" };      //   of المنتجات — the door stays lit inside a drill
   for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
@@ -952,6 +959,8 @@ const TITLES = {
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
   indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
   indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
+  accounts: ["العملاء", "المنشآت التي تبيع لها Lean: جهات اتصالها، ومسؤولها، واعتمادها، وفرصها"],
+  account: ["سجل العميل", "بيانات العميل وجهات اتصاله وفرصه وحملاته ومؤشراته في شاشة واحدة"],
   divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
   team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
 };
@@ -1071,7 +1080,7 @@ function nav() {
   document.getElementById("subnav").innerHTML = band || (subs.length > 1
     ? subs.map((sx) => {
         const sb = badges[sx[0]];
-        return '<button class="sub' + (sx[0] === raw || (raw === "indicator" && sx[0] === "indicators") ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
+        return '<button class="sub' + (sx[0] === raw || (raw === "indicator" && sx[0] === "indicators") || (raw === "account" && sx[0] === "accounts") ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
           (sb ? '<span class="sbdg">' + sb[0] + "</span>" : "") + "</button>";
       }).join("")
     : "");
@@ -4043,7 +4052,9 @@ function vCustomer(ph) {
       '<a href="javascript:void(0)" onclick="reloadProfile()" style="color:#2563EB;font-weight:600;">إعادة المحاولة</a></div></div>';
   }
   if (profileData.missing) {
-    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">يظهر ملف العميل بعد أول رسالة واتساب. <a href="#customers" style="color:#2563EB;font-weight:600;">→ جهات الاستهداف</a></div></div>';
+    const acc = (entities || []).find((e) => e.phone === ph);
+    return '<div class="empty"><div class="ic"><span></span></div><div class="t">لا محادثة لهذا الرقم بعد</div><div class="s">تظهر المحادثة بعد أول رسالة واتساب. ' +
+      (acc ? '<a href="#account/' + acc.id + '" style="color:#2563EB;font-weight:600;">افتح سجل العميل ←</a>' : '<a href="#accounts" style="color:#2563EB;font-weight:600;">→ العملاء</a>') + '</div></div>';
   }
   // «d.context» is NOT read here any more (design plan §5): contextScore is a 0-100 invented
   // score over fields we happen to hold, and it read FULL on a contact whose only sentence was
@@ -4051,6 +4062,9 @@ function vCustomer(ph) {
   const d = profileData; const c = d.contact; const ins = d.insights || {};
   const nm = c.waName || (d.entity && d.entity.name) || "غير معروف";
   let h = '<a href="javascript:history.back()" style="display:inline-block;font-size:12px;font-weight:600;color:#14161A;text-decoration:none;margin-bottom:14px;">→ رجوع</a>';
+  // BR-CUS-004: the conversation is one side of the customer; the account record carries the rest
+  // (contacts, owner, approval, opportunities, campaigns, indicators).
+  if (d.entity && d.entity.id) h += '<a href="#account/' + d.entity.id + '" style="display:inline-block;font-size:12px;font-weight:600;color:var(--accent-deep);text-decoration:none;margin-bottom:14px;margin-inline-start:16px;">سجل العميل ←</a>';
   h += '<div class="card" style="display:flex;gap:18px;align-items:stretch;flex-wrap:wrap;">' +
     '<div style="flex:1;min-width:260px;display:flex;gap:14px;align-items:flex-start;">' +
     // Monogram deleted: a 52px tile showing one letter of a name printed beside it.
@@ -4435,7 +4449,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4454,6 +4468,8 @@ function render(fetchNew) {
       : cur === "settings" || cur === "divisions" || cur === "team" ? vSettings(cur)
       : cur === "indicators" ? vIndicators()
       : cur === "indicator" ? vIndicatorForm((location.hash || "").split("/").slice(1).join("/"))
+      : cur === "accounts" ? vAccounts()
+      : cur === "account" ? vAccount((location.hash || "").split("/")[1] || "")
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4463,6 +4479,7 @@ function render(fetchNew) {
   // on each one is the jump DESIGN.md §8.6 forbids.
   // The indicators drawer adds its «in» class one frame after it is painted (indicators-crm).
   try { if (typeof inAfterPaint === "function") inAfterPaint(); } catch (e) { /* never block a paint */ }
+  try { if (typeof acAfterPaint === "function") acAfterPaint(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
@@ -4817,6 +4834,8 @@ ${TARGETS_CRM_JS}
 ${SETTINGS_CRM_JS}
 ${INDICATORS_CRM_JS}
 ${INDICATOR_DOMAIN_JS}
+${ACCOUNTS_CRM_JS}
+${ACCOUNT_DOMAIN_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}

@@ -28,7 +28,7 @@ const subIds  = [...subsBlock.matchAll(/\["([a-z]+)",/g)].map((m) => m[1]);
 // TITLES keys are the screens that exist. `customer` is a detail view reached from a row, not a
 // destination of its own, so it is the one legitimate exception.
 // `indicator` is the create/edit form of «مؤشرات الاستخدام», reached from its tab's own button and rows.
-const DETAIL_VIEWS = new Set(["customer", "indicator"]);
+const DETAIL_VIEWS = new Set(["customer", "indicator", "account"]);
 // Keys anywhere in the block, NOT just at line start: several TITLES entries share a line, and a
 // line-anchored pattern silently scanned 10 of 15 while reporting all green. A guard that quietly
 // covers less than it claims is worse than no guard — this repo has shipped that exact bug before,

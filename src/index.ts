@@ -23,6 +23,7 @@ import * as pipelineReport from "./pipeline-report-domain.js";
 import * as sysCfg from "./config-domain.js";
 import * as pd from "./product-domain.js";
 import * as ind from "./indicator-domain.js";
+import * as acct from "./account-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -1524,8 +1525,11 @@ app.get("/admin/entities", async (req, reply) => {
 // Paste import: one line per entity — "name, phone[, size[, city]]" (Arabic or Latin commas/tabs).
 app.post("/admin/entities", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const { text } = (req.body ?? {}) as { text?: string };
+  const { text, source } = (req.body ?? {}) as { text?: string; source?: string };
   if (!text?.trim()) return reply.code(400).send({ error: "body: { text }" });
+  // BR-CUS-005: where the account came from. The indicator form's «إضافة كعميل جديد» says so; anything
+  // else typed into this box is a manual add.
+  const origin: acct.AccountSource = source === "indicator" ? "indicator" : "manual";
   const rows: { name: string; phone: string; size?: string; city?: string }[] = [];
   const bad: string[] = [];
   for (const raw of text.split("\n")) {
@@ -1539,7 +1543,7 @@ app.post("/admin/entities", async (req, reply) => {
     if (!name || phone.length < 8) { bad.push(line.slice(0, 60)); continue; }
     rows.push({ name, phone, size: parts[2] || undefined, city: parts[3] || undefined });
   }
-  const res = await db.addEntities(rows);
+  const res = await db.addEntities(rows, { source: origin, by: adminName(req) });
   await accounts.refresh();
   return { ...res, invalid: bad.length, invalidLines: bad.slice(0, 5) };
 });
@@ -1572,7 +1576,7 @@ app.post("/admin/entities/import", async (req, reply) => {
     } else {
       for (const t of wanted) if (await db.createTag(t, "import")) tagsCreated++;
     }
-    const res = await db.addEntities(parsed.rows);
+    const res = await db.addEntities(parsed.rows, { source: "import", by: adminName(req) });
     // Imported columns became typed facts inside the upsert; the agent must see them on the very
     // next inbound message, not after the next restart.
     await accounts.refresh();
@@ -1692,6 +1696,110 @@ app.post("/admin/entities/delete", async (req, reply) => {
   if (!id) return reply.code(400).send({ error: "body: { id }" });
   await db.deleteEntity(Number(id));
   return { status: "ok" };
+});
+
+// ---- «العملاء» as accounts (client A, BRD §9, slice S2) ---------------------------------------------
+// Rules in account-domain.ts; these routes load, check and store. Nothing here sends a message.
+
+async function activeMemberIds(): Promise<{ ids: number[]; members: { id: number; name: string; role: string; division: string | null }[] }> {
+  const all = (await db.listMembers()).filter((m) => m.active);
+  return { ids: all.map((m) => m.id), members: all.map((m) => ({ id: m.id, name: m.name, role: m.role, division: m.division })) };
+}
+function accountBody(req: any): { account: acct.AccountInput; ifUpdatedAt: number | null } {
+  const b = (req.body ?? {}) as any;
+  const a = b.account && typeof b.account === "object" ? b.account : {};
+  const n = Number(b.ifUpdatedAt);
+  return { account: a, ifUpdatedAt: Number.isSafeInteger(n) && n > 0 ? n : null };
+}
+
+app.get("/admin/accounts", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const [list, team] = await Promise.all([db.listAccounts(), activeMemberIds()]);
+  return { ok: true, accounts: list, members: team.members };
+});
+
+app.get("/admin/accounts/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const account = await db.accountById(id);
+  if (!account) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+  const [activity, tasks, notes, indicators, team] = await Promise.all([
+    db.accountActivity(account.phone),
+    db.listTasks({ kind: "contact", id: account.phone }),
+    db.listNotes({ kind: "contact", id: account.phone }),
+    db.indicatorsForPhone(account.phone),
+    activeMemberIds(),
+  ]);
+  const contact = tracker.findContact(account.phone);
+  return {
+    ok: true, account, ...activity, indicators, members: team.members,
+    tasks: tasks.slice(0, 20).map((t) => ({ id: t.id, title: t.title, status: t.status, dueAt: t.due_at, assignedTo: t.assigned_to })),
+    notes: notes.slice(0, 20).map((n) => ({ id: n.id, title: n.title, content: n.content.slice(0, 400), author: n.author, createdAt: n.created_at })),
+    conversation: contact ? { lastEventAt: contact.lastEventAt, optedOut: contact.optedOut } : null,
+  };
+});
+
+app.post("/admin/accounts", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const { account } = accountBody(req);
+  const team = await activeMemberIds();
+  // The canonical 966… form BEFORE the check: 0551234567 and 966551234567 are the same customer, and
+  // the uniqueness that protects every conversation is on the stored form.
+  const normalized = { ...account, phone: audience.normalizePhone(account.phone) };
+  const checked = acct.checkAccount(normalized, team.ids, false);
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+  checked.value.contacts = checked.value.contacts.map((c) => ({ ...c, phone: c.phone ? audience.normalizePhone(c.phone) : null }));
+  const r = await db.createAccount(checked.value, "manual", adminName(req));
+  if (!r) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  if ("conflict" in r) {
+    return reply.code(409).type("application/problem+json").send({
+      type: "about:blank", title: "phone_exists", status: 409, error: "phone_exists", field: "phone",
+      detail: "هذا الرقم مسجّل لعميل آخر", existingId: r.conflict,
+    });
+  }
+  await accounts.refresh();
+  return reply.code(201).header("Location", "/admin/accounts/" + r.id).send({ ok: true, id: r.id });
+});
+
+app.patch("/admin/accounts/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const { account, ifUpdatedAt } = accountBody(req);
+  const cur = await db.accountById(id);
+  if (!cur) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+  const team = await activeMemberIds();
+  // An owner who has since left the team stays assignable on THIS account until someone changes it —
+  // otherwise editing a phone number would force a reassignment nobody asked for.
+  const ids = cur.ownerId != null && team.ids.indexOf(cur.ownerId) < 0 ? team.ids.concat([cur.ownerId]) : team.ids;
+  const checked = acct.checkAccount(account, ids, true);
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+  checked.value.phone = cur.phone;
+  checked.value.contacts = checked.value.contacts.map((c) => ({ ...c, phone: c.phone ? audience.normalizePhone(c.phone) : null }));
+  const r = await db.updateAccount(id, checked.value, ifUpdatedAt, adminName(req));
+  if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+  if ("stale" in r) return problem(reply, 409, "stale_account", "عدّل شخص آخر هذا العميل بعد أن فتحته — أعد التحميل ثم عدّل");
+  await accounts.refresh();
+  return { ok: true, updatedAt: r.updatedAt };
+});
+
+app.post("/admin/accounts/:id/approval", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const b = (req.body ?? {}) as { decision?: string; note?: string };
+  if (!acct.ACCOUNT_APPROVALS.includes(String(b.decision) as acct.AccountApproval)) return problem(reply, 400, "invalid_field", "قرار غير معروف", "decision");
+  const note = b.note == null ? null : String(b.note).trim().slice(0, 300) || null;
+  const r = await db.setAccountApproval(id, b.decision as acct.AccountApproval, note, adminName(req));
+  if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+  if ("refused" in r) return problem(reply, 409, "no_change", r.refused, "decision");
+  return { ok: true, updatedAt: r.updatedAt };
 });
 
 // ------------------------------ campaign launch (human-confirmed in the UI) ------------------------------

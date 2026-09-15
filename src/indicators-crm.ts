@@ -392,7 +392,7 @@ function inDrawer() {
       var talked = typeof contactByPhone === "function" && contactByPhone(m.phone);
       b += '<div class="in-mem">' + (talked
           ? '<a class="in-link" href="#customer/' + esc(m.phone) + '">' + esc(m.name) + "</a>"
-          : '<button class="in-link" data-in="tgt" data-q="' + esc(m.phone) + '" title="لم تُراسل بعد — افتحها في جهات الاستهداف">' + esc(m.name) + "</button>") +
+          : '<a class="in-link" href="#account/' + Number(m.entityId) + '" title="لم تُراسل بعد — افتح سجل العميل">' + esc(m.name) + "</a>") +
         (m.value ? '<span class="v">' + esc(m.value) + "</span>" : "") +
         '<span class="m">' + [m.city ? esc(m.city) : "", m.period ? esc(m.period) : "", m.matchedBy ? IN_MATCHED_BY[m.matchedBy] || "" : "", talked ? "" : "لم تُراسل بعد", '<bdi dir="ltr">+' + esc(m.phone) + "</bdi>"].filter(Boolean).join(" · ") + "</span></div>";
     });
@@ -736,7 +736,7 @@ function inAddEntity(line) {
   var r = f.preview.rows.filter(function (x) { return String(x.line) === String(line); })[0];
   if (!r) return;
   f.adding[line] = true; render(false);
-  cfJson("POST", "/admin/entities", { text: String(r.name).replace(/[,\\n\\t،؛;]/g, " ") + ", " + r.phone }).then(function (res) {
+  cfJson("POST", "/admin/entities", { text: String(r.name).replace(/[,\\n\\t،؛;]/g, " ") + ", " + r.phone, source: "indicator" }).then(function (res) {
     f.adding[line] = false;
     if (!res.ok || res.j.invalid) { inToast("تعذّرت إضافة «" + r.name + "» — تحقق من الجوال", true); render(false); return; }
     return fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }).then(function (x) { return x.json(); }).then(function (list) {

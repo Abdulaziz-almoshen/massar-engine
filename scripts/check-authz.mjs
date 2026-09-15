@@ -83,6 +83,7 @@ try {
   // security review found the GET-only matrix could not see a single one of them; a write route a rep
   // token could reach would be the gap this file exists to close.
   const ADMIN_WRITES = [
+    ["GET", "/admin/accounts"], ["GET", "/admin/accounts/1"], ["POST", "/admin/accounts"], ["PATCH", "/admin/accounts/1"], ["POST", "/admin/accounts/1/approval"],
     ["GET", "/admin/indicators"], ["GET", "/admin/indicators/membership"], ["GET", "/admin/indicators/1"],
     ["GET", "/admin/indicators/for-customer/966500000000"], ["GET", "/admin/campaign-suggestions"],
     ["POST", "/admin/indicators"], ["POST", "/admin/indicators/preview"], ["PATCH", "/admin/indicators/1"],

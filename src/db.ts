@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import * as facts from "./facts.js";
 import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
+import * as acct from "./account-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -780,6 +781,59 @@ ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS objective TEXT;
 ALTER TABLE campaign_targets ADD COLUMN IF NOT EXISTS outcome TEXT;
 `,
   },
+  {
+    version: "012-customer-accounts",
+    sql: `
+-- «العملاء» as accounts (client A, BRD v1.0 §9, slice S2). An entity was a WhatsApp number with a name;
+-- the BRD's customer is an organisation with a city, a sector, an importance, an owner, the people
+-- inside it, and a record of where it came from and who added it. The phone stays the identity every
+-- other table joins on.
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS sector TEXT;
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS importance TEXT CHECK (importance IN ('high','medium','low'));
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS owner_member_id BIGINT REFERENCES team_members(id) ON DELETE SET NULL;
+-- Every account that exists today was already being worked, so it lands «معتمد». From here a new one
+-- arrives «مقترح» and waits for the sales team, as the prototype draws it.
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS approval TEXT NOT NULL DEFAULT 'approved' CHECK (approval IN ('proposed','approved','rejected'));
+ALTER TABLE entities ALTER COLUMN approval SET DEFAULT 'proposed';
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS approval_by TEXT;
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS approval_at BIGINT;
+-- NULL = added before this column existed: shown «غير مسجّل», never back-filled with a guess.
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS source TEXT CHECK (source IN ('manual','import','whatsapp','indicator','partner','other'));
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS created_by TEXT;
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS updated_at BIGINT;
+UPDATE entities SET updated_at = created_at WHERE updated_at IS NULL;
+-- Sector and city were already typed into imported sheets under these headers; they are the same
+-- facts, moved from a free attribute into the column the filters read.
+UPDATE entities SET sector = left(attrs->>'القطاع', 80) WHERE sector IS NULL AND coalesce(attrs->>'القطاع', '') <> '';
+UPDATE entities SET city = left(attrs->>'المدينة', 60) WHERE city IS NULL AND coalesce(attrs->>'المدينة', '') <> '';
+CREATE INDEX IF NOT EXISTS idx_entities_owner ON entities (owner_member_id);
+-- BR-CUS-002: the people inside an account. One of them is primary.
+CREATE TABLE IF NOT EXISTS entity_contacts (
+  id         BIGSERIAL PRIMARY KEY,
+  entity_id  BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  role       TEXT,
+  phone      TEXT,
+  email      TEXT,
+  is_primary BOOLEAN NOT NULL DEFAULT false,
+  position   INT NOT NULL DEFAULT 0,
+  created_at BIGINT NOT NULL,
+  created_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_entity_contacts ON entity_contacts (entity_id, position);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_entity_contacts_primary ON entity_contacts (entity_id) WHERE is_primary;
+-- NFR-002 for accounts: created, edited, approved, rejected. Append-only.
+CREATE TABLE IF NOT EXISTS account_events (
+  id        BIGSERIAL PRIMARY KEY,
+  entity_id BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  action    TEXT NOT NULL,
+  detail    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  by_name   TEXT,
+  at        BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_account_events ON account_events (entity_id, at);
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -854,6 +908,9 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   suggestion_dismissals: ["key", "title", "indicator_ids", "reason", "by_name", "at"],
   campaign_targets: ["campaign_id", "phone", "name", "outcome"],
   campaigns: ["id", "name", "product", "message", "created_at", "test", "origin", "objective"],
+  entities: ["id", "name", "phone", "city", "attrs", "facts", "product_tags", "sector", "importance", "owner_member_id", "approval", "approval_by", "approval_at", "source", "created_by", "created_at", "updated_at"],
+  entity_contacts: ["id", "entity_id", "name", "role", "phone", "email", "is_primary", "position", "created_at", "created_by"],
+  account_events: ["id", "entity_id", "action", "detail", "by_name", "at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1305,12 +1362,16 @@ export async function listEntities(): Promise<EntityRow[]> {
   }));
 }
 
-export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string; attrs?: Record<string, string>; tags?: string[] }[]):
+export async function addEntities(rows: { name: string; phone: string; size?: string; city?: string; attrs?: Record<string, string>; tags?: string[] }[],
+  meta: { source: acct.AccountSource; by: string } = { source: "manual", by: "" }):
   Promise<{ added: number; updated: number; skipped: number }> {
   if (!pool || !connected) return { added: 0, updated: 0, skipped: rows.length };
   let added = 0, updated = 0, skipped = 0;
   for (const r of rows) {
     try {
+      // BR-CUS-001/002/005: a customer sheet's القطاع · الأهمية · جهة الاتصال · المنصب · البريد columns
+      // fill the account columns and its first contact. A re-import never overwrites what a person set.
+      const fields = acct.accountFieldsFromAttrs(r.attrs ?? {});
       // The sheet is fact producer #1 (src/facts.ts). Mapped columns become TYPED facts with
       // `source:'human', by:'import'` in the same upsert, so an import can never land a fact the
       // agent then re-asks for. `||` merges at key level: a re-import updates the columns it
@@ -1322,21 +1383,35 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
       // re-import adds the lines its column names and leaves every tag an operator applied by hand
       // standing. jsonb_agg(DISTINCT …) is what stops a re-import doubling a tag already present.
       const res = await pool.query(
-        `INSERT INTO entities (name, phone, size, city, attrs, facts, product_tags, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        `INSERT INTO entities (name, phone, size, city, attrs, facts, product_tags, created_at, updated_at, sector, importance, source, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12)
          ON CONFLICT (phone) DO UPDATE SET
            name = EXCLUDED.name,
            size = COALESCE(EXCLUDED.size, entities.size),
            city = COALESCE(EXCLUDED.city, entities.city),
+           sector = COALESCE(entities.sector, EXCLUDED.sector),
+           importance = COALESCE(entities.importance, EXCLUDED.importance),
+           updated_at = EXCLUDED.updated_at,
            attrs = entities.attrs || EXCLUDED.attrs,
            facts = entities.facts || EXCLUDED.facts,
            product_tags = (
              SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb)
                FROM jsonb_array_elements(entities.product_tags || EXCLUDED.product_tags) AS v)
-         RETURNING (xmax = 0) AS inserted`,
-        [r.name, r.phone, r.size ?? null, r.city ?? null, JSON.stringify(r.attrs ?? {}),
-         JSON.stringify(imported), JSON.stringify(r.tags ?? []), Date.now()]);
-      res.rows[0]?.inserted ? added++ : updated++;
+         RETURNING id, (xmax = 0) AS inserted`,
+        [r.name, r.phone, r.size ?? null, r.city ?? (r.attrs?.["المدينة"] || null), JSON.stringify(r.attrs ?? {}),
+         JSON.stringify(imported), JSON.stringify(r.tags ?? []), Date.now(),
+         fields.sector, fields.importance, meta.source, meta.by || null]);
+      const row = res.rows[0];
+      row?.inserted ? added++ : updated++;
+      // The sheet's contact becomes the account's first person only while the account has none — a
+      // re-import must not stack a copy of the same person on every upload.
+      if (row && fields.contact) {
+        await pool.query(
+          `INSERT INTO entity_contacts (entity_id, name, role, phone, email, is_primary, position, created_at, created_by)
+           SELECT $1, $2, $3, $4, $5, true, 0, $6, $7
+            WHERE NOT EXISTS (SELECT 1 FROM entity_contacts WHERE entity_id = $1)`,
+          [Number(row.id), fields.contact.name, fields.contact.role, r.phone, fields.contact.email, Date.now(), meta.by || meta.source]);
+      }
     } catch { skipped++; }
   }
   return { added, updated, skipped };
@@ -1546,11 +1621,198 @@ export async function ensureEntity(phone: string, name: string): Promise<boolean
   if (!pool || !connected) return false;
   try {
     await pool.query(
-      `INSERT INTO entities (name, phone, attrs, facts, created_at) VALUES ($1,$2,'{}','{}',$3)
+      `INSERT INTO entities (name, phone, attrs, facts, created_at, updated_at, source, created_by) VALUES ($1,$2,'{}','{}',$3,$3,'whatsapp','المساعد')
        ON CONFLICT (phone) DO NOTHING`,
       [name || phone, phone, Date.now()]);
     return true;
   } catch { return false; }
+}
+
+// ------------------------------ customer accounts (BRD §9, slice S2) ------------------------------
+
+export type ContactRow = { id: number; name: string; role: string | null; phone: string | null; email: string | null; primary: boolean };
+export type AccountRow = {
+  id: number; name: string; phone: string; city: string | null; sector: string | null; importance: string | null;
+  ownerId: number | null; ownerName: string | null; approval: string; approvalBy: string | null; approvalAt: number | null;
+  source: string | null; createdBy: string | null; createdAt: number; updatedAt: number;
+  productTags: string[]; usesProducts: string[];
+  contactCount: number; primaryContact: Omit<ContactRow, "id"> | null; contactText: string;
+  opps: { count: number; open: number; won: number; value: number }; oppProducts: string[];
+};
+
+const ACCOUNT_SELECT = `
+  SELECT e.id, e.name, e.phone, e.city, e.sector, e.importance, e.owner_member_id, m.name AS owner_name,
+         e.approval, e.approval_by, e.approval_at, e.source, e.created_by, e.created_at, e.updated_at, e.product_tags,
+         e.facts->'currentProducts'->>'value' AS uses,
+         (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'role', c.role, 'phone', c.phone, 'email', c.email, 'primary', c.is_primary)
+                          ORDER BY c.is_primary DESC, c.position, c.id)
+            FROM entity_contacts c WHERE c.entity_id = e.id) AS contacts,
+         (SELECT json_agg(json_build_object('product', o.product, 'stage', o.stage, 'sale_price', o.sale_price, 'years', o.years, 'qty', o.qty, 'discount', o.discount))
+            FROM opportunities o WHERE o.phone = e.phone) AS opp_lines
+    FROM entities e LEFT JOIN team_members m ON m.id = e.owner_member_id`;
+
+function accountFrom(x: any): AccountRow & { contacts: ContactRow[] } {
+  const contacts: ContactRow[] = (Array.isArray(x.contacts) ? x.contacts : []).map((c: any) => ({
+    id: Number(c.id), name: String(c.name), role: c.role ?? null, phone: c.phone ?? null, email: c.email ?? null, primary: c.primary === true,
+  }));
+  const lines = (Array.isArray(x.opp_lines) ? x.opp_lines : []).map((l: any) => ({
+    product: String(l.product), stage: String(l.stage), salePrice: Number(l.sale_price) || 0, years: Number(l.years) || 1,
+    quantity: Number(l.qty) || 1, discountPercent: Number(l.discount) || 0,
+  }));
+  const p = contacts[0];
+  return {
+    id: Number(x.id), name: String(x.name), phone: String(x.phone), city: x.city ?? null, sector: x.sector ?? null, importance: x.importance ?? null,
+    ownerId: x.owner_member_id == null ? null : Number(x.owner_member_id), ownerName: x.owner_name ?? null,
+    approval: String(x.approval), approvalBy: x.approval_by ?? null, approvalAt: x.approval_at == null ? null : Number(x.approval_at),
+    source: x.source ?? null, createdBy: x.created_by ?? null, createdAt: Number(x.created_at), updatedAt: Number(x.updated_at ?? x.created_at),
+    productTags: Array.isArray(x.product_tags) ? x.product_tags.filter((t: unknown) => typeof t === "string") : [],
+    usesProducts: String(x.uses ?? "").split(/[،,]/).map((s) => s.trim()).filter(Boolean),
+    contactCount: contacts.length,
+    primaryContact: p ? { name: p.name, role: p.role, phone: p.phone, email: p.email, primary: p.primary } : null,
+    contactText: contacts.map((c) => [c.name, c.role ?? "", c.email ?? "", c.phone ?? ""].join(" ")).join(" "),
+    opps: acct.summarizeAccountOpps(lines),
+    oppProducts: [...new Set<string>(lines.map((l: { product: string }) => l.product))],
+    contacts,
+  };
+}
+
+export async function listAccounts(): Promise<AccountRow[]> {
+  if (!pool || !connected) return [];
+  const r = await pool.query(ACCOUNT_SELECT + " ORDER BY e.name");
+  return r.rows.map((x) => { const { contacts: _c, ...row } = accountFrom(x); return row; });
+}
+
+export async function accountById(id: number): Promise<(AccountRow & { contacts: ContactRow[]; events: { action: string; detail: unknown; by: string | null; at: number }[] }) | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(ACCOUNT_SELECT + " WHERE e.id = $1", [id]);
+  if (!r.rows.length) return null;
+  const ev = await pool.query(`SELECT action, detail, by_name, at FROM account_events WHERE entity_id = $1 ORDER BY at DESC, id DESC LIMIT 30`, [id]);
+  return { ...accountFrom(r.rows[0]), events: ev.rows.map((e) => ({ action: String(e.action), detail: e.detail ?? {}, by: e.by_name ?? null, at: Number(e.at) })) };
+}
+
+export async function accountIdByPhone(phone: string): Promise<number | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT id FROM entities WHERE phone = $1`, [phone]);
+  return r.rows.length ? Number(r.rows[0].id) : null;
+}
+
+async function writeContacts(client: pg.PoolClient, entityId: number, contacts: readonly acct.ContactValue[], by: string): Promise<void> {
+  await client.query(`DELETE FROM entity_contacts WHERE entity_id = $1`, [entityId]);
+  if (!contacts.length) return;
+  await client.query(
+    `INSERT INTO entity_contacts (entity_id, name, role, phone, email, is_primary, position, created_at, created_by)
+     SELECT $1, u.name, u.role, u.phone, u.email, u.is_primary, u.position, $2, $3
+       FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::boolean[], $9::int[]) AS u(name, role, phone, email, is_primary, position)`,
+    [entityId, Date.now(), by,
+     contacts.map((c) => c.name), contacts.map((c) => c.role), contacts.map((c) => c.phone), contacts.map((c) => c.email),
+     contacts.map((c) => c.primary), contacts.map((_, i) => i)]);
+}
+
+/** BR-CUS-001/005. The account arrives «مقترح» with its source and author; a phone already on file is a
+ *  conflict naming that account, never a silent merge into it. */
+export async function createAccount(v: acct.AccountValue, source: acct.AccountSource, by: string): Promise<{ id: number } | { conflict: number } | null> {
+  if (!pool || !connected) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const now = Date.now();
+    const ins = await client.query(
+      `INSERT INTO entities (name, phone, city, sector, importance, owner_member_id, approval, source, created_by, created_at, updated_at, attrs, facts)
+       VALUES ($1,$2,$3,$4,$5,$6,'proposed',$7,$8,$9,$9,'{}','{}')
+       ON CONFLICT (phone) DO NOTHING RETURNING id`,
+      [v.name, v.phone, v.city, v.sector, v.importance, v.ownerId, source, by, now]);
+    if (!ins.rows.length) {
+      await client.query("ROLLBACK");
+      const ex = await pool.query(`SELECT id FROM entities WHERE phone = $1`, [v.phone]);
+      return { conflict: ex.rows.length ? Number(ex.rows[0].id) : 0 };
+    }
+    const id = Number(ins.rows[0].id);
+    await writeContacts(client, id, v.contacts, by);
+    await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'created',$2,$3,$4)`,
+      [id, JSON.stringify({ source, contacts: v.contacts.length }), by, now]);
+    await client.query("COMMIT");
+    return { id };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** Edit everything but the phone. `ifUpdatedAt` is the version the editor loaded: two people editing the
+ *  same account in two tabs get a conflict, not a silent last-write-wins. */
+export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedAt: number | null, by: string):
+  Promise<{ ok: true; updatedAt: number } | { stale: true } | null> {
+  if (!pool || !connected) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(`SELECT name, city, sector, importance, owner_member_id, updated_at, created_at FROM entities WHERE id = $1 FOR UPDATE`, [id]);
+    if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
+    const was = cur.rows[0];
+    const version = Number(was.updated_at ?? was.created_at);
+    if (ifUpdatedAt != null && ifUpdatedAt !== version) { await client.query("ROLLBACK"); return { stale: true }; }
+    const now = Math.max(Date.now(), version + 1);
+    await client.query(
+      `UPDATE entities SET name=$2, city=$3, sector=$4, importance=$5, owner_member_id=$6, updated_at=$7 WHERE id=$1`,
+      [id, v.name, v.city, v.sector, v.importance, v.ownerId, now]);
+    await writeContacts(client, id, v.contacts, by);
+    const changed = [
+      was.name !== v.name ? "name" : "", (was.city ?? null) !== v.city ? "city" : "", (was.sector ?? null) !== v.sector ? "sector" : "",
+      (was.importance ?? null) !== v.importance ? "importance" : "",
+      (was.owner_member_id == null ? null : Number(was.owner_member_id)) !== v.ownerId ? "owner" : "",
+    ].filter(Boolean);
+    await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'edited',$2,$3,$4)`,
+      [id, JSON.stringify({ changed, contacts: v.contacts.length }), by, now]);
+    await client.query("COMMIT");
+    return { ok: true, updatedAt: now };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+export async function setAccountApproval(id: number, decision: acct.AccountApproval, note: string | null, by: string):
+  Promise<{ ok: true; updatedAt: number } | { refused: string } | null> {
+  if (!pool || !connected) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(`SELECT approval, updated_at, created_at FROM entities WHERE id = $1 FOR UPDATE`, [id]);
+    if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
+    const check = acct.checkApproval(String(cur.rows[0].approval), decision);
+    if (!check.ok) { await client.query("ROLLBACK"); return { refused: check.reason }; }
+    const now = Math.max(Date.now(), Number(cur.rows[0].updated_at ?? cur.rows[0].created_at) + 1);
+    await client.query(`UPDATE entities SET approval=$2, approval_by=$3, approval_at=$4, updated_at=$4 WHERE id=$1`, [id, decision, by, now]);
+    await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,$2,$3,$4,$5)`,
+      [id, decision, JSON.stringify({ from: cur.rows[0].approval, note }), by, now]);
+    await client.query("COMMIT");
+    return { ok: true, updatedAt: now };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** The account's side of every other record: opportunity lines and campaigns sent to its number. */
+export async function accountActivity(phone: string): Promise<{
+  opps: { id: number; product: string; stage: string; value: number; owner: string | null; closeOn: number | null; source: string; nextStep: string | null; updatedAt: number }[];
+  campaigns: { id: number; name: string; product: string | null; objective: string | null; createdAt: number; outcome: string | null }[];
+}> {
+  if (!pool || !connected) return { opps: [], campaigns: [] };
+  const [o, c] = await Promise.all([
+    pool.query(`SELECT id, product, stage, sale_price, years, qty, discount, owner, close_on, source, next_step, updated_at FROM opportunities WHERE phone = $1 ORDER BY updated_at DESC LIMIT 100`, [phone]),
+    pool.query(`SELECT c.id, c.name, c.product, c.objective, c.created_at, t.outcome
+                  FROM campaign_targets t JOIN campaigns c ON c.id = t.campaign_id
+                 WHERE t.phone = $1 AND c.test = false ORDER BY c.created_at DESC LIMIT 50`, [phone]),
+  ]);
+  return {
+    opps: o.rows.map((x) => ({
+      id: Number(x.id), product: String(x.product), stage: String(x.stage), owner: x.owner ?? null, source: String(x.source),
+      closeOn: x.close_on == null ? null : Number(x.close_on), nextStep: x.next_step ?? null, updatedAt: Number(x.updated_at),
+      value: acct.summarizeAccountOpps([{ product: String(x.product), stage: "contact", salePrice: Number(x.sale_price) || 0, years: Number(x.years) || 1, quantity: Number(x.qty) || 1, discountPercent: Number(x.discount) || 0 }]).value,
+    })),
+    campaigns: c.rows.map((x) => ({ id: Number(x.id), name: String(x.name), product: x.product ?? null, objective: x.objective ?? null, createdAt: Number(x.created_at), outcome: x.outcome ?? null })),
+  };
 }
 
 // ------------------------------ contact insights (فهم المساعد cache) ------------------------------
