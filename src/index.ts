@@ -803,6 +803,8 @@ function sourceFrom(body: any): { source: string; filename: string | null } {
 }
 /** A path id Postgres can hold. «99999999999999999999» used to reach the driver and answer 500. */
 function idParam(req: any): number | null {
+  // Digits only: Number("1e3") is 1000, so «/admin/opps/1e3/work» read line 1000 (review).
+  if (!/^[0-9]{1,16}$/.test(String((req.params as any).id))) return null;
   const n = Number((req.params as any).id);
   return Number.isSafeInteger(n) && n > 0 && n < 2 ** 53 ? n : null;
 }
@@ -2564,6 +2566,9 @@ app.post("/admin/opps", async (req, reply) => {
   const startStage = await db.defaultStageKey();
   for (const l of lines) {
     if (l.stage == null || l.stage === "") l.stage = startStage;
+    // BRULE-009: a line is closed as lost with a reason, on the board, after it exists — never born lost.
+    if (typeof l.stage !== "string") return reply.code(400).send({ ok: false, error: "invalid_field", field: "stage" });
+    if (l.stage === "lost") return problem(reply, 400, "lost_reason_required", "لا تُسجَّل فرصة مغلقة خسارة مباشرة — أنشئها ثم أغلقها بسبب", "stage");
     const bad = db.validateOppLine(l, liveStages);
     if (bad) return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
     if (!known.has(String(l.product).trim())) {
@@ -2601,6 +2606,7 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   // Stages an EDIT may land on: the active ones, plus the rung this line already sits on — pausing a
   // rung must not trap the deals on it, and must not become a way to move new deals onto it either
   // (config-domain.isStageSelectable, the same rule the picker uses).
+  if (b.stage !== undefined && typeof b.stage !== "string") return reply.code(400).send({ ok: false, error: "invalid_field", field: "stage" });
   const currentStage = await db.oppStageOf(id);
   const allowedStages = [...new Set([...(await db.activeStageKeys()), ...(currentStage ? [currentStage] : [])])];
   const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, allowedStages);
@@ -2626,6 +2632,8 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     if (!lostNow) return problem(reply, 400, "invalid_field", "سبب الخسارة يُسجَّل على بند مغلق خسارة فقط", "lost_reason");
     const loss = work.checkLossReason(b.lost_reason, b.lost_note);
     if (!loss.ok) return problem(reply, 400, closingLost && loss.field === "lost_reason" ? "lost_reason_required" : "invalid_field", loss.message, loss.field);
+    // A CLOSE sent for a line that is already lost (a board loaded before another tab closed it) does not
+    // rewrite the reason it was lost for — db.updateOpp keeps it on the locked row (review).
     patch.lost_reason = loss.reason;
     patch.lost_note = loss.note;
   }
@@ -2633,7 +2641,16 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
   }
   if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
-  const row = await db.updateOpp(id, patch as never, adminName(req));
+  let row: Awaited<ReturnType<typeof db.updateOpp>>;
+  try { row = await db.updateOpp(id, patch as never, adminName(req)); }
+  catch (e) {
+    if (e instanceof db.LossReasonRequired) {
+      return e.kind === "not_lost"
+        ? problem(reply, 400, "invalid_field", "سبب الخسارة يُسجَّل على بند مغلق خسارة فقط", "lost_reason")
+        : problem(reply, 400, "lost_reason_required", "اختر سبب الخسارة — يُسجَّل في تقرير الخسائر", "lost_reason");
+    }
+    throw e;
+  }
   if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
   return { ok: true, opp: row };
 });
@@ -2643,7 +2660,11 @@ app.get("/admin/opps/:id/work", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "id");
-  return withDb(reply, async () => ({ ok: true, today: riyadhToday(), departments: sales.DEPARTMENTS, ...(await db.oppWork(id)) }));
+  return withDb(reply, async () => {
+    const w = await db.oppWork(id);
+    if (!w) return problem(reply, 404, "unknown_opp", "لا فرصة بهذا الرقم", "id");
+    return { ok: true, today: riyadhToday(), departments: sales.DEPARTMENTS, ...w };
+  });
 });
 
 app.post("/admin/opps/:id/activities", async (req, reply) => {

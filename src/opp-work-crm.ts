@@ -87,6 +87,9 @@ var owWork = {};       /* oppId -> { data, failed, loading } */
 var owAct = null;      /* the activity form: { oppId, kind, occurredOn, summary, nextStep, nextOn, owner, dept, err, field, busy } */
 var owQuote = null;    /* the quote form: { oppId, salePrice, years, qty, discount, validUntil, note, err, field, busy } */
 var owQBusy = 0, owDelArm = 0;
+var owActDrafts = {}, owQApply = {};  /* unsaved activity drafts per line; «apply price» choice per quote */
+/* The dialog belongs to the board it was opened on (review: it reappeared after #home → #opps). */
+window.addEventListener("hashchange", function () { if ((location.hash || "").slice(1).split("/")[0] !== "opps") { owLoss = null; owDelArm = 0; } });
 /* Where focus belongs once the work list has re-read: every save repaints the drawer twice (saved, then
    loaded), and a focus set between the two was dropped on the second (QA). */
 var owFocus = { id: "", opp: 0 };
@@ -108,9 +111,12 @@ function owReasonLabel(k) { return LOSS_REASON_LABELS[k] || k || ""; }
 function owLossOpen(ids, mode, stage) {
   var first = owLine(ids[0]);
   var el = document.activeElement;
+  /* Where focus returns: the control that opened the dialog, or — for a kanban drop or a bulk menu, whose
+     element is gone after the repaint — the drawer heading, the bulk menu, or the board toolbar. */
+  var from = el && el.id ? el.id : mode === "bulk" ? "oxb_stage" : "oxdrt";
   owLoss = { ids: ids, mode: mode, stage: stage, name: first ? first.account_name + " — " + first.product : "",
     reason: mode === "edit" && first ? first.lost_reason || "" : "", note: mode === "edit" && first ? first.lost_note || "" : "",
-    err: "", field: "", busy: false, from: el && el.id ? el.id : "", shown: false };
+    err: "", field: "", busy: false, from: from, shown: false };
   opRender();
 }
 function owLossClose() {
@@ -118,13 +124,18 @@ function owLossClose() {
   var from = owLoss.from;
   document.querySelectorAll(".ow-scrim, .ow-box").forEach(function (x) { x.classList.remove("in"); });
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(function () { owLoss = null; opRender(); var t = from && document.getElementById(from); if (t) t.focus(); }, reduce ? 0 : 150);
+  setTimeout(function () { owLoss = null; opRender(); owFocusBack(from); }, reduce ? 0 : 150);
+}
+function owFocusBack(id) {
+  var t = (id && document.getElementById(id)) || document.getElementById("oxdrt") || document.getElementById("oxb_stage") || document.querySelector(".ox-tb button");
+  if (t) t.focus({ preventScroll: true });
 }
 function owLossModal() {
   if (!owLoss) return "";
   var L = owLoss, cls = L.shown ? " in" : "";
   var n = L.ids.length;
-  var title = L.mode === "edit" ? "تعديل سبب الخسارة" : n > 1 ? "إغلاق " + opNLine(n) + " خسارة" : "إغلاق البند خسارة";
+  /* After «إغلاق» the count is the object: «بندين», not «بندان» (review). */
+  var title = L.mode === "edit" ? "تعديل سبب الخسارة" : n === 2 ? "إغلاق بندين خسارة" : n > 1 ? "إغلاق " + opNLine(n) + " خسارة" : "إغلاق البند خسارة";
   var h = '<div class="ow-scrim' + cls + '" data-ow="losscancel"></div><div class="ow-lossm"><div class="ow-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="owlt">' +
     '<div class="mh"><h2 id="owlt">' + title + "</h2>" + (n === 1 && L.name ? '<div class="s">' + esc(L.name) + "</div>" : "") +
     '<div class="s">السبب يُسجَّل على البند وفي «الخسائر حسب السبب» — لا يُغلق بند خسارة بلا سبب.</div></div><div class="mb">';
@@ -153,8 +164,10 @@ function owLossSave() {
   var extra = { lost_reason: c.reason, lost_note: c.note || "" };
   if (L.mode === "bulk") {
     var label = "أُغلقت خسارة (" + owReasonLabel(c.reason) + ")";
-    owLoss = null; opRender();
-    void opBulkPatch({ stage: L.stage, lost_reason: c.reason, lost_note: c.note || "" }, label);
+    owLoss = null;
+    opSel = {}; L.ids.forEach(function (x) { opSel[x] = 1; });
+    opRender();
+    void opBulkPatch({ stage: L.stage, lost_reason: c.reason, lost_note: c.note || "" }, label).then(function () { owFocusBack("oxb_stage"); });
     return;
   }
   var id = L.ids[0];
@@ -174,7 +187,7 @@ function owLossSave() {
   var back = L.from;
   void window.opSaveField(id, "stage", L.stage, extra).then(function () {
     delete owWork[id];
-    var t = back && document.getElementById(back); if (t) t.focus();
+    owFocusBack(back === "oxlost_" + id ? "owlossedit_" + id : back);
   });
 }
 
@@ -204,7 +217,7 @@ function owActivitiesSection(l) {
   var depts = (w.data && w.data.departments) || [];
   var b = '<section class="ox-sec ow-sec" aria-labelledby="oxsec_act"><div class="ow-top"><div class="ox-sech" id="oxsec_act">الأنشطة' +
     (rows.length ? '<span class="ox-cnt" style="color:var(--muted)">' + fmtN(rows.length) + "</span>" : "") + '</div><span class="sp"></span>' +
-    (!owAct || owAct.oppId !== l.id ? '<button class="btn btn-ghost" id="owactnew_' + l.id + '" data-ow="actnew" data-i="' + l.id + '">' + opIco("plus") + "تسجيل نشاط</button>" : "") + "</div>";
+    (!owAct || owAct.oppId !== l.id ? '<button class="btn btn-ghost" id="owactnew_' + l.id + '" data-ow="actnew" data-i="' + l.id + '">' + opIco("plus") + (owActDrafts[l.id] ? "متابعة مسودة النشاط" : "تسجيل نشاط") + "</button>" : "") + "</div>";
   if (owAct && owAct.oppId === l.id) {
     var A = owAct;
     var inv = function (f) { return A.field === f ? ' aria-invalid="true" aria-describedby="owaerr"' : ""; };
@@ -241,6 +254,9 @@ function owActivitiesSection(l) {
   return b + "</section>";
 }
 function owActOpen(l) {
+  /* A draft on another line is kept, not discarded (review): opening this line's form parks it. */
+  if (owAct && owAct.oppId !== l.id && (owAct.summary || owAct.nextStep)) owActDrafts[owAct.oppId] = owAct;
+  if (owActDrafts[l.id]) { owAct = owActDrafts[l.id]; delete owActDrafts[l.id]; owAct.err = ""; owAct.field = ""; opRender(); setTimeout(function () { var s0 = document.getElementById("owa_sum"); if (s0) s0.focus(); }, 0); return; }
   owAct = { oppId: l.id, kind: "meeting", occurredOn: owToday(), summary: "", nextStep: "", nextOn: "", owner: String(l.owner || ""), dept: "", err: "", field: "", busy: false };
   opRender();
   setTimeout(function () { var k = document.getElementById("owk_meeting"); if (k) k.focus(); }, 0);
@@ -259,8 +275,10 @@ function owActSave() {
     var oppId = A.oppId;
     owAct = null;
     if (c.value.nextStep) {
-      var label = c.value.nextOn ? c.value.nextStep + " — " + c.value.nextOn : c.value.nextStep;
-      oppRows = (oppRows || []).map(function (o) { return o.id === oppId ? Object.assign({}, o, { next_step: label }) : o; });
+      /* The same words the server stored (db.addActivity), so the board does not change on the next load. */
+      var day = c.value.nextOn ? new Date(c.value.nextOn + "T00:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" }) : "";
+      var label = day ? c.value.nextStep + " — " + day : c.value.nextStep;
+      oppRows = (oppRows || []).map(function (o) { return o.id === oppId && isOpenStage(o.stage) ? Object.assign({}, o, { next_step: label }) : o; });
     }
     owLoad(oppId, true);
     opToast("سُجّل «" + ACTIVITY_KIND_LABELS[c.value.kind] + "»", false);
@@ -304,7 +322,9 @@ function owQuotesSection(l) {
         '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">ألغِ المسودة</button>";
       else if (q.status === "sent") acts = '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="accepted"' + (busy ? " disabled" : "") + ">قبله العميل</button>" +
         '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">رفضه العميل</button>" +
-        '<label class="ow-chk"><input type="checkbox" id="owqapply_' + q.id + '" checked> عند القبول: اجعله سعر البند</label>';
+        /* The choice lives in state: a repaint used to re-check a box the user had cleared (review). A closed
+           line keeps the value it closed at, so the choice is not offered there. */
+        (opIsOpen(l) ? '<label class="ow-chk"><input type="checkbox" id="owqapply_' + q.id + '" data-owapply="' + q.id + '"' + (owQApply[q.id] === false ? "" : " checked") + "> عند القبول: اجعله سعر البند</label>" : "");
       return '<div class="ow-row"><span><span class="ow-amt">' + opMoney(q.amount) + '</span> <span class="cf-pill q-' + esc(q.status) + '">' + esc(QUOTE_STATUS_LABELS[q.status] || q.status) + "</span></span>" +
         '<span class="d">' + fmtD(q.createdAt) + "</span>" +
         '<span class="m"><bdi>' + fmtN(q.salePrice) + " ر.س سنويًا × " + opNYear(q.years) + " × " + fmtN(q.qty) + (q.discount ? " × (1 − " + fmtN(q.discount) + "٪)" : "") + "</bdi>" +
@@ -340,8 +360,8 @@ function owQuoteSave() {
 }
 function owQuoteMove(id, oppId, to) {
   if (owQBusy) return;
-  var applyEl = document.getElementById("owqapply_" + id);
-  var apply = to === "accepted" && (!applyEl || applyEl.checked);
+  var line = owLine(oppId);
+  var apply = to === "accepted" && !!line && opIsOpen(line) && owQApply[id] !== false;
   owQBusy = id; opRender();
   cfJson("POST", "/admin/opp-quotes/" + id + "/status", { status: to, apply: apply }).then(function (r) {
     owQBusy = 0;
@@ -349,12 +369,14 @@ function owQuoteMove(id, oppId, to) {
     if (r.j.opp) oppRows = (oppRows || []).map(function (o) { return o.id === r.j.opp.id ? r.j.opp : o; });
     owLoad(oppId, true);
     owFocusAfter("owqnew_" + oppId, oppId);
-    opToast(to === "accepted" ? (apply ? "قُبل العرض وأصبح سعر البند" : "قُبل العرض") : to === "sent" ? "سُجّل إرسال العرض" : "سُجّل رفض العرض", false);
+    opToast(to === "accepted" ? (apply && r.j.opp ? "قُبل العرض وأصبح سعر البند" : "قُبل العرض — لم يتغيّر سعر البند") : to === "sent" ? "سُجّل إرسال العرض" : "سُجّل رفض العرض", false);
   }).catch(function () { owQBusy = 0; opToast("تعذّر الاتصال", true); opRender(); });
 }
 
 /* Runs after the board paints: the dialog fades in once, focus lands on its checked (or first) reason. */
 function owAfterRender() {
+  /* Leaving a drawer disarms a pending delete: reopening it used to show «تأكيد الحذف» one click from gone. */
+  if (owDelArm && !document.getElementById("owdel_" + owDelArm)) owDelArm = 0;
   if (owFocus.id) {
     var fe = document.getElementById(owFocus.id);
     var w = owWork[owFocus.opp];
@@ -422,11 +444,14 @@ document.addEventListener("input", function (ev) {
 });
 document.addEventListener("change", function (ev) {
   var t = ev.target; if (!t || !t.getAttribute) return;
+  var qa = t.getAttribute("data-owapply");
+  if (qa) { owQApply[qa] = !!t.checked; return; }
   var f = t.getAttribute("data-owf");
   if (f && owAct && t.tagName === "SELECT") owAct[f] = t.value;
 });
 document.addEventListener("keydown", function (ev) {
   var t = ev.target;
+  if (ev.key === "Escape" && owDelArm && !owLoss) { owDelArm = 0; opRender(); ev.stopImmediatePropagation(); ev.preventDefault(); return; }
   /* Arrow keys move within the reason and kind radiogroups. */
   var grp = t && t.closest ? t.closest(".ow-reasons, .ow-kind") : null;
   if (grp && (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "ArrowUp" || ev.key === "ArrowDown")) {

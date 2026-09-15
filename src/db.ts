@@ -1924,8 +1924,10 @@ function quoteFrom(x: any): QuoteRow {
     createdAt: Number(x.created_at), statusBy: x.status_by ?? null, statusAt: x.status_at == null ? null : Number(x.status_at) };
 }
 
-export async function oppWork(oppId: number): Promise<{ activities: ActivityRow[]; quotes: QuoteRow[]; lossEvents: { at: number; key: string | null; note: string | null; actor: string | null }[] }> {
+export async function oppWork(oppId: number): Promise<{ activities: ActivityRow[]; quotes: QuoteRow[]; lossEvents: { at: number; key: string | null; note: string | null; actor: string | null }[] } | null> {
   if (!pool || !connected) throw new DbUnavailable();
+  const exists = await pool.query(`SELECT 1 FROM opportunities WHERE id = $1`, [oppId]);
+  if (!exists.rows.length) return null;
   const [a, q, e] = await Promise.all([
     pool.query(`SELECT * FROM opp_activities WHERE opp_id = $1 ORDER BY occurred_on DESC, id DESC LIMIT 200`, [oppId]),
     pool.query(`SELECT * FROM opp_quotes WHERE opp_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100`, [oppId]),
@@ -1942,15 +1944,17 @@ export async function addActivity(oppId: number, v: import("./opp-work-domain.js
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const o = await client.query(`SELECT phone FROM opportunities WHERE id = $1 FOR UPDATE`, [oppId]);
+    const o = await client.query(`SELECT phone, stage FROM opportunities WHERE id = $1 FOR UPDATE`, [oppId]);
     if (!o.rows.length) { await client.query("ROLLBACK"); return null; }
     const now = Date.now();
     const r = await client.query(
       `INSERT INTO opp_activities (opp_id, phone, kind, occurred_on, summary, next_step, next_on, owner, dept, created_by, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [oppId, o.rows[0].phone ?? null, v.kind, v.occurredOn, v.summary, v.nextStep, v.nextOn, v.owner, v.dept, by, now]);
-    if (v.nextStep) {
-      const label = v.nextOn ? v.nextStep + " — " + v.nextOn : v.nextStep;
+    // Only a line still being worked takes a next step; a closed one keeps what it closed with (review).
+    if (v.nextStep && o.rows[0].stage !== "won" && o.rows[0].stage !== "lost") {
+      const day = v.nextOn ? new Date(v.nextOn + "T00:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", timeZone: "UTC" }) : "";
+      const label = day ? v.nextStep + " — " + day : v.nextStep;
       await client.query(`UPDATE opportunities SET next_step = $2, updated_at = $3 WHERE id = $1`, [oppId, label.slice(0, 300), now]);
     }
     await client.query("COMMIT");
@@ -2001,8 +2005,9 @@ export async function moveQuote(id: number, to: string, apply: boolean, by: stri
     let opp: OppRow | null = null;
     if (to === "accepted" && apply) {
       const x = q.rows[0];
+      // A closed line keeps the value it closed at: re-pricing a WON line would move «المحقق» after the fact.
       const o = await client.query(
-        `UPDATE opportunities SET sale_price = $2, years = $3, qty = $4, discount = $5, updated_at = $6 WHERE id = $1 RETURNING *`,
+        `UPDATE opportunities SET sale_price = $2, years = $3, qty = $4, discount = $5, updated_at = $6 WHERE id = $1 AND stage NOT IN ('won','lost') RETURNING *`,
         [Number(x.opp_id), Number(x.sale_price), Number(x.years), Number(x.qty), Number(x.discount), now]);
       opp = o.rows.length ? rowToOpp(o.rows[0]) : null;
     }
@@ -2794,6 +2799,10 @@ export async function createOppLines(head: {
 /** stage_at moves ONLY when the stage actually changes, so «متوقّف منذ 18 يومًا» counts days in the
  *  stage and not days since anyone last touched the row — editing a next step must not reset a
  *  stall the board exists to show. */
+/** Thrown by updateOpp when a close-as-lost carries no reason (or a reason arrives for a line that is not
+ *  lost). The route answers 400 with the domain's sentence. */
+export class LossReasonRequired extends Error { constructor(public readonly kind: "missing" | "not_lost" = "missing") { super("lost_reason_required"); } }
+
 export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: string): Promise<OppRow | null> {
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
@@ -2828,6 +2837,22 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
     const prev = await client.query("SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
     if (!prev.rows[0]) { await client.query("ROLLBACK"); return null; }
     const fromStage = String(prev.rows[0].stage);
+    // BRULE-009 decided on the LOCKED row: the route's pre-read raced a concurrent reopen, and 8 closes in 40
+    // landed lost with no reason (review, S3). A reason without a lost line is refused here for the same reason.
+    const lostAfter = patch.stage !== undefined ? patch.stage === "lost" : fromStage === "lost";
+    // The same rule on the locked row: a close that arrives for a line already lost keeps its recorded reason.
+    if (patch.stage === "lost" && fromStage === "lost" && patch.lost_reason !== undefined) {
+      // Rewritten in place, keeping every placeholder bound: an unused $n would fail the statement. A line
+      // lost with NO recorded reason (closed before reasons were required) does take the one sent.
+      const r = sets.findIndex((x) => x.startsWith("lost_reason = $"));
+      const n = sets.findIndex((x) => x.startsWith("lost_note = $"));
+      const pr = r >= 0 ? sets[r].slice("lost_reason = ".length) : "";
+      const pn = n >= 0 ? sets[n].slice("lost_note = ".length) : "";
+      if (n >= 0) sets[n] = "lost_note = CASE WHEN lost_reason IS NULL THEN " + pn + "::text ELSE lost_note END";
+      if (r >= 0) sets[r] = "lost_reason = COALESCE(lost_reason, " + pr + "::text)";
+    }
+    if (patch.stage === "lost" && fromStage !== "lost" && !patch.lost_reason) { await client.query("ROLLBACK"); throw new LossReasonRequired(); }
+    if ((patch.lost_reason !== undefined || patch.lost_note !== undefined) && !lostAfter) { await client.query("ROLLBACK"); throw new LossReasonRequired("not_lost"); }
     const q = await client.query(
       `UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
     if (!q.rows[0]) { await client.query("ROLLBACK"); return null; }
@@ -3259,6 +3284,11 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
         if (!resolved.ok) { await client.query("ROLLBACK"); return { ok: false, error: resolved.error, field: "outcomeKey" }; }
         toStage = resolved.toStage; dept = resolved.dept; nextAction = resolved.nextAction;
 
+        const outcomeIsLost = sales.STAGE_OUTCOMES.some((o) => o.key === input.outcomeKey && o.kind === "lost");
+        if (toStage === fromStage && toStage === "lost" && outcomeIsLost) {
+          // A reason recorded by a rep on a line that is already lost corrects the line too (review, S3).
+          await client.query(`UPDATE opportunities SET lost_reason = $1, lost_note = NULL, updated_at = $2 WHERE id = $3`, [input.outcomeKey, now, input.oppId]);
+        }
         if (toStage !== fromStage) {
           // A rep's lost outcome is the line's lost reason too, so the board shows WHY without a second entry.
           await client.query(
@@ -4252,10 +4282,15 @@ export async function blockedByDept(): Promise<DeptBlock[]> {
 export async function lossesByReason(): Promise<LossReason[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query(
+    // The line's own lost_reason wins over the ledger's latest outcome: a reason EDITED on a lost line (or
+    // recorded late on one closed before reasons were required) is the current truth, and the ledger row
+    // only says what was known at the close (review, S3). Lines with neither stay out, as before.
     `WITH latest AS (
-       SELECT o.id, o.sale_price, o.qty, o.years, o.discount, src.outcome_key, src.at
+       SELECT o.id, o.sale_price, o.qty, o.years, o.discount,
+              COALESCE(o.lost_reason, src.outcome_key) AS outcome_key,
+              COALESCE(src.at, to_timestamp(o.stage_at / 1000.0)) AS at
          FROM opportunities o
-         JOIN LATERAL (
+         LEFT JOIN LATERAL (
            SELECT k.outcome_key, k.at FROM (
              SELECT e.outcome_key, e.effective_at AS at FROM track_stage_events e
               WHERE e.opp_id = o.id AND e.outcome_key IS NOT NULL
@@ -4264,7 +4299,7 @@ export async function lossesByReason(): Promise<LossReason[]> {
               WHERE en.opp_id = o.id AND en.outcome_key IS NOT NULL
            ) k ORDER BY k.at DESC LIMIT 1
          ) src ON TRUE
-        WHERE o.stage = 'lost'
+        WHERE o.stage = 'lost' AND COALESCE(o.lost_reason, src.outcome_key) IS NOT NULL
      )
      SELECT outcome_key,
             COUNT(*)::int AS n,

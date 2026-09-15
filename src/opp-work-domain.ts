@@ -65,7 +65,13 @@ export type ActivityValue = { kind: ActivityKind; occurredOn: string; summary: s
 export function checkActivity(input: ActivityInput, todayIso: string, departments: readonly string[]): { ok: true; value: ActivityValue } | { ok: false; field: string; message: string } {
   var src = input && typeof input === "object" ? input : {};
   var text = function (v: unknown) { return typeof v === "string" ? v.trim() : ""; };
-  var isDay = function (s: string) { return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s + "T00:00:00Z").getTime()); };
+  /* A REAL calendar day in a sane range: JavaScript rolls «2026-02-31» over to March, so the round trip is
+     the test, not whether a Date could be built (review). */
+  var isDay = function (s: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var d = new Date(s + "T00:00:00Z");
+    return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s && s >= "2000-01-01" && s <= "2100-12-31";
+  };
   var kind = text(src.kind);
   if (ACTIVITY_KINDS.indexOf(kind as ActivityKind) < 0) return { ok: false, field: "kind", message: "اختر نوع النشاط" };
   var on = text(src.occurredOn);
@@ -103,18 +109,24 @@ export type QuoteValue = { salePrice: number; years: number; qty: number; discou
  *  become the line's value without a conversion. A validity date cannot be in the past. */
 export function checkQuote(input: QuoteInput, todayIso: string): { ok: true; value: QuoteValue } | { ok: false; field: string; message: string } {
   var src = input && typeof input === "object" ? input : {};
-  var num = function (v: unknown) { return typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN; };
+  /* Decimal digits only: Number("0x10") is 16 and Number("1e3") is 1000, and neither is a price anyone typed. */
+  var num = function (v: unknown) { return typeof v === "number" ? v : typeof v === "string" && /^\s*\d+(\.\d+)?\s*$/.test(v) ? Number(v) : NaN; };
   var price = num(src.salePrice);
   if (!(price > 0) || price > 1e10) return { ok: false, field: "salePrice", message: "أدخل السعر السنوي" };
   var years = src.years == null || src.years === "" ? 1 : num(src.years);
   if (!(years >= 1 && years <= 10 && Math.floor(years) === years)) return { ok: false, field: "years", message: "السنوات من 1 إلى 10" };
   var qty = src.qty == null || src.qty === "" ? 1 : num(src.qty);
-  if (!(qty >= 1 && qty <= 100000 && Math.floor(qty) === qty)) return { ok: false, field: "qty", message: "الكمية عدد صحيح من 1" };
+  /* The line's own bounds (validateOppLine: qty ≤ 10,000, whole-percent discount in an INTEGER column), so an
+     accepted quote can always become the line's price — 12.5% used to fail that write with a 500 (review). */
+  if (!(qty >= 1 && qty <= 10000 && Math.floor(qty) === qty)) return { ok: false, field: "qty", message: "الكمية عدد صحيح من 1 إلى 10,000" };
   var discount = src.discount == null || src.discount === "" ? 0 : num(src.discount);
-  if (!(discount >= 0 && discount <= 100)) return { ok: false, field: "discount", message: "الخصم من 0 إلى 100٪" };
+  if (!(discount >= 0 && discount <= 100 && Math.floor(discount) === discount)) return { ok: false, field: "discount", message: "الخصم نسبة صحيحة من 0 إلى 100٪" };
+  if (src.validUntil != null && typeof src.validUntil !== "string") return { ok: false, field: "validUntil", message: "تاريخ الصلاحية غير صحيح" };
   var vu = typeof src.validUntil === "string" ? src.validUntil.trim() : "";
-  if (vu && !(/^\d{4}-\d{2}-\d{2}$/.test(vu) && !isNaN(new Date(vu + "T00:00:00Z").getTime()))) return { ok: false, field: "validUntil", message: "تاريخ الصلاحية غير صحيح" };
+  var vd = vu ? new Date(vu + "T00:00:00Z") : null;
+  if (vu && !(/^\d{4}-\d{2}-\d{2}$/.test(vu) && vd && !isNaN(vd.getTime()) && vd.toISOString().slice(0, 10) === vu && vu <= "2100-12-31")) return { ok: false, field: "validUntil", message: "تاريخ الصلاحية غير صحيح" };
   if (vu && vu < todayIso) return { ok: false, field: "validUntil", message: "تاريخ الصلاحية مضى" };
+  if (src.note != null && typeof src.note !== "string") return { ok: false, field: "note", message: "الملاحظة نص" };
   var note = typeof src.note === "string" ? src.note.trim() : "";
   if (note.length > QUOTE_NOTE_MAX) return { ok: false, field: "note", message: "الملاحظة أطول من " + QUOTE_NOTE_MAX + " حرفًا" };
   return { ok: true, value: { salePrice: Math.round(price), years: years, qty: qty, discount: discount, validUntil: vu || null, note: note || null } };

@@ -1273,7 +1273,7 @@ function opDetailDrawer(l) {
       (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
       '<span style="flex:1"></span>' +
       '<button class="btn btn-ghost ox-won" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
-      '<button class="btn btn-ghost ox-lost" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
+      '<button class="btn btn-ghost ox-lost" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
   } else {
     b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
       '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
@@ -1613,8 +1613,10 @@ window.opSaveField = async function (id, key, val, extra) {
   var cur = l[key] == null ? (num ? 0 : "") : l[key];
   /* An unchanged value is not a write — the server answers 404 not_found_or_no_change to one. */
   if (String(num ? Number(cur) : cur) === String(norm)) { delete opFState[sk]; opRender(); return; }
-  if (opFState[sk] && opFState[sk].s === "pending") { opFQueue[sk] = val; opFState[sk].v = val; return; }
-  opFState[sk] = { s: "pending", v: val }; opRender();
+  /* The lost reason travels WITH the value through the queue and the retry: both used to resend the bare
+     stage and hit lost_reason_required forever (review, S3). */
+  if (opFState[sk] && opFState[sk].s === "pending") { opFQueue[sk] = val; opFQueueX[sk] = extra; opFState[sk].v = val; return; }
+  opFState[sk] = { s: "pending", v: val, x: extra }; opRender();
   var body = {}; body[key] = norm;
   /* A stage move to lost carries its reason in the same write (opp-work-crm's dialog). */
   if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
@@ -1626,25 +1628,26 @@ window.opSaveField = async function (id, key, val, extra) {
     if (r.ok && j.ok) {
       ok = true;
       oppRows = (oppRows || []).map(function (o) { return o.id === j.opp.id ? j.opp : o; });
-    }
+    } else if (j && j.detail) { opToast(j.detail, true); }
   } catch (e) { ok = false; }
   if (ok) {
     opFState[sk] = { s: "saved", v: val };
     setTimeout(function () { if (opFState[sk] && opFState[sk].s === "saved") { delete opFState[sk]; opRender(); } }, 1600);
   } else {
-    opFState[sk] = { s: "failed", v: val };
+    opFState[sk] = { s: "failed", v: val, x: extra };
     var nm = l.account_name;
     if (opOpen !== id) opToast("لم يُحفظ تعديل على «" + nm + "»", true, "فتح البند", function () { window.opOpenLine(id, ""); });
   }
   opRender();
-  if (opFQueue[sk] !== undefined) { var nv = opFQueue[sk]; delete opFQueue[sk]; void window.opSaveField(id, key, nv); }
+  if (opFQueue[sk] !== undefined) { var nv = opFQueue[sk], nx = opFQueueX[sk]; delete opFQueue[sk]; delete opFQueueX[sk]; void window.opSaveField(id, key, nv, nx); }
 };
 window.opRetryField = function (id, key) {
   var st = opFState[id + ":" + key]; if (!st) return;
-  var v = st.v; delete opFState[id + ":" + key]; void window.opSaveField(id, key, v);
+  var v = st.v, x = st.x; delete opFState[id + ":" + key]; void window.opSaveField(id, key, v, x);
 };
 window.opDiscardField = function (id, key) { delete opFState[id + ":" + key]; opRender(); };
 /* BRULE-009: every path that closes a line as lost goes through the reason dialog first. */
+var opFQueueX = {};
 function opNeedsLossReason(id, stage) {
   var l = (oppRows || []).find(function (o) { return o.id === id; });
   return !!l && typeof isLossClose === "function" && isLossClose(l.stage, stage);
@@ -1718,8 +1721,11 @@ window.opBulkStage = function (el) {
   var v = el.value; el.value = "";
   if (!v) return;
   if (isLostStage(v)) {
+    /* Only lines that are CLOSING get the reason: a line already lost keeps the reason it was lost for, which
+       a bulk close used to overwrite silently (review). */
     var toClose = opSelIds().filter(function (id) { return opNeedsLossReason(id, v); });
-    if (toClose.length) { owLossOpen(opSelIds(), "bulk", v); return; }
+    if (!toClose.length) { opToast("البنود المحدّدة مغلقة خسارة بالفعل", false); return; }
+    owLossOpen(toClose, "bulk", v); return;
   }
   void opBulkPatch({ stage: v }, "نُقلت إلى «" + opStage(v).label + "»");
 };

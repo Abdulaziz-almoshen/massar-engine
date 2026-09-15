@@ -50,6 +50,11 @@ describe("activities (BR-OPP-003)", () => {
     expect(checkActivity({ ...good, nextOn: "2026-09-01" }, today, DEPARTMENTS)).toMatchObject({ field: "nextOn" });
     expect(checkActivity({ ...good, nextStep: "", nextOn: "" }, today, DEPARTMENTS)).toMatchObject({ ok: true, value: { nextStep: null, nextOn: null } });
   });
+  it("real calendar days only (review: 2026-02-31 and 0001-01-01 were accepted)", () => {
+    expect(checkActivity({ ...good, occurredOn: "2026-02-31" }, today, DEPARTMENTS)).toMatchObject({ field: "occurredOn" });
+    expect(checkActivity({ ...good, occurredOn: "0001-01-01" }, today, DEPARTMENTS)).toMatchObject({ field: "occurredOn" });
+    expect(checkActivity({ ...good, nextOn: "9999-12-31" }, today, DEPARTMENTS)).toMatchObject({ field: "nextOn" });
+  });
   it("department comes from the company list", () => {
     expect(checkActivity({ ...good, dept: "المطبخ" }, today, DEPARTMENTS)).toMatchObject({ field: "dept" });
   });
@@ -66,6 +71,14 @@ describe("quotes (BR-OPP-004)", () => {
     expect(checkQuote({ salePrice: 100, discount: 120 }, today)).toMatchObject({ field: "discount" });
     expect(checkQuote({ salePrice: 100, validUntil: "2026-09-01" }, today)).toMatchObject({ field: "validUntil" });
     expect(checkQuote({ salePrice: 100 }, today)).toMatchObject({ ok: true, value: { years: 1, qty: 1, discount: 0 } });
+  });
+  it("stays inside the line's own bounds so an accepted quote can always become the line (review)", () => {
+    expect(checkQuote({ salePrice: 100, discount: 12.5 }, today)).toMatchObject({ field: "discount" });
+    expect(checkQuote({ salePrice: 100, qty: 50000 }, today)).toMatchObject({ field: "qty" });
+    expect(checkQuote({ salePrice: "0x10" }, today)).toMatchObject({ field: "salePrice" });
+    expect(checkQuote({ salePrice: "1e3" }, today)).toMatchObject({ field: "salePrice" });
+    expect(checkQuote({ salePrice: 100, note: { a: 1 } }, today)).toMatchObject({ field: "note" });
+    expect(checkQuote({ salePrice: 100, validUntil: "2026-02-31" }, "2026-01-01")).toMatchObject({ field: "validUntil" });
   });
   it("moves forward only; a decided quote is history", () => {
     expect(canMoveQuote("draft", "sent")).toBe(true);
