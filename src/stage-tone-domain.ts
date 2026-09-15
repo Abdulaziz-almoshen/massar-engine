@@ -50,14 +50,28 @@ export const STAGE_TONE_CYCLE: readonly StageTone[] = [
 ];
 
 /** Resolve a stage's tone. `terminal` is the ladder's own field ("won" | "lost" | null); the key is
- *  checked too, because the compiled fallback ladder in the browser carries terminal:null. */
-export function stageToneOf(key: string, terminal: string | null, openIndex: number): StageTone {
+ *  checked too, because the compiled fallback ladder in the browser carries terminal:null.
+ *  `customIndex` is the rung's position among the UNKEYED open rungs (customToneIndex), so two custom
+ *  rungs take different cycle tones however many seeded rungs sit between them. Only a fifth custom
+ *  rung repeats a hue, and its label still names it. */
+export function stageToneOf(key: string, terminal: string | null, customIndex: number): StageTone {
   if (terminal === "won" || key === "won") return STAGE_TONE_WON;
   if (terminal === "lost" || key === "lost") return STAGE_TONE_LOST;
-  const keyed = STAGE_TONE_KEYED[key];
-  if (keyed) return keyed;
-  const i = Math.max(0, Math.floor(Number(openIndex) || 0));
+  // OWN property only: «constructor» is a valid admin-made key and would otherwise resolve to
+  // Object.prototype.constructor, a tone with no colours (GPT review, 2026-09-15).
+  if (Object.prototype.hasOwnProperty.call(STAGE_TONE_KEYED, key)) return STAGE_TONE_KEYED[key];
+  const i = Math.max(0, Math.floor(Number(customIndex) || 0));
   return STAGE_TONE_CYCLE[i % STAGE_TONE_CYCLE.length];
+}
+
+/** A custom rung's index among the open rungs that have no seeded tone, in ladder order. */
+export function customToneIndex(openKeys: readonly string[], key: string): number {
+  let n = 0;
+  for (let i = 0; i < openKeys.length; i++) {
+    if (openKeys[i] === key) return n;
+    if (!Object.prototype.hasOwnProperty.call(STAGE_TONE_KEYED, openKeys[i])) n++;
+  }
+  return n;
 }
 
 export type StepState = "done" | "current" | "todo";
@@ -82,7 +96,7 @@ export function stageSteps(openKeys: readonly string[], currentKey: string): Ste
   return openKeys.map((_, i) => (i < at ? "done" : i === at ? "current" : "todo") as StepState);
 }
 
-const TONE_FNS = [stageToneOf, stageSteps] as const;
+const TONE_FNS = [stageToneOf, customToneIndex, stageSteps] as const;
 
 export const STAGE_TONE_JS: string = [
   "/* ===== stage-tone-domain (generated from src/stage-tone-domain.ts — do not edit here) ===== */",

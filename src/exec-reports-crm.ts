@@ -23,6 +23,14 @@ export const EXEC_REPORTS_CSS = `
 .rx-seg button:active { transform:scale(0.97); }
 .rx-seg button.on { background:var(--paper); color:var(--ink); box-shadow:0 0 0 1px var(--line); }
 .rx :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.rx-ref { font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--accent-deep); background:transparent; border:none;
+  cursor:pointer; padding:0 4px; min-height:24px; border-radius:var(--r-sm); }
+.rx-ref:hover { text-decoration:underline; }
+.rx-ref[disabled] { color:var(--s-off-text); cursor:default; text-decoration:none; }
+/* DESIGN.md §3.10: 44px on a coarse pointer, the same floor the board's controls already meet. */
+@media (pointer:coarse) {
+  .rx-seg button, button.rx-act, .rx-ref { min-height:44px; }
+}
 
 /* KPI strip: one lead figure, the rest support it (DESIGN.md §5 Tile). */
 .rx-kpis { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr)); background:var(--paper);
@@ -138,7 +146,10 @@ export const EXEC_REPORTS_JS = `
 var rxData = null, rxDays = 30, rxLoading = false, rxFailed = false, rxTries = 0;
 
 function rxLoad(force) {
-  if (rxLoading || (rxData && !force && rxData.report.movement.days === rxDays)) return;
+  /* After the retries are spent the screen waits for «أعد المحاولة». Without this guard the failed
+     render called rxLoad again and a dead database was hit in a tight loop (GPT review). */
+  if (rxLoading || (rxFailed && !force)) return;
+  if (rxData && !force && rxData.report.movement.days === rxDays) return;
   rxLoading = true;
   fetch("/admin/reports/pipeline?days=" + rxDays, { headers: { "x-admin-token": TOKEN } })
     .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
@@ -151,22 +162,47 @@ function rxLoad(force) {
       rxFailed = true; render(false);
     });
 }
+/* Every ENTRY to «التقارير» re-reads: a stage moved on the board a minute ago must show here. The old
+   figures stay on screen while the new ones load, so re-entry never flashes a skeleton. */
+if (!window.__rxHash) {
+  window.__rxHash = 1;
+  window.addEventListener("hashchange", function () {
+    if ((location.hash || "").split("/")[0] === "#reports" && rxData) { rxFailed = false; rxTries = 0; rxLoad(true); }
+  });
+}
+window.rxRefresh = function () { rxFailed = false; rxTries = 0; rxLoad(true); render(false); };
 window.rxRetry = function () { rxFailed = false; rxTries = 0; rxLoad(true); render(false); };
 window.rxSetDays = function (d) { if (rxDays === d) return; rxDays = d; rxData = null; rxLoad(true); render(false); };
-/* A next action that names a rung opens the board filtered to that rung. */
-window.rxGoStage = function (key) {
-  if (typeof opStg !== "undefined") { opStg = key; if (typeof opResetScope === "function") opResetScope(); }
+/* A next action opens «فرص البيع» on EXACTLY the population it named: its stage, source, product and
+   shortcut, with every other filter cleared. Setting only the stage left last visit's product and
+   owner filters in place, and the list could hide the very deals the sentence was about. */
+window.rxGo = function (i) {
+  var a = rxActions[i];
+  if (!a || typeof opStg === "undefined") { location.hash = "#opps"; return; }
+  opQ = ""; opStat = "all"; opOwn = "all";
+  opStg = a.stage || "all"; opSrc = a.source || "all"; opProd = a.product || ""; opShort = a.shortcut || "";
+  opSel = {}; if (typeof PAGE !== "undefined") PAGE.opps = 1;
   location.hash = "#opps";
 };
+var rxActions = [];
 
 function rxPct(p) { return p === null || p === undefined ? "—" : fmtN(p) + "٪"; }
 function rxLabel(key) {
   var s = (rxData && rxData.stages || []).filter(function (x) { return x.key === key; })[0];
   return s ? s.label : (typeof opStage === "function" ? opStage(key).label : key);
 }
-/* A tone for a key the ladder carries, read through the board's own resolver so the colours agree. */
-function rxTone(key) { return typeof opToneVars === "function" ? opToneVars(key) : ""; }
-function rxDotFor(key) { return typeof opDot === "function" ? opDot(key) : ""; }
+/* Tones resolve against the ladder THIS report was computed on, with the same domain resolver the
+   board uses — so the colours agree, and a direct visit to #reports (before the board ever loaded the
+   live ladder) cannot give two custom rungs the same fallback tone. */
+function rxToneObj(key) {
+  var st = (rxData && rxData.stages || []).slice().sort(function (a, b) { return a.position - b.position; });
+  var open = st.filter(function (s) { return !s.terminal && s.key !== "won" && s.key !== "lost"; }).map(function (s) { return s.key; });
+  var me = st.filter(function (s) { return s.key === key; })[0];
+  return stageToneOf(key, me ? me.terminal : null, customToneIndex(open, key));
+}
+function rxTone(key) { var t = rxToneObj(key); return "--tn:" + t.solid + ";--tn-soft:" + t.soft + ";--tn-text:" + t.text; }
+function rxColor(key) { return rxToneObj(key).solid; }
+function rxDotFor(key) { return '<i class="ox-dot" style="background:' + rxColor(key) + '"></i>'; }
 
 function rxCard(id, title, question, signal, body, action, wide) {
   var h = '<section class="rx-card' + (wide ? " wide" : "") + '" aria-labelledby="rx_' + id + '">' +
@@ -174,9 +210,13 @@ function rxCard(id, title, question, signal, body, action, wide) {
   if (signal) h += '<div class="rx-sig">' + signal + "</div>";
   h += body;
   if (action) {
-    h += action.stage
-      ? '<button class="rx-act" onclick="rxGoStage(&quot;' + esc(action.stage) + '&quot;)">' + opIco("warn") + "<span>" + esc(action.text) + '</span><span class="go">افتح في الفرص</span></button>'
-      : '<div class="rx-act">' + opIco("check") + "<span>" + esc(action.text) + "</span></div>";
+    var drills = action.stage || action.source || action.product || action.shortcut;
+    if (drills) {
+      rxActions.push(action);
+      h += '<button class="rx-act" onclick="rxGo(' + (rxActions.length - 1) + ')">' + opIco("warn") + "<span>" + esc(action.text) + '</span><span class="go">افتح هذه البنود</span></button>';
+    } else {
+      h += '<div class="rx-act">' + opIco("check") + "<span>" + esc(action.text) + "</span></div>";
+    }
   }
   return h + "</section>";
 }
@@ -189,10 +229,13 @@ function vReportsExec() {
   }
   if (!rxData) return '<div class="rx" aria-busy="true">' + moSkeleton(3, ["w40", "w80", "w60"]) + "</div>";
   var r = rxData.report;
+  rxActions = [];
   var h = '<div class="rx">';
   h += '<div class="rx-head"><div><div class="rx-q">أين يتسرّب الأنبوب، وما الذي يتحرك؟</div>' +
-    '<div class="rx-meta"><span>محسوب من ' + opNLine(r.lines) + " وسجل انتقالات المراحل، لحظة الفتح</span>" +
-    (r.smallSample && r.lines ? '<span class="rx-small">' + opIco("warn") + "عيّنة صغيرة — النسب مؤشر لا حكم</span>" : "") + "</div></div>" +
+    '<div class="rx-meta"><span>محسوب من ' + opNLine(r.lines) + " وسجل انتقالات المراحل</span>" +
+    '<span>' + (rxLoading ? "جارٍ التحديث…" : "حُدِّث " + new Date(r.generatedAt).toLocaleTimeString("ar-SA-u-nu-latn", { hour: "2-digit", minute: "2-digit" })) + "</span>" +
+    '<button class="rx-ref" onclick="rxRefresh()"' + (rxLoading ? " disabled" : "") + ">تحديث</button>" +
+    (r.smallSample && r.lines ? '<span class="rx-small">' + opIco("warn") + "عيّنة صغيرة — كل نسبة معروضة مع عدد ما قيست عليه</span>" : "") + "</div></div>" +
     '<div class="rx-seg" role="group" aria-label="مدة الحركة">' +
       [30, 90].map(function (d) {
         return '<button class="' + (rxDays === d ? "on" : "") + '" aria-pressed="' + (rxDays === d) + '" onclick="rxSetDays(' + d + ')">آخر ' + fmtN(d) + " يومًا</button>";
@@ -207,14 +250,16 @@ function vReportsExec() {
     return '<div class="rx-kpi ' + cls + '"><span class="l">' + label + "</span>" + value + (sub ? '<span class="s">' + sub + "</span>" : "") + "</div>";
   };
   h += '<div class="rx-kpis">' +
-    kpi("lead", "القيمة المفتوحة", hd.openValue ? '<span class="n">' + opMoney(hd.openValue) + "</span>" : '<span class="n none">—</span>',
+    kpi("lead", "القيمة المفتوحة", hd.pricedOpen ? '<span class="n">' + opMoney(hd.openValue) + "</span>" : '<span class="n none">—</span>',
       (hd.weightedValue ? "المرجّحة بأوزان المراحل " + opMoneyShort(hd.weightedValue) : "لا قيمة مرجّحة") +
       (hd.unpricedOpen ? "، و" + opNLine(hd.unpricedOpen) + " بلا تسعير" : "")) +
     kpi("", "بنود مفتوحة", '<span class="n">' + fmtN(hd.openLines) + "</span>", "") +
     kpi("", "نسبة الفوز", '<span class="n' + (hd.winRatePct === null ? " none" : "") + '">' + rxPct(hd.winRatePct) + "</span>",
-      hd.wonCount + hd.lostCount ? fmtN(hd.wonCount) + " ربح · " + fmtN(hd.lostCount) + " خسارة" : "لم تُحسم صفقة بعد") +
+      hd.wonCount + hd.lostCount
+        ? fmtN(hd.wonCount) + " ربح من " + fmtN(hd.wonCount + hd.lostCount) + " محسومة" + (hd.winRateSmall ? " — عيّنة صغيرة" : "")
+        : "لم تُحسم صفقة بعد") +
     kpi("", "دورة البيع (الوسيط)", hd.medianCycleDays === null ? '<span class="n none">—</span>' : '<span class="n">' + opNDay(hd.medianCycleDays) + "</span>",
-      hd.medianCycleDays === null ? "تُقاس على الصفقات الرابحة" : "من فتح الفرصة إلى الربح") +
+      hd.medianCycleDays === null ? "تُقاس على الصفقات الرابحة" : "من فتح الفرصة إلى الربح، على " + opPl(hd.cycleBasis, "صفقة واحدة", "صفقتين", "صفقات", "صفقة")) +
     kpi(r.velocity.overSla ? "warn" : "", "متأخرة عن المهلة", '<span class="n">' + fmtN(r.velocity.overSla) + "</span>",
       r.movement.quietOpen ? opNLine(r.movement.quietOpen) + " بلا حركة " + fmtN(r.movement.days) + " يومًا" : "كل البنود تحركت") +
     "</div>";
@@ -224,6 +269,12 @@ function vReportsExec() {
   return h + "</div>";
 }
 
+/* The chip between two bands says how many LEFT the rung and how many of them moved on — a rate with
+   its own denominator, because «100٪» of one deal and of forty are different findings. */
+function rxConv(st) {
+  if (st.conversionPct === null) return "لم يُحسم بعد";
+  return "انتقل " + rxPct(st.conversionPct) + " · " + fmtN(st.moved) + " من " + fmtN(st.decided);
+}
 function rxFunnel(f) {
   var top = Math.max(1, f.steps.length ? f.steps[0].reached : 0, f.won);
   var body = '<div class="rx-fun" role="list">';
@@ -231,7 +282,7 @@ function rxFunnel(f) {
     if (i > 0) {
       var prev = f.steps[i - 1];
       var weak = f.weakest && f.weakest.from === prev.key;
-      body += '<div class="rx-conv' + (weak ? " weak" : "") + '" aria-hidden="true"><span>انتقل ' + rxPct(prev.conversionPct) + "</span></div>";
+      body += '<div class="rx-conv' + (weak ? " weak" : "") + '" aria-hidden="true"><span>' + rxConv(prev) + "</span></div>";
     }
     body += '<div class="rx-row" role="listitem" style="' + rxTone(s.key) + '">' +
       '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
@@ -239,18 +290,19 @@ function rxFunnel(f) {
       '<span class="rx-fig"><b>' + fmtN(s.reached) + "</b> وصلت · " + fmtN(s.now) + " الآن</span></div>";
   });
   var last = f.steps[f.steps.length - 1];
-  if (last) body += '<div class="rx-conv" aria-hidden="true"><span>انتقل ' + rxPct(last.conversionPct) + "</span></div>";
-  var wonKey = (rxData.stages || []).filter(function (s) { return s.terminal === "won"; })[0];
-  wonKey = wonKey ? wonKey.key : "won";
+  if (last) body += '<div class="rx-conv' + (f.weakest && f.weakest.from === last.key ? " weak" : "") + '" aria-hidden="true"><span>' + rxConv(last) + "</span></div>";
+  var wonKey = f.wonKey || "won";
   body += '<div class="rx-row" role="listitem" style="' + rxTone(wonKey) + '">' +
     '<span class="rx-lab">' + rxDotFor(wonKey) + esc(rxLabel(wonKey)) + "</span>" +
     '<span class="band"><i style="width:' + Math.round((f.won / top) * 100) + '%"></i></span>' +
     '<span class="rx-fig"><b>' + fmtN(f.won) + "</b> ربح · " + fmtN(f.lost) + " خسارة</span></div>";
   body += "</div>";
   var sig = f.weakest
-    ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»</span>"
-    : '<b class="none">—</b><span>لا انتقال يُقاس بعد</span>';
-  return rxCard("fun", "قمع المراحل", "كم فرصة وصلت كل مرحلة، وكم انتقلت منها إلى التالية؟", sig, body, f.action, false);
+    ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) + "</span>"
+    : f.measured
+      ? "<b>" + rxPct(100) + "</b><span>لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية</span>"
+      : '<b class="none">—</b><span>لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها</span>';
+  return rxCard("fun", "قمع المراحل", "كم فرصة وصلت كل مرحلة، وكم ممن غادرها انتقل إلى التالية؟ الفرصة الباقية في مرحلتها لا تُحسب تسرّبًا.", sig, body, f.action, false);
 }
 
 function rxVelocity(v) {
@@ -263,7 +315,7 @@ function rxVelocity(v) {
       fig = "<b>" + fmtN(s.maxOpenDays) + "</b> الأقدم · " + fmtN(s.medianOpenDays) + " الوسيط" +
         (s.overSla ? ' · <span class="rx-over">' + fmtN(s.overSla) + " متأخرة</span>" : "");
     } else {
-      fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + fmtN(s.medianDoneDays) + " يومًا";
+      fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : opNDay(s.medianDoneDays));
     }
     body += '<div class="rx-row" role="listitem" style="' + rxTone(s.key) + '">' +
       '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
@@ -291,9 +343,9 @@ function rxProducts(p) {
     body += '<div class="rx-row rx-prow" role="listitem">' +
       '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + "</span></span>" +
       '<span class="rx-stack" role="img" aria-label="' + esc(said) + '">' + r.byStage.map(function (x) {
-        return '<i style="flex:' + x.n + ' 1 0;background:' + opColor(x.key) + '" title="' + esc(rxLabel(x.key)) + " " + fmtN(x.n) + '"></i>';
+        return '<i style="flex:' + x.n + ' 1 0;background:' + rxColor(x.key) + '" title="' + esc(rxLabel(x.key)) + " " + fmtN(x.n) + '"></i>';
       }).join("") + "</span>" +
-      '<span class="rx-fig">' + (r.openValue ? "<b>" + opMoneyShort(r.openValue) + "</b> مفتوحة" : r.openLines ? "بلا تسعير" : "لا مفتوح") +
+      '<span class="rx-fig">' + (r.openLines - r.unpricedOpen > 0 ? "<b>" + opMoneyShort(r.openValue) + "</b> مفتوحة" : r.openLines ? "بلا تسعير" : "لا مفتوح") +
         (r.wonValue ? "<br>" + opMoneyShort(r.wonValue) + " ربح" : "") + "</span></div>";
   });
   body += "</div>";
@@ -318,8 +370,8 @@ function rxSources(s) {
   body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--accent)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-mark)"></i>لم تتقدّم</span></div>';
   var best = s.rows.filter(function (r) { return r.source === s.best; })[0];
   var sig = best
-    ? "<b>" + rxPct(best.advancedPct) + "</b><span>أعلى تقدّم — «" + esc(labels[best.source] || best.source) + "»</span>"
-    : '<b class="none">—</b><span>يُقارن المصدر حين يملك بندين أو أكثر</span>';
+    ? "<b>" + rxPct(best.advancedPct) + "</b><span>أعلى تقدّم بين " + opPl(s.eligible, "مصدر واحد", "مصدرين", "مصادر", "مصدرًا") + " لكلٍّ منها بندان أو أكثر — «" + esc(labels[best.source] || best.source) + "»</span>"
+    : '<b class="none">—</b><span>لا ترتيب بعد: يُقارن المصدر حين يملك بندين أو أكثر، ' + (s.eligible ? "ولا يملك ذلك الآن إلا مصدر واحد" : "ولا مصدر يملك ذلك الآن") + "</span>";
   return rxCard("src", "مصادر الفرص", "أي قناة تُنتج فرصًا تتقدّم فعلًا؟", sig, body, s.action, false);
 }
 
@@ -348,8 +400,8 @@ function rxMovement(m) {
   });
   body += "</div>";
   var moved = m.totals.advanced + m.totals.won;
-  var sig = "<b>" + fmtN(moved) + "</b><span>تقدّم أو ربح خلال " + fmtN(m.days) + " يومًا" +
-    (m.wonValue ? "، ربح " + opMoneyShort(m.wonValue) : "") + (m.lostValue ? "، خسارة " + opMoneyShort(m.lostValue) : "") + "</span>";
+  var sig = "<b>" + fmtN(moved) + "</b><span>انتقال إلى الأمام أو ربح خلال " + fmtN(m.days) + " يومًا" +
+    (m.wonValue ? "، صفقات رابحة بقيمتها الحالية " + opMoneyShort(m.wonValue) : "") + (m.lostValue ? "، وخاسرة " + opMoneyShort(m.lostValue) : "") + "</span>";
   return rxCard("mov", "الحركة", "ماذا تغيّر في الأنبوب خلال الفترة؟", sig, body, m.action, false);
 }
 `;

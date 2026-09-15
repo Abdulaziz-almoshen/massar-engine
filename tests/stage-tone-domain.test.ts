@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   STAGE_TONE_KEYED, STAGE_TONE_CYCLE, STAGE_TONE_WON, STAGE_TONE_LOST, STAGE_TONE_JS,
-  stageToneOf, stageSteps, type StageTone,
+  stageToneOf, customToneIndex, stageSteps, type StageTone,
 } from "../src/stage-tone-domain.js";
 import { SALES_STAGES } from "../src/sales-domain.js";
 
@@ -43,11 +43,23 @@ describe("stageToneOf", () => {
     expect(stageToneOf("x", "won", 0)).toBe(STAGE_TONE_WON);
     expect(stageToneOf("lost", null, 0)).toBe(STAGE_TONE_LOST);
   });
-  it("a custom rung cycles by open index and never borrows a keyed hue", () => {
+  it("a custom rung cycles by its custom index and never borrows a keyed hue", () => {
     expect(stageToneOf("custom_a", null, 0)).toBe(STAGE_TONE_CYCLE[0]);
     expect(stageToneOf("custom_b", null, 5)).toBe(STAGE_TONE_CYCLE[1]);
     expect(stageToneOf("custom_c", null, -3)).toBe(STAGE_TONE_CYCLE[0]);
     expect(stageToneOf("present", null, 99)).toBe(STAGE_TONE_KEYED.present);
+  });
+  it("a key named after an Object.prototype member still gets a real tone", () => {
+    for (const k of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(stageToneOf(k, null, 0).solid).toMatch(/^#[0-9A-F]{6}$/);
+    }
+  });
+  it("two custom rungs separated by seeded rungs take different tones", () => {
+    const ladder = ["contact", "custom_a", "discover", "present", "tech", "quote", "custom_b", "negotiate"];
+    expect(customToneIndex(ladder, "custom_a")).toBe(0);
+    expect(customToneIndex(ladder, "custom_b")).toBe(1);
+    expect(stageToneOf("custom_a", null, customToneIndex(ladder, "custom_a")))
+      .not.toBe(stageToneOf("custom_b", null, customToneIndex(ladder, "custom_b")));
   });
 });
 
@@ -66,7 +78,7 @@ describe("stageSteps", () => {
 describe("browser seam", () => {
   it("ships both functions and every constant they read", () => {
     const js = STAGE_TONE_JS;
-    for (const name of ["STAGE_TONE_KEYED", "STAGE_TONE_WON", "STAGE_TONE_LOST", "STAGE_TONE_CYCLE", "function stageToneOf", "function stageSteps"]) {
+    for (const name of ["STAGE_TONE_KEYED", "STAGE_TONE_WON", "STAGE_TONE_LOST", "STAGE_TONE_CYCLE", "function stageToneOf", "function customToneIndex", "function stageSteps"]) {
       expect(js).toContain(name);
     }
     // Evaluated as the page would: a missing reference is a ReferenceError here, not a blank page.

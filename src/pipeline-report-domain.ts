@@ -37,10 +37,18 @@ export type ReportEvent = {
 const DAY_MS = 86_400_000;
 /** Below this many lines a percentage is a hint, not a finding. Stated on screen, not hidden. */
 export const SMALL_SAMPLE = 10;
+/** The fewest lines a channel needs before it is ranked against another. */
+export const SOURCE_MIN_LINES = 2;
 
 const fmt = (n: number) => Number(n || 0).toLocaleString("en-US");
 const nLine = (n: number) => pluralizeArabic(n, "بند واحد", "بندان", "بنود", "بندًا", fmt);
 const nDay = (n: number) => pluralizeArabic(n, "يوم واحد", "يومان", "أيام", "يومًا", fmt);
+/** «منذ …» governs the genitive: «منذ يومين», never «منذ يومان». */
+const nDaySince = (n: number) => pluralizeArabic(n, "يوم واحد", "يومين", "أيام", "يومًا", fmt);
+/** The adjective agrees with the count: «بند واحد مفتوح»، «بندان مفتوحان»، «٣ بنود مفتوحة»، «١١ بندًا مفتوحًا». */
+const nOpenLine = (n: number) => pluralizeArabic(n, "بند واحد مفتوح", "بندان مفتوحان", "بنود مفتوحة", "بندًا مفتوحًا", fmt);
+/** «لم يتحرك» agreeing with the same count. */
+const notMoved = (n: number) => (n === 1 ? "لم يتحرك" : n === 2 ? "لم يتحركا" : n >= 3 && n <= 10 ? "لم تتحرك" : "لم يتحرك");
 
 export function pctOf(part: number, whole: number): number | null {
   return whole > 0 ? Math.round((part / whole) * 100) : null;
@@ -94,17 +102,27 @@ export function furthestIndex(
   return best;
 }
 
-export type NextAction = { text: string; stage: string | null };
+/** One next action, and the exact board population it is about. The screen opens «فرص البيع» with
+ *  THESE filters and every other filter cleared, so the list a CPO lands on is the one the sentence
+ *  named — not the stage filtered inside whatever product and owner were left selected last time. */
+export type NextAction = {
+  text: string; stage: string | null;
+  source?: string | null; product?: string | null; shortcut?: "stalled" | "unpriced" | "open" | null;
+};
 
 // ------------------------------------------------------------------------------------------------
 // 1. قمع المراحل — where the ladder leaks
 // ------------------------------------------------------------------------------------------------
 export type FunnelStep = {
-  key: string; label: string; reached: number; now: number; conversionPct: number | null;
+  key: string; label: string; reached: number; now: number;
+  /** Deals whose fate at this rung is KNOWN: they moved past it, or were lost on it. */
+  decided: number; moved: number; conversionPct: number | null;
 };
 export type Funnel = {
-  steps: FunnelStep[]; won: number; lost: number; lines: number;
-  weakest: { from: string; to: string; conversionPct: number } | null;
+  steps: FunnelStep[]; won: number; lost: number; lines: number; wonKey: string;
+  /** True when at least one rung had a decided deal — «nothing measured» and «nothing leaked» differ. */
+  measured: boolean;
+  weakest: { from: string; to: string; conversionPct: number; moved: number; decided: number } | null;
   action: NextAction | null;
 };
 
@@ -114,35 +132,54 @@ export function buildFunnel(
   const ladder = openLadder(stages);
   const hist = eventsByOpp(events);
   const idx = lines.map((l) => furthestIndex(stages, l, hist.get(l.id) ?? []));
-  const won = lines.filter((l) => isWon(stages, l.stage)).length;
-  const lost = lines.filter((l) => isLost(stages, l.stage)).length;
-  const reached = ladder.map((_, i) => idx.filter((x) => x >= i).length);
-  const steps: FunnelStep[] = ladder.map((st, i) => ({
-    key: st.key, label: st.label, reached: reached[i],
-    now: lines.filter((l) => l.stage === st.key).length,
-    // The last open rung converts into WON, which is the number the whole ladder exists for.
-    conversionPct: pctOf(i + 1 < ladder.length ? reached[i + 1] : won, reached[i]),
-  }));
+  const wonOf = lines.map((l) => isWon(stages, l.stage));
+  const lostOf = lines.map((l) => isLost(stages, l.stage));
+  const won = wonOf.filter(Boolean).length;
+  const lost = lostOf.filter(Boolean).length;
+  const wonKey = stages.find((s) => s.terminal === "won")?.key ?? "won";
+  const last = ladder.length - 1;
 
-  // The weakest step is the lowest conversion that had someone to convert. Ties go to the EARLIER
-  // rung: a leak near the top starves every rung below it.
-  let weakest: Funnel["weakest"] = null;
-  steps.forEach((s, i) => {
-    if (s.conversionPct === null || i + 1 >= steps.length) return;
-    if (!weakest || s.conversionPct < weakest.conversionPct) {
-      weakest = { from: s.key, to: steps[i + 1].key, conversionPct: s.conversionPct };
-    }
+  // CONVERSION IS PER DEAL, over one population. At rung i a deal either MOVED (its furthest rung is
+  // beyond i; at the last rung, it was won), FAILED (it was lost and i is the furthest it got), or is
+  // UNDECIDED (still open with i as its furthest). Numerator and denominator are drawn from the same
+  // decided set, so the rate cannot pass 100٪. The first version divided historical reach by reach
+  // minus current occupancy, and a deal that regressed produced 200٪ (GPT review, 2026-09-15).
+  const steps: FunnelStep[] = ladder.map((st, i) => {
+    let moved = 0, failed = 0;
+    idx.forEach((f, k) => {
+      if (i === last ? wonOf[k] : f > i) moved++;
+      else if (f === i && lostOf[k]) failed++;
+    });
+    return {
+      key: st.key, label: st.label,
+      reached: idx.filter((f) => f >= i).length,
+      now: lines.filter((l) => l.stage === st.key).length,
+      decided: moved + failed, moved,
+      conversionPct: pctOf(moved, moved + failed),
+    };
   });
-  const w = weakest as Funnel["weakest"];
-  const label = (k: string) => ladder.find((s) => s.key === k)?.label ?? k;
+
+  // The weakest step is the lowest conversion below 100٪ — including the last rung into WON, the
+  // transition the whole ladder exists for. Ties go to the EARLIER rung: a leak near the top starves
+  // every rung below it.
+  let w: Funnel["weakest"] = null;
+  for (let i = 0; i < steps.length; i++) {
+    const st = steps[i];
+    if (st.conversionPct === null || st.conversionPct >= 100) continue;
+    if (!w || st.conversionPct < w.conversionPct) {
+      w = { from: st.key, to: i === last ? wonKey : steps[i + 1].key, conversionPct: st.conversionPct,
+        moved: st.moved, decided: st.decided };
+    }
+  }
+  const label = (k: string) => stages.find((s) => s.key === k)?.label ?? k;
   const action: NextAction | null = w
     ? {
-        text: "أكبر تسرّب بين «" + label(w.from) + "» و«" + label(w.to) + "»: " +
-          fmt(w.conversionPct) + "٪ فقط انتقلت. راجع شرط الخروج من «" + label(w.from) + "».",
+        text: "راجع شرط الخروج من «" + label(w.from) + "»: انتقل " + fmt(w.moved) + " من " + fmt(w.decided) +
+          " إلى «" + label(w.to) + "» (" + fmt(w.conversionPct) + "٪)، وهو أكبر تسرّب في الأنبوب.",
         stage: w.from,
       }
     : null;
-  return { steps, won, lost, lines: lines.length, weakest: w, action };
+  return { steps, won, lost, lines: lines.length, wonKey, measured: steps.some((x) => x.decided > 0), weakest: w, action };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -199,8 +236,8 @@ export function buildVelocity(
         // The verb agrees with the count: «بند واحد تجاوز»، «بندان تجاوزا»، «٣ بنود تجاوزت».
         text: pluralizeArabic(top.overSla, "بند واحد", "بندان", "بنود", "بندًا", fmt) + " في «" + top.label + "» " +
           pluralizeArabic(top.overSla, "تجاوز", "تجاوزا", "تجاوزت", "تجاوز", () => "").trim() + " مهلة " + nDay(top.slaDays ?? 0) +
-          ". الأقدم بلا حركة منذ " + nDay(top.maxOpenDays ?? 0) + ".",
-        stage: top.key,
+          ". ابدأ بالأقدم: بلا حركة منذ " + nDaySince(top.maxOpenDays ?? 0) + ".",
+        stage: top.key, shortcut: "stalled",
       }
     : { text: "لا تجاوز لمهل المراحل. أطول بقاء الآن في «" + top.label + "»: " + nDay(top.maxOpenDays ?? 0) + ".",
         stage: top.key };
@@ -250,11 +287,14 @@ export function buildProducts(stages: readonly ReportStage[], lines: readonly Re
   let action: NextAction | null = null;
   if (openLines && unpriced * 2 >= openLines) {
     // More than half the open pipeline has no price, so any value ranking is mostly unpriced guesswork.
-    action = { text: nLine(unpriced) + " مفتوحة من أصل " + fmt(openLines) + " بلا تسعير — ترتيب المنتجات بالقيمة لا يُعتمد قبل تسعيرها.", stage: null };
+    action = { text: "سعّر البنود المفتوحة أولًا: " + nOpenLine(unpriced) + " من أصل " + fmt(openLines) +
+      " بلا سعر، فترتيب المنتجات بالقيمة لا يُعتمد قبلها.", stage: null, shortcut: "unpriced" };
   } else if (top && topSharePct !== null && topSharePct >= 60) {
-    action = { text: "«" + top.product + "» يحمل " + fmt(topSharePct) + "٪ من القيمة المفتوحة — الأنبوب معتمد على منتج واحد.", stage: null };
+    action = { text: "«" + top.product + "» يحمل " + fmt(topSharePct) + "٪ من القيمة المفتوحة: وسّع الأنبوب في بقية المنتجات قبل أن يتوقف الربع على منتج واحد.",
+      stage: null, product: top.product, shortcut: "open" };
   } else if (top && top.openValue) {
-    action = { text: "أعلى قيمة مفتوحة: «" + top.product + "» (" + fmt(topSharePct ?? 0) + "٪).", stage: null };
+    action = { text: "تابع بنود «" + top.product + "» أولًا: أعلى قيمة مفتوحة (" + fmt(topSharePct ?? 0) + "٪).",
+      stage: null, product: top.product, shortcut: "open" };
   }
   return { rows, openValue, topSharePct, action };
 }
@@ -266,7 +306,7 @@ export type SourceReport = {
   source: string; lines: number; value: number; advanced: number; advancedPct: number | null;
   wonCount: number; lostCount: number; winRatePct: number | null;
 };
-export type Sources = { rows: SourceReport[]; best: string | null; action: NextAction | null };
+export type Sources = { rows: SourceReport[]; best: string | null; eligible: number; action: NextAction | null };
 
 export function buildSources(
   stages: readonly ReportStage[], lines: readonly ReportLine[], events: readonly ReportEvent[],
@@ -289,18 +329,22 @@ export function buildSources(
     };
   }).sort((a, b) => (b.lines - a.lines) || (b.value - a.value));
 
-  const eligible = rows.filter((r) => r.lines >= 2 && r.advancedPct !== null);
-  const best = [...eligible].sort((a, b) => ((b.advancedPct ?? 0) - (a.advancedPct ?? 0)) || (b.lines - a.lines))[0] ?? null;
-  const worst = [...eligible].sort((a, b) => ((a.advancedPct ?? 0) - (b.advancedPct ?? 0)) || (b.lines - a.lines))[0] ?? null;
+  // A channel is compared only once it has two lines. With one, «100٪» is a single deal, and naming it
+  // the best channel is the small-sample claim this report promises not to make.
+  const eligible = rows.filter((r) => r.lines >= SOURCE_MIN_LINES && r.advancedPct !== null);
+  const byAdvance = [...eligible].sort((a, b) => ((b.advancedPct ?? 0) - (a.advancedPct ?? 0)) || (b.lines - a.lines));
+  const best = eligible.length >= 2 ? byAdvance[0] : null;
+  const worst = eligible.length >= 2 ? byAdvance[byAdvance.length - 1] : null;
+  const firstKey = openLadder(stages)[0]?.key ?? null;
   const name = (k: string) => labels[k] ?? k;
   let action: NextAction | null = null;
-  if (best && worst && best.source !== worst.source) {
-    action = { text: "تقدّمت " + fmt(best.advancedPct ?? 0) + "٪ من فرص «" + name(best.source) + "»، و" +
-      fmt(worst.advancedPct ?? 0) + "٪ فقط من «" + name(worst.source) + "».", stage: null };
-  } else if (rows[0]) {
-    action = { text: "تقدّمت " + fmt(rows[0].advancedPct ?? 0) + "٪ من فرص «" + name(rows[0].source) + "» بعد التواصل الأولي.", stage: null };
+  if (best && worst && (best.advancedPct ?? 0) > (worst.advancedPct ?? 0)) {
+    action = { text: "راجع بنود «" + name(worst.source) + "» العالقة في التواصل الأولي: تقدّم منها " + fmt(worst.advancedPct ?? 0) +
+      "٪ فقط، مقابل " + fmt(best.advancedPct ?? 0) + "٪ من «" + name(best.source) + "».", stage: firstKey, source: worst.source };
+  } else if (rows.length) {
+    action = { text: "لا مقارنة بين المصادر بعد: يُقارن المصدر حين يملك بندين أو أكثر.", stage: null };
   }
-  return { rows, best: best ? best.source : null, action };
+  return { rows, best: best ? best.source : null, eligible: eligible.length, action };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -316,9 +360,11 @@ export type Movement = {
 };
 
 export function classifyMove(stages: readonly ReportStage[], e: ReportEvent): MoveKind | null {
-  if (!e.fromStage) return "opened";
+  // A deal RECORDED already won or lost is a closure, not an opening — «opened=1, won=0» for a deal
+  // created at signature was the GPT review's reproduction.
   if (isWon(stages, e.toStage)) return "won";
   if (isLost(stages, e.toStage)) return "lost";
+  if (!e.fromStage) return "opened";
   if (isWon(stages, e.fromStage) || isLost(stages, e.fromStage)) return "reopened";
   const ladder = openLadder(stages).map((s) => s.key);
   const a = ladder.indexOf(e.fromStage), b = ladder.indexOf(e.toStage);
@@ -343,7 +389,9 @@ export function buildMovement(
     return { startMs: Math.max(from, endMs - 7 * DAY_MS), endMs, counts: zeroCounts() };
   });
   const totals = zeroCounts();
-  let wonValue = 0, lostValue = 0, advancedValue = 0;
+  // Money is per DEAL, not per event: a deal won, reopened and won again is one deal's value, once.
+  // It is the line's CURRENT value — the ledger does not snapshot price — and the screen says so.
+  const wonDeals = new Set<number>(), lostDeals = new Set<number>(), advancedDeals = new Set<number>();
   const moved = new Set<number>();
   for (const e of inWindow) {
     const kind = classifyMove(stages, e);
@@ -352,17 +400,24 @@ export function buildMovement(
     totals[kind]++;
     const wk = weeks.find((w) => e.at > w.startMs && e.at <= w.endMs) ?? weeks[0];
     wk.counts[kind]++;
-    const l = byId.get(e.oppId);
-    const v = l && l.priced ? l.value : 0;
-    if (kind === "won") wonValue += v;
-    if (kind === "lost") lostValue += v;
-    if (kind === "advanced") advancedValue += v;
+    if (kind === "won") wonDeals.add(e.oppId);
+    if (kind === "lost") lostDeals.add(e.oppId);
+    if (kind === "advanced") advancedDeals.add(e.oppId);
   }
+  const valueOf = (ids: Set<number>) => [...ids].reduce((n, id) => {
+    const l = byId.get(id);
+    return n + (l && l.priced ? l.value : 0);
+  }, 0);
+  // A deal won in the window and still won counts as won; one lost then reopened is not a loss today.
+  const wonValue = valueOf(new Set([...wonDeals].filter((id) => { const l = byId.get(id); return !!l && isWon(stages, l.stage); })));
+  const lostValue = valueOf(new Set([...lostDeals].filter((id) => { const l = byId.get(id); return !!l && isLost(stages, l.stage); })));
+  const advancedValue = valueOf(advancedDeals);
   const open = lines.filter((l) => !isWon(stages, l.stage) && !isLost(stages, l.stage));
   const quietOpen = open.filter((l) => !moved.has(l.id)).length;
   const action: NextAction | null = !open.length ? null : quietOpen
-    ? { text: nLine(quietOpen) + " مفتوحة من أصل " + fmt(open.length) + " لم تتحرك خلال " + nDay(days) + ".", stage: null }
-    : { text: "كل البنود المفتوحة تحركت خلال " + nDay(days) + ".", stage: null };
+    ? { text: "حرّك الراكد: " + nOpenLine(quietOpen) + " من أصل " + fmt(open.length) + " " + notMoved(quietOpen) +
+        " خلال " + nDay(days) + " — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.", stage: null, shortcut: "open" }
+    : { text: "كل البنود المفتوحة تحركت خلال " + nDay(days) + " — لا راكد يحتاج قرارًا.", stage: null };
   return { days, totals, wonValue, lostValue, advancedValue, weeks, quietOpen, openLines: open.length, action };
 }
 
@@ -372,8 +427,10 @@ export function buildMovement(
 export type PipelineReport = {
   generatedAt: number; lines: number; smallSample: boolean;
   headline: {
-    openLines: number; openValue: number; weightedValue: number; unpricedOpen: number;
-    winRatePct: number | null; wonCount: number; lostCount: number; medianCycleDays: number | null;
+    openLines: number; openValue: number; weightedValue: number; unpricedOpen: number; pricedOpen: number;
+    winRatePct: number | null; wonCount: number; lostCount: number;
+    /** Each rate carries its own sample, because «small» depends on the metric, not on the board. */
+    winRateSmall: boolean; medianCycleDays: number | null; cycleBasis: number;
   };
   funnel: Funnel; velocity: Velocity; products: Products; sources: Sources; movement: Movement;
 };
@@ -397,6 +454,9 @@ export function buildPipelineReport(input: {
   return {
     generatedAt: now, lines: lines.length, smallSample: lines.length < SMALL_SAMPLE,
     headline: {
+      pricedOpen: products.rows.reduce((n, r) => n + r.openLines - r.unpricedOpen, 0),
+      winRateSmall: wonCount + lostCount < SMALL_SAMPLE,
+      cycleBasis: cycles.length,
       openLines: products.rows.reduce((n, r) => n + r.openLines, 0),
       openValue: products.openValue,
       weightedValue: products.rows.reduce((n, r) => n + r.weightedValue, 0),

@@ -376,12 +376,13 @@ export const OPPS_CRM_CSS = `
   .ox-stb { position:relative; width:100%; font-family:inherit; display:flex; align-items:center; gap:var(--s2);
     min-height:40px; padding:6px 12px; background:transparent; border:none; border-radius:var(--r-md); text-align:start;
     cursor:pointer; color:var(--ink-2); transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
-  .ox-stb[disabled] { cursor:default; }
+  .ox-stb[aria-disabled="true"] { cursor:default; }
   @media (hover:hover) and (pointer:fine) {
-    .ox-step:not(.current) .ox-stb:not([disabled]):hover { background:var(--surface); }
-    .ox-stb:not([disabled]):hover .go { opacity:1; }
+    .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover { background:var(--surface); }
+    .ox-stb:not([aria-disabled="true"]):hover .go { opacity:1; }
   }
-  .ox-stb:not([disabled]):active { transform:scale(0.98); }
+  .ox-stb:not([aria-disabled="true"]):active { transform:scale(0.98); }
+  @media (pointer:coarse) { .ox-stb { min-height:44px; } }
   .ox-stb .k { flex:none; width:24px; height:24px; border-radius:var(--r-pill); display:inline-flex; align-items:center;
     justify-content:center; font-size:var(--t-xs); font-weight:600; font-variant-numeric:tabular-nums;
     background:var(--paper); color:var(--muted); box-shadow:inset 0 0 0 1.5px var(--s-off-mark); position:relative; }
@@ -582,9 +583,7 @@ function opLostKey() { var s = OPP_ST.filter(function (x) { return isLostStage(x
    now come from stage-tone-domain.ts (measured, unit-tested); the label is always printed beside the
    colour, so colour is never the only channel (DESIGN.md §3.0b). */
 function opTone(k) {
-  var open = opOpenStages(), idx = 0;
-  for (var i = 0; i < open.length; i++) if (open[i].key === k) idx = i;
-  return stageToneOf(k, opStage(k).terminal, idx);
+  return stageToneOf(k, opStage(k).terminal, customToneIndex(opOpenStages().map(function (s) { return s.key; }), k));
 }
 function opColor(k) { return opTone(k).solid; }
 /* The three custom properties every toned element reads, so CSS decides WHERE a tone applies and the
@@ -640,7 +639,8 @@ function opMoneyShort(v) {
 }
 function opAgo(o) {
   var d = opDays(o);
-  return d <= 0 ? "منذ اليوم" : "منذ " + opNDay(d);
+  /* «منذ» governs the genitive: «منذ يومين», not «منذ يومان» (GPT review, 2026-09-15). */
+  return d <= 0 ? "منذ اليوم" : "منذ " + opPl(d, "يوم واحد", "يومين", "أيام", "يومًا");
 }
 
 /* ---- icons: 16px, stroke 1.5, currentColor (DESIGN.md §5 Icon) ---- */
@@ -1190,7 +1190,14 @@ function opDrawerShell(labelId, head, body, foot) {
    quiet. Each rung is a real button — the 6px bars it replaces were aria-hidden and named their
    stage only in a tooltip, so the ladder could not be read without hovering every bar. A paused rung
    stays visible and is disabled, the same rule isStageSelectable applies to the write. */
-var opStepPrev = null, opStepAnim = null;
+var opStepPrev = null, opStepAnim = null, opStepFocus = "";
+/* A stepper click remembers WHICH rung was pressed, so every repaint the save causes (pending, saved,
+   failed) can put focus back on that rung's button instead of dropping it. */
+window.opStepTo = function (id, key) {
+  var el = document.activeElement;
+  opStepFocus = el && el.classList && el.classList.contains("ox-stb") ? "oxst_" + id + "_" + key : "";
+  return window.opSetStage(id, key);
+};
 function opStepper(l, open, idx) {
   var states = stageSteps(open.map(function (s) { return s.key; }), l.stage);
   var selectable = {};
@@ -1203,8 +1210,10 @@ function opStepper(l, open, idx) {
     var can = !isCur && !paused && !oppBusy;
     var said = state === "done" ? "مرحلة مكتملة" : isCur ? "المرحلة الحالية" : "مرحلة قادمة";
     h += '<li class="ox-step ' + state + (paused ? " paused" : "") + '" style="' + opToneVars(s.key) + '"' + (isCur ? ' aria-current="step"' : "") + ">";
-    h += '<button type="button" class="ox-stb"' +
-      (can ? ' onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)"' : " disabled") +
+    h += '<button type="button" class="ox-stb" id="oxst_' + l.id + "_" + esc(s.key) + '"' +
+      /* aria-disabled, not disabled: a disabled button cannot hold focus, and the rung a keyboard user
+         just chose BECOMES the current (inert) rung on the next paint — focus would fall to <body>. */
+      (can ? ' onclick="opStepTo(' + l.id + ',&quot;' + s.key + '&quot;)"' : ' aria-disabled="true"') +
       ' aria-label="' + esc(s.label) + "، " + said + (paused ? "، موقوفة" : can ? "، نقل إليها" : "") + '">' +
       '<span class="k" aria-hidden="true">' + (state === "done" ? opIco("check") : fmtN(i + 1)) + "</span>" +
       '<span class="tx"><span class="l">' + esc(s.label) + "</span>" +
@@ -1401,8 +1410,13 @@ function opAfterRender() {
   var tb = document.querySelector(".ox-tb");
   if (tb && !opSelIds().length) opTbH = Math.round(tb.getBoundingClientRect().height);
   var dr = document.querySelector(".ox-dr");
-  if (!dr) { opStepPrev = null; return; }
+  if (!dr) { opStepPrev = null; opStepFocus = ""; return; }
   opPlaceStepPill();
+  if (opStepFocus) {
+    var sf = document.getElementById(opStepFocus);
+    if (sf && document.activeElement !== sf) sf.focus({ preventScroll: true });
+    if (!opFState[opStepFocus.split("_")[1] + ":stage"]) opStepFocus = "";
+  }
   var db = document.getElementById("oxdb");
   if (db && opDrScroll) db.scrollTop = opDrScroll;
   if (!opDrShown) {

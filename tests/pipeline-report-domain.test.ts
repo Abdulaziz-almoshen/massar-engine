@@ -64,12 +64,38 @@ describe("buildFunnel", () => {
     const d = line({ stage: "lost" });
     const f = buildFunnel(STAGES, [a, b, c, d], [ev(d.id, null, "contact", 10), ev(d.id, "contact", "lost", 2)]);
     expect(f.steps.map((s) => s.reached)).toEqual([4, 2, 2, 1]);
-    expect(f.steps.map((s) => s.conversionPct)).toEqual([50, 100, 50, 100]);
+    // contact: b and c moved past it, d was lost on it, a is undecided → 2 of 3.
+    // present: b still sits there (undecided), c moved on → 1 of 1. tech → won: c won → 1 of 1.
+    expect(f.steps.map((s) => s.conversionPct)).toEqual([67, 100, 100, 100]);
     expect(f.won).toBe(1);
     expect(f.lost).toBe(1);
-    expect(f.weakest).toEqual({ from: "contact", to: "discover", conversionPct: 50 });
+    expect(f.weakest).toEqual({ from: "contact", to: "discover", conversionPct: 67, moved: 2, decided: 3 });
     expect(f.action?.stage).toBe("contact");
-    expect(f.action?.text).toContain("50٪");
+    expect(f.action?.text).toBe("راجع شرط الخروج من «تواصل أولي»: انتقل 2 من 3 إلى «اكتشاف الحاجة» (67٪)، وهو أكبر تسرّب في الأنبوب.");
+  });
+  it("a deal that moved BACKWARD cannot push conversion past 100٪ (GPT review reproduction)", () => {
+    const x = line({ stage: "contact" });
+    const y = line({ stage: "discover" });
+    const f = buildFunnel(STAGES, [x, y], [
+      ev(x.id, null, "contact", 20), ev(x.id, "contact", "discover", 10), ev(x.id, "discover", "contact", 5),
+      ev(y.id, null, "discover", 8),
+    ]);
+    for (const st of f.steps) if (st.conversionPct !== null) expect(st.conversionPct).toBeLessThanOrEqual(100);
+    expect(f.steps[0].conversionPct).toBe(100);
+  });
+  it("a loss on the LAST rung is the weakest step, pointing at won", () => {
+    const z = line({ stage: "lost" });
+    const f = buildFunnel(STAGES, [z], [ev(z.id, null, "tech", 9), ev(z.id, "tech", "lost", 2)]);
+    expect(f.steps[3].conversionPct).toBe(0);
+    expect(f.weakest).toMatchObject({ from: "tech", to: "won", conversionPct: 0 });
+    expect(f.measured).toBe(true);
+  });
+  it("a rung whose only deal is still on it has no conversion — undecided is not a leak", () => {
+    // Production, 2026-09-15: one open deal at quote reported «0٪ انتقلت» as the biggest leak.
+    const q = line({ stage: "tech" });
+    const f = buildFunnel(STAGES, [q], [ev(q.id, null, "contact", 9), ev(q.id, "contact", "tech", 7)]);
+    expect(f.steps.find((s) => s.key === "tech")!.conversionPct).toBeNull();
+    expect(f.weakest).toBeNull();
   });
   it("an empty board has no weakest step and no action", () => {
     const f = buildFunnel(STAGES, [], []);
@@ -93,7 +119,8 @@ describe("buildVelocity", () => {
     expect(tech.maxOpenDays).toBe(20);
     expect(tech.overSla).toBe(1); // 20 days ≥ 14-day SLA; the 3-day one is inside it
     expect(v.bottleneck).toBe("tech");
-    expect(v.action?.text).toBe("بند واحد في «التقييم التقني» تجاوز مهلة 14 يومًا. الأقدم بلا حركة منذ 20 يومًا.");
+    expect(v.action?.text).toBe("بند واحد في «التقييم التقني» تجاوز مهلة 14 يومًا. ابدأ بالأقدم: بلا حركة منذ 20 يومًا.");
+    expect(v.action).toMatchObject({ stage: "tech", shortcut: "stalled" });
   });
   it("a stage with no SLA never reports a breach", () => {
     const a = line({ stage: "contact", stageAt: NOW - 400 * DAY });
@@ -127,7 +154,8 @@ describe("buildProducts", () => {
   });
   it("when most of the open pipeline is unpriced it says the ranking cannot be trusted", () => {
     const p = buildProducts(STAGES, [line({}), line({}), line({ stage: "tech", value: 9, priced: true })]);
-    expect(p.action?.text).toContain("بلا تسعير");
+    expect(p.action?.text).toBe("سعّر البنود المفتوحة أولًا: بندان مفتوحان من أصل 3 بلا سعر، فترتيب المنتجات بالقيمة لا يُعتمد قبلها.");
+    expect(p.action?.shortcut).toBe("unpriced");
   });
 });
 
@@ -144,7 +172,15 @@ describe("buildSources", () => {
     expect(vi.advancedPct).toBe(100);
     expect(vi.winRatePct).toBe(100);
     expect(s.best).toBe("visit");
-    expect(s.action?.text).toBe("تقدّمت 100٪ من فرص «زيارة»، و0٪ فقط من «حملة واتساب».");
+    expect(s.eligible).toBe(2);
+    expect(s.action?.text).toBe("راجع بنود «حملة واتساب» العالقة في التواصل الأولي: تقدّم منها 0٪ فقط، مقابل 100٪ من «زيارة».");
+    expect(s.action).toMatchObject({ stage: "contact", source: "whatsapp" });
+  });
+  it("a one-line channel is never ranked — «100٪» of one deal is not the best channel", () => {
+    const s = buildSources(STAGES, [line({ source: "whatsapp" }), line({ source: "whatsapp" }), line({ source: "visit", stage: "won" })], [], {});
+    expect(s.best).toBeNull();
+    expect(s.eligible).toBe(1);
+    expect(s.action?.text).toContain("لا مقارنة");
   });
 });
 
@@ -176,7 +212,19 @@ describe("buildMovement", () => {
     expect(m.weeks[m.weeks.length - 1].counts.won).toBe(1);
     expect(m.quietOpen).toBe(1);
     expect(m.openLines).toBe(2);
-    expect(m.action?.text).toContain("لم تتحرك");
+    expect(m.action?.text).toBe("حرّك الراكد: بند واحد مفتوح من أصل 2 لم يتحرك خلال 30 يومًا — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.");
+  });
+  it("a deal recorded already won is a win, not an opening; a re-won deal is valued once", () => {
+    const a = line({ stage: "won", value: 1000, priced: true });
+    const b = line({ stage: "won", value: 1000, priced: true });
+    const m = buildMovement(STAGES, [a, b], [
+      ev(a.id, null, "won", 3),
+      ev(b.id, "tech", "won", 20), ev(b.id, "won", "tech", 15), ev(b.id, "tech", "won", 10),
+    ], NOW, 30);
+    expect(m.totals.opened).toBe(0);
+    expect(m.totals.won).toBe(3);
+    expect(m.totals.reopened).toBe(1);
+    expect(m.wonValue).toBe(2000);
   });
 });
 
