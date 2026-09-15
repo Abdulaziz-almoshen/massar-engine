@@ -22,6 +22,7 @@ import { CONFIRMED_INTEREST_STAGES, OPP_STAGES, OPP_SOURCES as OPP_SOURCE_LABELS
 import * as pipelineReport from "./pipeline-report-domain.js";
 import * as sysCfg from "./config-domain.js";
 import * as pd from "./product-domain.js";
+import * as ind from "./indicator-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -768,6 +769,275 @@ app.post("/admin/escalations/:id/resolve", async (req, reply) => {
   return { ok: true, id };
 });
 
+// ---- «مؤشرات استخدام العملاء» and the campaign opportunities they produce ----------------------
+// Client A's BRD v1.0 (2026-09-15). Every rule is in indicator-domain.ts; these routes load, check
+// and store. None of them sends anything: a suggestion becomes a campaign only through the wizard's
+// launch, which keeps its human confirmation.
+
+/** Today as a calendar day in Riyadh — «تاريخ تحديث البيانات» is a day a manager typed, not an instant. */
+function riyadhToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+}
+function suppressionDays(): number {
+  const n = Number(process.env.SUPPRESSION_DAYS);
+  return Number.isInteger(n) && n >= 0 && n <= 365 ? n : ind.DEFAULT_SUPPRESSION_DAYS;
+}
+async function liveProductNames(): Promise<string[]> {
+  return (await productRows()).filter((p) => !p.archived).map((p) => String(p.product));
+}
+/** The members a create/update carries, cleaned. Only ids and short strings survive. */
+function membersFrom(body: any): db.IndicatorMemberIn[] | null {
+  if (!Array.isArray(body?.members)) return null;
+  const clip = (v: unknown, n: number) => (v == null ? null : String(v).trim().slice(0, n) || null);
+  return body.members.slice(0, ind.INDICATOR_MEMBERS_MAX + 1).map((m: any) => ({
+    entityId: Number(m?.entityId), value: clip(m?.value, 60), period: clip(m?.period, 40), note: clip(m?.note, 200),
+    sourceName: clip(m?.sourceName, 120), matchedBy: ["phone", "code", "name", "manual", "review"].includes(String(m?.matchedBy)) ? String(m.matchedBy) : null,
+  })).filter((m: db.IndicatorMemberIn) => Number.isSafeInteger(m.entityId) && m.entityId > 0);
+}
+function sourceFrom(body: any): { source: string; filename: string | null } {
+  const s = ["manual", "file", "paste"].includes(String(body?.source)) ? String(body.source) : "manual";
+  return { source: s, filename: s === "file" ? String(body?.sourceFilename || "").slice(0, 160) || null : null };
+}
+/** A path id Postgres can hold. «99999999999999999999» used to reach the driver and answer 500. */
+function idParam(req: any): number | null {
+  const n = Number((req.params as any).id);
+  return Number.isSafeInteger(n) && n > 0 && n < 2 ** 53 ? n : null;
+}
+const INDICATOR_UPLOAD_MAX = 5 * 1024 * 1024;
+
+app.get("/admin/indicators", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const [indicators, coverage, products] = await Promise.all([db.listIndicators(), db.indicatorCoverage(), liveProductNames()]);
+  return { ok: true, indicators, coverage, products, today: riyadhToday(), suppressionDays: suppressionDays() };
+});
+
+/** Member ids per indicator, for the audience filters (BR-CAM-002, BR-CUS-003). */
+app.get("/admin/indicators/membership", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  return { ok: true, indicators: await db.indicatorRuleInput() };
+});
+
+app.get("/admin/indicators/for-customer/:phone", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const phone = String((req.params as any).phone || "").replace(/\D/g, "").slice(0, 20);
+  if (!phone) return problem(reply, 400, "invalid_field", "الرقم مطلوب", "phone");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  return { ok: true, indicators: await db.indicatorsForPhone(phone), today: riyadhToday() };
+});
+
+app.get("/admin/indicators/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم المؤشر غير صحيح", "id");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const row = await db.indicatorById(id);
+  if (!row) return problem(reply, 404, "unknown_indicator", "لا مؤشر بهذا الرقم", "id");
+  return { ok: true, indicator: row, today: riyadhToday() };
+});
+
+/** BR-IND-003, read-only: a pasted text or an uploaded file comes back as rows in three states
+ *  (مطابق · يحتاج مراجعة · غير مطابق) with candidates. Nothing is stored until the manager saves. */
+app.post("/admin/indicators/preview", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  let grid: string[][];
+  let filename: string | null = null;
+  let overflow = false;
+  try {
+    if ((req as any).isMultipart && (req as any).isMultipart()) {
+      // Its own ceiling, far under the global 25MB: an indicator sheet of 5,000 rows is well under 1MB.
+      const file = await (req as any).file({ limits: { fileSize: INDICATOR_UPLOAD_MAX, files: 1 } });
+      if (!file) return problem(reply, 400, "file_required", "أرفق ملف Excel أو CSV", "file");
+      filename = String(file.filename || "indicator.xlsx").slice(0, 160);
+      const buf = await file.toBuffer();
+      if (file.file?.truncated || buf.length >= INDICATOR_UPLOAD_MAX) return problem(reply, 413, "file_too_large", "الملف أكبر من 5 ميغابايت", "file");
+      ({ grid, overflow } = audience.gridFromFile(buf, filename));
+    } else {
+      const text = String((req.body as any)?.text ?? "");
+      if (!text.trim()) return problem(reply, 400, "text_required", "الصق محتوى الملف أولًا", "text");
+      grid = ind.gridFromText(text.slice(0, 600_000));
+    }
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    if (/fileSize|too large/i.test(msg)) return problem(reply, 413, "file_too_large", "الملف أكبر من 5 ميغابايت", "file");
+    return problem(reply, 422, "unreadable_file", "تعذّرت قراءة الملف: " + msg.slice(0, 160), "file");
+  }
+  const { rows, headerFound } = ind.rowsFromGrid(grid);
+  if (overflow || rows.length > ind.INDICATOR_MEMBERS_MAX) return problem(reply, 422, "too_many_rows", "الملف يتجاوز 5000 صف — قسّمه إلى مؤشرات أصغر", "file");
+  if (!rows.length) return problem(reply, 422, "no_rows", filename ? "الملف لا يحتوي صفوف بيانات." : "لا صفوف بيانات في المحتوى الملصق.", "file");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const entities = (await db.listEntities()).map((e) => ({ id: e.id, name: e.name, phone: e.phone, code: ind.entityCodeOf(e.attrs) }));
+  const matched = ind.matchRows(rows, entities);
+  const totals = { total: matched.length, matched: 0, review: 0, unmatched: 0 };
+  for (const r of matched) totals[r.status]++;
+  // The same customer twice in one file is a data-quality fact the manager should see (NFR-006).
+  const seen = new Map<number, number>();
+  for (const r of matched) if (r.entityId != null) seen.set(r.entityId, (seen.get(r.entityId) || 0) + 1);
+  const duplicates = [...seen.values()].filter((n) => n > 1).length;
+  return { ok: true, filename, headerFound, totals, duplicates, rows: matched, customers: entities.length };
+});
+
+function indicatorBody(req: any): any {
+  const body = req.body;
+  return body && typeof body === "object" && !Array.isArray(body) ? body : {};
+}
+function indicatorInput(body: any): Record<string, unknown> {
+  return body.indicator && typeof body.indicator === "object" && !Array.isArray(body.indicator) ? body.indicator : {};
+}
+
+app.post("/admin/indicators", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const body = indicatorBody(req);
+  const draft = body.draft === true;
+  const checked = ind.checkIndicator(indicatorInput(body), await liveProductNames(), riyadhToday(), draft);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  if (ind.isDuplicateIndicatorName(checked.value.name, await db.listIndicators(), 0)) {
+    return problem(reply, 409, "name_exists", "يوجد مؤشر بهذا الاسم — اختر اسمًا يميّزه", "name");
+  }
+  const members = membersFrom(body) ?? [];
+  const count = ind.checkMemberCount(members.length, draft);
+  if (!count.ok) return problem(reply, 400, count.code, count.reason, count.field);
+  const src = sourceFrom(body);
+  const made = await db.createIndicator(checked.value, members, src.source, src.filename, adminName(req), draft);
+  if (!made) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  if (made.gone) return problem(reply, 409, "members_gone", "لم يُحفظ شيء: العملاء المختارون لم يعودوا في القائمة", "members");
+  log({ at: "indicator", msg: "created", id: made.id, members: made.members, status: checked.value.status, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/indicators/" + made.id).send({ ok: true, id: made.id, members: made.members });
+});
+
+app.patch("/admin/indicators/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم المؤشر غير صحيح", "id");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const current = await db.indicatorById(id);
+  if (!current) return problem(reply, 404, "unknown_indicator", "لا مؤشر بهذا الرقم", "id");
+  const body = indicatorBody(req);
+  const draft = body.draft === true;
+  // Two tabs editing one indicator: the second save used to wipe the first silently, and re-activate a
+  // row disabled in between (QA). The form sends the version it loaded; a mismatch is a conflict.
+  if (body.ifUpdatedAt !== undefined && Number(body.ifUpdatedAt) !== current.updatedAt) {
+    return problem(reply, 409, "stale_indicator", "عُدّل هذا المؤشر من مكان آخر بعد أن فتحته — أعد فتحه لترى آخر نسخة.", "ifUpdatedAt");
+  }
+  const inp = indicatorInput(body);
+  // PATCH carries what changed; everything else is the row as it stands.
+  const pick = (k: string, cur: unknown) => (Object.prototype.hasOwnProperty.call(inp, k) ? inp[k] : cur);
+  const merged: ind.IndicatorInput = {
+    name: pick("name", current.name), description: pick("description", current.description), product: pick("product", current.product),
+    signal: pick("signal", current.signal), customerType: pick("customerType", current.customerType), status: pick("status", current.status),
+    periodFrom: pick("periodFrom", current.periodFrom), periodTo: pick("periodTo", current.periodTo), dataUpdatedAt: pick("dataUpdatedAt", current.dataUpdatedAt),
+  };
+  // Its own product stays valid even if archived since: an edit that keeps it must not fail (QA).
+  const allowed = await liveProductNames();
+  if (current.product && !allowed.includes(current.product)) allowed.push(current.product);
+  const checked = ind.checkIndicator(merged, allowed, riyadhToday(), draft);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  if (ind.isDuplicateIndicatorName(checked.value.name, await db.listIndicators(), id)) {
+    return problem(reply, 409, "name_exists", "يوجد مؤشر بهذا الاسم — اختر اسمًا يميّزه", "name");
+  }
+  const members = membersFrom(body);
+  const count = ind.checkMemberCount(members ? members.length : current.memberCount, draft);
+  if (!count.ok) return problem(reply, 400, count.code, count.reason, count.field);
+  const src = members ? sourceFrom(body) : { source: null, filename: null };
+  const done = await db.updateIndicator(id, checked.value, members, src.source, src.filename, adminName(req), draft);
+  if (!done) return problem(reply, 404, "unknown_indicator", "لا مؤشر بهذا الرقم", "id");
+  if (done.gone) return problem(reply, 409, "members_gone", "لم يُحفظ شيء: العملاء المختارون لم يعودوا في القائمة", "members");
+  log({ at: "indicator", msg: "updated", id, replacedMembers: Boolean(members), members: done.members, by: adminName(req) });
+  return { ok: true, id, members: done.members };
+});
+
+app.post("/admin/indicators/:id/status", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  const status = String((req.body as any)?.status ?? "");
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم المؤشر غير صحيح", "id");
+  if (status !== "active" && status !== "inactive") return problem(reply, 400, "invalid_status", "الحالة «نشط» أو «غير نشط»", "status");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const current = await db.indicatorById(id);
+  if (!current) return problem(reply, 404, "unknown_indicator", "لا مؤشر بهذا الرقم", "id");
+  if (current.status === "draft") return problem(reply, 409, "not_toggleable", "المسودة تُفعَّل بحفظها كاملة، لا من هنا", "status");
+  const ok = await db.setIndicatorStatus(id, status, adminName(req));
+  if (!ok) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  log({ at: "indicator", msg: status, id, by: adminName(req) });
+  return { ok: true, id, status };
+});
+
+app.get("/assets/indicator-template.xlsx", async (_req, reply) => {
+  reply.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  reply.header("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent("قالب-مؤشر-الاستخدام.xlsx")}`);
+  return audience.buildIndicatorTemplateXlsx();
+});
+
+/** BR-IND-007/008, BR-CAM-003, BR-MON-002 — and the adoption KPI beside them, so the recommendation
+ *  engine is judged on the same screen it speaks on. */
+app.get("/admin/campaign-suggestions", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const days = suppressionDays();
+  const since = Date.now() - days * 86_400_000;
+  const [indicators, entities, catalogue, recent, withOrigin, opps, dismissals] = await Promise.all([
+    db.indicatorRuleInput(), db.entityIdentities(), productRows(), db.recentCampaignTargets(since), db.campaignsWithOrigin(), db.listOpps(), db.listDismissals(),
+  ]);
+  const suggestions = ind.suggestOpportunities({
+    indicators, entities,
+    products: catalogue.filter((p) => !p.archived).map((p) => ({ name: String(p.product), sector: (p.sector as string) ?? null, eligible: Boolean(p.eligible), why: p.eligible ? undefined : "لا يبيعه المساعد بعد" })),
+    optedOutPhones: tracker.listContacts().filter((c) => c.optedOut).map((c) => c.phone),
+    recentTargets: recent.filter((c) => c.product).flatMap((c) => c.phones.map((phone) => ({ phone, product: c.product as string, at: c.createdAt }))),
+    openOpportunities: opps.filter((o) => o.phone && !sysCfg.isTerminalStageKey(o.stage)).map((o) => ({ phone: o.phone as string, product: o.product })),
+    dismissedKeys: dismissals.map((d) => d.key),
+    now: Date.now(), todayIso: riyadhToday(), suppressionDays: days,
+  });
+  // KPI «Recommendation Adoption» (BRD §23). A campaign built from an indicator's own list (rule
+  // «indicator») is attributed but is not a recommendation adopted. Launched-as-proposed and
+  // launched-after-changes are counted apart, so an edited audience is not reported as the engine's win.
+  const adopted = withOrigin.filter((c) => (c.origin as any).suggestionKey && (c.origin as any).rule !== "indicator");
+  return {
+    ok: true, suggestions, suppressionDays: days,
+    activeIndicators: indicators.filter((i) => ind.isIndicatorUsable(i.status)).length,
+    adoption: {
+      launched: adopted.length,
+      launchedAsProposed: adopted.filter((c) => (c.origin as any).modified !== true).length,
+      dismissed: dismissals.length, open: suggestions.length,
+      campaigns: adopted.slice(0, 20).map((c) => ({ id: c.id, name: c.name, product: c.product, createdAt: c.createdAt, rule: (c.origin as any).rule ?? null, modified: (c.origin as any).modified === true })),
+    },
+    dismissals: dismissals.slice(0, 20),
+  };
+});
+
+app.post("/admin/campaign-suggestions/dismiss", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.body as any)?.key ?? "").slice(0, 400);
+  if (key.split("|").length !== 4) return problem(reply, 400, "invalid_field", "مفتاح التوصية غير صحيح", "key");
+  const title = String((req.body as any)?.title ?? "").trim().slice(0, 160) || null;
+  const reason = String((req.body as any)?.reason ?? "").trim().slice(0, 200) || null;
+  const ids = Array.isArray((req.body as any)?.indicatorIds)
+    ? [...new Set<number>((req.body as any).indicatorIds.map(Number).filter((n: number) => Number.isSafeInteger(n) && n > 0))].slice(0, 50) : [];
+  if (!(await db.dismissSuggestion(key, title, ids, reason, adminName(req)))) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  log({ at: "suggestion", msg: "dismissed", key, by: adminName(req) });
+  return { ok: true, key };
+});
+
+app.post("/admin/campaign-suggestions/restore", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.body as any)?.key ?? "").slice(0, 400);
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  if (!(await db.restoreSuggestion(key))) return problem(reply, 404, "unknown_dismissal", "لا توصية متجاهلة بهذا المفتاح", "key");
+  return { ok: true, key };
+});
+
+/** BR-CAM-007 — a warning the wizard shows before launch. Read-only, windowed in SQL. */
+app.post("/admin/campaign/repeat-check", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const product = String((req.body as any)?.product ?? "").trim().slice(0, 120);
+  const phones = Array.isArray((req.body as any)?.phones) ? (req.body as any).phones.slice(0, 5000).map((p: unknown) => String(p).slice(0, 20)) : [];
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const days = suppressionDays();
+  const campaigns = await db.recentCampaignTargets(Date.now() - days * 86_400_000);
+  return { ok: true, ...ind.checkRepeatTargeting(product, phones, campaigns, Date.now(), days) };
+});
+
 // ---- the four named reports (R11) and the four-quarter view (R13) -------------------------
 // READ-ONLY, endpoints only. «التقارير» is a door with no screen yet; saying otherwise is the
 // mistake this project has already made once.
@@ -1428,8 +1698,19 @@ app.post("/admin/entities/delete", async (req, reply) => {
 
 app.post("/admin/campaign/launch", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
-  const { targets, message, name, product, buttons, templateId } = (req.body ?? {}) as
-    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string; buttons?: boolean; templateId?: string };
+  const { targets, message, name, product, buttons, templateId, objective, origin } = (req.body ?? {}) as
+    { targets?: { phone: string; name?: string }[]; message?: string; name?: string; product?: string; buttons?: boolean; templateId?: string;
+      objective?: string; origin?: { suggestionKey?: unknown; rule?: unknown; indicatorIds?: unknown } };
+  // BR-CAM-001: the objective is a closed list, so a report can group by it.
+  if (objective !== undefined && objective !== null && objective !== "" && !ind.CAMPAIGN_OBJECTIVES.includes(String(objective))) {
+    return problem(reply, 400, "invalid_objective", "هدف الحملة غير معروف", "objective");
+  }
+  // Attribution to a suggestion, kept to the three fields a report reads. Anything else is dropped.
+  const campOrigin = origin && typeof origin.suggestionKey === "string" && origin.suggestionKey.includes("|")
+    ? { suggestionKey: origin.suggestionKey.slice(0, 400), rule: String(origin.rule ?? "").slice(0, 40) || null,
+        indicatorIds: Array.isArray(origin.indicatorIds) ? origin.indicatorIds.map(Number).filter(Number.isInteger).slice(0, 20) : [],
+        modified: (origin as any).modified === true }
+    : null;
   // Buttons come from the REGISTRY by id, never from the request body. The operator edits the
   // message text freely, but the reply buttons are an approved shape — resolving them server-side
   // keeps the wizard's preview and the wire in agreement and blocks arbitrary titles.
@@ -1467,13 +1748,13 @@ app.post("/admin/campaign/launch", async (req, reply) => {
   const allSandbox = phones.length > 0 && phones.every((p) => Boolean(tracker.findContact(p)?.test));
   const isRehearsal = typeof (req.body as any)?.test === "boolean" ? Boolean((req.body as any).test) : allSandbox;
   const campaignId = await db.createCampaign(campName, (product || "").trim(), message, targets.map(t => ({
-    phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })), isRehearsal);
+    phone: String(t.phone || "").replace(/\D/g, ""), name: t.name })), isRehearsal, campOrigin, objective ? String(objective) : null);
   const results: { phone: string; ok: boolean; error?: string; reason?: string }[] = [];
   for (const t of targets) {
     const phone = String(t.phone || "").replace(/\D/g, "");
     if (!phone) { results.push({ phone: String(t.phone), ok: false, error: "invalid phone" }); continue; }
     const contact = tracker.getContact(phone, t.name);
-    if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); continue; }
+    if (contact.optedOut) { results.push({ phone, ok: false, error: "opted out — skipped" }); void db.markTargetOutcome(campaignId, phone, "opted_out"); continue; }
     // REFUSE rather than fail. WhatsApp accepts a free-form message only inside 24h of the
     // customer's own last message; outside it, only a Meta-approved template — and this path sends
     // session messages. The founder launched to two contacts who had last written 33h earlier, both
@@ -1483,6 +1764,7 @@ app.post("/admin/campaign/launch", async (req, reply) => {
     if (win.state !== "open") {
       results.push({ phone, ok: false, error: win.state === "closed" ? "outside_window" : "no_inbound_ever", reason: win.reason });
       tracker.recordSystem(phone, `[لم تُرسل: ${win.state === "closed" ? "خارج نافذة 24 ساعة" : "لم يراسلنا من قبل"}]`);
+      void db.markTargetOutcome(campaignId, phone, win.state === "closed" ? "outside_window" : "no_inbound_ever");
       continue;
     }
     // {{1}} is the service variable in the founder's Meta template shape. Resolved here as well as
@@ -1536,7 +1818,10 @@ app.post("/admin/campaign/launch", async (req, reply) => {
         }
       }
       results.push({ phone, ok: true });
+      void db.markTargetOutcome(campaignId, phone, "sent");
     } catch (e) {
+      // Unknown, not «failed»: a provider timeout may still have delivered (send-outcome rule), so the
+      // row stays approached for suppression rather than being offered again tomorrow.
       tracker.recordSystem(phone, `campaign send failed: ${String(e).slice(0, 150)}`);
       results.push({ phone, ok: false, error: String(e).slice(0, 150) });
     }

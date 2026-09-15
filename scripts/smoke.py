@@ -53,6 +53,8 @@ ROUTES = [
     ("#tasks", "الأولوية"),
     ("#notes", "ملاحظة"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
+    ("#indicators", "مؤشر"),
+    ("#indicator/new", "بيانات العملاء"),
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the

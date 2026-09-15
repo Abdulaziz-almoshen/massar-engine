@@ -709,6 +709,77 @@ UPDATE packages SET scope = translate(scope, '٠١٢٣٤٥٦٧٨٩', '0123456789
  WHERE scope ~ '[٠-٩]' AND product IN ('الإجازات المرضية');
 `,
   },
+  {
+    version: "011-usage-indicators",
+    sql: `
+-- «مؤشرات استخدام العملاء» (client A, BRD v1.0, 2026-09-15). An indicator is a product manager's
+-- measured statement about a set of customers — «these 128 facilities use sick leave heavily» — with
+-- WHEN it was measured and WHAT membership means (signal), so the opportunity rules in
+-- indicator-domain.ts can read it without guessing. Dates are calendar days as the manager typed them.
+CREATE TABLE IF NOT EXISTS usage_indicators (
+  id              BIGSERIAL PRIMARY KEY,
+  name            TEXT NOT NULL,
+  description     TEXT,
+  product         TEXT,
+  signal          TEXT NOT NULL DEFAULT 'other'
+                  CHECK (signal IN ('high_usage','usage_no_integration','integrated','uses','not_using','other')),
+  customer_type   TEXT NOT NULL DEFAULT 'all' CHECK (customer_type IN ('medical','company','all')),
+  status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','draft')),
+  period_from     TEXT,
+  period_to       TEXT,
+  data_updated_at TEXT NOT NULL,
+  source          TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','file','paste')),
+  source_filename TEXT,
+  created_by      TEXT,
+  created_at      BIGINT NOT NULL,
+  updated_by      TEXT,
+  updated_at      BIGINT NOT NULL
+);
+-- A customer appears in many indicators (BRULE-003), once per indicator. The uploaded name is kept
+-- beside the link: when a later audit asks why a clinic is in «استخدام مرتفع», the row it came from
+-- is the answer.
+CREATE TABLE IF NOT EXISTS usage_indicator_members (
+  indicator_id BIGINT NOT NULL REFERENCES usage_indicators(id) ON DELETE CASCADE,
+  entity_id    BIGINT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  value        TEXT,
+  period       TEXT,
+  note         TEXT,
+  source_name  TEXT,
+  matched_by   TEXT,
+  PRIMARY KEY (indicator_id, entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_uim_entity ON usage_indicator_members (entity_id);
+-- NFR-002: indicator changes are audited. Append-only; the screen shows it as «سجل التغييرات».
+CREATE TABLE IF NOT EXISTS indicator_events (
+  id           BIGSERIAL PRIMARY KEY,
+  indicator_id BIGINT NOT NULL REFERENCES usage_indicators(id) ON DELETE CASCADE,
+  action       TEXT NOT NULL,
+  detail       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  by_name      TEXT,
+  at           BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_indicator_events ON indicator_events (indicator_id, at);
+-- NFR-009: a recommendation can be ignored. The key is indicator-domain's suggestionKey, so the same
+-- suggestion stays dismissed across reloads and returns only when what it proposes changes.
+CREATE TABLE IF NOT EXISTS suggestion_dismissals (
+  key           TEXT PRIMARY KEY,
+  title         TEXT,
+  indicator_ids BIGINT[] NOT NULL DEFAULT '{}',
+  reason        TEXT,
+  by_name TEXT,
+  at      BIGINT NOT NULL
+);
+-- Attribution (BR-MON-006, §19.2 step 7, KPI «Recommendation Adoption»): a campaign launched from a
+-- suggestion records which one, its rule and its indicators. NULL = built by hand.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS origin JSONB;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS objective TEXT;
+-- Whether each target was actually SENT. campaign_targets is written before the send loop, so a
+-- refused recipient (opted out, outside the 24h window, never wrote to us) used to count as
+-- «approached» — suppressing them from suggestions for 30 days and telling the repeat warning they
+-- had been reached. NULL = a row from before this column: unknown, treated as approached.
+ALTER TABLE campaign_targets ADD COLUMN IF NOT EXISTS outcome TEXT;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -777,6 +848,12 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   targets: ["product", "year", "quarter", "amount"],
   engagements: ["id", "contact_phone", "opp_id", "rep", "kind", "outcome_key", "occurred_at", "recorded_at", "idem_key"],
   packages: ["id", "product", "name", "list_price", "years", "scope", "retired_at", "created_at"],
+  usage_indicators: ["id", "name", "description", "product", "signal", "customer_type", "status", "period_from", "period_to", "data_updated_at", "source", "source_filename", "created_by", "created_at", "updated_by", "updated_at"],
+  usage_indicator_members: ["indicator_id", "entity_id", "value", "period", "note", "source_name", "matched_by"],
+  indicator_events: ["id", "indicator_id", "action", "detail", "by_name", "at"],
+  suggestion_dismissals: ["key", "title", "indicator_ids", "reason", "by_name", "at"],
+  campaign_targets: ["campaign_id", "phone", "name", "outcome"],
+  campaigns: ["id", "name", "product", "message", "created_at", "test", "origin", "objective"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1338,7 +1415,7 @@ export async function createTag(name: string, by: string): Promise<boolean> {
  */
 const PRODUCT_NAME_TABLES = [
   "opportunities", "targets", "packages", "product_meta", "pipelines",
-  "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb",
+  "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb", "usage_indicators",
 ] as const;
 
 export type RenameResult = { ok: boolean; moved: Record<string, number> };
@@ -1386,6 +1463,17 @@ export async function renameTag(from: string, to: string): Promise<RenameResult>
               FROM jsonb_array_elements(product_tags) AS v)
         WHERE product_tags @> jsonb_build_array($1::text)`, [from, to]);
     if (e.rowCount) moved.entities = e.rowCount;
+
+    // Suggestion dismissals are keyed «rule|product|fromProduct|ids». Without this a rename brought
+    // every dismissed suggestion for the product back (eng review).
+    const dk = await client.query(
+      `UPDATE suggestion_dismissals
+          SET key = concat_ws('|', split_part(key, '|', 1),
+                CASE WHEN split_part(key, '|', 2) = $1 THEN $2 ELSE split_part(key, '|', 2) END,
+                CASE WHEN split_part(key, '|', 3) = $1 THEN $2 ELSE split_part(key, '|', 3) END,
+                split_part(key, '|', 4))
+        WHERE split_part(key, '|', 2) = $1 OR split_part(key, '|', 3) = $1`, [from, to]);
+    if (dk.rowCount) moved.suggestion_dismissals = dk.rowCount;
 
     await client.query("COMMIT");
     return { ok: true, moved };
@@ -1675,11 +1763,14 @@ export async function tagState(name: string): Promise<{ exists: boolean; archive
 // ------------------------------ campaigns (launches) ------------------------------
 
 export async function createCampaign(name: string, product: string, message: string,
-  targets: { phone: string; name?: string }[], test = false): Promise<number | null> {
+  targets: { phone: string; name?: string }[], test = false,
+  origin: Record<string, unknown> | null = null, objective: string | null = null): Promise<number | null> {
   if (!pool || !connected) return null;
+  // origin/objective ride the same INSERT: a campaign's attribution written in a second statement is
+  // one that can be lost between the two.
   const r = await pool.query(
-    `INSERT INTO campaigns (name, product, message, created_at, test) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [name, product, message, Date.now(), test]);
+    `INSERT INTO campaigns (name, product, message, created_at, test, origin, objective) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [name, product, message, Date.now(), test, origin ? JSON.stringify(origin) : null, objective]);
   const id = Number(r.rows[0].id);
   for (const t of targets) {
     await pool.query(
@@ -1691,16 +1782,269 @@ export async function createCampaign(name: string, product: string, message: str
 
 export async function listCampaigns(): Promise<{
   id: number; name: string; product: string | null; message: string | null; created_at: string;
-  test: boolean; targets: { phone: string; name: string | null }[];
+  test: boolean; origin: Record<string, unknown> | null; objective: string | null;
+  targets: { phone: string; name: string | null }[];
 }[]> {
   if (!pool || !connected) return [];
   const cs = (await pool.query(`SELECT * FROM campaigns ORDER BY created_at DESC`)).rows;
   const ts = (await pool.query(`SELECT campaign_id, phone, name FROM campaign_targets`)).rows;
   return cs.map((c) => ({
     id: Number(c.id), name: c.name, product: c.product, message: c.message, created_at: c.created_at,
-    test: Boolean(c.test),
+    test: Boolean(c.test), origin: c.origin ?? null, objective: c.objective ?? null,
     targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
   }));
+}
+
+// ------------------------------ «مؤشرات استخدام العملاء» ------------------------------
+// Writers and readers ship together (gate step 18): the list, the record, the rule input and the
+// customer record all read what createIndicator/updateIndicator/setIndicatorStatus write.
+
+export type IndicatorRow = {
+  id: number; name: string; description: string | null; product: string | null; signal: string;
+  customerType: string; status: string; periodFrom: string | null; periodTo: string | null;
+  dataUpdatedAt: string; source: string; sourceFilename: string | null;
+  createdBy: string | null; createdAt: number; updatedBy: string | null; updatedAt: number;
+  memberCount: number;
+};
+export type IndicatorMemberIn = { entityId: number; value?: string | null; period?: string | null; note?: string | null; sourceName?: string | null; matchedBy?: string | null };
+export type IndicatorWrite = {
+  name: string; description: string | null; product: string | null; signal: string; customerType: string;
+  status: string; periodFrom: string | null; periodTo: string | null; dataUpdatedAt: string;
+};
+
+function indicatorOf(x: any): IndicatorRow {
+  return {
+    id: Number(x.id), name: String(x.name), description: x.description ?? null, product: x.product ?? null,
+    signal: String(x.signal), customerType: String(x.customer_type), status: String(x.status),
+    periodFrom: x.period_from ?? null, periodTo: x.period_to ?? null, dataUpdatedAt: String(x.data_updated_at),
+    source: String(x.source), sourceFilename: x.source_filename ?? null,
+    createdBy: x.created_by ?? null, createdAt: Number(x.created_at), updatedBy: x.updated_by ?? null,
+    updatedAt: Number(x.updated_at), memberCount: Number(x.member_count) || 0,
+  };
+}
+
+export async function listIndicators(): Promise<IndicatorRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT i.*, (SELECT COUNT(*) FROM usage_indicator_members m WHERE m.indicator_id = i.id) AS member_count
+       FROM usage_indicators i ORDER BY i.updated_at DESC`);
+  return r.rows.map(indicatorOf);
+}
+
+/** Distinct customers across ALL indicators — the «العملاء المشمولون» tile. Summing per-indicator
+ *  counts (as the prototype did) counts a clinic in three indicators three times. */
+export async function indicatorCoverage(): Promise<{ customers: number; activeCustomers: number }> {
+  if (!(await reprobe()) || !pool) return { customers: 0, activeCustomers: 0 };
+  const r = await pool.query(
+    `SELECT COUNT(DISTINCT m.entity_id) AS n,
+            COUNT(DISTINCT m.entity_id) FILTER (WHERE i.status = 'active') AS a
+       FROM usage_indicator_members m JOIN usage_indicators i ON i.id = m.indicator_id`);
+  return { customers: Number(r.rows[0]?.n) || 0, activeCustomers: Number(r.rows[0]?.a) || 0 };
+}
+
+export async function indicatorById(id: number): Promise<(IndicatorRow & {
+  members: { entityId: number; name: string; phone: string; city: string | null; value: string | null; period: string | null; note: string | null; sourceName: string | null; matchedBy: string | null }[];
+  events: { action: string; detail: Record<string, unknown>; by: string | null; at: number }[];
+}) | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const r = await pool.query(
+    `SELECT i.*, (SELECT COUNT(*) FROM usage_indicator_members m WHERE m.indicator_id = i.id) AS member_count
+       FROM usage_indicators i WHERE i.id = $1`, [id]);
+  if (!r.rowCount) return null;
+  const [m, ev] = await Promise.all([
+    pool.query(
+      `SELECT m.entity_id, e.name, e.phone, e.city, m.value, m.period, m.note, m.source_name, m.matched_by
+         FROM usage_indicator_members m JOIN entities e ON e.id = m.entity_id
+        WHERE m.indicator_id = $1 ORDER BY e.name`, [id]),
+    pool.query(`SELECT action, detail, by_name, at FROM indicator_events WHERE indicator_id = $1 ORDER BY at DESC LIMIT 50`, [id]),
+  ]);
+  return {
+    ...indicatorOf(r.rows[0]),
+    members: m.rows.map((x: any) => ({ entityId: Number(x.entity_id), name: String(x.name), phone: String(x.phone), city: x.city ?? null,
+      value: x.value ?? null, period: x.period ?? null, note: x.note ?? null, sourceName: x.source_name ?? null, matchedBy: x.matched_by ?? null })),
+    events: ev.rows.map((x: any) => ({ action: String(x.action), detail: x.detail ?? {}, by: x.by_name ?? null, at: Number(x.at) })),
+  };
+}
+
+async function writeMembers(client: pg.PoolClient, id: number, members: readonly IndicatorMemberIn[]): Promise<number> {
+  await client.query("DELETE FROM usage_indicator_members WHERE indicator_id = $1", [id]);
+  const seen = new Set<number>();
+  const cols: { eid: number[]; value: (string | null)[]; period: (string | null)[]; note: (string | null)[]; src: (string | null)[]; by: (string | null)[] } =
+    { eid: [], value: [], period: [], note: [], src: [], by: [] };
+  for (const mm of members) {
+    const eid = Number(mm.entityId);
+    if (!Number.isInteger(eid) || seen.has(eid)) continue;
+    seen.add(eid);
+    cols.eid.push(eid); cols.value.push(mm.value || null); cols.period.push(mm.period || null);
+    cols.note.push(mm.note || null); cols.src.push(mm.sourceName || null); cols.by.push(mm.matchedBy || null);
+  }
+  if (!cols.eid.length) return 0;
+  // ONE statement for up to 5,000 rows. Row-by-row inserts held one of the pool's 3 connections for
+  // thousands of round trips on a 256MB database (eng review). The JOIN skips a customer deleted
+  // between preview and save instead of failing the whole save on a foreign key.
+  const r = await client.query(
+    `INSERT INTO usage_indicator_members (indicator_id, entity_id, value, period, note, source_name, matched_by)
+     SELECT $1, e.id, u.value, u.period, u.note, u.src, u.by
+       FROM unnest($2::bigint[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[]) AS u(eid, value, period, note, src, by)
+       JOIN entities e ON e.id = u.eid
+     ON CONFLICT DO NOTHING`,
+    [id, cols.eid, cols.value, cols.period, cols.note, cols.src, cols.by]);
+  return r.rowCount || 0;
+}
+
+/** `gone: true` = a non-draft save whose customers all vanished before it committed; nothing was
+ *  written. The first version committed the empty active indicator and THEN answered 409, so a retry
+ *  created a second copy. */
+export async function createIndicator(v: IndicatorWrite, members: readonly IndicatorMemberIn[], source: string, sourceFilename: string | null, by: string, asDraft = false): Promise<{ id: number; members: number; gone?: boolean } | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const now = Date.now();
+    const r = await client.query(
+      `INSERT INTO usage_indicators (name, description, product, signal, customer_type, status, period_from, period_to,
+         data_updated_at, source, source_filename, created_by, created_at, updated_by, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$12,$13) RETURNING id`,
+      [v.name, v.description, v.product, v.signal, v.customerType, v.status, v.periodFrom, v.periodTo, v.dataUpdatedAt, source, sourceFilename, by, now]);
+    const id = Number(r.rows[0].id);
+    const n = await writeMembers(client, id, members);
+    if (!asDraft && n < 1) { await client.query("ROLLBACK"); return { id: 0, members: 0, gone: true }; }
+    await client.query(`INSERT INTO indicator_events (indicator_id, action, detail, by_name, at) VALUES ($1,'created',$2,$3,$4)`,
+      [id, JSON.stringify({ status: v.status, members: n, source, product: v.product }), by, now]);
+    await client.query("COMMIT");
+    return { id, members: n };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+/** `members === null` keeps the customer list untouched (a metadata edit); an array REPLACES it
+ *  (a data update). The audit row says which happened, with before/after counts. */
+export async function updateIndicator(id: number, v: IndicatorWrite, members: readonly IndicatorMemberIn[] | null, source: string | null, sourceFilename: string | null, by: string, asDraft = false): Promise<{ members: number; gone?: boolean } | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(
+      `SELECT i.status, (SELECT COUNT(*) FROM usage_indicator_members m WHERE m.indicator_id = i.id) AS n
+         FROM usage_indicators i WHERE i.id = $1 FOR UPDATE`, [id]);
+    if (!cur.rowCount) { await client.query("ROLLBACK"); return null; }
+    const now = Date.now();
+    await client.query(
+      `UPDATE usage_indicators SET name=$2, description=$3, product=$4, signal=$5, customer_type=$6, status=$7,
+         period_from=$8, period_to=$9, data_updated_at=$10, source=COALESCE($11, source),
+         source_filename=CASE WHEN $11::text IS NULL THEN source_filename ELSE $12 END, updated_by=$13, updated_at=$14
+       WHERE id=$1`,
+      [id, v.name, v.description, v.product, v.signal, v.customerType, v.status, v.periodFrom, v.periodTo, v.dataUpdatedAt, source, sourceFilename, by, now]);
+    const before = Number(cur.rows[0].n) || 0;
+    let n = before;
+    if (members) {
+      n = await writeMembers(client, id, members);
+      if (!asDraft && n < 1) { await client.query("ROLLBACK"); return { members: 0, gone: true }; }
+      await client.query(`INSERT INTO indicator_events (indicator_id, action, detail, by_name, at) VALUES ($1,'data_replaced',$2,$3,$4)`,
+        [id, JSON.stringify({ before, after: n, source, dataUpdatedAt: v.dataUpdatedAt }), by, now]);
+      // New customers mean a new proposal: a suggestion dismissed against the old list must be able
+      // to come back. The dismissal row records which indicators it was built from.
+      await client.query(`DELETE FROM suggestion_dismissals WHERE $1::bigint = ANY(indicator_ids)`, [id]);
+    }
+    await client.query(`INSERT INTO indicator_events (indicator_id, action, detail, by_name, at) VALUES ($1,'edited',$2,$3,$4)`,
+      [id, JSON.stringify({ status: v.status, previousStatus: String(cur.rows[0].status), product: v.product, signal: v.signal }), by, now]);
+    await client.query("COMMIT");
+    return { members: n };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+export async function setIndicatorStatus(id: number, status: "active" | "inactive", by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const now = Date.now();
+  const r = await pool.query(`UPDATE usage_indicators SET status=$2, updated_by=$3, updated_at=$4 WHERE id=$1 AND status <> 'draft' RETURNING id`, [id, status, by, now]);
+  if (!r.rowCount) return false;
+  await pool.query(`INSERT INTO indicator_events (indicator_id, action, detail, by_name, at) VALUES ($1,$2,'{}',$3,$4)`,
+    [id, status === "active" ? "activated" : "deactivated", by, now]);
+  return true;
+}
+
+/** What the opportunity rules read: every indicator with its member ids. One query, no N+1. */
+export async function indicatorRuleInput(): Promise<{ id: number; name: string; product: string | null; signal: string; status: string; dataUpdatedAt: string; customerType: string; memberIds: number[] }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT i.id, i.name, i.product, i.signal, i.status, i.data_updated_at, i.customer_type,
+            COALESCE(array_agg(m.entity_id) FILTER (WHERE m.entity_id IS NOT NULL), '{}') AS ids
+       FROM usage_indicators i LEFT JOIN usage_indicator_members m ON m.indicator_id = i.id
+      GROUP BY i.id`);
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), product: x.product ?? null, signal: String(x.signal),
+    status: String(x.status), dataUpdatedAt: String(x.data_updated_at), customerType: String(x.customer_type), memberIds: (x.ids || []).map(Number) }));
+}
+
+/** The indicators one customer sits in — the «المؤشرات» block of the customer record (BR-CUS-004). */
+export async function indicatorsForPhone(phone: string): Promise<{ id: number; name: string; product: string | null; status: string; value: string | null; dataUpdatedAt: string }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT i.id, i.name, i.product, i.status, i.data_updated_at, m.value
+       FROM usage_indicator_members m JOIN usage_indicators i ON i.id = m.indicator_id
+       JOIN entities e ON e.id = m.entity_id
+      WHERE e.phone = $1 ORDER BY i.status = 'active' DESC, i.name`, [phone]);
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), product: x.product ?? null, status: String(x.status), value: x.value ?? null, dataUpdatedAt: String(x.data_updated_at) }));
+}
+
+export async function dismissSuggestion(key: string, title: string | null, indicatorIds: readonly number[], reason: string | null, by: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  await pool.query(
+    `INSERT INTO suggestion_dismissals (key, title, indicator_ids, reason, by_name, at) VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (key) DO UPDATE SET title = EXCLUDED.title, indicator_ids = EXCLUDED.indicator_ids, reason = EXCLUDED.reason, by_name = EXCLUDED.by_name, at = EXCLUDED.at`,
+    [key, title, indicatorIds, reason, by, Date.now()]);
+  return true;
+}
+export async function restoreSuggestion(key: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(`DELETE FROM suggestion_dismissals WHERE key = $1`, [key]);
+  return (r.rowCount || 0) > 0;
+}
+export async function listDismissals(): Promise<{ key: string; title: string | null; reason: string | null; by: string | null; at: number }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(`SELECT key, title, reason, by_name, at FROM suggestion_dismissals ORDER BY at DESC`);
+  return r.rows.map((x: any) => ({ key: String(x.key), title: x.title ?? null, reason: x.reason ?? null, by: x.by_name ?? null, at: Number(x.at) }));
+}
+
+/** Non-test campaigns inside a window, with the phones that were actually approached (sent, or of
+ *  unknown outcome on rows older than the outcome column). Windowed in SQL: the unbounded version
+ *  aggregated every target ever sent on every suggestions read and every repeat check. */
+export async function recentCampaignTargets(sinceMs: number): Promise<{ id: number; name: string; product: string | null; createdAt: number; test: boolean; phones: string[] }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT c.id, c.name, c.product, c.created_at, c.test,
+            COALESCE(array_agg(t.phone) FILTER (WHERE t.phone IS NOT NULL AND (t.outcome IS NULL OR t.outcome = 'sent')), '{}') AS phones
+       FROM campaigns c LEFT JOIN campaign_targets t ON t.campaign_id = c.id
+      WHERE c.created_at >= $1 AND NOT c.test
+      GROUP BY c.id ORDER BY c.created_at DESC`, [sinceMs]);
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), product: x.product ?? null, createdAt: Number(x.created_at),
+    test: Boolean(x.test), phones: (x.phones || []).map(String) }));
+}
+
+/** Campaigns launched from a suggestion — the numerator of «Recommendation Adoption». Small by
+ *  construction: only rows that carry an origin. */
+export async function campaignsWithOrigin(): Promise<{ id: number; name: string; product: string | null; createdAt: number; origin: Record<string, unknown> }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(`SELECT id, name, product, created_at, origin FROM campaigns WHERE origin IS NOT NULL AND NOT test ORDER BY created_at DESC LIMIT 500`);
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), product: x.product ?? null, createdAt: Number(x.created_at), origin: x.origin }));
+}
+
+/** The launch loop's writer for campaign_targets.outcome: «sent», or the refusal code. */
+export async function markTargetOutcome(campaignId: number | null, phone: string, outcome: string): Promise<void> {
+  if (campaignId == null || !pool || !connected) return;
+  await pool.query(`UPDATE campaign_targets SET outcome = $3 WHERE campaign_id = $1 AND phone = $2`, [campaignId, phone, outcome.slice(0, 40)])
+    .catch((e) => console.error(JSON.stringify({ at: "db", msg: "target outcome write failed", err: String(e).slice(0, 200) })));
+}
+
+/** Only what the rules need from a customer — not the attrs/facts JSON of the whole book. */
+export async function entityIdentities(): Promise<{ id: number; name: string; phone: string }[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(`SELECT id, name, phone FROM entities`);
+  return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), phone: String(x.phone) }));
 }
 
 // ------------------------------ tasks & notes ------------------------------

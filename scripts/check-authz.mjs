@@ -47,9 +47,11 @@ const child = spawn(process.execPath, ["dist/index.js"], {
 // Kept narrow: 500 is still a failure, not a refusal.
 const refused = (code) => code === 401 || code === 429;
 
-const hit = async (path, headers) => {
+const hit = async (path, headers, method = "GET") => {
   try {
-    const r = await fetch(BASE + path, { headers, method: "GET" });
+    const body = method === "GET" ? undefined : "{}";
+    const h = body ? { ...headers, "content-type": "application/json" } : headers;
+    const r = await fetch(BASE + path, { headers: h, method, body });
     return r.status;
   } catch { return 0; }
 };
@@ -76,6 +78,23 @@ try {
     c(`${route} refuses a wrong token`, refused(await hit(route, wrong)));
     c(`${route} refuses no token`, refused(await hit(route, none)));
   }
+
+  // The usage-indicator and campaign-suggestion routes (client A BRD, 2026-09-15), every method. The
+  // security review found the GET-only matrix could not see a single one of them; a write route a rep
+  // token could reach would be the gap this file exists to close.
+  const ADMIN_WRITES = [
+    ["GET", "/admin/indicators"], ["GET", "/admin/indicators/membership"], ["GET", "/admin/indicators/1"],
+    ["GET", "/admin/indicators/for-customer/966500000000"], ["GET", "/admin/campaign-suggestions"],
+    ["POST", "/admin/indicators"], ["POST", "/admin/indicators/preview"], ["PATCH", "/admin/indicators/1"],
+    ["POST", "/admin/indicators/1/status"], ["POST", "/admin/campaign-suggestions/dismiss"],
+    ["POST", "/admin/campaign-suggestions/restore"], ["POST", "/admin/campaign/repeat-check"],
+  ];
+  for (const [method, route] of ADMIN_WRITES) {
+    c(`${method} ${route} admits admin`, (await hit(route, admin, method)) !== 401);
+    c(`${method} ${route} REFUSES a rep token`, refused(await hit(route, rep, method)));
+    c(`${method} ${route} refuses no token`, refused(await hit(route, none, method)));
+  }
+  c("/assets/indicator-template.xlsx is public", (await hit("/assets/indicator-template.xlsx", none)) === 200);
 
   // The rep surface admits the rep AND the admin (the founder walks the same screen), refuses the rest.
   const REP_ROUTES = ["/rep/queue", "/rep/outcomes?stage=tech"];

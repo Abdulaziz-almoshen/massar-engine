@@ -443,7 +443,11 @@ function crmRow(c, st) {
     '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#14161A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div></div>' +
     '<span style="font-size:12px;color:#656B76;flex:none;">' + fmtD(c.created_at) + '</span></div>' +
     '<div class="c-meta">' +
-    '<div class="c-prod" style="font-size:12px;color:#33373E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' + esc(c.product || "—") + '</div>' +
+    '<div class="c-prod" style="font-size:12px;color:#33373E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' + esc(c.product || "—") +
+      /* BR-MON-001 / BR-CAM-001: the objective the campaign was launched for, and whether it came from a
+         Massar recommendation — the two things a report groups a campaign by. */
+      (c.objective && typeof CAMPAIGN_OBJECTIVE_LABELS !== "undefined" ? '<span style="color:#656B76;"> · ' + esc(CAMPAIGN_OBJECTIVE_LABELS[c.objective] || "") + '</span>' : "") +
+      (c.origin && c.origin.suggestionKey ? ' <span class="cf-pill sys" style="font-size:12px;padding:1px 8px;" title="' + (c.origin.rule === "indicator" ? "مبنية على قائمة مؤشر استخدام" : "مبنية على توصية من مسار") + '">' + (c.origin.rule === "indicator" ? "من مؤشر" : "من توصية") + '</span>' : "") + '</div>' +
     '<div class="c-state" style="display:flex;align-items:center;gap:7px;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + ps.dot + ';"></span><span style="font-size:14px;color:#33373E;">' + ps.label + '</span></div></div>' +
     '<div class="c-fig fig">' +
       '<div class="c-num"><span class="lbl-ph">الجمهور </span>' + fmtN(st.targeted) + '</div>' +
@@ -932,7 +936,11 @@ var crmBooted = false;
 function crmCampaignsHtml(campId) {
   try {
     if (!crmBooted) { crmBoot(); crmBooted = true; }
-    return campId ? vKmonDetailCrm(campId, cache) : vKmonCrm(cache);
+    /* BR-MON-002: suggested campaign opportunities greet the campaigns page (indicators-crm). Guarded
+       like everything else here, so a fault in the panel cannot take the list down with it. */
+    var sg = "";
+    if (!campId && typeof sgPanel === "function") { try { sg = '<div style="margin-bottom:var(--s4,24px)">' + sgPanel("kmon") + "</div>"; } catch (e) { sg = ""; } }
+    return campId ? vKmonDetailCrm(campId, cache) : sg + vKmonCrm(cache);
   } catch (e) {
     /* Say it out loud rather than silently serving the old screen: a fallback nobody knows about is
        how a regression lives for a week. */
