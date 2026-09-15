@@ -223,7 +223,7 @@ function rxCard(id, title, question, signal, body, action, wide) {
 
 function vReportsExec() {
   rxLoad(false);
-  if (rxFailed) {
+  if (rxFailed && !rxData) {
     return '<div class="rx"><div class="rx-state" role="alert">' + opIco("warn") + "تعذّر تحميل التقارير التنفيذية." +
       '<button class="btn btn-ghost" onclick="rxRetry()">أعد المحاولة</button></div></div>';
   }
@@ -233,6 +233,7 @@ function vReportsExec() {
   var h = '<div class="rx">';
   h += '<div class="rx-head"><div><div class="rx-q">أين يتسرّب الأنبوب، وما الذي يتحرك؟</div>' +
     '<div class="rx-meta"><span>محسوب من ' + opNLine(r.lines) + " وسجل انتقالات المراحل</span>" +
+    (rxFailed ? '<span class="rx-small" role="alert">' + opIco("warn") + "تعذّر التحديث — المعروض من آخر قراءة ناجحة</span>" : "") +
     '<span>' + (rxLoading ? "جارٍ التحديث…" : "حُدِّث " + new Date(r.generatedAt).toLocaleTimeString("ar-SA-u-nu-latn", { hour: "2-digit", minute: "2-digit" })) + "</span>" +
     '<button class="rx-ref" onclick="rxRefresh()"' + (rxLoading ? " disabled" : "") + ">تحديث</button>" +
     (r.smallSample && r.lines ? '<span class="rx-small">' + opIco("warn") + "عيّنة صغيرة — كل نسبة معروضة مع عدد ما قيست عليه</span>" : "") + "</div></div>" +
@@ -299,6 +300,8 @@ function rxFunnel(f) {
   body += "</div>";
   var sig = f.weakest
     ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) + "</span>"
+    : f.lostUnplaced
+      ? "<b>" + fmtN(f.lostUnplaced) + "</b><span>خسارة بلا مرحلة معروفة، فلا يمكن تحديد موضع تسرّبها</span>"
     : f.measured
       ? "<b>" + rxPct(100) + "</b><span>لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية</span>"
       : '<b class="none">—</b><span>لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها</span>';
@@ -315,7 +318,7 @@ function rxVelocity(v) {
       fig = "<b>" + fmtN(s.maxOpenDays) + "</b> الأقدم · " + fmtN(s.medianOpenDays) + " الوسيط" +
         (s.overSla ? ' · <span class="rx-over">' + fmtN(s.overSla) + " متأخرة</span>" : "");
     } else {
-      fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : opNDay(s.medianDoneDays));
+      fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : opPl(s.medianDoneDays, "يومًا واحدًا", "يومين", "أيام", "يومًا"));
     }
     body += '<div class="rx-row" role="listitem" style="' + rxTone(s.key) + '">' +
       '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
@@ -341,7 +344,7 @@ function rxProducts(p) {
   p.rows.forEach(function (r) {
     var said = r.byStage.map(function (x) { return rxLabel(x.key) + " " + fmtN(x.n); }).join("، ");
     body += '<div class="rx-row rx-prow" role="listitem">' +
-      '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + "</span></span>" +
+      '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></span>" +
       '<span class="rx-stack" role="img" aria-label="' + esc(said) + '">' + r.byStage.map(function (x) {
         return '<i style="flex:' + x.n + ' 1 0;background:' + rxColor(x.key) + '" title="' + esc(rxLabel(x.key)) + " " + fmtN(x.n) + '"></i>';
       }).join("") + "</span>" +
@@ -350,7 +353,12 @@ function rxProducts(p) {
   });
   body += "</div>";
   var top = p.rows[0];
-  var sig = top && p.topSharePct !== null
+  var openN = 0, unpN = 0;
+  p.rows.forEach(function (r) { openN += r.openLines; unpN += r.unpricedOpen; });
+  /* When most open lines have no price, a value share is mostly silence: lead with the gap instead. */
+  var sig = openN && unpN * 2 >= openN
+    ? "<b>" + fmtN(unpN) + "</b><span>بلا سعر من أصل " + opPl(openN, "بند واحد مفتوح", "بندين مفتوحين", "بنود مفتوحة", "بندًا مفتوحًا") + " — حصص القيمة أدناه لا تشملها</span>"
+    : top && p.topSharePct !== null
     ? "<b>" + rxPct(p.topSharePct) + "</b><span>من القيمة المفتوحة في «" + esc(top.product) + "»</span>"
     : "<b>" + fmtN(p.rows.length) + "</b><span>" + (p.rows.length === 1 ? "منتج في الأنبوب" : "منتجات في الأنبوب، ولا قيمة مسعَّرة بعد") + "</span>";
   return rxCard("prd", "المنتجات", "أي منتج يحمل الأنبوب، وفي أي مرحلة تقف بنوده؟", sig, body, p.action, true);
@@ -365,7 +373,8 @@ function rxSources(s) {
     body += '<div class="rx-row" role="listitem">' +
       '<span class="rx-lab">' + opIco(r.source in OPP_ICO ? r.source : "other") + esc(labels[r.source] || r.source) + "</span>" +
       '<span class="rx-track" style="width:' + Math.max(8, Math.round((r.lines / max) * 100)) + '%"><i style="width:' + (r.advancedPct || 0) + '%"></i></span>' +
-      '<span class="rx-fig"><b>' + fmtN(r.lines) + "</b> · تقدّم " + rxPct(r.advancedPct) + " · فوز " + rxPct(r.winRatePct) + "</span></div>";
+      '<span class="rx-fig"><b>' + fmtN(r.lines) + "</b> · تقدّم " + rxPct(r.advancedPct) + " (" + fmtN(r.advanced) + ") · فوز " + rxPct(r.winRatePct) +
+        (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></div>";
   });
   body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--accent)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-mark)"></i>لم تتقدّم</span></div>';
   var best = s.rows.filter(function (r) { return r.source === s.best; })[0];

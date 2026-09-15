@@ -83,6 +83,22 @@ describe("buildFunnel", () => {
     for (const st of f.steps) if (st.conversionPct !== null) expect(st.conversionPct).toBeLessThanOrEqual(100);
     expect(f.steps[0].conversionPct).toBe(100);
   });
+  it("losses with no known rung are counted, so the card cannot call the pipeline leak-free", () => {
+    const w = line({ stage: "won" });
+    const lost = [line({ stage: "lost" }), line({ stage: "lost" }), line({ stage: "lost" })];
+    const f = buildFunnel(STAGES, [w, ...lost], [ev(w.id, null, "contact", 30), ev(w.id, "contact", "won", 5),
+      ...lost.map((l) => ev(l.id, null, "lost", 40, "migration"))]);
+    expect(f.lostUnplaced).toBe(3);
+    expect(f.weakest).toBeNull();
+  });
+  it("a deal won, reopened and lost at contact leaked at contact, not before signature", () => {
+    const d = line({ stage: "lost" });
+    const f = buildFunnel(STAGES, [d], [ev(d.id, null, "tech", 30), ev(d.id, "tech", "won", 20),
+      ev(d.id, "won", "contact", 10), ev(d.id, "contact", "lost", 2)]);
+    expect(f.steps[0].conversionPct).toBe(0);
+    expect(f.steps[3].conversionPct).toBeNull();
+    expect(f.weakest).toMatchObject({ from: "contact" });
+  });
   it("a loss on the LAST rung is the weakest step, pointing at won", () => {
     const z = line({ stage: "lost" });
     const f = buildFunnel(STAGES, [z], [ev(z.id, null, "tech", 9), ev(z.id, "tech", "lost", 2)]);
@@ -175,6 +191,17 @@ describe("buildSources", () => {
     expect(s.eligible).toBe(2);
     expect(s.action?.text).toBe("راجع بنود «حملة واتساب» العالقة في التواصل الأولي: تقدّم منها 0٪ فقط، مقابل 100٪ من «زيارة».");
     expect(s.action).toMatchObject({ stage: "contact", source: "whatsapp" });
+  });
+  it("two level channels are not ranked, and the action says they are level", () => {
+    const s = buildSources(STAGES, [line({ source: "a" }), line({ source: "a" }), line({ source: "b" }), line({ source: "b" })], [], {});
+    expect(s.best).toBeNull();
+    expect(s.level).toBe(true);
+    expect(s.action?.text).toContain("متساوية");
+  });
+  it("a 2-day SLA reads «مهلة يومين», never «مهلة يومان»", () => {
+    const st = STAGES.map((x) => (x.key === "tech" ? { ...x, slaDays: 2 } : x));
+    const v = buildVelocity(st, [line({ stage: "tech", stageAt: NOW - 3 * DAY })], [], NOW);
+    expect(v.action?.text).toContain("مهلة يومين");
   });
   it("a one-line channel is never ranked — «100٪» of one deal is not the best channel", () => {
     const s = buildSources(STAGES, [line({ source: "whatsapp" }), line({ source: "whatsapp" }), line({ source: "visit", stage: "won" })], [], {});

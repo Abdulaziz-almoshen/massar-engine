@@ -120,6 +120,9 @@ export type FunnelStep = {
 };
 export type Funnel = {
   steps: FunnelStep[]; won: number; lost: number; lines: number; wonKey: string;
+  /** Lost deals with no known rung (backfilled «null → lost», or recorded lost): real losses the
+   *  funnel cannot place. The screen must not call the pipeline leak-free while these exist. */
+  lostUnplaced: number;
   /** True when at least one rung had a decided deal — «nothing measured» and «nothing leaked» differ. */
   measured: boolean;
   weakest: { from: string; to: string; conversionPct: number; moved: number; decided: number } | null;
@@ -131,7 +134,18 @@ export function buildFunnel(
 ): Funnel {
   const ladder = openLadder(stages);
   const hist = eventsByOpp(events);
-  const idx = lines.map((l) => furthestIndex(stages, l, hist.get(l.id) ?? []));
+  const ladderKeys = ladder.map((s) => s.key);
+  // A LOST deal is placed at the rung it was lost FROM (its last move into lost), not the furthest it
+  // ever reached: a deal won, reopened and lost at «تواصل أولي» leaked at contact, not before signature.
+  const idx = lines.map((l) => {
+    const h = hist.get(l.id) ?? [];
+    if (isLost(stages, l.stage)) {
+      const into = [...h].reverse().find((e) => isLost(stages, e.toStage) && e.fromStage);
+      const at = into && into.fromStage ? ladderKeys.indexOf(into.fromStage) : -1;
+      if (at !== -1) return at;
+    }
+    return furthestIndex(stages, l, h);
+  });
   const wonOf = lines.map((l) => isWon(stages, l.stage));
   const lostOf = lines.map((l) => isLost(stages, l.stage));
   const won = wonOf.filter(Boolean).length;
@@ -179,7 +193,8 @@ export function buildFunnel(
         stage: w.from,
       }
     : null;
-  return { steps, won, lost, lines: lines.length, wonKey, measured: steps.some((x) => x.decided > 0), weakest: w, action };
+  const lostUnplaced = idx.filter((f, k) => lostOf[k] && f === -1).length;
+  return { steps, won, lost, lines: lines.length, wonKey, lostUnplaced, measured: steps.some((x) => x.decided > 0), weakest: w, action };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -235,7 +250,7 @@ export function buildVelocity(
     ? {
         // The verb agrees with the count: «بند واحد تجاوز»، «بندان تجاوزا»، «٣ بنود تجاوزت».
         text: pluralizeArabic(top.overSla, "بند واحد", "بندان", "بنود", "بندًا", fmt) + " في «" + top.label + "» " +
-          pluralizeArabic(top.overSla, "تجاوز", "تجاوزا", "تجاوزت", "تجاوز", () => "").trim() + " مهلة " + nDay(top.slaDays ?? 0) +
+          pluralizeArabic(top.overSla, "تجاوز", "تجاوزا", "تجاوزت", "تجاوز", () => "").trim() + " مهلة " + nDaySince(top.slaDays ?? 0) +
           ". ابدأ بالأقدم: بلا حركة منذ " + nDaySince(top.maxOpenDays ?? 0) + ".",
         stage: top.key, shortcut: "stalled",
       }
@@ -306,7 +321,7 @@ export type SourceReport = {
   source: string; lines: number; value: number; advanced: number; advancedPct: number | null;
   wonCount: number; lostCount: number; winRatePct: number | null;
 };
-export type Sources = { rows: SourceReport[]; best: string | null; eligible: number; action: NextAction | null };
+export type Sources = { rows: SourceReport[]; best: string | null; eligible: number; level: boolean; action: NextAction | null };
 
 export function buildSources(
   stages: readonly ReportStage[], lines: readonly ReportLine[], events: readonly ReportEvent[],
@@ -333,18 +348,24 @@ export function buildSources(
   // the best channel is the small-sample claim this report promises not to make.
   const eligible = rows.filter((r) => r.lines >= SOURCE_MIN_LINES && r.advancedPct !== null);
   const byAdvance = [...eligible].sort((a, b) => ((b.advancedPct ?? 0) - (a.advancedPct ?? 0)) || (b.lines - a.lines));
-  const best = eligible.length >= 2 ? byAdvance[0] : null;
-  const worst = eligible.length >= 2 ? byAdvance[byAdvance.length - 1] : null;
+  const top = eligible.length >= 2 ? byAdvance[0] : null;
+  const bottom = eligible.length >= 2 ? byAdvance[byAdvance.length - 1] : null;
+  // Level channels are not a ranking: naming one «best» on a tie contradicted the action beside it.
+  const level = !!top && !!bottom && (top.advancedPct ?? 0) === (bottom.advancedPct ?? 0);
+  const best = level ? null : top;
+  const worst = level ? null : bottom;
   const firstKey = openLadder(stages)[0]?.key ?? null;
   const name = (k: string) => labels[k] ?? k;
   let action: NextAction | null = null;
   if (best && worst && (best.advancedPct ?? 0) > (worst.advancedPct ?? 0)) {
     action = { text: "راجع بنود «" + name(worst.source) + "» العالقة في التواصل الأولي: تقدّم منها " + fmt(worst.advancedPct ?? 0) +
       "٪ فقط، مقابل " + fmt(best.advancedPct ?? 0) + "٪ من «" + name(best.source) + "».", stage: firstKey, source: worst.source };
+  } else if (level && top) {
+    action = { text: "المصادر المؤهلة متساوية: تقدّم " + fmt(top.advancedPct ?? 0) + "٪ من فرص كلٍّ منها — لا قناة تستحق تحويل الجهد إليها بعد.", stage: null };
   } else if (rows.length) {
     action = { text: "لا مقارنة بين المصادر بعد: يُقارن المصدر حين يملك بندين أو أكثر.", stage: null };
   }
-  return { rows, best: best ? best.source : null, eligible: eligible.length, action };
+  return { rows, best: best ? best.source : null, eligible: eligible.length, level, action };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -416,7 +437,7 @@ export function buildMovement(
   const quietOpen = open.filter((l) => !moved.has(l.id)).length;
   const action: NextAction | null = !open.length ? null : quietOpen
     ? { text: "حرّك الراكد: " + nOpenLine(quietOpen) + " من أصل " + fmt(open.length) + " " + notMoved(quietOpen) +
-        " خلال " + nDay(days) + " — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.", stage: null, shortcut: "open" }
+        " خلال " + nDay(days) + " — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.", stage: null }
     : { text: "كل البنود المفتوحة تحركت خلال " + nDay(days) + " — لا راكد يحتاج قرارًا.", stage: null };
   return { days, totals, wonValue, lostValue, advancedValue, weeks, quietOpen, openLines: open.length, action };
 }

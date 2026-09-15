@@ -1413,9 +1413,15 @@ function opAfterRender() {
   if (!dr) { opStepPrev = null; opStepFocus = ""; return; }
   opPlaceStepPill();
   if (opStepFocus) {
+    /* Only put focus back when the repaint DROPPED it (to <body>) or it is still on the stepper — a
+       user who has since tabbed to «السعر» keeps their place. Once the save is no longer pending
+       the memory ends, so a later failed or saved repaint cannot pull focus back either. */
+    var ae = document.activeElement;
+    var lost = !ae || ae === document.body || (ae.closest && ae.closest(".ox-steps"));
     var sf = document.getElementById(opStepFocus);
-    if (sf && document.activeElement !== sf) sf.focus({ preventScroll: true });
-    if (!opFState[opStepFocus.split("_")[1] + ":stage"]) opStepFocus = "";
+    if (sf && lost && ae !== sf) sf.focus({ preventScroll: true });
+    var fs = opFState[opStepFocus.split("_")[1] + ":stage"];
+    if (!fs || fs.s !== "pending") opStepFocus = "";
   }
   var db = document.getElementById("oxdb");
   if (db && opDrScroll) db.scrollTop = opDrScroll;
