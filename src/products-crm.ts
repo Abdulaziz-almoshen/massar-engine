@@ -993,11 +993,14 @@ function pxKnowledgeSection(p) {
     '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
     '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb"></div></div>';
   if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
+  /* S6: the weighted section score and the editor (knowledge-crm). */
+  if (typeof kbScoreBlock === "function") b += kbScoreBlock(p, kn);
   var ap = pxAppr[name] || {};
   if (kn && kn.draftMd) {
     b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</div>" +
       '<div class="px-note"><bdi>' + esc(kn.draftSource || "") + "</bdi>" + (kn.draftBy ? " · رُفعت · " + esc(kn.draftBy) : "") + (kn.draftAt ? " · " + fmtD(kn.draftAt) : "") +
       (kn.changeSummary ? " · أُضيف " + pxNRowTxt(kn.changeSummary.added) + " · حُذف " + pxNRowTxt(kn.changeSummary.removed) + " مقارنة بالمعتمد" : "") + "</div>" +
+      (typeof kbDraftLine === "function" ? kbDraftLine(kn) : "") +
       '<div class="px-md">' + mdRender(kn.draftMd) + "</div>" +
       (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
       '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
@@ -1008,7 +1011,7 @@ function pxKnowledgeSection(p) {
       '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
       '<div class="acts"><button class="btn ' + (kn.draftMd ? "btn-ghost" : "btn-teal") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div></div>";
   } else if (kn && kn.state === "approved" && kn.md) {
-    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'النص المعتمد <span class="src">يُحدَّث برفع ملف جديد ثم اعتماده — التحرير المباشر في إصدار لاحق</span></summary><div class="px-md">' + mdRender(kn.md) + "</div></details>";
+    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'النص المعتمد <span class="src">يُحدَّث برفع ملف جديد أو من «تحرير الأقسام»، ثم اعتماده</span></summary><div class="px-md">' + mdRender(kn.md) + "</div></details>";
   } else if (!kn && !pxKnowFailed[name] && kst !== "none") {
     b += moSkeleton(2, ["w80", "w60"]);
   }
@@ -1026,7 +1029,8 @@ var PX_RD_GOTO = { knowledge: "knowledge", asset: "knowledge", price: "pricing",
 function pxReadinessState(p) {
   var kst = (p.kb && p.kb.state) || "none";
   return {
-    knowledge: kst === "approved" ? "معتمدة" : p.draft ? "مسودة بانتظار الاعتماد" : kst === "legacy" ? "بانتظار اعتماد النص الحالي" : p.embedded ? "مدمجة فقط — لا ملف" : "لا معرفة",
+    knowledge: (kst === "approved" ? "معتمدة" : p.draft ? "مسودة بانتظار الاعتماد" : kst === "legacy" ? "بانتظار اعتماد النص الحالي" : p.embedded ? "مدمجة فقط — لا ملف" : "لا معرفة") +
+      (p.knowledgeScore && (kst !== "none" || p.embedded) ? " · " + fmtN(p.knowledgeScore.score) + "٪" : ""),
     asset: p.asset ? "مرفق" : "غير مرفق",
     price: pxPrice(p).kind === "package" ? pxNPkg(pxPrice(p).count) : pxPrice(p).kind === "note" ? "ملاحظة تسعير" : "لا سعر",
     lock: p.embedded ? "ضمن كتالوج المساعد" : "يتطلب تحديث كتالوج المساعد"
@@ -1140,7 +1144,7 @@ function vProductDrill(name, section) {
   h += '</div><aside class="px-side" aria-label="الجاهزية والمرتبط">' + pxSide(p, rd) + "</aside></div>";
   h += "</div>";
   if (section) setTimeout(function () { var el = document.getElementById("pxsec_" + section); if (el && !el.dataset.pxJumped) { el.dataset.pxJumped = "1"; el.scrollIntoView({ block: "start" }); } }, 30);
-  return h + pxRenameModal();
+  return h + pxRenameModal() + (typeof kbEditor === "function" ? kbEditor() : "");
 }
 
 /* ================================ WRITES ================================ */

@@ -943,6 +943,35 @@ ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS partner_id BIGINT REFERENCES 
 CREATE INDEX IF NOT EXISTS idx_opportunities_partner ON opportunities (partner_id) WHERE partner_id IS NOT NULL;
 `,
   },
+  {
+    version: "015-answer-quality",
+    sql: `
+-- What the assistant's answers rest on, and whether a person found them right (client A, BRD v1.0 BR-KB-004/005,
+-- BR-MON-005, slice S6). answer_signals is written by the assistant's record_answer_basis tool; answer_reviews
+-- by a reviewer on the conversation. A review is keyed by the reply's (phone, ts), the key the transcript holds.
+CREATE TABLE IF NOT EXISTS answer_signals (
+  id               BIGSERIAL PRIMARY KEY,
+  phone            TEXT NOT NULL,
+  product          TEXT,
+  basis            TEXT NOT NULL CHECK (basis IN ('approved_knowledge','catalogue','conversation','none')),
+  confidence       TEXT NOT NULL CHECK (confidence IN ('high','medium','low')),
+  product_question BOOLEAN NOT NULL DEFAULT false,
+  handoff_reason   TEXT,
+  ts               BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_answer_signals_ts ON answer_signals (ts);
+CREATE TABLE IF NOT EXISTS answer_reviews (
+  phone    TEXT NOT NULL,
+  msg_ts   BIGINT NOT NULL,
+  verdict  TEXT NOT NULL CHECK (verdict IN ('correct','wrong')),
+  note     TEXT,
+  by_name  TEXT,
+  at       BIGINT NOT NULL,
+  PRIMARY KEY (phone, msg_ts)
+);
+CREATE INDEX IF NOT EXISTS idx_answer_reviews_at ON answer_reviews (at);
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1026,6 +1055,8 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   partners: ["id", "name", "kind", "contact_name", "phone", "email", "note", "status", "created_by", "created_at", "updated_by", "updated_at"],
   partner_targets: ["partner_id", "product", "week_start", "target", "updated_by", "updated_at"],
   partner_results: ["id", "partner_id", "product", "account_name", "phone", "result", "contacted_on", "note", "opp_id", "handed_at", "recorded_by", "created_at", "updated_at"],
+  answer_signals: ["id", "phone", "product", "basis", "confidence", "product_question", "handoff_reason", "ts"],
+  answer_reviews: ["phone", "msg_ts", "verdict", "note", "by_name", "at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1615,7 +1646,7 @@ const PRODUCT_NAME_TABLES = [
   "opportunities", "targets", "packages", "product_meta", "pipelines",
   "campaigns", "interest_tags", "opp_auto", "product_assets", "product_kb", "usage_indicators",
   // S5: a partner's weekly target and its recorded contacts are keyed by product name too.
-  "partner_targets", "partner_results",
+  "partner_targets", "partner_results", "answer_signals",
 ] as const;
 
 export type RenameResult = { ok: boolean; moved: Record<string, number> };
@@ -2127,6 +2158,54 @@ export async function replyTimeline(sinceMs: number): Promise<{ phone: string; r
   return r.rows.map((x) => ({ phone: String(x.phone), role: String(x.role), ts: Number(x.ts) }));
 }
 
+// ------------------------------ answer quality (BR-KB-004/005, BR-MON-005, S6) ------------------------------
+
+/** The assistant's own account of one answer. Fire-and-forget like insertMessage: a conversation never waits
+ *  on, or fails because of, a quality record. */
+export function recordAnswerSignal(v: { phone: string; product: string | null; basis: string; confidence: string; productQuestion: boolean; handoffReason: string | null }): void {
+  fire(`INSERT INTO answer_signals (phone, product, basis, confidence, product_question, handoff_reason, ts) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [v.phone, v.product, v.basis, v.confidence, v.productQuestion, v.handoffReason, Date.now()]);
+}
+
+export async function answerQuality(sinceMs: number): Promise<{ confidence: { high: number; medium: number; low: number }; handoffs: number; outOfKnowledge: number;
+  reviews: { correct: number; wrong: number } }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const [s, r] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*) FILTER (WHERE a.confidence = 'high')::int AS high, COUNT(*) FILTER (WHERE a.confidence = 'medium')::int AS medium,
+              COUNT(*) FILTER (WHERE a.confidence = 'low')::int AS low, COUNT(*) FILTER (WHERE a.handoff_reason IS NOT NULL)::int AS handoffs,
+              COUNT(*) FILTER (WHERE a.basis = 'none' AND a.product_question)::int AS out_of_knowledge
+         FROM answer_signals a LEFT JOIN contacts c ON c.phone = a.phone WHERE a.ts >= $1 AND COALESCE(c.test, false) = false`, [sinceMs]),
+    pool.query(
+      `SELECT COUNT(*) FILTER (WHERE r.verdict = 'correct')::int AS correct, COUNT(*) FILTER (WHERE r.verdict = 'wrong')::int AS wrong
+         FROM answer_reviews r LEFT JOIN contacts c ON c.phone = r.phone WHERE r.msg_ts >= $1 AND COALESCE(c.test, false) = false`, [sinceMs]),
+  ]);
+  const x = s.rows[0] || {}, y = r.rows[0] || {};
+  return { confidence: { high: Number(x.high) || 0, medium: Number(x.medium) || 0, low: Number(x.low) || 0 }, handoffs: Number(x.handoffs) || 0,
+    outOfKnowledge: Number(x.out_of_knowledge) || 0, reviews: { correct: Number(y.correct) || 0, wrong: Number(y.wrong) || 0 } };
+}
+
+export async function answerReviewsFor(phone: string): Promise<{ msgTs: number; verdict: string; note: string | null; by: string | null; at: number }[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`SELECT msg_ts, verdict, note, by_name, at FROM answer_reviews WHERE phone = $1 ORDER BY msg_ts`, [phone]);
+  return r.rows.map((x) => ({ msgTs: Number(x.msg_ts), verdict: String(x.verdict), note: x.note ?? null, by: x.by_name ?? null, at: Number(x.at) }));
+}
+
+/** A verdict on one reply of the assistant. Refused (null) unless the ledger holds an agent message at that moment. */
+export async function setAnswerReview(phone: string, msgTs: number, verdict: string | null, note: string | null, by: string): Promise<"ok" | "cleared" | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  // Exact: boot rebuilds transcripts from the ledger, so the moment the reviewer sees IS the stored one. A tolerance
+  // let one reply carry two contradictory verdicts under two nearby keys (review).
+  const m = await pool.query(`SELECT 1 FROM messages WHERE phone = $1 AND ts = $2 AND role = 'agent' LIMIT 1`, [phone, msgTs]);
+  if (!m.rows.length) return null;
+  if (verdict == null) { await pool.query(`DELETE FROM answer_reviews WHERE phone = $1 AND msg_ts = $2`, [phone, msgTs]); return "cleared"; }
+  await pool.query(
+    `INSERT INTO answer_reviews (phone, msg_ts, verdict, note, by_name, at) VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (phone, msg_ts) DO UPDATE SET verdict = EXCLUDED.verdict, note = EXCLUDED.note, by_name = EXCLUDED.by_name, at = EXCLUDED.at`,
+    [phone, msgTs, verdict, note, by, Date.now()]);
+  return "ok";
+}
+
 // ------------------------------ partners (BRD §17 BR-PRT-001..004, S5) ------------------------------
 
 export type PartnerRow = {
@@ -2503,6 +2582,34 @@ export async function saveKb(product: string, md: string, sourceFilename: string
      ON CONFLICT (product) DO UPDATE SET draft_md = EXCLUDED.draft_md, draft_source = EXCLUDED.draft_source,
        draft_by = EXCLUDED.draft_by, draft_at = EXCLUDED.draft_at`,
     [product, md, sourceFilename, Date.now(), by]);
+}
+
+/** S6 section editor: a draft written by hand replaces the draft only if nobody changed the draft or the approved
+ *  text since the editor loaded them — the hashes it started from are checked on the locked row. */
+export async function saveKbDraftIf(product: string, md: string, by: string, baseDraftHash: string | null, baseMdHash: string): Promise<"ok" | "stale"> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // A product with no row yet has nothing for FOR UPDATE to lock; two first saves both passed (review).
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, ["kb-draft|" + product]);
+    const cur = await client.query(`SELECT md, draft_md FROM product_kb WHERE product = $1 FOR UPDATE`, [product]);
+    const row = cur.rows[0];
+    const curDraft = row && row.draft_md != null ? sha256Hex(String(row.draft_md)) : null;
+    const curMd = sha256Hex(row ? String(row.md) : "");
+    if (curDraft !== baseDraftHash || curMd !== baseMdHash) { await client.query("ROLLBACK"); return "stale"; }
+    const now = Date.now();
+    await client.query(
+      `INSERT INTO product_kb (product, md, source_filename, updated_at, draft_md, draft_source, draft_by, draft_at)
+       VALUES ($1, '', NULL, $2, $3, 'تحرير الأقسام', $4, $2)
+       ON CONFLICT (product) DO UPDATE SET draft_md = EXCLUDED.draft_md, draft_source = EXCLUDED.draft_source,
+         draft_by = EXCLUDED.draft_by, draft_at = EXCLUDED.draft_at`, [product, now, md, by]);
+    await client.query("COMMIT");
+    return "ok";
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => { /* the original error is the one that matters */ });
+    throw e;
+  } finally { client.release(); }
 }
 
 /** kb.processDeck does not know who is uploading; the endpoint does, and stamps it after. */

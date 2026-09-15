@@ -277,9 +277,12 @@ export function recordStatus(e: StatusEvent) {
 
 export function recordAgentReply(phone: string, text: string) {
   const c = getContact(phone);
-  c.transcript.push({ role: "agent", text, ts: Date.now() });
+  // ONE timestamp for the transcript and the ledger: a reviewer's verdict on a reply is keyed by (phone, ts),
+  // and two Date.now() calls a millisecond apart pointed the review at a message the ledger does not hold.
+  const ts = Date.now();
+  c.transcript.push({ role: "agent", text, ts });
   c.agentTurns += 1;
-  db.insertMessage(phone, "agent", text, Date.now());
+  db.insertMessage(phone, "agent", text, ts);
   persist(c);
   bump("agent_reply");
   logEvent("agent_reply", phone, text.slice(0, 80));

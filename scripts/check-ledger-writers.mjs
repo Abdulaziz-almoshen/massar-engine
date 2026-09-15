@@ -47,7 +47,9 @@ const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pi
   // client A slices S2/S3: the account record and the opportunity drawer read these.
   "entity_contacts", "account_events", "opp_activities", "opp_quotes",
   // S5: «شركاء المبيعات» reads these.
-  "partners", "partner_targets", "partner_results"];
+  "partners", "partner_targets", "partner_results",
+  // S6: «الثقة في الإجابات» and «دقة الإجابات» read these.
+  "answer_signals", "answer_reviews"];
 
 for (const table of MUST_HAVE_WRITERS) {
   const writers = [];

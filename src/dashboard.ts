@@ -43,6 +43,8 @@ import { CAMPAIGN_RESULTS_CRM_CSS, CAMPAIGN_RESULTS_CRM_JS } from "./campaign-re
 import { CAMPAIGN_RESULTS_DOMAIN_JS } from "./campaign-results-domain.js";
 import { PARTNERS_CRM_CSS, PARTNERS_CRM_JS } from "./partners-crm.js";
 import { PARTNER_DOMAIN_JS } from "./partner-domain.js";
+import { KNOWLEDGE_CRM_CSS, KNOWLEDGE_CRM_JS } from "./knowledge-crm.js";
+import { KNOWLEDGE_DOMAIN_JS } from "./knowledge-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -724,6 +726,7 @@ ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
 ${CAMPAIGN_RESULTS_CRM_CSS}
 ${PARTNERS_CRM_CSS}
+${KNOWLEDGE_CRM_CSS}
 ${PALETTE_CSS}
 /* LAST. The V3 shell and component language wins on cascade order — see revamp.ts. */
 ${REVAMP_CSS}
@@ -1329,7 +1332,8 @@ function renderConvo() {
   const c = (cache.contacts || []).find((x) => x.phone === convoPhone);
   if (!c) { el.innerHTML = ""; convoPhone = null; convoSig = ""; return; }
   const sig = c.phone + "|" + (c.transcript || []).length + "|" + c.human + "|" + c.test + "|" + (c.outcome || "") +
-    "|" + Object.keys(c.statusTimes || {}).join(",") + "|" + (c.tags || []).map((t) => t.product + ":" + t.level).join(",");
+    "|" + Object.keys(c.statusTimes || {}).join(",") + "|" + (c.tags || []).map((t) => t.product + ":" + t.level).join(",") +
+    "|" + (typeof aqSig === "function" ? aqSig(c.phone) : "");
   if (sig === convoSig && el.innerHTML) return;   // nothing changed — don't rebuild (keeps scroll)
   const prevMsgs = document.getElementById("convoMsgs");
   const wasAtBottom = !prevMsgs || (prevMsgs.scrollHeight - prevMsgs.scrollTop - prevMsgs.clientHeight < 60);
@@ -1351,7 +1355,8 @@ function renderConvo() {
       // normally. Suppressed at render, never deleted: the ledger keeps what was actually said.
       (/proxy|بروكسي/i.test(t.text) && /massar|مسار/i.test(t.text)
         ? '<div class="bub b-s" style="opacity:.55;font-size:12px;">تفعيل بيئة Gupshup التجريبية — ليست جزءًا من المحادثة<div class="bt">' + fmtT(t.ts) + "</div></div>"
-        : '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div></div>")).join("") + "</div>" +
+        : '<div class="bub ' + (t.role === "agent" ? "b-a" : t.role === "customer" ? "b-c" : "b-s") + '">' + esc(t.text) + '<div class="bt">' + fmtT(t.ts) + "</div>" +
+          (t.role === "agent" && typeof aqCtl === "function" ? aqCtl(c.phone, t.ts) : "") + "</div>")).join("") + "</div>" +
     '<div class="ft" style="display:flex;gap:8px;"><button class="btn" style="flex:1;font-size:12px;' +
     (c.human ? 'color:#fff;background:#1E5FCC;' : 'color:#D9534F;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
@@ -4493,6 +4498,7 @@ function render(fetchNew) {
   try { if (typeof inAfterPaint === "function") inAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof acAfterPaint === "function") acAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof ptAfterPaint === "function") ptAfterPaint(); } catch (e) { /* never block a paint */ }
+  try { if (typeof kbAfterPaint === "function") kbAfterPaint(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
@@ -4861,6 +4867,8 @@ ${CAMPAIGN_RESULTS_CRM_JS}
 ${CAMPAIGN_RESULTS_DOMAIN_JS}
 ${PARTNERS_CRM_JS}
 ${PARTNER_DOMAIN_JS}
+${KNOWLEDGE_CRM_JS}
+${KNOWLEDGE_DOMAIN_JS}
 ${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain

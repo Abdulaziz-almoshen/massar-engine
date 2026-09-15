@@ -188,10 +188,17 @@ function vReportsKpis() {
       d.target ? crMoney(d.target.achieved) + " من " + (d.target.target ? crMoney(d.target.target) : "لا مستهدف") + " · الربع " + d.target.quarter + " من " + d.target.year : "", "المحقق ÷ المستهدف للربع الحالي") + "</div></section>";
   var ho = d.assistant.handoff;
   h += '<section class="kp-grp" aria-labelledby="kph4"><h2 class="hd" id="kph4">المساعد الذكي</h2><div class="kp-tiles">' +
-    kpTile("الثقة في الإجابات", "Answer Confidence", "—", "", "غير مُقاس: المساعد لا يُصدر درجة ثقة لإجاباته بعد، ولن يعرض مسار رقمًا لم يُقَس") +
+    kpTile("الثقة في الإجابات", "Answer Confidence", crPct(d.assistant.answerConfidence ? d.assistant.answerConfidence.pct : null),
+      d.assistant.answerConfidence ? ratio(d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium, d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium + d.assistant.answerConfidence.low) + " · حُوّل لموظف: " + fmtN(d.assistant.answerConfidence.handoffs) : "",
+      "الإجابات التي قدّر المساعد ثقته فيها مرتفعة أو متوسطة ÷ الإجابات المسجّلة — تقدير المساعد نفسه، آخر 30 يومًا. المنخفضة تُحوَّل لموظف تلقائيًا") +
+    kpTile("دقة الإجابات", "Answer Accuracy", crPct(d.assistant.answerAccuracy ? d.assistant.answerAccuracy.pct : null),
+      d.assistant.answerAccuracy ? ratio(d.assistant.answerAccuracy.correct, d.assistant.answerAccuracy.correct + d.assistant.answerAccuracy.wrong) : "",
+      "الردود التي حكم عليها مراجع بأنها صحيحة ÷ الردود التي راجعها — من «دقة الرد» في نافذة المحادثة، آخر 30 يومًا") +
     kpTile("التحويل لبشر", "Human Handoff Rate", crPct(ho.pct), ratio(ho.handedOff, ho.conversations), "المحادثات المحوّلة الآن لموظف ÷ المحادثات التي كتب فيها العميل — حالة اليوم، لا سجل التحويلات") +
     kpTile("زمن الرد", "Median reply time", kpDuration(d.assistant.medianReplySeconds), "آخر 30 يومًا", "الوسيط بين رسالة العميل وأول رسالة من مسار بعدها (خلال 15 دقيقة)") +
-    kpTile("جاهزية المعرفة", "Knowledge readiness", fmtN(d.assistant.productsReady.eligible) + " من " + fmtN(d.assistant.productsReady.total), "", "منتجات يستطيع المساعد بيعها الآن: معرفة معتمدة، ملف، سعر، وقفل منتج") + "</div></section>";
+    kpTile("جاهزية المعرفة", "Knowledge readiness", d.assistant.knowledgeScore && d.assistant.knowledgeScore.avg !== null ? fmtN(d.assistant.knowledgeScore.avg) + "٪" : "—",
+      "يبيعها المساعد: " + fmtN(d.assistant.productsReady.eligible) + " من " + fmtN(d.assistant.productsReady.total) + (d.assistant.knowledgeScore ? " · فوق حد الجاهزية: " + fmtN(d.assistant.knowledgeScore.ready) : ""),
+      "متوسط درجة المعرفة بأقسامها الثمانية الموزونة للمنتجات التي يبيعها المساعد") + "</div></section>";
   h += '<section class="kp-grp" aria-labelledby="kph5"><h2 class="hd" id="kph5">الحملات واحدة واحدة</h2><div class="kp-tbl" tabindex="0" role="region" aria-labelledby="kph5"><table><caption>نتائج كل حملة فعلية</caption><thead><tr>' +
     '<th scope="col">الحملة</th><th scope="col">المستهدفون</th><th scope="col">أُرسلت</th><th scope="col">ردّوا</th><th scope="col">مهتمون</th><th scope="col">مؤهلون</th><th scope="col">فرص</th><th scope="col">مبيعات</th><th scope="col">الإيراد</th></tr></thead><tbody>' +
     (rows.length ? rows.map(function (x) {

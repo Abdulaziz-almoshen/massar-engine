@@ -8,6 +8,7 @@ import { SANDBOX_ACTIVATION_RE, SERVICE_CATALOGUE } from "./insights.js";
 import * as templates from "./templates.js";
 import * as accounts from "./accounts.js";
 import * as productlock from "./productlock.js";
+import * as know from "./knowledge-domain.js";
 
 // ---------------------------------------------------------------------------
 // The Arabic AI salesperson — full-capability edition.
@@ -172,6 +173,20 @@ const PIVOTS = [
 // 2026-08-16: the prompt-level lock stopped the wrong FILE but left every other product's pricing
 // and features sitting in context, one sentence away from being quoted. A model cannot quote a
 // price it was never given — so scope the knowledge, do not just forbid its use.
+/** The embedded catalogue entry written as a knowledge document, so «جاهزية المعرفة» scores the six embedded
+ *  products by the same section rule as an uploaded one (knowledge-domain). Read-only: the prompt still uses
+ *  productBlock below, unchanged. */
+export function embeddedKnowledgeMd(name: string): string | null {
+  const p = PRODUCTS.find((x) => x.name === name);
+  if (!p) return null;
+  return [
+    `# ${p.name}`, "", "## نظرة عامة", p.pitch, "", "## القيمة المقدمة", ...p.efficiency.map((e) => `- ${e}`), "",
+    "## العملاء المستهدفون", ...p.bestFor.map((b) => `- ${b}`), "", "## التسعير", p.pricing, "",
+    ...(p.faq.length ? ["## الأسئلة الشائعة", ...p.faq.map(([q, a]) => `- ${q} — ${a}`), ""] : []),
+    ...(p.objections.length ? ["## الاعتراضات", ...p.objections.map(([o, r]) => `- ${o} — ${r}`), ""] : []),
+  ].join("\n");
+}
+
 function productBlock(locked?: string | null): string {
   const list = locked ? PRODUCTS.filter((p) => p.name === locked) : PRODUCTS;
   return (list.length ? list : PRODUCTS).map((p) => [
@@ -569,6 +584,7 @@ export function systemPrompt(contact: Contact): string {
     "",
     "# ٢٠) سلامة المعرفة",
     "لا تخترع أبدًا: قدرات منتج · طرق تكامل · سلوك واجهات برمجية · تسعيرًا · خصمًا · متطلبات تقنية · مدة تنفيذ · مرفقات · بيانات عميل · معلومات فروع. إن لم تتوفر المعلومة، قل ما تعرفه، ثم اسأل أو صعّد الجزء الناقص وحده.",
+    "مع كل رد يجيب عن سؤال، استدعِ record_answer_basis بصدق: على ماذا بنيت الإجابة، وثقتك فيها. الثقة المنخفضة ليست فشلًا — تحيل المحادثة لمختص يكمل النقطة، وهذا أفضل من إجابة مخمَّنة. الأقسام المعتمدة للمنتج (ومنها «الضوابط») تعلو على أي افتراض.",
     "",
     "# ٢٠ب) الذاكرة",
     "بعد كل دور مفيد، حدّث داخليًا: المنتج النشط · عدد الفروع · اسم الـHIS · هل البيئة موحدة · نطاق التكامل · هدف العميل · الاهتمام التجاري · السعر المطروح · طلب الخصم · هل السعر هو العائق الوحيد · الأسئلة التقنية · الاعتراضات · الالتزامات · أفضل إجراء تالٍ. ولا تطلب من العميل إعادة معلومة محفوظة.",
@@ -604,7 +620,10 @@ export function systemPrompt(contact: Contact): string {
     productBlock(lockedProduct),
     "## مسارات بديلة",
     ...PIVOTS,
-    ...(hubKb.length ? ["## المعرفة الرسمية المعتمدة (لها الأولوية عند أي تعارض)", ...hubKb.map((h) => h.md.slice(0, 6000))] : []),
+    // Narrowed to the active product when it has approved knowledge, as productBlock is: every product's document in
+    // every prompt was the cross-product leak the product lock exists to stop (S6 review).
+    ...(hubKb.length ? ["## المعرفة الرسمية المعتمدة (لها الأولوية عند أي تعارض)",
+      ...(lockedProduct && hubKb.some((h) => h.product === lockedProduct) ? hubKb.filter((h) => h.product === lockedProduct) : hubKb).map((h) => h.md.slice(0, 6000))] : []),
     "",
     "# المبدأ الحاكم",
     "افهم نية العميل أولًا. استخدم أقل عدد ممكن من الكلمات. اربط ما قاله العميل بقيمة واحدة ذات صلة. ثم اطلب خطوة واحدة فقط. لا تحاول إنهاء البيع في رسالة واحدة؛ حرّك المحادثة خطوة واحدة إلى الأمام في كل مرة.",
@@ -732,6 +751,25 @@ const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       name: "request_human_handoff",
       description: "أحِل المحادثة إلى مختص المبيعات عند وجود شكوى، أو طلب خصم، أو سؤال خارج المعرفة، أو رغبة في تنسيق اجتماع.",
       parameters: { type: "object", properties: { reason: { type: "string" } }, required: ["reason"] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "record_answer_basis",
+      // BR-KB-004/005, BR-MON-005. The model's own account of what an answer rests on. Recorded, counted on
+      // «مؤشرات الأداء», and ACTED ON IN CODE: low confidence, or a product question answered from nothing, hands
+      // the conversation to a person (knowledge-domain.handoffForAnswer) whatever the prompt was followed.
+      description: "سجّل على ماذا بنيت إجابتك عن سؤال العميل، مرة واحدة مع كل رد يجيب عن سؤال. approved_knowledge: من المعرفة الرسمية المعتمدة · catalogue: من بيانات المنتج المدمجة · conversation: مما قاله العميل نفسه · none: لا مصدر لديك. وقدّر ثقتك بصدق: low إن كنت غير متأكد أو المعلومة ناقصة. product_question = true إن كان السؤال عن المنتج (سعر، ميزة، تكامل، مدة، شرط، مرفق).",
+      parameters: {
+        type: "object",
+        properties: {
+          basis: { type: "string", enum: [...know.ANSWER_BASES] },
+          confidence: { type: "string", enum: [...know.ANSWER_CONFIDENCE] },
+          product_question: { type: "boolean" },
+        },
+        required: ["basis", "confidence", "product_question"],
+      },
     },
   },
   {
@@ -1056,6 +1094,24 @@ async function execTool(contact: Contact, name: string, args: any): Promise<stri
       await propRead(contact.phone, "disqualifyReason",
         `other: ${volunteered || "لا يرغب في التواصل"}`.slice(0, 200), "mark_not_interested");
       return "سُجّل أنه لا يرغب في التواصل، وتوقف الإرسال. اشكره بجملة واحدة واختم — ممنوع عرض بديل، وممنوع سؤال عن السبب.";
+    }
+    case "record_answer_basis": {
+      const basis = (know.ANSWER_BASES as readonly string[]).includes(String(args.basis)) ? String(args.basis) : "none";
+      const confidence = (know.ANSWER_CONFIDENCE as readonly string[]).includes(String(args.confidence)) ? String(args.confidence) : "low";
+      const productQuestion = args.product_question === true;
+      const reason = know.handoffForAnswer({ confidence, basis, productQuestion });
+      const hot = (contact.tags || []).find((t) => t.level === "hot") || (contact.tags || [])[0];
+      const product = productlock.activeProduct(contact) ?? hot?.product ?? null;
+      // The handoff never overrides a decision already on the record: a customer who said stop, declined, closed
+      // or booked is not paged to a rep because one answer was uncertain (S6 review, P1). Already with a person:
+      // nothing to add. Test contacts and an unset alert number record only.
+      const settled = contact.optedOut || contact.human || ["handoff", "stopped", "not_interested", "closed", "scheduled", "opted_out"].includes(String(contact.outcome || ""));
+      const acts = !!reason && !settled;
+      db.recordAnswerSignal({ phone: contact.phone, product, basis, confidence, productQuestion, handoffReason: acts ? reason : null });
+      if (!acts) return "سُجّل.";
+      const handed = await execTool(contact, "request_human_handoff", { reason });
+      // Starts with «أُشعر» on purpose: if the model writes nothing after this, the no-silence fallback sends it.
+      return handed + " أجب بما تعرفه فقط دون أي تخمين.";
     }
     case "request_human_handoff": {
       const why = String(args.reason ?? "");
@@ -1461,7 +1517,11 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
   try {
     let finalText = "";
     let sentOwnBubble = false;
-    for (let round = 0; round < 4; round++) {
+    let carriedText = "";
+    let basisRecorded = false;
+    // Five rounds, not four (S6): record_answer_basis spends a tool round on most answers, and a turn that runs
+    // out of rounds falls back to a canned line instead of the answer the model was about to write.
+    for (let round = 0; round < 5; round++) {
       const completion = await client.chat.completions.create({
         model, messages, tools, tool_choice: "auto",
         // "none" is required for tools on gpt-5.x/chat.completions; older fallbacks reject the param.
@@ -1472,10 +1532,21 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
 
       if (msg.tool_calls?.length) {
         messages.push(msg);
+        // An answer written in the same message as a tool call was dropped here, and if the model then returned
+        // nothing (it had already answered) the no-silence fallback sent the canned opener instead. It is kept as
+        // the answer of last resort (S6 review: record_answer_basis makes «answer + tool call» the common shape).
+        const alongside = (msg.content ?? "").trim();
+        if (alongside) carriedText = alongside;
         for (const tc of msg.tool_calls) {
           if (tc.type !== "function") continue;
           let args: any = {};
           try { args = JSON.parse(tc.function.arguments || "{}"); } catch {}
+          // One account of the answer per turn: a rewrite after a refusal must not count the same answer twice.
+          if (tc.function.name === "record_answer_basis" && basisRecorded) {
+            messages.push({ role: "tool", tool_call_id: tc.id, content: "سُجّل مسبقًا في هذا الدور." });
+            continue;
+          }
+          if (tc.function.name === "record_answer_basis") basisRecorded = true;
           // Tools that ARE the message (file with caption, buttons) own the bubble for this
           // turn — enforced in code, because the model was observed ignoring the prompt rule
           // and appending a second bubble to a live thread.
@@ -1488,7 +1559,7 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
         continue;
       }
 
-      finalText = (msg.content ?? "").trim();
+      finalText = (msg.content ?? "").trim() || carriedText;
       // DETERMINISTIC ANSWER, PREPENDED IN CODE.
       // Seven Codex-judged iterations proved the model will not reliably state a fact it has been
       // given: the price scenario scored 0 in ALL SEVEN, including the round where the exact
@@ -1507,7 +1578,8 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
       // the offer reads as a complete message and costs the model nothing.
       // So it is refused here and the model is made to answer, once. A rule the model keeps
       // breaking belongs in code (CLAUDE.md §4).
-      if (menuDodge(finalText) && round < 3) {
+      // round < 4 with five rounds keeps the three refusals this had with four: the answer-basis tool spends a round.
+      if (menuDodge(finalText) && round < 4) {
         console.log(JSON.stringify({ at: "agent", msg: "menu dodge refused — forcing an answer", phone: contact.phone, dropped: finalText.slice(0, 120) }));
         messages.push(msg);
         messages.push({
@@ -1517,11 +1589,12 @@ export async function handleInbound(contact: Contact, text: string, wasTap = fal
             + "أو مراحل التنفيذ، أو الميزة التشغيلية — ثم أضف جملة قيمة واحدة. "
             + "ممنوع في هذا الرد أن تعرض «تفاصيل التكامل» أو «العرض التجاري» كخيارين، وممنوع أن تنتهي الرسالة بسؤال اختيار.",
         });
-        finalText = "";
+        finalText = ""; carriedText = "";
         continue;
       }
       break;
     }
+    if (!finalText && carriedText && !sentOwnBubble) finalText = carriedText;
 
     // NEVER SILENCE. The send was conditional on finalText, so a turn spent entirely on tool
     // calls — or a model returning empty content — produced no message at all. That is what the

@@ -27,6 +27,7 @@ import * as acct from "./account-domain.js";
 import * as work from "./opp-work-domain.js";
 import * as results from "./campaign-results-domain.js";
 import * as partnerDom from "./partner-domain.js";
+import * as know from "./knowledge-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -332,10 +333,18 @@ async function productRows(): Promise<Record<string, unknown>[]> {
         ? { state: kbState, source: c.kb.source, approvedBy: c.kb.approvedBy, approvedAt: c.kb.approvedAt, updatedAt: c.kb.updatedAt }
         : { state: "none", source: null, approvedBy: null, approvedAt: null, updatedAt: null },
       draft: c.draft ? { source: c.draft.source, by: c.draft.by, at: c.draft.at, hash: db.sha256Hex(c.draft.md) } : null,
+      // BR-KB-002/003: the document the assistant reads (or, with none, the embedded entry) scored by section.
+      knowledgeScore: knowledgeScoreOf(c.kb && c.kb.md ? c.kb.md : embedded ? agent.embeddedKnowledgeMd(c.product) : null, c.kb && c.kb.md ? (kbState === "approved" ? "approved" : "legacy") : embedded ? "embedded" : "none"),
+      draftScore: c.draft ? know.scoreKnowledge(c.draft.md).score : null,
       asset: c.asset,
       createdAt: c.createdAt,
     };
   });
+}
+
+function knowledgeScoreOf(md: string | null, basis: string): { score: number; ready: boolean; basis: string; missing: { key: string; label: string; state: string }[]; truncated: boolean } {
+  const s = know.scoreKnowledge(md ?? "");
+  return { score: md ? s.score : 0, ready: md ? s.ready : false, basis, missing: s.missing.map((m) => ({ key: m.key, label: m.label, state: m.state })), truncated: s.truncated };
 }
 
 async function productRow(name: string): Promise<Record<string, unknown> | null> {
@@ -394,7 +403,60 @@ app.get("/admin/products/knowledge", async (req, reply) => {
     draftMd, draftHash: draftMd == null ? null : db.sha256Hex(draftMd),
     draftSource: row?.draft_source ?? null, draftBy: row?.draft_by ?? null, draftAt: row?.draft_at ?? null,
     changeSummary: draftMd == null ? null : pd.changeSummary(md, draftMd),
+    // S6: the sections of what the editor should start from (the draft if there is one), and both scores.
+    score: know.scoreKnowledge(md || (pd.isEmbeddedProduct(product) ? agent.embeddedKnowledgeMd(product) ?? "" : "")),
+    draftScore: draftMd == null ? null : know.scoreKnowledge(draftMd),
+    editable: know.parseKbSections(draftMd ?? (md || (pd.isEmbeddedProduct(product) ? agent.embeddedKnowledgeMd(product) ?? "" : ""))),
+    embeddedBasis: !md && pd.isEmbeddedProduct(product),
   };
+});
+
+/** BR-MON-005 «دقة الإجابات»: a reviewer's verdict on the assistant's replies in one conversation. */
+app.get("/admin/answer-reviews", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const phone = String((req.query as any)?.phone ?? "").replace(/\D/g, "");
+  if (!phone) return problem(reply, 400, "invalid_field", "الرقم مطلوب", "phone");
+  return withDb(reply, async () => ({ ok: true, reviews: await db.answerReviewsFor(phone) }));
+});
+app.post("/admin/answer-reviews", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+  const phone = typeof b.phone === "string" ? b.phone.replace(/\D/g, "") : "";
+  const msgTs = typeof b.msgTs === "number" && Number.isInteger(b.msgTs) && b.msgTs > 0 ? b.msgTs : null;
+  const verdict = b.verdict === null ? null : typeof b.verdict === "string" && (b.verdict === "correct" || b.verdict === "wrong") ? b.verdict : "bad";
+  const note = typeof b.note === "string" ? b.note.trim().slice(0, 300) : "";
+  if (!phone) return problem(reply, 400, "invalid_field", "الرقم مطلوب", "phone");
+  if (msgTs == null) return problem(reply, 400, "invalid_field", "وقت الرسالة مطلوب", "msgTs");
+  if (verdict === "bad") return problem(reply, 400, "invalid_field", "التقييم صحيحة أو خاطئة", "verdict");
+  return withDb(reply, async () => {
+    const r = await db.setAnswerReview(phone, msgTs, verdict as string | null, note || null, adminName(req));
+    if (!r) return problem(reply, 404, "unknown_message", "لا رسالة من المساعد بهذا الوقت", "msgTs");
+    return { ok: true, cleared: r === "cleared" };
+  });
+});
+
+/** BR-KB-001: knowledge written section by section. It becomes a DRAFT — the assistant reads it only after
+ *  «اعتماد المعرفة», the same approval an uploaded file goes through. */
+app.post("/admin/products/knowledge/draft", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+  const product = typeof b.product === "string" ? b.product.trim() : "";
+  if (!product || product.startsWith("__")) return problem(reply, 400, "unknown_product", "اسم المنتج مطلوب", "product");
+  const baseMdHash = typeof b.baseMdHash === "string" && /^[0-9a-f]{64}$/.test(b.baseMdHash) ? b.baseMdHash : null;
+  const baseDraftHash = b.baseDraftHash == null ? null : typeof b.baseDraftHash === "string" && /^[0-9a-f]{64}$/.test(b.baseDraftHash) ? b.baseDraftHash : "bad";
+  if (!baseMdHash || baseDraftHash === "bad") return problem(reply, 400, "invalid_field", "النسخة التي بُني عليها التعديل مطلوبة", "baseMdHash");
+  const checked = know.checkSectionDraft({ sections: b.sections, extra: b.extra });
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+  return withDb(reply, async () => {
+    const state = await db.tagState(product);
+    if (!state.exists) return problem(reply, 404, "unknown_product", "لا منتج بهذا الاسم", "product");
+    if (state.archived) return problem(reply, 400, "archived_product", "المنتج مؤرشف — استعده أولًا", "product");
+    const md = know.assembleKb(product, checked.sections, checked.extra);
+    const r = await db.saveKbDraftIf(product, md, adminName(req), baseDraftHash, baseMdHash);
+    if (r === "stale") return problem(reply, 409, "stale_knowledge", "تغيّرت المعرفة أو مسودتها بعد أن فتحت المحرر — راجع النسخة الأحدث");
+    const s = know.scoreKnowledge(md);
+    return { ok: true, draftHash: db.sha256Hex(md), score: s.score, missing: s.missing };
+  });
 });
 
 app.get("/admin/products/impact", async (req, reply) => {
@@ -2957,9 +3019,10 @@ app.get("/admin/kpis", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   return withDb(reply, async () => {
     const per = resolvePeriod({});
-    const [all, sugg, handoff, timeline, perf, catalogue] = await Promise.all([
+    const [all, sugg, handoff, timeline, perf, catalogue, quality] = await Promise.all([
       computeCampaignResults(), suggestionsPayload(), db.handoffCounts(), db.replyTimeline(Date.now() - 30 * 86_400_000),
       "bad" in per ? Promise.resolve([]) : db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod), productRows(),
+      db.answerQuality(Date.now() - 30 * 86_400_000),
     ]);
     const live = all.filter((c) => !c.test);
     const sum = (k: keyof results.CampaignResults) => live.reduce((a, c) => a + c.results[k], 0);
@@ -2978,8 +3041,10 @@ app.get("/admin/kpis", async (req, reply) => {
       assistant: {
         handoff: { ...handoff, pct: results.handoffRate(handoff.handedOff, handoff.conversations) },
         medianReplySeconds: results.medianReplySeconds(timeline),
-        // Stated, not invented: the assistant emits no confidence for its answers, so there is nothing to average.
-        answerConfidence: null,
+        // S6: the assistant's own rating of each answer (record_answer_basis), and a reviewer's verdicts — last 30 days.
+        answerConfidence: { pct: know.confidenceRate(quality.confidence), ...quality.confidence, handoffs: quality.handoffs, outOfKnowledge: quality.outOfKnowledge },
+        answerAccuracy: { pct: know.accuracyRate(quality.reviews), ...quality.reviews },
+        knowledgeScore: (() => { const live = catalogue.filter((p) => !p.archived && p.eligible) as any[]; const n = live.length; return { avg: n ? Math.round(live.reduce((a, p) => a + (p.knowledgeScore?.score || 0), 0) / n) : null, ready: live.filter((p) => p.knowledgeScore?.ready).length, total: n }; })(),
         productsReady: { eligible: catalogue.filter((p) => !p.archived && p.eligible).length, total: catalogue.filter((p) => !p.archived).length },
       },
     };
