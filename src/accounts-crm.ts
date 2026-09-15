@@ -47,6 +47,10 @@ export const ACCOUNTS_CRM_CSS = `
 .ac-dec .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
 .ac-dec .ok { background:var(--accent-tint); color:var(--accent-deep); }
 .ac-dec .no { background:var(--paper); color:var(--s-fail-text); box-shadow:inset 0 0 0 1px var(--s-fail-soft); }
+.ac-newtop { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; border-radius:var(--r-sm); font-size:var(--t-sm); white-space:nowrap; }
+.ac-newtop .sm { display:none; }
+@media (max-width: 560px) { .ac-newtop .lg { display:none; } .ac-newtop .sm { display:inline; } }
+.ac-num, .ac-li .val { white-space:nowrap; }
 .ac-more { display:flex; justify-content:center; padding:var(--s3); border-top:1px solid var(--line-soft); }
 .ac .btn, .ac-modal .btn { transition:transform 140ms var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease); }
 .ac .btn:active, .ac-modal .btn:active, .ac-f .lnk:active { transform:scale(.97); }
@@ -190,6 +194,19 @@ function acApprPill(ap) { return '<span class="cf-pill ap-' + ap + '">' + esc(AC
 function acSource(a) { return a.source ? ACCOUNT_SOURCE_LABELS[a.source] || a.source : "غير مسجّل"; }
 function acRowById(id) { return (acRows || []).filter(function (r) { return String(r.id) === String(id); })[0] || null; }
 
+/* Every arrival on the list re-reads it: accounts are also created by imports, the indicator form, WhatsApp
+   and new opportunities, and a list loaded once per session showed none of them (review). The rows already
+   held stay painted while the fresh read runs. The sheet and the record belong to the route they were
+   opened on, like the indicators drawer: leaving drops them. */
+var acStale = true, acRoute0 = "";
+window.addEventListener("hashchange", function () {
+  var r = acRoute();
+  if (r === acRoute0) return;
+  acRoute0 = r;
+  acStale = true;
+  if (acForm) acForm = null;
+  if (acRec && r !== "account/" + acRec.id) acRec = null;
+});
 function acLoad(force) {
   if (acLoading) { if (force) acPending = true; return; }
   if (acRows && !force) return;
@@ -243,15 +260,18 @@ function acKpis() {
   var noOwner = all.filter(function (a) { return a.ownerId == null; }).length;
   var value = all.reduce(function (s, a) { return s + (a.opps ? a.opps.value : 0); }, 0);
   var openN = all.reduce(function (s, a) { return s + (a.opps ? a.opps.open : 0); }, 0);
+  var wonN = all.reduce(function (s, a) { return s + (a.opps ? a.opps.won : 0); }, 0);
   var tile = function (k, v, s, lead, act) {
     var open = act ? '<button class="crm-kpi crm-click' + (lead ? " crm-lead" : "") + '" data-ac="' + act + '">' : '<div class="crm-kpi' + (lead ? " crm-lead" : "") + '">';
     return open + '<div class="crm-k">' + k + '</div><div class="crm-v">' + v + "</div>" + (s ? '<div class="crm-s">' + s + "</div>" : "") + (act ? "</button>" : "</div>");
   };
   return '<div class="crm-kpis crm-hasLead">' +
-    tile("العملاء", fmtN(all.length), fmtN(all.length - pending) + " معتمد", true) +
+    tile("العملاء", fmtN(all.length), "معتمدون: " + fmtN(all.length - pending), true) +
     tile("بانتظار الاعتماد", fmtN(pending), pending ? "اعرضهم" : "لا أحد", false, pending ? "tabproposed" : "") +
     tile("بلا موظف مسؤول", fmtN(noOwner), noOwner ? "اعرضهم" : "", false, noOwner ? "noowner" : "") +
-    tile("قيمة الفرص", acMoney(value), acNOpp(openN) + " قائمة", false) + "</div>";
+    /* The value includes won lines (the list column does too), so the caption names both, as counts
+       that need no noun agreement (review: «فرصتان قائمة»). */
+    tile("قيمة الفرص", acMoney(value), "قائمة: " + fmtN(openN) + " · رابحة: " + fmtN(wonN), false) + "</div>";
 }
 function acDecisionCell(a) {
   if (a.approval !== "proposed") return "<span>" + acApprPill(a.approval) + "</span>";
@@ -280,10 +300,12 @@ function acPaintCrumb() {
   if (!act) return;
   var r = acRoute().split("/")[0];
   if (r !== "accounts" && r !== "account") return;
-  act.innerHTML = '<button class="btn btn-teal" id="acnewtop" data-ac="new" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-sm);font-size:var(--t-sm);">' + acIco("plus") + "إضافة عميل جديد</button>";
+  /* Painted once per route: rebuilding it on every paint destroyed the button the sheet returns focus to. */
+  if (document.getElementById("acnewtop")) return;
+  act.innerHTML = '<button class="btn btn-teal ac-newtop" id="acnewtop" data-ac="new" aria-label="إضافة عميل جديد">' + acIco("plus") + '<span class="lg">إضافة عميل جديد</span><span class="sm">عميل</span></button>';
 }
 function vAccounts() {
-  acLoad(false);
+  if (acStale) { acStale = false; acLoad(!!acRows); } else acLoad(false);
   if (typeof inMemLoad === "function") inMemLoad();
   acRec = null;
   setTimeout(acPaintCrumb, 0);
@@ -300,6 +322,8 @@ function vAccounts() {
   h += acKpis();
   var counts = { all: acFiltered("all").length, approved: acFiltered("approved").length, proposed: acFiltered("proposed").length, rejected: acFiltered("rejected").length };
   var rows = acFiltered();
+  /* «M» is the tab before search and filters, so «من» says how much the filters hid (review). */
+  var tabTotal = (acRows || []).filter(function (a) { return acF.tab === "all" ? a.approval !== "rejected" : a.approval === acF.tab; }).length;
   var tabs = [["all", "الكل"], ["approved", "معتمدون"], ["proposed", "مقترحون"], ["rejected", "مرفوضون"]];
   h += '<section class="cf-sec ac-t"><div class="ac-bar">' +
     '<span class="vtog" role="radiogroup" aria-label="حالة الاعتماد">' + tabs.map(function (t) {
@@ -318,7 +342,7 @@ function vAccounts() {
     acSel("importance", "الأهمية", acF.importance, ACCOUNT_IMPORTANCE.map(function (k) { return [k, ACCOUNT_IMPORTANCE_LABELS[k]]; })) +
     (typeof inIndOptions === "function" && (inMembership || []).length ? '<select aria-label="مؤشر الاستخدام" data-acset="ind"' + (acF.ind ? ' class="on"' : "") + '><option value="">المؤشر: الكل</option>' + inIndOptions(acF.ind, true) + "</select>" : "") +
     (anyF ? '<button class="lnk" data-ac="clearf">مسح التصفية</button>' : "") +
-    '<span class="sp" style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " من " + fmtN(counts.all + (acF.tab === "rejected" ? counts.rejected : 0)) + "</span></div>";
+    '<span class="sp" style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " من " + fmtN(tabTotal) + "</span></div>";
   h += '<div class="cf-t"><div class="cf-hr" role="row"><span>العميل</span><span>المدينة</span><span>القطاع</span><span>الموظف المسؤول</span><span>مصدر الإضافة</span><span>الحالة</span><span>الفرص</span><span>قيمة الفرص</span></div>';
   if (!rows.length) {
     h += '<div class="cf-state">' + (acF.q ? "لا عميل يطابق «" + esc(acF.q) + "»." : acF.tab === "proposed" ? "لا عملاء بانتظار الاعتماد." : acF.tab === "rejected" ? "لا عملاء مرفوضون." : "لا عملاء يطابقون هذه التصفية.") +
@@ -331,9 +355,9 @@ function vAccounts() {
 }
 
 /* ---------------- approval ---------------- */
-function acApplyApproval(id, decision, updatedAt) {
-  var r = acRowById(id); if (r) { r.approval = decision; r.updatedAt = updatedAt; }
-  if (acRec && acRec.data && acRec.data.account.id === id) { acRec.data.account.approval = decision; acRec.data.account.updatedAt = updatedAt; acRec.stale = true; }
+function acApplyApproval(id, decision, approvalAt) {
+  var r = acRowById(id); if (r) { r.approval = decision; r.approvalAt = approvalAt; }
+  if (acRec && acRec.data && acRec.data.account.id === id) { acRec.data.account.approval = decision; acRec.data.account.approvalAt = approvalAt; }
 }
 function acDecide(id, decision, name, undoTo) {
   if (acBusy[id]) return;
@@ -341,13 +365,22 @@ function acDecide(id, decision, name, undoTo) {
   cfJson("POST", "/admin/accounts/" + id + "/approval", { decision: decision }).then(function (r) {
     delete acBusy[id];
     if (!r.ok) { acToast(r.j.detail || "تعذّر حفظ القرار", true); render(false); return; }
-    acApplyApproval(id, decision, r.j.updatedAt);
+    /* Where focus goes after the row's buttons are replaced: the row's own link if it is still listed, the
+       row that took its place if the tab no longer shows it, the tab otherwise; on the record, its heading. */
+    var visible = acFiltered().map(function (x) { return x.id; });
+    var at = visible.indexOf(id);
+    acApplyApproval(id, decision, r.j.approvalAt);
     if (acRec && acRec.id === id) acRecLoad(id);
     render(false);
+    var after = acFiltered().map(function (x) { return x.id; });
+    var target = null;
+    if (acRoute().split("/")[0] === "account") target = document.getElementById("acrech");
+    else if (after.indexOf(id) >= 0) target = document.querySelector('[data-acrow="' + id + '"] a');
+    else if (at >= 0 && after.length) target = document.querySelector('[data-acrow="' + after[Math.min(at, after.length - 1)] + '"] a');
+    if (!target) target = document.querySelector('[data-ac="tab"][aria-checked="true"]');
+    if (target) target.focus({ preventScroll: true });
     var said = decision === "approved" ? "اعتُمد" : decision === "rejected" ? "رُفض" : "أُعيد إلى مقترح";
     acToast(said + " «" + name + "»", false, undoTo ? "تراجع" : "", undoTo ? function () { acDecide(id, undoTo, name, ""); } : null);
-    /* Focus follows the row: its two buttons were replaced by a pill, which cannot hold focus. */
-    var link = document.querySelector('[data-acrow="' + id + '"] a'); if (link) link.focus({ preventScroll: true });
   }).catch(function () { delete acBusy[id]; acToast("تعذّر الاتصال", true); render(false); });
 }
 
@@ -363,6 +396,7 @@ function acEnsureRec(id) {
   acRec = { id: id, data: null, failed: false, missing: false };
   acRecLoad(id);
 }
+var AC_FIELD_LABEL = { name: "الاسم", city: "المدينة", sector: "القطاع", importance: "الأهمية", owner: "الموظف المسؤول", contacts: "جهات الاتصال" };
 var AC_EVENT = { created: "أُضيف العميل", edited: "عُدّلت بياناته", approved: "اعتُمد", rejected: "رُفض", proposed: "أُعيد إلى مقترح" };
 var AC_OUTCOME = { sent: "أُرسلت", opted_out: "لم تُرسل — طلب الإيقاف", outside_window: "لم تُرسل — خارج نافذة 24 ساعة", no_inbound_ever: "لم تُرسل — لم يراسلنا بعد" };
 var AC_TASK = { backlog: "مؤجلة", todo: "للتنفيذ", in_progress: "قيد التنفيذ", done: "منجزة", canceled: "ملغاة" };
@@ -417,8 +451,10 @@ function vAccount(idRaw) {
     }).join("") : '<div class="empty">لم يُستهدف هذا العميل بأي حملة.</div>');
   var evs = [];
   (a.events || []).forEach(function (e) {
-    var extra = e.action === "edited" && e.detail && e.detail.changed && e.detail.changed.length ? "" : "";
-    evs.push({ at: e.at, cls: "", html: esc(AC_EVENT[e.action] || e.action) + extra + '<span class="sub">' + esc(acBy(e.by)) + (e.detail && e.detail.note ? " · " + esc(e.detail.note) : "") + "</span>" });
+    var extra = e.action === "edited" && e.detail && e.detail.changed && e.detail.changed.length
+      ? ": " + e.detail.changed.map(function (k) { return AC_FIELD_LABEL[k] || k; }).join("، ") : "";
+    var src0 = e.action === "created" && e.detail && e.detail.source ? " · " + esc(ACCOUNT_SOURCE_LABELS[e.detail.source] || "") : "";
+    evs.push({ at: e.at, cls: "", html: esc(AC_EVENT[e.action] || e.action) + esc(extra) + '<span class="sub">' + esc(acBy(e.by)) + src0 + (e.detail && e.detail.note ? " · " + esc(e.detail.note) : "") + "</span>" });
   });
   (d.tasks || []).forEach(function (t) { evs.push({ at: t.dueAt || 0, cls: "t", html: "مهمة: " + esc(t.title) + '<span class="sub">' + esc(AC_TASK[t.status] || t.status) + (t.assignedTo ? " · " + esc(t.assignedTo) : "") + (t.dueAt ? " · تستحق " + acDate(t.dueAt) : "") + "</span>" }); });
   (d.notes || []).forEach(function (n) { evs.push({ at: n.createdAt, cls: "n", html: "ملاحظة" + (n.title ? ": " + esc(n.title) : "") + '<span class="sub">' + esc(clip(n.content, 140)) + (n.author ? " · " + esc(n.author) : "") + "</span>" }); });
@@ -429,16 +465,16 @@ function vAccount(idRaw) {
   /* side column */
   var side = "";
   var owner = a.ownerId != null ? (d.members || []).filter(function (m) { return m.id === a.ownerId; })[0] : null;
-  side += '<section class="ac-card"><div class="hd"><h2>مدير الحساب</h2><span class="sp"></span><button class="lnk" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button></div>" +
+  side += '<section class="ac-card"><div class="hd"><h2>مدير الحساب</h2><span class="sp"></span><button class="lnk" id="acedit_owner" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button></div>" +
     (a.ownerName ? '<div class="ac-owner"><span class="ac-av" aria-hidden="true">' + acIni(a.ownerName) + '</span><span><span class="nm">' + esc(a.ownerName) + '</span><br><span class="rl">' +
       esc([owner ? (owner.role === "sales" ? "مبيعات" : owner.role === "support" ? "دعم" : owner.role === "manager" ? "مدير" : owner.role) : "لم يعد نشطًا في الفريق", owner && owner.division ? owner.division : ""].filter(Boolean).join(" · ")) + "</span></span></div>"
       : '<div class="bd"><div class="empty">لا موظف مسؤول عن هذا العميل.</div></div>') + "</section>";
-  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", '<button class="lnk" data-ac="edit">إدارة</button>',
+  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", '<button class="lnk" id="acedit_contacts" data-ac="edit">إدارة</button>',
     a.contacts.length ? a.contacts.map(function (c) {
       return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(c.name) + '</span><span class="grow"><span>' + esc(c.name) +
         (c.primary ? ' <span class="cf-pill ap-approved">رئيسية</span>' : "") + "</span>" + (c.role ? '<span class="sub">' + esc(c.role) + "</span>" : "") +
         '<span class="reach">' + (c.phone ? '<bdi dir="ltr">+' + esc(c.phone) + "</bdi>" : "") + (c.email ? '<a href="mailto:' + esc(c.email) + '" dir="ltr">' + esc(c.email) + "</a>" : "") + "</span></span></div>";
-    }).join("") : '<div class="empty">لا جهات اتصال مسجّلة — أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال. <button class="sg-toggle" data-ac="edit">أضف جهة اتصال</button></div>');
+    }).join("") : '<div class="empty">لا جهات اتصال مسجّلة — أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال. <button class="sg-toggle" id="acedit_addct" data-ac="edit">أضف جهة اتصال</button></div>');
   var lines = d.opps.map(function (o) { return { product: o.product, stage: o.stage }; });
   var prods = acProducts({ productTags: a.productTags, usesProducts: a.usesProducts, oppProducts: a.oppProducts });
   side += acCard("المنتجات", prods.length ? fmtN(prods.length) : "", "",
@@ -467,7 +503,7 @@ function acOpenForm(mode, from) {
     var a = acRec && acRec.data && acRec.data.account; if (!a) return;
     acForm = { mode: "edit", id: a.id, updatedAt: a.updatedAt, phone: a.phone, from: from || "",
       d: { name: a.name, city: a.city || "", sector: a.sector || "", importance: a.importance || "", ownerId: a.ownerId == null ? "" : String(a.ownerId) },
-      contacts: a.contacts.length ? a.contacts.map(function (c) { acCtSeq++; return { key: "c" + acCtSeq, name: c.name, role: c.role || "", phone: c.phone || "", email: c.email || "", primary: c.primary }; }) : [acBlankContact(true)],
+      contacts: a.contacts.length ? a.contacts.map(function (c) { acCtSeq++; return { key: "c" + acCtSeq, id: c.id, name: c.name, role: c.role || "", phone: c.phone || "", email: c.email || "", primary: c.primary }; }) : [acBlankContact(true)],
       members: acRec.data.members || [], ownerName: a.ownerName };
   } else {
     acForm = { mode: "new", id: 0, updatedAt: 0, phone: "", from: from || "",
@@ -559,7 +595,7 @@ function acFieldTarget(field) {
 function acSave() {
   var f = acForm; if (!f || f.busy) return;
   var payload = { name: f.d.name, city: f.d.city, sector: f.d.sector, importance: f.d.importance, ownerId: f.d.ownerId, phone: f.d.phone,
-    contacts: f.contacts.map(function (c) { return { name: c.name, role: c.role, phone: c.phone, email: c.email, primary: c.primary }; }) };
+    contacts: f.contacts.map(function (c) { return { id: c.id || undefined, name: c.name, role: c.role, phone: c.phone, email: c.email, primary: c.primary }; }) };
   var ids = (f.members || []).map(function (m) { return m.id; });
   if (f.mode === "edit" && f.d.ownerId) ids.push(Number(f.d.ownerId));
   var local = checkAccount(payload, ids, f.mode === "edit");
@@ -575,7 +611,17 @@ function acSave() {
     if (acForm !== f) return;
     if (!r.ok) {
       if (r.status === 409 && r.j.error === "phone_exists") { fail("هذا الرقم مسجّل لعميل آخر.", "phone", r.j.existingId); return; }
-      if (r.status === 409 && r.j.error === "stale_account") { fail(r.j.detail || "عدّل شخص آخر هذا العميل — أغلق النافذة وأعد فتحها.", ""); return; }
+      if (r.status === 409 && r.j.error === "stale_account") {
+        /* Rebase instead of dead-ending: the draft stays, the version moves to what is stored now, and the
+           next save applies it knowingly. «Close and reopen» used to reopen the same stale version (review). */
+        pxGet("/admin/accounts/" + f.id).then(function (j) {
+          if (acForm !== f) return;
+          f.updatedAt = j.account.updatedAt;
+          if (acRec && acRec.id === f.id) { acRec.data = j; }
+          fail("عدّل شخص آخر هذا العميل بعد أن فتحت النموذج. راجع الحقول ثم احفظ مرة أخرى لتطبيق تعديلاتك.", "");
+        }).catch(function () { fail("عدّل شخص آخر هذا العميل، وتعذّر تحميل النسخة الأحدث — أعد المحاولة.", ""); });
+        return;
+      }
       fail(r.j.detail || "تعذّر الحفظ (" + fmtN(r.status) + ")", r.j.field || ""); return;
     }
     var name = payload.name.trim();
@@ -626,11 +672,11 @@ document.addEventListener("click", function (ev) {
   if (a === "tab") { acF.tab = t.getAttribute("data-v"); acShown = AC_PAGE; render(false); var b = document.querySelector('[data-ac="tab"][data-v="' + acF.tab + '"]'); if (b) b.focus(); return; }
   if (a === "tabproposed") { acF.tab = "proposed"; acShown = AC_PAGE; render(false); return; }
   if (a === "noowner") { acF.tab = "all"; acF.owner = "none"; acShown = AC_PAGE; render(false); return; }
-  if (a === "clearf") { acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.ind = ""; render(false); return; }
+  if (a === "clearf") { acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.ind = ""; render(false); var f0 = document.querySelector('[data-acset="product"]'); if (f0) f0.focus(); return; }
   if (a === "clearall") { acF.q = ""; acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.ind = ""; render(false); return; }
   if (a === "more") { acShown += AC_PAGE; render(false); return; }
   if (a === "new") { acOpenForm("new", t.id || ""); return; }
-  if (a === "edit") { acOpenForm("edit", "acedit"); return; }
+  if (a === "edit") { acOpenForm("edit", t.id || "acedit"); return; }
   if (a === "opp") { var ar = acRec && acRec.data && acRec.data.account; if (ar && typeof opFromEntity === "function") opFromEntity(ar.id); return; }
   if (a === "approve" || a === "reject" || a === "repropose") {
     var row = acRowById(id) || (acRec && acRec.data && acRec.data.account.id === id ? acRec.data.account : null);
@@ -641,7 +687,7 @@ document.addEventListener("click", function (ev) {
   }
   if (!acForm) return;
   if (a === "close") { acCloseForm(false); return; }
-  if (a === "keep") { acForm.confirm = false; render(false); var s0 = document.getElementById("acf_name"); if (s0) s0.focus(); return; }
+  if (a === "keep") { acForm.confirm = false; render(false); var s0 = document.querySelector('.ac-box [data-ac="save"]'); if (s0) s0.focus(); return; }
   if (a === "discard") { acCloseForm(true); return; }
   if (a === "gotoexisting") { acForm = null; return; }
   if (a === "save") { acSave(); return; }
@@ -705,16 +751,21 @@ document.addEventListener("keydown", function (ev) {
   if (!acForm || !document.querySelector(".ac-box")) {
     /* Arrow keys move between the approval tabs, as a radiogroup should. */
     var tb = ev.target && ev.target.closest ? ev.target.closest('[data-ac="tab"]') : null;
-    if (tb && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) {
+    if (tb && (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "Home" || ev.key === "End")) {
       ev.preventDefault();
       var order = ["all", "approved", "proposed", "rejected"];
-      var at = order.indexOf(acF.tab) + (ev.key === "ArrowLeft" ? 1 : -1);
+      var at = ev.key === "Home" ? 0 : ev.key === "End" ? order.length - 1 : order.indexOf(acF.tab) + (ev.key === "ArrowLeft" ? 1 : -1);
       acF.tab = order[(at + order.length) % order.length]; acShown = AC_PAGE; render(false);
       var nb = document.querySelector('[data-ac="tab"][data-v="' + acF.tab + '"]'); if (nb) nb.focus();
     }
     return;
   }
-  if (ev.key === "Escape") { ev.preventDefault(); if (acForm.confirm) { acForm.confirm = false; render(false); } else acCloseForm(false); return; }
+  if (ev.key === "Escape") {
+    ev.preventDefault();
+    if (acForm.confirm) { acForm.confirm = false; render(false); var sv = document.querySelector('.ac-box [data-ac="save"]'); if (sv) sv.focus(); }
+    else acCloseForm(false);
+    return;
+  }
   if (ev.key === "Enter" && ev.target && ev.target.tagName === "INPUT" && !(ev.target.getAttribute("list"))) { ev.preventDefault(); acSave(); return; }
   if (ev.key !== "Tab") return;
   /* Focus stays inside the sheet while it is open. */

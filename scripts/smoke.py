@@ -55,7 +55,8 @@ ROUTES = [
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#indicators", "مؤشر"),
     ("#indicator/new", "بيانات العملاء"),
-    ("#accounts", "العميل"),
+    # The table header renders only when rows loaded: an outage or an empty read cannot match it.
+    ("#accounts", "مصدر الإضافة"),
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the

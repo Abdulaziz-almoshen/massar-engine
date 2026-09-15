@@ -723,6 +723,7 @@ app.delete("/admin/config/team/:id", async (req, reply) => {
   const out = await db.deleteMember(id);
   if (out === "referenced") return problem(reply, 409, "member_referenced", "عليه تصعيدات مسجّلة — أوقفه بدل حذفه", "id");
   if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
+  if (typeof out === "object") return problem(reply, 409, "member_owns_accounts", "مسؤول عن " + out.owns + " من العملاء — انقلهم إلى عضو آخر أو أوقفه بدل حذفه", "id");
   return { ok: true, id };
 });
 
@@ -1707,99 +1708,124 @@ async function activeMemberIds(): Promise<{ ids: number[]; members: { id: number
 }
 function accountBody(req: any): { account: acct.AccountInput; ifUpdatedAt: number | null } {
   const b = (req.body ?? {}) as any;
-  const a = b.account && typeof b.account === "object" ? b.account : {};
-  const n = Number(b.ifUpdatedAt);
+  const a = b.account && typeof b.account === "object" && !Array.isArray(b.account) ? b.account : {};
+  const n = typeof b.ifUpdatedAt === "number" ? b.ifUpdatedAt : NaN;
   return { account: a, ifUpdatedAt: Number.isSafeInteger(n) && n > 0 ? n : null };
+}
+/** Phones in their stored 966… form BEFORE the rules run, so «0551234567» and «966551234567» on two
+ *  contacts of one account are recognised as the same number (review). */
+function normalizeAccountPhones(a: acct.AccountInput): acct.AccountInput {
+  const norm = (v: unknown) => {
+    const d = acct.phoneDigits(v);
+    return d ? audience.normalizePhone(d) : (typeof v === "string" ? v : "");
+  };
+  const contacts = Array.isArray(a.contacts) ? (a.contacts as acct.ContactInput[]).map((c) => (c && typeof c === "object" ? { ...c, phone: norm(c.phone) } : c)) : a.contacts;
+  return { ...a, phone: norm(a.phone), contacts };
+}
+/** A route body run against the database; an outage is 503, never an empty list or a false 404. */
+async function withDb(reply: any, fn: () => Promise<unknown>): Promise<unknown> {
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  try { return await fn(); }
+  catch (e) {
+    if (e instanceof db.DbUnavailable) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+    throw e;
+  }
 }
 
 app.get("/admin/accounts", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
-  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const [list, team] = await Promise.all([db.listAccounts(), activeMemberIds()]);
-  return { ok: true, accounts: list, members: team.members };
+  return withDb(reply, async () => {
+    const [list, team] = await Promise.all([db.listAccounts(), activeMemberIds()]);
+    return { ok: true, accounts: list, members: team.members };
+  });
 });
 
 app.get("/admin/accounts/:id", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
-  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const account = await db.accountById(id);
-  if (!account) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-  const [activity, tasks, notes, indicators, team] = await Promise.all([
-    db.accountActivity(account.phone),
-    db.listTasks({ kind: "contact", id: account.phone }),
-    db.listNotes({ kind: "contact", id: account.phone }),
-    db.indicatorsForPhone(account.phone),
-    activeMemberIds(),
-  ]);
-  const contact = tracker.findContact(account.phone);
-  return {
-    ok: true, account, ...activity, indicators, members: team.members,
-    tasks: tasks.slice(0, 20).map((t) => ({ id: t.id, title: t.title, status: t.status, dueAt: t.due_at, assignedTo: t.assigned_to })),
-    notes: notes.slice(0, 20).map((n) => ({ id: n.id, title: n.title, content: n.content.slice(0, 400), author: n.author, createdAt: n.created_at })),
-    conversation: contact ? { lastEventAt: contact.lastEventAt, optedOut: contact.optedOut } : null,
-  };
+  return withDb(reply, async () => {
+    const account = await db.accountById(id);
+    if (!account) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+    const [activity, tasks, notes, indicators, team] = await Promise.all([
+      db.accountActivity(account.phone),
+      db.listTasks({ kind: "contact", id: account.phone }),
+      db.listNotes({ kind: "contact", id: account.phone }),
+      db.indicatorsForPhone(account.phone),
+      activeMemberIds(),
+    ]);
+    const contact = tracker.findContact(account.phone);
+    return {
+      ok: true, account, ...activity, indicators, members: team.members,
+      tasks: tasks.slice(0, 20).map((t) => ({ id: t.id, title: t.title, status: t.status, dueAt: t.due_at, assignedTo: t.assigned_to })),
+      notes: notes.slice(0, 20).map((n) => ({ id: n.id, title: n.title, content: n.content.slice(0, 400), author: n.author, createdAt: n.created_at })),
+      conversation: contact ? { lastEventAt: contact.lastEventAt, optedOut: contact.optedOut } : null,
+    };
+  });
 });
 
 app.post("/admin/accounts", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
-  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const { account } = accountBody(req);
-  const team = await activeMemberIds();
-  // The canonical 966… form BEFORE the check: 0551234567 and 966551234567 are the same customer, and
-  // the uniqueness that protects every conversation is on the stored form.
-  const normalized = { ...account, phone: audience.normalizePhone(account.phone) };
-  const checked = acct.checkAccount(normalized, team.ids, false);
-  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
-  checked.value.contacts = checked.value.contacts.map((c) => ({ ...c, phone: c.phone ? audience.normalizePhone(c.phone) : null }));
-  const r = await db.createAccount(checked.value, "manual", adminName(req));
-  if (!r) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  if ("conflict" in r) {
-    return reply.code(409).type("application/problem+json").send({
-      type: "about:blank", title: "phone_exists", status: 409, error: "phone_exists", field: "phone",
-      detail: "هذا الرقم مسجّل لعميل آخر", existingId: r.conflict,
-    });
-  }
-  await accounts.refresh();
-  return reply.code(201).header("Location", "/admin/accounts/" + r.id).send({ ok: true, id: r.id });
+  return withDb(reply, async () => {
+    const { account } = accountBody(req);
+    const team = await activeMemberIds();
+    const checked = acct.checkAccount(normalizeAccountPhones(account), team.ids, false);
+    if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+    const r = await db.createAccount(checked.value, "manual", adminName(req));
+    if (!r) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+    if ("conflict" in r) {
+      return reply.code(409).type("application/problem+json").send({
+        type: "about:blank", title: "phone_exists", status: 409, error: "phone_exists", field: "phone",
+        detail: "هذا الرقم مسجّل لعميل آخر", existingId: r.conflict,
+      });
+    }
+    await accounts.refresh();
+    return reply.code(201).header("Location", "/admin/accounts/" + r.id).send({ ok: true, id: r.id });
+  });
 });
 
 app.patch("/admin/accounts/:id", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
-  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
   const { account, ifUpdatedAt } = accountBody(req);
-  const cur = await db.accountById(id);
-  if (!cur) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-  const team = await activeMemberIds();
-  // An owner who has since left the team stays assignable on THIS account until someone changes it —
-  // otherwise editing a phone number would force a reassignment nobody asked for.
-  const ids = cur.ownerId != null && team.ids.indexOf(cur.ownerId) < 0 ? team.ids.concat([cur.ownerId]) : team.ids;
-  const checked = acct.checkAccount(account, ids, true);
-  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
-  checked.value.phone = cur.phone;
-  checked.value.contacts = checked.value.contacts.map((c) => ({ ...c, phone: c.phone ? audience.normalizePhone(c.phone) : null }));
-  const r = await db.updateAccount(id, checked.value, ifUpdatedAt, adminName(req));
-  if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-  if ("stale" in r) return problem(reply, 409, "stale_account", "عدّل شخص آخر هذا العميل بعد أن فتحته — أعد التحميل ثم عدّل");
-  await accounts.refresh();
-  return { ok: true, updatedAt: r.updatedAt };
+  // Required, not optional: a PATCH without the version it was based on is a blind overwrite (review).
+  if (ifUpdatedAt == null) return problem(reply, 400, "invalid_field", "ifUpdatedAt مطلوب — نسخة العميل التي بُني عليها التعديل", "ifUpdatedAt");
+  return withDb(reply, async () => {
+    const cur = await db.accountById(id);
+    if (!cur) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+    const team = await activeMemberIds();
+    // An owner who has since left the team stays assignable on THIS account until someone changes it —
+    // otherwise editing a phone number would force a reassignment nobody asked for.
+    const ids = cur.ownerId != null && team.ids.indexOf(cur.ownerId) < 0 ? team.ids.concat([cur.ownerId]) : team.ids;
+    const checked = acct.checkAccount(normalizeAccountPhones(account), ids, true);
+    if (!checked.ok) return problem(reply, 400, "invalid_field", checked.reason, checked.field);
+    checked.value.phone = cur.phone;
+    // A contact id this account does not own is treated as a new person, never an update of someone else's.
+    const own = new Set(cur.contacts.map((c) => c.id));
+    checked.value.contacts = checked.value.contacts.map((c) => ({ ...c, id: c.id != null && own.has(c.id) ? c.id : null }));
+    const r = await db.updateAccount(id, checked.value, ifUpdatedAt, adminName(req));
+    if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+    if ("stale" in r) return problem(reply, 409, "stale_account", "عدّل شخص آخر هذا العميل بعد أن فتحته");
+    await accounts.refresh();
+    return { ok: true, updatedAt: r.updatedAt };
+  });
 });
 
 app.post("/admin/accounts/:id/approval", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم العميل غير صحيح", "id");
-  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const b = (req.body ?? {}) as { decision?: string; note?: string };
-  if (!acct.ACCOUNT_APPROVALS.includes(String(b.decision) as acct.AccountApproval)) return problem(reply, 400, "invalid_field", "قرار غير معروف", "decision");
-  const note = b.note == null ? null : String(b.note).trim().slice(0, 300) || null;
-  const r = await db.setAccountApproval(id, b.decision as acct.AccountApproval, note, adminName(req));
-  if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-  if ("refused" in r) return problem(reply, 409, "no_change", r.refused, "decision");
-  return { ok: true, updatedAt: r.updatedAt };
+  const b = (req.body ?? {}) as { decision?: unknown; note?: unknown };
+  const decision = typeof b.decision === "string" ? b.decision : "";
+  if (!acct.ACCOUNT_APPROVALS.includes(decision as acct.AccountApproval)) return problem(reply, 400, "invalid_field", "قرار غير معروف", "decision");
+  const note = typeof b.note === "string" ? b.note.trim().slice(0, 300) || null : null;
+  return withDb(reply, async () => {
+    const r = await db.setAccountApproval(id, decision as acct.AccountApproval, note, adminName(req));
+    if (!r) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
+    if ("refused" in r) return problem(reply, 409, "no_change", r.refused, "decision");
+    return { ok: true, approvalAt: r.approvalAt };
+  });
 });
 
 // ------------------------------ campaign launch (human-confirmed in the UI) ------------------------------

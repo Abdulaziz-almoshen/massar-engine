@@ -55,72 +55,93 @@ export const CONTACTS_MAX = 20;
 
 // ---------------------------------------------------------------------------------------- types
 
-export type ContactInput = { name?: unknown; role?: unknown; phone?: unknown; email?: unknown; primary?: unknown };
+export type ContactInput = { id?: unknown; name?: unknown; role?: unknown; phone?: unknown; email?: unknown; primary?: unknown };
 export type AccountInput = {
   name?: unknown; city?: unknown; sector?: unknown; importance?: unknown; ownerId?: unknown; phone?: unknown;
   contacts?: unknown;
 };
-export type ContactValue = { name: string; role: string | null; phone: string | null; email: string | null; primary: boolean };
+export type ContactValue = { id?: number | null; name: string; role: string | null; phone: string | null; email: string | null; primary: boolean };
 export type AccountValue = {
-  name: string; city: string; sector: string | null; importance: AccountImportance | null; ownerId: number | null;
+  name: string; city: string | null; sector: string | null; importance: AccountImportance | null; ownerId: number | null;
   phone: string; contacts: ContactValue[];
 };
 export type AccountCheck = { ok: true; value: AccountValue } | { ok: false; field: string; reason: string };
 
 // ---------------------------------------------------------------------------------------- the rules
 
-/** Digits only, with Arabic-Indic digits read as digits. Used to decide whether a phone is plausible;
- *  the server's canonical form (966…) comes from audience.normalizePhone before storage. */
+/** Digits only, with Arabic-Indic (٠-٩) and Persian (۰-۹) digits read as digits. Used to decide whether
+ *  a phone is plausible; the stored canonical form (966…) comes from audience.normalizePhone. */
 export function phoneDigits(raw: unknown): string {
-  var s = String(raw == null ? "" : raw);
+  var s = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
   var out = "";
   for (var i = 0; i < s.length; i++) {
     var c = s.charAt(i);
     var ar = "٠١٢٣٤٥٦٧٨٩".indexOf(c);
+    var fa = "۰۱۲۳۴۵۶۷۸۹".indexOf(c);
     if (ar >= 0) out += String(ar);
+    else if (fa >= 0) out += String(fa);
     else if (c >= "0" && c <= "9") out += c;
   }
   return out;
 }
 
+/** Why a phone cannot be a real number, or "" when it can. A Saudi mobile has a fixed length in each of
+ *  its written forms, so «055000900» (one digit short) is refused instead of becoming a second customer
+ *  that no WhatsApp message can ever reach (review, 2026-09-15). Other countries: 8–15 digits. */
+export function phoneShapeProblem(digits: string): string {
+  var d = String(digits || "");
+  if (!d) return "";
+  if (d.length < 8 || d.length > 15) return "رقم غير صالح — عدد الأرقام غير صحيح";
+  if (d.indexOf("05") === 0 && d.length !== 10) return "رقم الجوال السعودي يبدأ بـ05 ويتكون من 10 أرقام";
+  if (d.indexOf("9665") === 0 && d.length !== 12) return "رقم الجوال السعودي الدولي يتكون من 12 رقمًا (9665…)";
+  if (d.indexOf("009665") === 0 && d.length !== 14) return "رقم الجوال السعودي الدولي يتكون من 14 رقمًا (009665…)";
+  if (d.charAt(0) === "5" && d.length !== 9 && d.length < 11) return "رقم الجوال السعودي بدون الصفر يتكون من 9 أرقام";
+  return "";
+}
+
 /**
- * BR-CUS-001 + BR-CUS-002: an account needs a name, a city and at least one named contact; each contact
+ * BR-CUS-001 + BR-CUS-002: a NEW account needs a name, a city and at least one named contact; each contact
  * row that carries anything needs a name; one contact is primary. The account's WhatsApp number is its
  * identity everywhere else in Massar (conversations, campaigns, opportunities all key by it), so it is
- * required on create and fixed afterwards — `isEdit` skips it.
+ * required on create and fixed afterwards.
  *
- * `memberIds` are the ACTIVE team members an owner may be chosen from.
+ * An EDIT asks for the name only: accounts that arrived before this slice (imports, WhatsApp) have no city
+ * and no contacts, and assigning one an owner must not force someone to invent a person (review).
+ *
+ * `memberIds` are the team members an owner may be chosen from. Values that are not text are treated as
+ * empty — an object in a JSON body is a malformed request, not a name.
  */
 export function checkAccount(input: AccountInput, memberIds: readonly number[], isEdit: boolean): AccountCheck {
-  var src = input || {};
-  var text = function (v: unknown) { return String(v == null ? "" : v).trim(); };
+  var src = input && typeof input === "object" ? input : {};
+  var text = function (v: unknown) { return typeof v === "string" || typeof v === "number" ? String(v).trim() : ""; };
   var name = text(src.name);
   if (!name) return { ok: false, field: "name", reason: "اسم العميل مطلوب" };
   if (name.length > ACCOUNT_NAME_MAX) return { ok: false, field: "name", reason: "اسم العميل أطول من " + ACCOUNT_NAME_MAX + " حرفًا" };
   var city = text(src.city);
-  if (!city) return { ok: false, field: "city", reason: "المدينة مطلوبة" };
+  if (!city && !isEdit) return { ok: false, field: "city", reason: "المدينة مطلوبة" };
   if (city.length > ACCOUNT_CITY_MAX) return { ok: false, field: "city", reason: "اسم المدينة أطول من " + ACCOUNT_CITY_MAX + " حرفًا" };
   var sector = text(src.sector);
   if (sector.length > ACCOUNT_SECTOR_MAX) return { ok: false, field: "sector", reason: "القطاع أطول من " + ACCOUNT_SECTOR_MAX + " حرفًا" };
   var importance = text(src.importance);
   if (importance && ACCOUNT_IMPORTANCE.indexOf(importance as AccountImportance) < 0) return { ok: false, field: "importance", reason: "درجة الأهمية غير معروفة" };
-  var ownerRaw = src.ownerId;
+  var ownerRaw = text(src.ownerId);
   var ownerId: number | null = null;
-  if (ownerRaw != null && String(ownerRaw) !== "") {
-    ownerId = Number(ownerRaw);
+  if (ownerRaw) {
+    ownerId = /^[0-9]+$/.test(ownerRaw) ? Number(ownerRaw) : 0;
     if (!(ownerId > 0) || memberIds.indexOf(ownerId) < 0) return { ok: false, field: "ownerId", reason: "الموظف المسؤول غير موجود في الفريق أو غير نشط" };
   }
   var phone = phoneDigits(src.phone);
   if (!isEdit) {
     if (!phone) return { ok: false, field: "phone", reason: "رقم واتساب العميل مطلوب — به ترتبط المحادثات والحملات والفرص" };
-    if (phone.length < 8 || phone.length > 15) return { ok: false, field: "phone", reason: "رقم واتساب غير صالح" };
+    var pp = phoneShapeProblem(phone);
+    if (pp) return { ok: false, field: "phone", reason: pp };
   }
   var rows = Array.isArray(src.contacts) ? (src.contacts as ContactInput[]) : [];
   var contacts: ContactValue[] = [];
   var seenPhones: Record<string, number> = {};
   var primaryAt = -1;
   for (var i = 0; i < rows.length; i++) {
-    var r = rows[i] || {};
+    var r = rows[i] && typeof rows[i] === "object" ? rows[i] : {};
     var cn = text(r.name), cr = text(r.role), cp = text(r.phone), ce = text(r.email);
     if (!cn && !cr && !cp && !ce) continue;
     var at = contacts.length;
@@ -128,27 +149,30 @@ export function checkAccount(input: AccountInput, memberIds: readonly number[], 
     if (cn.length > CONTACT_NAME_MAX) return { ok: false, field: "contacts." + i + ".name", reason: "اسم جهة الاتصال أطول من " + CONTACT_NAME_MAX + " حرفًا" };
     if (cr.length > CONTACT_ROLE_MAX) return { ok: false, field: "contacts." + i + ".role", reason: "المنصب أطول من " + CONTACT_ROLE_MAX + " حرفًا" };
     var cd = phoneDigits(cp);
-    if (cp && (cd.length < 8 || cd.length > 15)) return { ok: false, field: "contacts." + i + ".phone", reason: "رقم هاتف جهة الاتصال غير صالح" };
+    if (cp && !cd) return { ok: false, field: "contacts." + i + ".phone", reason: "رقم هاتف جهة الاتصال غير صالح" };
+    var cpp = phoneShapeProblem(cd);
+    if (cpp) return { ok: false, field: "contacts." + i + ".phone", reason: cpp };
     if (cd && seenPhones[cd] != null) return { ok: false, field: "contacts." + i + ".phone", reason: "هذا الرقم مكرر لجهتي اتصال" };
     if (cd) seenPhones[cd] = at;
     if (ce && (ce.length > CONTACT_EMAIL_MAX || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(ce))) return { ok: false, field: "contacts." + i + ".email", reason: "البريد الإلكتروني غير صالح" };
     var isPrimary = r.primary === true || r.primary === "true";
     if (isPrimary && primaryAt < 0) primaryAt = at;
-    contacts.push({ name: cn, role: cr || null, phone: cd || null, email: ce || null, primary: false });
+    var cid = typeof r.id === "number" && r.id > 0 && r.id === Math.floor(r.id) ? r.id : null;
+    contacts.push({ id: cid, name: cn, role: cr || null, phone: cd || null, email: ce || null, primary: false });
   }
-  if (!contacts.length) return { ok: false, field: "contacts", reason: "أضف جهة اتصال واحدة على الأقل باسمها" };
+  if (!contacts.length && !isEdit) return { ok: false, field: "contacts", reason: "أضف جهة اتصال واحدة على الأقل باسمها" };
   if (contacts.length > CONTACTS_MAX) return { ok: false, field: "contacts", reason: "الحد " + CONTACTS_MAX + " جهة اتصال للعميل" };
-  contacts[primaryAt < 0 ? 0 : primaryAt].primary = true;
+  if (contacts.length) contacts[primaryAt < 0 ? 0 : primaryAt].primary = true;
   return {
     ok: true,
-    value: { name: name, city: city, sector: sector || null, importance: (importance || null) as AccountImportance | null, ownerId: ownerId, phone: phone, contacts: contacts },
+    value: { name: name, city: city || null, sector: sector || null, importance: (importance || null) as AccountImportance | null, ownerId: ownerId, phone: phone, contacts: contacts },
   };
 }
 
 /** The approval moves an account may make. Any state may move to any other — a rejection is reversible —
  *  but a no-op is refused so the audit log never records a decision nobody made. */
 export function checkApproval(current: string, next: unknown): { ok: true; value: AccountApproval } | { ok: false; reason: string } {
-  var n = String(next == null ? "" : next);
+  var n = typeof next === "string" ? next : "";
   if (ACCOUNT_APPROVALS.indexOf(n as AccountApproval) < 0) return { ok: false, reason: "قرار غير معروف" };
   if (n === current) return { ok: false, reason: "العميل " + ACCOUNT_APPROVAL_LABELS[n as AccountApproval] + " بالفعل" };
   return { ok: true, value: n as AccountApproval };
@@ -252,7 +276,7 @@ export function accountFieldsFromAttrs(attrs: Readonly<Record<string, string>>):
 
 // ---------------------------------------------------------------------------------------- the seam
 
-const DOMAIN_FNS = [phoneDigits, checkAccount, checkApproval, accountMatches, productStatusOf] as const;
+const DOMAIN_FNS = [phoneDigits, phoneShapeProblem, checkAccount, checkApproval, accountMatches, productStatusOf] as const;
 
 const INJECTED = [
   "ACCOUNT_APPROVALS", "ACCOUNT_APPROVAL_LABELS", "ACCOUNT_IMPORTANCE", "ACCOUNT_IMPORTANCE_LABELS",

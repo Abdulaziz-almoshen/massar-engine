@@ -804,8 +804,14 @@ ALTER TABLE entities ADD COLUMN IF NOT EXISTS updated_at BIGINT;
 UPDATE entities SET updated_at = created_at WHERE updated_at IS NULL;
 -- Sector and city were already typed into imported sheets under these headers; they are the same
 -- facts, moved from a free attribute into the column the filters read.
-UPDATE entities SET sector = left(attrs->>'القطاع', 80) WHERE sector IS NULL AND coalesce(attrs->>'القطاع', '') <> '';
-UPDATE entities SET city = left(attrs->>'المدينة', 60) WHERE city IS NULL AND coalesce(attrs->>'المدينة', '') <> '';
+-- Only a TEXT value that is not blank moves (review: a JSON object became the city «{"a": 1}», a blank
+-- sector became «   »), trimmed and cut to the length the edit form accepts, so every account stays editable.
+UPDATE entities SET sector = left(btrim(attrs->>'القطاع'), 80)
+ WHERE sector IS NULL AND jsonb_typeof(attrs->'القطاع') = 'string' AND btrim(attrs->>'القطاع') <> '';
+UPDATE entities SET city = left(btrim(attrs->>'المدينة'), 60)
+ WHERE (city IS NULL OR btrim(city) = '') AND jsonb_typeof(attrs->'المدينة') = 'string' AND btrim(attrs->>'المدينة') <> '';
+UPDATE entities SET city = left(btrim(city), 60) WHERE city IS NOT NULL AND (length(city) > 60 OR city <> btrim(city));
+UPDATE entities SET name = left(btrim(name), 120) WHERE length(name) > 120;
 CREATE INDEX IF NOT EXISTS idx_entities_owner ON entities (owner_member_id);
 -- BR-CUS-002: the people inside an account. One of them is primary.
 CREATE TABLE IF NOT EXISTS entity_contacts (
@@ -1339,6 +1345,8 @@ export async function counts(): Promise<{ contacts: number; messages: number; ev
 
 export type EntityRow = {
   id: number; name: string; phone: string; size: string | null; city: string | null;
+  /** proposed | approved | rejected — a rejected account is left out of campaign audiences and suggestions. */
+  approval: string;
   attrs: Record<string, string>;
   /** Raw JSONB. Callers pass it through `facts.readFacts` — this layer stores, it does not judge. */
   facts: Record<string, unknown>;
@@ -1348,7 +1356,7 @@ export type EntityRow = {
 
 export async function listEntities(): Promise<EntityRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts, product_tags FROM entities ORDER BY name`);
+  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts, product_tags, approval FROM entities ORDER BY name`);
   // Legacy size/city columns fold into attrs so the UI reads one uniform attribute map.
   return r.rows.map((x) => ({
     ...x, id: Number(x.id),
@@ -1370,7 +1378,9 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
   for (const r of rows) {
     try {
       // BR-CUS-001/002/005: a customer sheet's القطاع · الأهمية · جهة الاتصال · المنصب · البريد columns
-      // fill the account columns and its first contact. A re-import never overwrites what a person set.
+      // fill the account columns and its first contact. On an EXISTING account the sheet only fills what
+      // is empty: the name and city a person corrected in the account form survive the next upload, which
+      // used to replace them silently (review, 2026-09-15). Attributes, facts and tags still merge.
       const fields = acct.accountFieldsFromAttrs(r.attrs ?? {});
       // The sheet is fact producer #1 (src/facts.ts). Mapped columns become TYPED facts with
       // `source:'human', by:'import'` in the same upsert, so an import can never land a fact the
@@ -1386,9 +1396,8 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
         `INSERT INTO entities (name, phone, size, city, attrs, facts, product_tags, created_at, updated_at, sector, importance, source, created_by)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12)
          ON CONFLICT (phone) DO UPDATE SET
-           name = EXCLUDED.name,
            size = COALESCE(EXCLUDED.size, entities.size),
-           city = COALESCE(EXCLUDED.city, entities.city),
+           city = COALESCE(NULLIF(btrim(entities.city), ''), EXCLUDED.city),
            sector = COALESCE(entities.sector, EXCLUDED.sector),
            importance = COALESCE(entities.importance, EXCLUDED.importance),
            updated_at = EXCLUDED.updated_at,
@@ -1398,11 +1407,16 @@ export async function addEntities(rows: { name: string; phone: string; size?: st
              SELECT COALESCE(jsonb_agg(DISTINCT v), '[]'::jsonb)
                FROM jsonb_array_elements(entities.product_tags || EXCLUDED.product_tags) AS v)
          RETURNING id, (xmax = 0) AS inserted`,
-        [r.name, r.phone, r.size ?? null, r.city ?? (r.attrs?.["المدينة"] || null), JSON.stringify(r.attrs ?? {}),
+        [String(r.name).trim().slice(0, acct.ACCOUNT_NAME_MAX), r.phone, r.size ?? null,
+         (String(r.city ?? r.attrs?.["المدينة"] ?? "").trim().slice(0, acct.ACCOUNT_CITY_MAX)) || null, JSON.stringify(r.attrs ?? {}),
          JSON.stringify(imported), JSON.stringify(r.tags ?? []), Date.now(),
          fields.sector, fields.importance, meta.source, meta.by || null]);
       const row = res.rows[0];
       row?.inserted ? added++ : updated++;
+      if (row?.inserted) {
+        await pool.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'created',$2,$3,$4)`,
+          [Number(row.id), JSON.stringify({ source: meta.source }), meta.by || null, Date.now()]);
+      }
       // The sheet's contact becomes the account's first person only while the account has none — a
       // re-import must not stack a copy of the same person on every upload.
       if (row && fields.contact) {
@@ -1621,9 +1635,12 @@ export async function ensureEntity(phone: string, name: string): Promise<boolean
   if (!pool || !connected) return false;
   try {
     await pool.query(
-      `INSERT INTO entities (name, phone, attrs, facts, created_at, updated_at, source, created_by) VALUES ($1,$2,'{}','{}',$3,$3,'whatsapp','المساعد')
-       ON CONFLICT (phone) DO NOTHING`,
-      [name || phone, phone, Date.now()]);
+      `WITH ins AS (
+         INSERT INTO entities (name, phone, attrs, facts, created_at, updated_at, source, created_by) VALUES ($1,$2,'{}','{}',$3,$3,'whatsapp','المساعد')
+         ON CONFLICT (phone) DO NOTHING RETURNING id)
+       INSERT INTO account_events (entity_id, action, detail, by_name, at)
+       SELECT id, 'created', '{"source":"whatsapp"}'::jsonb, 'المساعد', $3 FROM ins`,
+      [String(name || phone).slice(0, acct.ACCOUNT_NAME_MAX), phone, Date.now()]);
     return true;
   } catch { return false; }
 }
@@ -1676,14 +1693,18 @@ function accountFrom(x: any): AccountRow & { contacts: ContactRow[] } {
   };
 }
 
+/** Thrown instead of returning an empty list: «لا عملاء بعد» during a database blip is the exact defect the
+ *  opportunities board shipped once. The routes turn it into 503. */
+export class DbUnavailable extends Error { constructor() { super("db_unavailable"); } }
+
 export async function listAccounts(): Promise<AccountRow[]> {
-  if (!pool || !connected) return [];
+  if (!pool || !connected) throw new DbUnavailable();
   const r = await pool.query(ACCOUNT_SELECT + " ORDER BY e.name");
   return r.rows.map((x) => { const { contacts: _c, ...row } = accountFrom(x); return row; });
 }
 
 export async function accountById(id: number): Promise<(AccountRow & { contacts: ContactRow[]; events: { action: string; detail: unknown; by: string | null; at: number }[] }) | null> {
-  if (!pool || !connected) return null;
+  if (!pool || !connected) throw new DbUnavailable();
   const r = await pool.query(ACCOUNT_SELECT + " WHERE e.id = $1", [id]);
   if (!r.rows.length) return null;
   const ev = await pool.query(`SELECT action, detail, by_name, at FROM account_events WHERE entity_id = $1 ORDER BY at DESC, id DESC LIMIT 30`, [id]);
@@ -1696,22 +1717,32 @@ export async function accountIdByPhone(phone: string): Promise<number | null> {
   return r.rows.length ? Number(r.rows[0].id) : null;
 }
 
+/** Contacts are kept by id: an edit updates the people it still carries, adds the new ones and removes the
+ *  rest, so each person's created_at / created_by survive every save (review: replace-all reset them).
+ *  The primary flag is cleared first because the partial unique index would refuse two primaries mid-way. */
 async function writeContacts(client: pg.PoolClient, entityId: number, contacts: readonly acct.ContactValue[], by: string): Promise<void> {
-  await client.query(`DELETE FROM entity_contacts WHERE entity_id = $1`, [entityId]);
-  if (!contacts.length) return;
-  await client.query(
-    `INSERT INTO entity_contacts (entity_id, name, role, phone, email, is_primary, position, created_at, created_by)
-     SELECT $1, u.name, u.role, u.phone, u.email, u.is_primary, u.position, $2, $3
-       FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::boolean[], $9::int[]) AS u(name, role, phone, email, is_primary, position)`,
-    [entityId, Date.now(), by,
-     contacts.map((c) => c.name), contacts.map((c) => c.role), contacts.map((c) => c.phone), contacts.map((c) => c.email),
-     contacts.map((c) => c.primary), contacts.map((_, i) => i)]);
+  const keep = contacts.map((c) => c.id).filter((id): id is number => typeof id === "number");
+  await client.query(`DELETE FROM entity_contacts WHERE entity_id = $1 AND NOT (id = ANY($2::bigint[]))`, [entityId, keep]);
+  await client.query(`UPDATE entity_contacts SET is_primary = false WHERE entity_id = $1`, [entityId]);
+  const now = Date.now();
+  for (let i = 0; i < contacts.length; i++) {
+    const c = contacts[i];
+    const upd = c.id != null
+      ? await client.query(`UPDATE entity_contacts SET name=$3, role=$4, phone=$5, email=$6, is_primary=$7, position=$8 WHERE id=$1 AND entity_id=$2`,
+          [c.id, entityId, c.name, c.role, c.phone, c.email, c.primary, i])
+      : null;
+    if (!upd || !upd.rowCount) {
+      await client.query(
+        `INSERT INTO entity_contacts (entity_id, name, role, phone, email, is_primary, position, created_at, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [entityId, c.name, c.role, c.phone, c.email, c.primary, i, now, by]);
+    }
+  }
 }
 
 /** BR-CUS-001/005. The account arrives «مقترح» with its source and author; a phone already on file is a
  *  conflict naming that account, never a silent merge into it. */
 export async function createAccount(v: acct.AccountValue, source: acct.AccountSource, by: string): Promise<{ id: number } | { conflict: number } | null> {
-  if (!pool || !connected) return null;
+  if (!pool || !connected) throw new DbUnavailable();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -1740,9 +1771,9 @@ export async function createAccount(v: acct.AccountValue, source: acct.AccountSo
 
 /** Edit everything but the phone. `ifUpdatedAt` is the version the editor loaded: two people editing the
  *  same account in two tabs get a conflict, not a silent last-write-wins. */
-export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedAt: number | null, by: string):
+export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedAt: number, by: string):
   Promise<{ ok: true; updatedAt: number } | { stale: true } | null> {
-  if (!pool || !connected) return null;
+  if (!pool || !connected) throw new DbUnavailable();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -1750,17 +1781,24 @@ export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedA
     if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
     const was = cur.rows[0];
     const version = Number(was.updated_at ?? was.created_at);
-    if (ifUpdatedAt != null && ifUpdatedAt !== version) { await client.query("ROLLBACK"); return { stale: true }; }
-    const now = Math.max(Date.now(), version + 1);
-    await client.query(
-      `UPDATE entities SET name=$2, city=$3, sector=$4, importance=$5, owner_member_id=$6, updated_at=$7 WHERE id=$1`,
-      [id, v.name, v.city, v.sector, v.importance, v.ownerId, now]);
-    await writeContacts(client, id, v.contacts, by);
+    if (ifUpdatedAt !== version) { await client.query("ROLLBACK"); return { stale: true }; }
+    const before = await client.query(`SELECT id, name, role, phone, email, is_primary FROM entity_contacts WHERE entity_id = $1 ORDER BY is_primary DESC, position, id`, [id]);
+    const sig = (rows: { id?: unknown; name: unknown; role: unknown; phone: unknown; email: unknown; primary: unknown }[]) =>
+      JSON.stringify(rows.map((c) => [c.id == null ? null : Number(c.id), c.name, c.role ?? null, c.phone ?? null, c.email ?? null, !!c.primary]));
+    const contactsChanged = sig(before.rows.map((c) => ({ ...c, primary: c.is_primary }))) !== sig(v.contacts);
     const changed = [
       was.name !== v.name ? "name" : "", (was.city ?? null) !== v.city ? "city" : "", (was.sector ?? null) !== v.sector ? "sector" : "",
       (was.importance ?? null) !== v.importance ? "importance" : "",
       (was.owner_member_id == null ? null : Number(was.owner_member_id)) !== v.ownerId ? "owner" : "",
+      contactsChanged ? "contacts" : "",
     ].filter(Boolean);
+    // Saving an unchanged form is not an edit: no version bump, no audit row claiming one (review).
+    if (!changed.length) { await client.query("ROLLBACK"); return { ok: true, updatedAt: version }; }
+    const now = Math.max(Date.now(), version + 1);
+    await client.query(
+      `UPDATE entities SET name=$2, city=$3, sector=$4, importance=$5, owner_member_id=$6, updated_at=$7 WHERE id=$1`,
+      [id, v.name, v.city, v.sector, v.importance, v.ownerId, now]);
+    if (contactsChanged) await writeContacts(client, id, v.contacts, by);
     await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'edited',$2,$3,$4)`,
       [id, JSON.stringify({ changed, contacts: v.contacts.length }), by, now]);
     await client.query("COMMIT");
@@ -1772,8 +1810,8 @@ export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedA
 }
 
 export async function setAccountApproval(id: number, decision: acct.AccountApproval, note: string | null, by: string):
-  Promise<{ ok: true; updatedAt: number } | { refused: string } | null> {
-  if (!pool || !connected) return null;
+  Promise<{ ok: true; approvalAt: number } | { refused: string } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -1781,12 +1819,14 @@ export async function setAccountApproval(id: number, decision: acct.AccountAppro
     if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
     const check = acct.checkApproval(String(cur.rows[0].approval), decision);
     if (!check.ok) { await client.query("ROLLBACK"); return { refused: check.reason }; }
-    const now = Math.max(Date.now(), Number(cur.rows[0].updated_at ?? cur.rows[0].created_at) + 1);
-    await client.query(`UPDATE entities SET approval=$2, approval_by=$3, approval_at=$4, updated_at=$4 WHERE id=$1`, [id, decision, by, now]);
+    // approval_at is its own clock. Bumping updated_at here made an edit form open in another tab fail
+    // with «someone changed this» when nobody had touched a field it carries (review).
+    const now = Date.now();
+    await client.query(`UPDATE entities SET approval=$2, approval_by=$3, approval_at=$4 WHERE id=$1`, [id, decision, by, now]);
     await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,$2,$3,$4,$5)`,
       [id, decision, JSON.stringify({ from: cur.rows[0].approval, note }), by, now]);
     await client.query("COMMIT");
-    return { ok: true, updatedAt: now };
+    return { ok: true, approvalAt: now };
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
@@ -2305,7 +2345,9 @@ export async function markTargetOutcome(campaignId: number | null, phone: string
 /** Only what the rules need from a customer — not the attrs/facts JSON of the whole book. */
 export async function entityIdentities(): Promise<{ id: number; name: string; phone: string }[]> {
   if (!(await reprobe()) || !pool) return [];
-  const r = await pool.query(`SELECT id, name, phone FROM entities`);
+  // A REJECTED account is not proposed for a campaign (BR-CUS-001 approval): the suggestion rules skip
+  // any member id missing from this list.
+  const r = await pool.query(`SELECT id, name, phone FROM entities WHERE approval <> 'rejected'`);
   return r.rows.map((x: any) => ({ id: Number(x.id), name: String(x.name), phone: String(x.phone) }));
 }
 
@@ -3606,10 +3648,14 @@ export async function updateMember(id: number, v: { name: string; email: string;
 
 /** A member who has been escalated to is never deleted — the record of who was asked outlives the
  *  directory entry. The caller turns that into «أوقفه بدل حذفه». */
-export async function deleteMember(id: number): Promise<"ok" | "missing" | "referenced"> {
+export async function deleteMember(id: number): Promise<"ok" | "missing" | "referenced" | { owns: number }> {
   if (!(await reprobe()) || !pool) return "missing";
   const used = await pool.query("SELECT 1 FROM escalations WHERE to_member_id = $1 LIMIT 1", [id]);
   if (used.rowCount) return "referenced";
+  // Deleting an account OWNER used to null the owner on every account they held, with no event and no
+  // warning (review). They are reassigned first, or the member is deactivated instead.
+  const owns = await pool.query("SELECT COUNT(*)::int AS n FROM entities WHERE owner_member_id = $1", [id]);
+  if (Number(owns.rows[0]?.n) > 0) return { owns: Number(owns.rows[0].n) };
   const r = await pool.query("DELETE FROM team_members WHERE id = $1", [id]);
   return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
 }

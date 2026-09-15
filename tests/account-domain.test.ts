@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONFIG_DOMAIN_JS, isEmailShaped } from "../src/config-domain.js";
 import {
   ACCOUNT_DOMAIN_JS, accountFieldsFromAttrs, accountMatches, checkAccount, checkAccountDomainClosure, checkApproval,
-  phoneDigits, productStatusOf, summarizeAccountOpps,
+  phoneDigits, phoneShapeProblem, productStatusOf, summarizeAccountOpps,
 } from "../src/account-domain.js";
 
 const good = {
@@ -40,11 +40,28 @@ describe("checkAccount (BR-CUS-001/002)", () => {
   });
   it("refuses duplicate contact phones, bad phones and bad emails", () => {
     expect(checkAccount({ ...good, contacts: [{ name: "أ", phone: "0551" }] }, [3], false)).toMatchObject({ field: "contacts.0.phone" });
+    expect(checkAccount({ ...good, contacts: [{ name: "أ", phone: "abc" }] }, [3], false)).toMatchObject({ field: "contacts.0.phone" });
     expect(checkAccount({ ...good, contacts: [{ name: "أ", phone: "0551111111" }, { name: "ب", phone: "٠٥٥١١١١١١١" }] }, [3], false)).toMatchObject({ field: "contacts.1.phone" });
     expect(checkAccount({ ...good, contacts: [{ name: "أ", email: "f@x" }] }, [3], false)).toMatchObject({ field: "contacts.0.email" });
   });
   it("an edit does not ask for the phone: it is the account's identity", () => {
     expect(checkAccount({ ...good, phone: "" }, [3], true)).toMatchObject({ ok: true });
+  });
+  it("an edit of a legacy account needs neither city nor contacts (review: no invented people)", () => {
+    const r = checkAccount({ name: "مستورد قديم", ownerId: 3, contacts: [{ name: "", role: "", phone: "", email: "" }] }, [3], true);
+    expect(r).toMatchObject({ ok: true, value: { city: null, contacts: [] } });
+    expect(checkAccount({ name: "جديد", contacts: [] }, [3], false)).toMatchObject({ ok: false, field: "city" });
+  });
+  it("non-text values are empty, not stringified objects (review: 500 and «[object Object]»)", () => {
+    expect(checkAccount({ ...good, name: { toString: 1 } as unknown }, [3], false)).toMatchObject({ ok: false, field: "name" });
+    expect(checkAccount({ ...good, name: ["a", "b"] as unknown }, [3], false)).toMatchObject({ ok: false, field: "name" });
+    expect(checkAccount({ ...good, ownerId: true as unknown }, [1], false)).toMatchObject({ ok: true, value: { ownerId: null } });
+    expect(checkAccount({ ...good, ownerId: "3x" }, [3], false)).toMatchObject({ ok: false, field: "ownerId" });
+    expect(checkApproval("proposed", ["approved"])).toMatchObject({ ok: false });
+  });
+  it("carries contact ids so an edit keeps each person's history", () => {
+    const r = checkAccount({ ...good, contacts: [{ id: 41, name: "أ" }, { id: "x", name: "ب" }] }, [3], true);
+    expect(r.ok && r.value.contacts.map((c) => c.id)).toEqual([41, null]);
   });
   it("runs identically in the page", () => {
     expect(checkAccountDomainClosure()).toEqual([]);
@@ -61,7 +78,14 @@ describe("small rules", () => {
       expect(r.ok, e).toBe(isEmailShaped(e));
     }
   });
-  it("reads Arabic-Indic digits", () => { expect(phoneDigits("+٩٦٦ ٥٥ 123")).toBe("96655123"); });
+  it("reads Arabic-Indic and Persian digits", () => {
+    expect(phoneDigits("+٩٦٦ ٥٥ 123")).toBe("96655123");
+    expect(phoneDigits("۰۵۵۱۲۳۴۵۶۷")).toBe("0551234567");
+  });
+  it("Saudi mobile lengths are fixed per written form", () => {
+    for (const ok of ["0551234567", "966551234567", "00966551234567", "551234567", "4915112345678", "97150123456"]) expect(phoneShapeProblem(ok), ok).toBe("");
+    for (const bad of ["055000900", "05500090011", "96655123456", "9665512345678", "55123456", "5512345678", "1234567"]) expect(phoneShapeProblem(bad), bad).not.toBe("");
+  });
   it("approval refuses no-ops and unknown decisions", () => {
     expect(checkApproval("proposed", "approved")).toEqual({ ok: true, value: "approved" });
     expect(checkApproval("approved", "approved")).toMatchObject({ ok: false });

@@ -119,7 +119,8 @@ function palBuild() {
     ((typeof entities !== "undefined" && entities) || []).forEach(function (e) {
       if (rows.length >= 8 || seen[e.phone]) return;
       if (!(palHit(e.name, q) || (digits && String(e.phone || "").indexOf(digits) >= 0))) return;
-      rows.push({ kind: "contact", label: e.name, phone: e.phone, stage: stageOfEntity(e), href: "customer/" + e.phone });
+      /* Never messaged: the account record is the page that exists for them (BRD §9, S2). */
+      rows.push({ kind: "contact", label: e.name, phone: e.phone, stage: stageOfEntity(e), href: "account/" + e.id });
     });
     if (rows.length) groups.push({ g: "العملاء", rows: rows.slice(0, 8) });
 

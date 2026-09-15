@@ -32,7 +32,8 @@ function matchHeader(headers: string[], candidates: string[]): number {
 
 /** KSA-aware: 05XXXXXXXX → 966XXXXXXXXX; bare 5XXXXXXXX → 966…; otherwise digits as-is. */
 export function normalizePhone(raw: unknown): string {
-  let d = String(raw ?? "").replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c))).replace(/\D/g, "");
+  // Persian digits (۰-۹) too: a number typed on a Persian keyboard was stripped to nothing (review).
+  let d = String(raw ?? "").replace(/[٠-٩]/g, (c) => String("٠١٢٣٤٥٦٧٨٩".indexOf(c))).replace(/[۰-۹]/g, (c) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(c))).replace(/\D/g, "");
   if (d.startsWith("00")) d = d.slice(2);
   if (d.length === 13 && d.startsWith("9660")) d = "966" + d.slice(4);   // 966 + 05… double-prefix
   if (d.length === 10 && d.startsWith("05")) d = "966" + d.slice(1);

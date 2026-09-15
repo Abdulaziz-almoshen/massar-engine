@@ -950,7 +950,7 @@ const TITLES = {
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
   aimkt: ["إنشاء حملة", "أنشئ حملة موجهة للمنشآت الصحية"],
   partners: ["لوحة متابعة شركاء المبيعات", "ضمن المرحلة القادمة"],
-  customers: ["العملاء", "كل جهة تحدّث معها المساعد، وحالتها"],
+  customers: ["المحادثات", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل بند من أول تواصل حتى الإغلاق"], triage: ["فرز الردود", "من ردّ، ومن لم يردّ، ومتى موعد المهتمين"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
@@ -959,7 +959,7 @@ const TITLES = {
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
   indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
   indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
-  accounts: ["العملاء", "المنشآت التي تبيع لها Lean: جهات اتصالها، ومسؤولها، واعتمادها، وفرصها"],
+  accounts: ["الحسابات", "المنشآت التي تبيع لها Lean: جهات اتصالها، ومسؤولها، واعتمادها، وفرصها"],
   account: ["سجل العميل", "بيانات العميل وجهات اتصاله وفرصه وحملاته ومؤشراته في شاشة واحدة"],
   divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
   team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
@@ -1883,6 +1883,8 @@ function tagList() {
 }
 function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate || (typeof wizIndF !== "undefined" && wizIndF)); }
 function entMatchesProduct(e) {
+  // A REJECTED account (BR-CUS-001 approval, «الحسابات») is never offered as a campaign audience.
+  if (e.approval === "rejected") return false;
   if (typeof indEntityInFilter === "function" && !indEntityInFilter(e)) return false;
   if (prodFilter.candidate && !entTagged(e, prodFilter.candidate)) return false;
   if (prodFilter.uses && !entUses(e, prodFilter.uses)) return false;
