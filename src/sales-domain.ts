@@ -138,6 +138,13 @@ export const STAGE_OUTCOMES: readonly StageOutcome[] = [
   { stage: "lost", key: "lost_competitor", label: "خسارة – منافس", reason: "اختار بديلاً", nextAction: "تسجيل وتحليل تنافسي", kind: "lost", dept: "" },
   { stage: "lost", key: "lost_deferred", label: "خسارة – تأجيل", reason: "أُجّل لسنة قادمة", nextAction: "إعادة تفعيل مجدولة", kind: "lost", dept: "" },
   { stage: "lost", key: "lost_integration", label: "خسارة – تكامل", reason: "فشل التكامل التقني", nextAction: "تسجيل ومراجعة تقنية", kind: "lost", dept: "" },
+  // Client A's BRD (BR-RPT-003) names four loss causes the archive's ladder did not: إلغاء الاحتياج،
+  // عدم التوافق، الميزانية، and «another reason» with a sentence. Added here, not in a second list, so the
+  // board's lost-reason dialog, the rep's outcome sheet and «الخسائر حسب السبب» share one vocabulary.
+  { stage: "lost", key: "lost_no_need", label: "خسارة – إلغاء الاحتياج", reason: "لم تعد الحاجة قائمة", nextAction: "تسجيل ومتابعة بعد فترة", kind: "lost", dept: "" },
+  { stage: "lost", key: "lost_fit", label: "خسارة – عدم التوافق", reason: "المنتج لا يلبّي الاحتياج", nextAction: "تسجيل ومراجعة المنتج", kind: "lost", dept: "" },
+  { stage: "lost", key: "lost_budget", label: "خسارة – الميزانية", reason: "لا ميزانية معتمدة", nextAction: "إعادة تفعيل مع دورة الميزانية", kind: "lost", dept: "" },
+  { stage: "lost", key: "lost_other", label: "خسارة – سبب آخر", reason: "سبب يُكتب في الملاحظة", nextAction: "تسجيل", kind: "lost", dept: "" },
 ];
 
 /** Riyadh is UTC+3 and Saudi Arabia has never observed daylight saving, so a fixed offset is not an

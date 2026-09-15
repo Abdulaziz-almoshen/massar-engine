@@ -24,6 +24,7 @@ import * as sysCfg from "./config-domain.js";
 import * as pd from "./product-domain.js";
 import * as ind from "./indicator-domain.js";
 import * as acct from "./account-domain.js";
+import * as work from "./opp-work-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -1747,16 +1748,17 @@ app.get("/admin/accounts/:id", async (req, reply) => {
   return withDb(reply, async () => {
     const account = await db.accountById(id);
     if (!account) return problem(reply, 404, "unknown_account", "لا عميل بهذا الرقم", "id");
-    const [activity, tasks, notes, indicators, team] = await Promise.all([
+    const [activity, tasks, notes, indicators, team, oppActivities] = await Promise.all([
       db.accountActivity(account.phone),
       db.listTasks({ kind: "contact", id: account.phone }),
       db.listNotes({ kind: "contact", id: account.phone }),
       db.indicatorsForPhone(account.phone),
       activeMemberIds(),
+      db.activitiesForPhone(account.phone),
     ]);
     const contact = tracker.findContact(account.phone);
     return {
-      ok: true, account, ...activity, indicators, members: team.members,
+      ok: true, account, ...activity, indicators, members: team.members, activities: oppActivities,
       tasks: tasks.slice(0, 20).map((t) => ({ id: t.id, title: t.title, status: t.status, dueAt: t.due_at, assignedTo: t.assigned_to })),
       notes: notes.slice(0, 20).map((n) => ({ id: n.id, title: n.title, content: n.content.slice(0, 400), author: n.author, createdAt: n.created_at })),
       conversation: contact ? { lastEventAt: contact.lastEventAt, optedOut: contact.optedOut } : null,
@@ -2544,6 +2546,10 @@ app.post("/admin/opps", async (req, reply) => {
   if (source === "whatsapp" && sourceRef && !(await db.refExists("campaign", sourceRef))) {
     return reply.code(400).send({ ok: false, error: "unknown_ref", kind: "campaign", id: sourceRef });
   }
+  // BR-OPP-007: «شريك مبيعات» without a partner name answers nothing when the partners report asks who.
+  if (source === "partner" && (!sourceRef || sourceRef.length > 120)) {
+    return reply.code(400).send({ ok: false, error: "invalid_field", field: "source_ref", detail: "اكتب اسم الشريك" });
+  }
   const lines = Array.isArray(b.lines) ? (b.lines as Record<string, unknown>[]) : [];
   if (!lines.length) return reply.code(400).send({ ok: false, error: "invalid_field", field: "lines" });
   if (lines.length > 20) return reply.code(400).send({ ok: false, error: "too_many_lines" });
@@ -2608,8 +2614,20 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     }
   }
   const patch: Record<string, unknown> = {};
-  for (const k of ["product", "stage", "owner", "next_step", "lost_reason"]) {
+  for (const k of ["product", "stage", "owner", "next_step"]) {
     if (b[k] !== undefined) patch[k] = String(b[k] ?? "").trim().slice(0, 300) || null;
+  }
+  // BRULE-009 / BR-OPP-006: closing a line as lost needs a reason from the ladder's list. Every path that
+  // moves a stage — the drawer buttons, the stepper, bulk and the kanban drop — reaches this one route, so
+  // the rule holds for all of them. A reason may also be corrected on a line that is already lost.
+  const closingLost = typeof b.stage === "string" && work.isLossClose(currentStage ?? "", b.stage);
+  if (closingLost || b.lost_reason !== undefined || b.lost_note !== undefined) {
+    const lostNow = closingLost || currentStage === "lost";
+    if (!lostNow) return problem(reply, 400, "invalid_field", "سبب الخسارة يُسجَّل على بند مغلق خسارة فقط", "lost_reason");
+    const loss = work.checkLossReason(b.lost_reason, b.lost_note);
+    if (!loss.ok) return problem(reply, 400, closingLost && loss.field === "lost_reason" ? "lost_reason_required" : "invalid_field", loss.message, loss.field);
+    patch.lost_reason = loss.reason;
+    patch.lost_note = loss.note;
   }
   for (const k of ["sale_price", "years", "qty", "discount"]) {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
@@ -2618,6 +2636,64 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   const row = await db.updateOpp(id, patch as never, adminName(req));
   if (!row) return reply.code(404).send({ ok: false, error: "not_found_or_no_change" });
   return { ok: true, opp: row };
+});
+
+// ---- the work on an opportunity: activities and quotes (BRD §15, S3) ------------------------------
+app.get("/admin/opps/:id/work", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "id");
+  return withDb(reply, async () => ({ ok: true, today: riyadhToday(), departments: sales.DEPARTMENTS, ...(await db.oppWork(id)) }));
+});
+
+app.post("/admin/opps/:id/activities", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "id");
+  const checked = work.checkActivity((req.body ?? {}) as work.ActivityInput, riyadhToday(), sales.DEPARTMENTS);
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.message, checked.field);
+  return withDb(reply, async () => {
+    const row = await db.addActivity(id, checked.value, adminName(req));
+    if (!row) return problem(reply, 404, "unknown_opp", "لا فرصة بهذا الرقم", "id");
+    return reply.code(201).header("Location", "/admin/opps/" + id + "/work").send({ ok: true, activity: row });
+  });
+});
+
+app.delete("/admin/opp-activities/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم النشاط غير صحيح", "id");
+  return withDb(reply, async () => ((await db.deleteActivity(id)) ? { ok: true } : problem(reply, 404, "unknown_activity", "لا نشاط بهذا الرقم", "id")));
+});
+
+app.post("/admin/opps/:id/quotes", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الفرصة غير صحيح", "id");
+  const checked = work.checkQuote((req.body ?? {}) as work.QuoteInput, riyadhToday());
+  if (!checked.ok) return problem(reply, 400, "invalid_field", checked.message, checked.field);
+  const v = checked.value;
+  const amount = calculateLineValue({ stage: "quote", salePrice: v.salePrice, years: v.years, quantity: v.qty, discountPercent: v.discount, stageEnteredAt: 0 });
+  return withDb(reply, async () => {
+    const row = await db.addQuote(id, v, amount, adminName(req));
+    if (!row) return problem(reply, 404, "unknown_opp", "لا فرصة بهذا الرقم", "id");
+    return reply.code(201).header("Location", "/admin/opps/" + id + "/work").send({ ok: true, quote: row });
+  });
+});
+
+app.post("/admin/opp-quotes/:id/status", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم العرض غير صحيح", "id");
+  const b = (req.body ?? {}) as { status?: unknown; apply?: unknown };
+  const to = typeof b.status === "string" ? b.status : "";
+  if (!(work.QUOTE_STATUSES as readonly string[]).includes(to)) return problem(reply, 400, "invalid_field", "حالة غير معروفة", "status");
+  return withDb(reply, async () => {
+    const r = await db.moveQuote(id, to, b.apply === true, adminName(req), work.canMoveQuote);
+    if (!r) return problem(reply, 404, "unknown_quote", "لا عرض سعر بهذا الرقم", "id");
+    if ("refused" in r) return problem(reply, 409, "quote_decided", "العرض «" + (work.QUOTE_STATUS_LABELS[r.refused as work.QuoteStatus] || r.refused) + "» — لا يُنقل إلى هذه الحالة. سعر جديد عرضٌ جديد", "status");
+    return { ok: true, quote: r.quote, opp: r.opp };
+  });
 });
 
 app.delete("/admin/opps/:id", async (req, reply) => {

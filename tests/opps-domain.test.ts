@@ -251,7 +251,7 @@ describe("OPP_SOURCES", () => {
   it("carries a label for every source the API accepts", () => {
     // Arrange — the emitted-value-must-be-readable rule: the board offers these keys and the
     // server validates against them, so an unlabelled key would render blank on a real card.
-    const apiAccepts = ["whatsapp", "call", "visit", "referral", "inbound", "other"];
+    const apiAccepts = ["whatsapp", "call", "visit", "referral", "inbound", "partner", "other"];
     // Act + Assert
     for (const key of apiAccepts) {
       expect(OPP_SOURCES[key], `no Arabic label for source «${key}»`).toBeTruthy();

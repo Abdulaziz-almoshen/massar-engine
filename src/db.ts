@@ -840,6 +840,54 @@ CREATE TABLE IF NOT EXISTS account_events (
 CREATE INDEX IF NOT EXISTS idx_account_events ON account_events (entity_id, at);
 `,
   },
+  {
+    version: "013-opportunity-work",
+    sql: `
+-- The work recorded on an opportunity (client A, BRD v1.0 §15, slice S3).
+-- BR-OPP-007: a deal can come from a sales partner. The source CHECK is the base table's inline one.
+ALTER TABLE opportunities DROP CONSTRAINT IF EXISTS opportunities_source_check;
+ALTER TABLE opportunities ADD CONSTRAINT opportunities_source_check
+  CHECK (source IN ('whatsapp','call','visit','referral','inbound','partner','other'));
+-- BRULE-009: lost_reason now holds a key from the ladder's lost outcomes; «سبب آخر» carries its sentence.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS lost_note TEXT;
+-- BR-OPP-003: meetings, calls, presentations, emails and notes, each with an optional dated next step.
+-- Dates are calendar days a person typed. opp_id may be NULL for work logged against the account alone.
+CREATE TABLE IF NOT EXISTS opp_activities (
+  id          BIGSERIAL PRIMARY KEY,
+  opp_id      BIGINT REFERENCES opportunities(id) ON DELETE CASCADE,
+  phone       TEXT,
+  kind        TEXT NOT NULL CHECK (kind IN ('meeting','call','presentation','email','note')),
+  occurred_on TEXT NOT NULL,
+  summary     TEXT NOT NULL,
+  next_step   TEXT,
+  next_on     TEXT,
+  owner       TEXT,
+  dept        TEXT,
+  created_by  TEXT,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_opp_activities_opp ON opp_activities (opp_id, occurred_on);
+CREATE INDEX IF NOT EXISTS idx_opp_activities_phone ON opp_activities (phone, occurred_on);
+-- BR-OPP-004: every price offered, kept after it is decided. amount is the computed total at the time.
+CREATE TABLE IF NOT EXISTS opp_quotes (
+  id          BIGSERIAL PRIMARY KEY,
+  opp_id      BIGINT NOT NULL REFERENCES opportunities(id) ON DELETE CASCADE,
+  sale_price  BIGINT NOT NULL,
+  years       INT NOT NULL,
+  qty         INT NOT NULL,
+  discount    NUMERIC NOT NULL DEFAULT 0,
+  amount      BIGINT NOT NULL,
+  valid_until TEXT,
+  note        TEXT,
+  status      TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','accepted','rejected')),
+  created_by  TEXT,
+  created_at  BIGINT NOT NULL,
+  status_by   TEXT,
+  status_at   BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_opp_quotes_opp ON opp_quotes (opp_id, created_at);
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -917,6 +965,9 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   entities: ["id", "name", "phone", "city", "attrs", "facts", "product_tags", "sector", "importance", "owner_member_id", "approval", "approval_by", "approval_at", "source", "created_by", "created_at", "updated_at"],
   entity_contacts: ["id", "entity_id", "name", "role", "phone", "email", "is_primary", "position", "created_at", "created_by"],
   account_events: ["id", "entity_id", "action", "detail", "by_name", "at"],
+  opportunities: ["id", "account_name", "phone", "product", "stage", "source", "source_ref", "lost_reason", "lost_note"],
+  opp_activities: ["id", "opp_id", "phone", "kind", "occurred_on", "summary", "next_step", "next_on", "owner", "dept", "created_by", "created_at"],
+  opp_quotes: ["id", "opp_id", "sale_price", "years", "qty", "discount", "amount", "valid_until", "note", "status", "created_by", "created_at", "status_by", "status_at"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -1855,6 +1906,114 @@ export async function accountActivity(phone: string): Promise<{
   };
 }
 
+// ------------------------------ opportunity work: activities and quotes (BRD §15, S3) ------------------------------
+
+export type ActivityRow = { id: number; oppId: number | null; phone: string | null; kind: string; occurredOn: string; summary: string;
+  nextStep: string | null; nextOn: string | null; owner: string | null; dept: string | null; createdBy: string | null; createdAt: number; product?: string | null };
+export type QuoteRow = { id: number; oppId: number; salePrice: number; years: number; qty: number; discount: number; amount: number;
+  validUntil: string | null; note: string | null; status: string; createdBy: string | null; createdAt: number; statusBy: string | null; statusAt: number | null };
+
+function activityFrom(x: any): ActivityRow {
+  return { id: Number(x.id), oppId: x.opp_id == null ? null : Number(x.opp_id), phone: x.phone ?? null, kind: String(x.kind), occurredOn: String(x.occurred_on),
+    summary: String(x.summary), nextStep: x.next_step ?? null, nextOn: x.next_on ?? null, owner: x.owner ?? null, dept: x.dept ?? null,
+    createdBy: x.created_by ?? null, createdAt: Number(x.created_at), ...(x.product !== undefined ? { product: x.product ?? null } : {}) };
+}
+function quoteFrom(x: any): QuoteRow {
+  return { id: Number(x.id), oppId: Number(x.opp_id), salePrice: Number(x.sale_price), years: Number(x.years), qty: Number(x.qty), discount: Number(x.discount),
+    amount: Number(x.amount), validUntil: x.valid_until ?? null, note: x.note ?? null, status: String(x.status), createdBy: x.created_by ?? null,
+    createdAt: Number(x.created_at), statusBy: x.status_by ?? null, statusAt: x.status_at == null ? null : Number(x.status_at) };
+}
+
+export async function oppWork(oppId: number): Promise<{ activities: ActivityRow[]; quotes: QuoteRow[]; lossEvents: { at: number; key: string | null; note: string | null; actor: string | null }[] }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const [a, q, e] = await Promise.all([
+    pool.query(`SELECT * FROM opp_activities WHERE opp_id = $1 ORDER BY occurred_on DESC, id DESC LIMIT 200`, [oppId]),
+    pool.query(`SELECT * FROM opp_quotes WHERE opp_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100`, [oppId]),
+    pool.query(`SELECT recorded_at, outcome_key, outcome_reason, actor FROM track_stage_events WHERE opp_id = $1 AND to_stage = 'lost' ORDER BY recorded_at DESC LIMIT 10`, [oppId]),
+  ]);
+  return { activities: a.rows.map(activityFrom), quotes: q.rows.map(quoteFrom),
+    lossEvents: e.rows.map((x) => ({ at: Number(x.recorded_at), key: x.outcome_key ?? null, note: x.outcome_reason ?? null, actor: x.actor ?? null })) };
+}
+
+/** BR-OPP-003. A next step given with the activity also becomes the line's «الخطوة التالية» — the board
+ *  shows one next step per line, and it should be the latest one someone committed to. */
+export async function addActivity(oppId: number, v: import("./opp-work-domain.js").ActivityValue, by: string): Promise<ActivityRow | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const o = await client.query(`SELECT phone FROM opportunities WHERE id = $1 FOR UPDATE`, [oppId]);
+    if (!o.rows.length) { await client.query("ROLLBACK"); return null; }
+    const now = Date.now();
+    const r = await client.query(
+      `INSERT INTO opp_activities (opp_id, phone, kind, occurred_on, summary, next_step, next_on, owner, dept, created_by, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [oppId, o.rows[0].phone ?? null, v.kind, v.occurredOn, v.summary, v.nextStep, v.nextOn, v.owner, v.dept, by, now]);
+    if (v.nextStep) {
+      const label = v.nextOn ? v.nextStep + " — " + v.nextOn : v.nextStep;
+      await client.query(`UPDATE opportunities SET next_step = $2, updated_at = $3 WHERE id = $1`, [oppId, label.slice(0, 300), now]);
+    }
+    await client.query("COMMIT");
+    return activityFrom(r.rows[0]);
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
+export async function deleteActivity(id: number): Promise<boolean> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`DELETE FROM opp_activities WHERE id = $1`, [id]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function activitiesForPhone(phone: string): Promise<ActivityRow[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `SELECT a.*, o.product FROM opp_activities a LEFT JOIN opportunities o ON o.id = a.opp_id
+      WHERE a.phone = $1 ORDER BY a.occurred_on DESC, a.id DESC LIMIT 50`, [phone]);
+  return r.rows.map(activityFrom);
+}
+
+export async function addQuote(oppId: number, v: import("./opp-work-domain.js").QuoteValue, amount: number, by: string): Promise<QuoteRow | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `INSERT INTO opp_quotes (opp_id, sale_price, years, qty, discount, amount, valid_until, note, status, created_by, created_at)
+     SELECT $1,$2,$3,$4,$5,$6,$7,$8,'draft',$9,$10 WHERE EXISTS (SELECT 1 FROM opportunities WHERE id = $1) RETURNING *`,
+    [oppId, v.salePrice, v.years, v.qty, v.discount, amount, v.validUntil, v.note, by, Date.now()]);
+  return r.rows.length ? quoteFrom(r.rows[0]) : null;
+}
+
+/** Moves a quote along draft → sent → accepted/rejected. «apply» on an accepted quote writes its price onto
+ *  the line in the same transaction — the line value and the accepted offer cannot disagree afterwards. */
+export async function moveQuote(id: number, to: string, apply: boolean, by: string,
+  canMove: (from: string, to: string) => boolean): Promise<{ quote: QuoteRow; opp: OppRow | null } | { refused: string } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const cur = await client.query(`SELECT * FROM opp_quotes WHERE id = $1 FOR UPDATE`, [id]);
+    if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
+    const from = String(cur.rows[0].status);
+    if (!canMove(from, to)) { await client.query("ROLLBACK"); return { refused: from }; }
+    const now = Date.now();
+    const q = await client.query(`UPDATE opp_quotes SET status = $2, status_by = $3, status_at = $4 WHERE id = $1 RETURNING *`, [id, to, by, now]);
+    let opp: OppRow | null = null;
+    if (to === "accepted" && apply) {
+      const x = q.rows[0];
+      const o = await client.query(
+        `UPDATE opportunities SET sale_price = $2, years = $3, qty = $4, discount = $5, updated_at = $6 WHERE id = $1 RETURNING *`,
+        [Number(x.opp_id), Number(x.sale_price), Number(x.years), Number(x.qty), Number(x.discount), now]);
+      opp = o.rows.length ? rowToOpp(o.rows[0]) : null;
+    }
+    await client.query("COMMIT");
+    return { quote: quoteFrom(q.rows[0]), opp };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
+}
+
 // ------------------------------ contact insights (فهم المساعد cache) ------------------------------
 
 export async function getInsightsRow(phone: string): Promise<{ data: unknown; turns_at: number; computed_at: number } | null> {
@@ -2517,10 +2676,10 @@ export async function deleteNote(id: number): Promise<boolean> {
 export type OppRow = {
   id: number; account_name: string; phone: string | null; product: string;
   stage: (typeof SALES_STAGES)[number]["key"];
-  source: "whatsapp" | "call" | "visit" | "referral" | "inbound" | "other";
+  source: "whatsapp" | "call" | "visit" | "referral" | "inbound" | "partner" | "other";
   source_ref: string | null;
   sale_price: number; years: number; qty: number; discount: number;
-  owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null;
+  owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null; lost_note: string | null;
   created_by: string | null; created_at: number; updated_at: number; stage_at: number;
 };
 
@@ -2535,7 +2694,7 @@ export type OppRow = {
  *  constraint. The one combination that would break — a new bundle offering eight against a server
  *  accepting six — cannot occur, because the bundle is generated by the same server that validates. */
 export const OPP_STAGES = SALES_STAGES.map((s) => s.key);
-export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", "other"] as const;
+export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", "partner", "other"] as const;
 
 /** Rejects what the CHECK constraints and the arithmetic would reject, before the query runs, so a
  *  bad value is a 400 naming its field rather than a 500 — the same contract validateTask holds.
@@ -2572,6 +2731,7 @@ function rowToOpp(r: Record<string, unknown>): OppRow {
     owner: (r.owner as string) ?? null,
     close_on: r.close_on == null ? null : Number(r.close_on),
     next_step: (r.next_step as string) ?? null, lost_reason: (r.lost_reason as string) ?? null,
+    lost_note: (r.lost_note as string) ?? null,
     created_by: (r.created_by as string) ?? null,
     created_at: Number(r.created_at), updated_at: Number(r.updated_at), stage_at: Number(r.stage_at),
   };
@@ -2638,7 +2798,7 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
   for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
-    "close_on", "next_step", "lost_reason", "source", "source_ref", "account_name"] as const) {
+    "close_on", "next_step", "lost_reason", "lost_note", "source", "source_ref", "account_name"] as const) {
     if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
   }
   if (!sets.length) return null;
@@ -2675,10 +2835,21 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
     // Only a real transition is an event. Re-saving a row without touching the stage must not
     // write one, or every edit would look like movement and «المحقق» would count a deal twice.
     if (toStage !== fromStage) {
+      // A close as lost carries its reason onto the ledger row, which is where «الخسائر حسب السبب» reads
+      // it (lossesByReason). Before S3 only a rep's /rep outcome reached that report; a deal closed from
+      // the board was lost for no recorded reason.
+      const lostKey = toStage === "lost" ? ((q.rows[0].lost_reason as string) ?? null) : null;
+      const lostNote = toStage === "lost" ? ((q.rows[0].lost_note as string) ?? null) : null;
       await client.query(
-        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, effective_at, recorded_at, actor)
-         VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), $4, $5)`,
-        [id, fromStage, toStage, Date.now(), actor || "اللوحة"]);
+        `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, outcome_reason, effective_at, recorded_at, actor)
+         VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0), $6, $7)`,
+        [id, fromStage, toStage, lostKey, lostNote, Date.now(), actor || "اللوحة"]);
+      // Reopened: the old reason no longer describes the line. It stays on the ledger row that recorded it.
+      if (fromStage === "lost") {
+        const cleared = await client.query(`UPDATE opportunities SET lost_reason = NULL, lost_note = NULL WHERE id = $1 RETURNING *`, [id]);
+        await client.query("COMMIT");
+        return rowToOpp(cleared.rows[0]);
+      }
     }
     await client.query("COMMIT");
     return rowToOpp(q.rows[0]);
@@ -3089,9 +3260,13 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
         toStage = resolved.toStage; dept = resolved.dept; nextAction = resolved.nextAction;
 
         if (toStage !== fromStage) {
+          // A rep's lost outcome is the line's lost reason too, so the board shows WHY without a second entry.
           await client.query(
-            `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2 WHERE id = $3`,
-            [toStage, now, input.oppId]);
+            `UPDATE opportunities SET stage = $1, stage_at = $2, updated_at = $2,
+                    lost_reason = CASE WHEN $1 = 'lost' THEN $4 WHEN stage = 'lost' THEN NULL ELSE lost_reason END,
+                    lost_note = CASE WHEN $1 = 'lost' OR stage = 'lost' THEN NULL ELSE lost_note END
+              WHERE id = $3`,
+            [toStage, now, input.oppId, input.outcomeKey]);
           const ev = await client.query(
             `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, effective_at, recorded_at, actor)
              VALUES ($1,$2,$3,$4, to_timestamp($5 / 1000.0), $6, $7) RETURNING id`,

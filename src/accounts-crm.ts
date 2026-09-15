@@ -458,6 +458,14 @@ function vAccount(idRaw) {
   });
   (d.tasks || []).forEach(function (t) { evs.push({ at: t.dueAt || 0, cls: "t", html: "مهمة: " + esc(t.title) + '<span class="sub">' + esc(AC_TASK[t.status] || t.status) + (t.assignedTo ? " · " + esc(t.assignedTo) : "") + (t.dueAt ? " · تستحق " + acDate(t.dueAt) : "") + "</span>" }); });
   (d.notes || []).forEach(function (n) { evs.push({ at: n.createdAt, cls: "n", html: "ملاحظة" + (n.title ? ": " + esc(n.title) : "") + '<span class="sub">' + esc(clip(n.content, 140)) + (n.author ? " · " + esc(n.author) : "") + "</span>" }); });
+  /* BR-OPP-003 work logged on this customer's opportunities. Calendar days sort by their noon so a meeting
+     logged today sits among today's other entries. */
+  (d.activities || []).forEach(function (x) {
+    var at = new Date(x.occurredOn + "T12:00:00").getTime() || x.createdAt;
+    var kind = typeof ACTIVITY_KIND_LABELS !== "undefined" ? ACTIVITY_KIND_LABELS[x.kind] || x.kind : x.kind;
+    evs.push({ at: at, cls: "t", html: esc(kind) + (x.product ? " · " + esc(x.product) : "") + '<span class="sub">' + esc(clip(x.summary, 140)) +
+      (x.nextStep ? " · الخطوة التالية: " + esc(x.nextStep) : "") + (x.owner ? " · " + esc(x.owner) : "") + "</span>" });
+  });
   d.campaigns.forEach(function (c) { evs.push({ at: c.createdAt, cls: "c", html: "حملة: " + esc(c.name) + '<span class="sub">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span>" }); });
   evs.sort(function (x, y) { return y.at - x.at; });
   main += acCard("سجل الأنشطة", "", talked ? '<a href="#customer/' + esc(a.phone) + '">المحادثة</a>' : "",

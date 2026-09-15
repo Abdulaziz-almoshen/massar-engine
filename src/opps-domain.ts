@@ -56,6 +56,9 @@ export const OPP_SOURCES: Readonly<Record<string, string>> = {
   visit: "زيارة",
   referral: "إحالة",
   inbound: "طلب وارد",
+  // BR-OPP-007: a deal a sales partner brought. source_ref carries the partner's name until partners
+  // have their own records (slice S5).
+  partner: "شريك مبيعات",
   other: "غير محدد",
 };
 

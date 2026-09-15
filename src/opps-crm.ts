@@ -1278,6 +1278,7 @@ function opDetailDrawer(l) {
     b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
       '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
       '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button></div>';
+    if (typeof owLostBlock === "function") b += owLostBlock(l);
   }
   b += "</section>";
   /* القيمة */
@@ -1304,11 +1305,13 @@ function opDetailDrawer(l) {
   b += '<section class="ox-sec" aria-labelledby="oxsec_d"><div class="ox-sech" id="oxsec_d">التفاصيل</div><dl class="ox-dl">' +
     "<dt>المصدر</dt><dd>" + srcDD + "</dd>" +
     (l.source === "whatsapp" && l.source_ref ? "<dt>الحملة</dt><dd>" + esc(opCampName(l.source_ref)) + "</dd>" : "") +
+    (l.source === "partner" && l.source_ref ? "<dt>الشريك</dt><dd>" + esc(l.source_ref) + "</dd>" : "") +
     (l.source === "whatsapp" && l.phone ? '<dt>المحادثة</dt><dd><a class="ox-lnk" href="#customer/' + esc(l.phone) + '">فتح المحادثة ←</a></dd>' : "") +
     (l.phone ? '<dt>الجوال</dt><dd><bdi dir="ltr">+' + esc(l.phone) + "</bdi></dd>" : "") +
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
     "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
+  if (typeof owActivitiesSection === "function") b += owActivitiesSection(l) + owQuotesSection(l);
   b += opEscSection(l);
   /* بنود أخرى لهذه الجهة */
   var key = opKey(l);
@@ -1358,6 +1361,11 @@ function opCreateDrawer() {
       (campaigns || []).map(function (cp) {
         return '<option value="' + esc(cp.id) + '"' + (String(d.source_ref) === String(cp.id) ? " selected" : "") + ">" + esc(clip(cp.name, 48)) + "</option>";
       }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>";
+  }
+  if (d.source === "partner") {
+    b += '<div class="ox-fld"><label for="opd_partner">اسم الشريك <span class="req" aria-hidden="true">*</span></label>' +
+      '<input class="inp" id="opd_partner" maxlength="120" value="' + esc(d.source_ref || "") + '" placeholder="مثال: شركة الحلول الصحية"' + errOf("source_ref") +
+      ' oninput="opDraft(&quot;source_ref&quot;,this.value)"></div>';
   }
   b += "</section>";
   var total = 0, unp = 0;
@@ -1520,7 +1528,9 @@ function vOppsCrm() {
     var l = oppRows.find(function (x) { return x.id === opOpen; });
     if (l) h += opDetailDrawer(l);
   }
+  if (typeof owLossModal === "function") h += owLossModal();
   setTimeout(opAfterRender, 0);
+  if (typeof owAfterRender === "function") setTimeout(owAfterRender, 0);
   return h;
 }
 
@@ -1588,7 +1598,7 @@ window.opCloseDrawer = function () {
 };
 
 /* ---- autosave: one PATCH path, per-field state, ordered writes ---- */
-window.opSaveField = async function (id, key, val) {
+window.opSaveField = async function (id, key, val, extra) {
   var l = (oppRows || []).find(function (o) { return o.id === id; });
   if (!l) return;
   var sk = id + ":" + key;
@@ -1606,6 +1616,8 @@ window.opSaveField = async function (id, key, val) {
   if (opFState[sk] && opFState[sk].s === "pending") { opFQueue[sk] = val; opFState[sk].v = val; return; }
   opFState[sk] = { s: "pending", v: val }; opRender();
   var body = {}; body[key] = norm;
+  /* A stage move to lost carries its reason in the same write (opp-work-crm's dialog). */
+  if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
   var ok = false;
   try {
     var r = await fetch("/admin/opps/" + fmtId(id), {
@@ -1632,8 +1644,16 @@ window.opRetryField = function (id, key) {
   var v = st.v; delete opFState[id + ":" + key]; void window.opSaveField(id, key, v);
 };
 window.opDiscardField = function (id, key) { delete opFState[id + ":" + key]; opRender(); };
-window.opSetStage = function (id, stage) { return window.opSaveField(id, "stage", stage); };
-window.opSetStageSel = function (v) { if (opOpen) void window.opSaveField(opOpen, "stage", v); };
+/* BRULE-009: every path that closes a line as lost goes through the reason dialog first. */
+function opNeedsLossReason(id, stage) {
+  var l = (oppRows || []).find(function (o) { return o.id === id; });
+  return !!l && typeof isLossClose === "function" && isLossClose(l.stage, stage);
+}
+window.opSetStage = function (id, stage) {
+  if (opNeedsLossReason(id, stage)) { owLossOpen([id], "close", stage); return Promise.resolve(); }
+  return window.opSaveField(id, "stage", stage);
+};
+window.opSetStageSel = function (v) { if (!opOpen) return; if (opNeedsLossReason(opOpen, v)) { owLossOpen([opOpen], "close", v); return; } void window.opSaveField(opOpen, "stage", v); };
 
 /* The escalation controls are delegated rather than inline-onclick: they live inside a drawer that
    re-renders on every keystroke, and an inline handler would be re-parsed on each paint. */
@@ -1697,6 +1717,10 @@ async function opBulkPatch(patch, label) {
 window.opBulkStage = function (el) {
   var v = el.value; el.value = "";
   if (!v) return;
+  if (isLostStage(v)) {
+    var toClose = opSelIds().filter(function (id) { return opNeedsLossReason(id, v); });
+    if (toClose.length) { owLossOpen(opSelIds(), "bulk", v); return; }
+  }
   void opBulkPatch({ stage: v }, "نُقلت إلى «" + opStage(v).label + "»");
 };
 window.opBulkOwner = function (el) {
@@ -1717,6 +1741,7 @@ window.opDrop = async function (e, stage, el) {
   if (id === null) return;
   var l = (oppRows || []).find(function (x) { return x.id === id; });
   if (!l || l.stage === stage) return;
+  if (opNeedsLossReason(id, stage)) { owLossOpen([id], "close", stage); return; }
   await window.opSaveField(id, "stage", stage);
   var st = opFState[id + ":stage"];
   if (st && st.s === "failed") {
@@ -1733,7 +1758,7 @@ window.opOpenSheet = function (opener) {
   opRender();
 };
 window.opDraft = function (k, v) { opSheet[k] = v; opErr = ""; opErrFld = ""; if (k === "source") opRender(); };
-window.opDraftSrc = function (k) { opSheet.source = k; if (k !== "whatsapp") opSheet.source_ref = ""; opRender(); };
+window.opDraftSrc = function (k) { if (opSheet.source !== k) opSheet.source_ref = ""; opSheet.source = k; opRender(); if (k === "partner") { var pf = document.getElementById("opd_partner"); if (pf) pf.focus(); } };
 window.opLineSet = function (i, k, v) { opSheet.lines[i][k] = v; opErr = ""; opErrFld = ""; opRender(); };
 window.opLineAdd = function () { opSheet.lines.push(opBlankLine()); opRender(); };
 window.opLineDel = function (i) { opSheet.lines.splice(i, 1); opRender(); };
@@ -1767,7 +1792,7 @@ window.opFromEntity = function (id) {
 };
 function opCreateInvalid(f, msg) {
   opErr = msg; opErrFld = f; opRender();
-  var idMap = { name: "opd_name", phone: "opd_phone" };
+  var idMap = { name: "opd_name", phone: "opd_phone", source_ref: "opd_partner" };
   var p = f.split("_"); var idx = p.pop();
   var el = document.getElementById(idMap[f] || ("opd_" + p.join("_") + "_" + idx));
   if (el) el.focus();
@@ -1794,7 +1819,7 @@ window.opSubmit = async function () {
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({
         account_name: String(d.name).trim(), phone: String(d.phone || "").trim(),
-        source: d.source, source_ref: d.source === "whatsapp" ? d.source_ref : "",
+        source: d.source, source_ref: d.source === "whatsapp" || d.source === "partner" ? String(d.source_ref || "").trim() : "",
         lines: lines.map(function (l) {
           return { product: l.product, sale_price: Number(l.sale_price || 0), years: Number(l.years || 1),
             qty: Number(l.qty || 1), discount: Number(l.discount || 0), owner: d.owner || "" };
@@ -1807,6 +1832,7 @@ window.opSubmit = async function () {
       /* The server names the field it rejected; repeating that name is what makes it fixable. */
       if (j.error === "invalid_field" && j.field === "phone") return opCreateInvalid("phone", "رقم الجوال غير صالح.");
       if (j.error === "invalid_field" && j.field === "account_name") return opCreateInvalid("name", "اسم الجهة مطلوب.");
+      if (j.error === "invalid_field" && j.field === "source_ref") return opCreateInvalid("source_ref", "اكتب اسم الشريك.");
       opErr = j.error === "unknown_product" ? "خدمة غير معروفة: " + String(j.product || "")
         : j.error === "unknown_ref" ? "الحملة المختارة لم تعد موجودة."
         : j.error === "invalid_field" ? "قيمة غير صالحة في الحقل: " + String(j.field || "")
