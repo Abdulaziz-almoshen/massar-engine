@@ -972,6 +972,47 @@ CREATE TABLE IF NOT EXISTS answer_reviews (
 CREATE INDEX IF NOT EXISTS idx_answer_reviews_at ON answer_reviews (at);
 `,
   },
+  {
+    version: "016-users-audit",
+    sql: `
+-- Users with roles and the audit log (client A, BRD v1.0 §22, NFR-001/002/007, slice S7). ADMIN_TOKEN is not a row
+-- here and keeps working: users are added beside it. A token is stored only as its SHA-256; the last four
+-- characters are kept so a person can tell two tokens apart without the secret.
+CREATE TABLE IF NOT EXISTS app_users (
+  id          BIGSERIAL PRIMARY KEY,
+  name        TEXT NOT NULL,
+  role        TEXT NOT NULL CHECK (role IN ('exec','product_manager','sales','partner','admin')),
+  partner_id  BIGINT REFERENCES partners(id) ON DELETE SET NULL,
+  member_id   BIGINT,
+  token_hash  TEXT NOT NULL UNIQUE,
+  token_hint  TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled')),
+  created_by  TEXT,
+  created_at  BIGINT NOT NULL,
+  updated_by  TEXT,
+  updated_at  BIGINT NOT NULL,
+  last_seen_at BIGINT
+);
+-- Names are what the audit log and the users screen show: two people with one name could not be told apart.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_users_name ON app_users (lower(btrim(name)));
+-- NFR-002: every successful write through /admin — who, in which role, what, on which record.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id          BIGSERIAL PRIMARY KEY,
+  at          BIGINT NOT NULL,
+  actor       TEXT NOT NULL,
+  role        TEXT NOT NULL,
+  user_id     BIGINT,
+  method      TEXT NOT NULL,
+  route       TEXT NOT NULL,
+  action      TEXT NOT NULL,
+  entity_id   TEXT,
+  status      INT NOT NULL,
+  detail      JSONB NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log (at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log (actor, at DESC);
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1057,6 +1098,8 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   partner_results: ["id", "partner_id", "product", "account_name", "phone", "result", "contacted_on", "note", "opp_id", "handed_at", "recorded_by", "created_at", "updated_at"],
   answer_signals: ["id", "phone", "product", "basis", "confidence", "product_question", "handoff_reason", "ts"],
   answer_reviews: ["phone", "msg_ts", "verdict", "note", "by_name", "at"],
+  app_users: ["id", "name", "role", "partner_id", "member_id", "token_hash", "token_hint", "status", "created_by", "created_at", "updated_by", "updated_at", "last_seen_at"],
+  audit_log: ["id", "at", "actor", "role", "user_id", "method", "route", "action", "entity_id", "status", "detail"],
 };
 
 async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
@@ -2156,6 +2199,90 @@ export async function replyTimeline(sinceMs: number): Promise<{ phone: string; r
     `SELECT m.phone, m.role, m.ts FROM messages m JOIN contacts c ON c.phone = m.phone
       WHERE c.test = false AND m.ts >= $1 AND m.role IN ('customer','agent') ORDER BY m.phone, m.ts`, [sinceMs]);
   return r.rows.map((x) => ({ phone: String(x.phone), role: String(x.role), ts: Number(x.ts) }));
+}
+
+// ------------------------------ users and audit (§22, NFR-001/002, S7) ------------------------------
+
+export class NameTaken extends Error { constructor() { super("name_taken"); } }
+export type AppUser = { id: number; name: string; role: string; partnerId: number | null; partnerName: string | null; memberId: number | null;
+  tokenHint: string; status: string; createdBy: string | null; createdAt: number; updatedBy: string | null; updatedAt: number; lastSeenAt: number | null };
+function appUserFrom(r: Record<string, any>): AppUser {
+  return { id: Number(r.id), name: String(r.name), role: String(r.role), partnerId: r.partner_id == null ? null : Number(r.partner_id), partnerName: r.partner_name ?? null,
+    memberId: r.member_id == null ? null : Number(r.member_id), tokenHint: String(r.token_hint), status: String(r.status), createdBy: r.created_by ?? null,
+    createdAt: Number(r.created_at), updatedBy: r.updated_by ?? null, updatedAt: Number(r.updated_at), lastSeenAt: r.last_seen_at == null ? null : Number(r.last_seen_at) };
+}
+/** Every active user by token hash, for the in-memory credential table. Disabled users are not in it. */
+export async function activeUserCredentials(): Promise<{ hash: string; id: number; name: string; role: string; partnerId: number | null }[] | null> {
+  if (!pool || !connected) return null;
+  const r = await pool.query(`SELECT id, name, role, partner_id, token_hash FROM app_users WHERE status = 'active'`);
+  return r.rows.map((x) => ({ hash: String(x.token_hash), id: Number(x.id), name: String(x.name), role: String(x.role), partnerId: x.partner_id == null ? null : Number(x.partner_id) }));
+}
+export async function listUsers(): Promise<AppUser[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`SELECT u.*, p.name AS partner_name FROM app_users u LEFT JOIN partners p ON p.id = u.partner_id ORDER BY u.status, lower(u.name)`);
+  return r.rows.map(appUserFrom);
+}
+export async function createUser(v: { name: string; role: string; partnerId: number | null; memberId: number | null }, tokenHash: string, tokenHint: string, by: string): Promise<AppUser> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO app_users (name, role, partner_id, member_id, token_hash, token_hint, created_by, created_at, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$7,$8) ON CONFLICT DO NOTHING RETURNING *`, [v.name, v.role, v.partnerId, v.memberId, tokenHash, tokenHint, by, now]);
+  if (!r.rows.length) throw new NameTaken();
+  return appUserFrom(r.rows[0]);
+}
+export async function updateUser(id: number, v: { name: string; role: string; partnerId: number | null; memberId: number | null; status: string }, ifUpdatedAt: number, by: string):
+  Promise<AppUser | { stale: true } | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  let r;
+  try {
+    r = await pool.query(
+      `UPDATE app_users SET name = $2, role = $3, partner_id = $4, member_id = $5, status = $6, updated_by = $7, updated_at = GREATEST($8, updated_at + 1)
+        WHERE id = $1 AND updated_at = $9 RETURNING *`, [id, v.name, v.role, v.partnerId, v.memberId, v.status, by, Date.now(), ifUpdatedAt]);
+  } catch (e: any) { if (e && e.code === "23505") throw new NameTaken(); throw e; }
+  if (r.rows.length) return appUserFrom(r.rows[0]);
+  const ex = await pool.query(`SELECT 1 FROM app_users WHERE id = $1`, [id]);
+  return ex.rows.length ? { stale: true } : null;
+}
+export async function rotateUserToken(id: number, tokenHash: string, tokenHint: string, by: string): Promise<AppUser | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`UPDATE app_users SET token_hash = $2, token_hint = $3, updated_by = $4, updated_at = GREATEST($5, updated_at + 1) WHERE id = $1 RETURNING *`,
+    [id, tokenHash, tokenHint, by, Date.now()]);
+  return r.rows[0] ? appUserFrom(r.rows[0]) : null;
+}
+/** Throttled by the caller: a user's last activity, for the users screen. */
+export function touchUser(id: number): void {
+  fire(`UPDATE app_users SET last_seen_at = $2 WHERE id = $1`, [id, Date.now()]);
+}
+export function writeAudit(e: { actor: string; role: string; userId: number | null; method: string; route: string; action: string; entityId: string | null; status: number; detail: Record<string, unknown> }): void {
+  fire(`INSERT INTO audit_log (at, actor, role, user_id, method, route, action, entity_id, status, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [Date.now(), e.actor, e.role, e.userId, e.method, e.route, e.action, e.entityId, e.status, JSON.stringify(e.detail)]);
+}
+export async function listAudit(f: { who?: string; action?: string; beforeAt?: number; beforeId?: number; limit: number }): Promise<{ id: number; at: number; actor: string; role: string; userId: number | null; method: string; route: string; action: string; entityId: string | null; status: number; detail: unknown }[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const where: string[] = [], params: unknown[] = [];
+  // «who» is a user id, or «main» for the environment token — never a free-text name two people could share.
+  if (f.who === "main") where.push(`user_id IS NULL`);
+  else if (f.who && /^\d+$/.test(f.who)) { params.push(Number(f.who)); where.push(`user_id = $${params.length}`); }
+  if (f.action) { params.push(f.action); where.push(`action = $${params.length}`); }
+  if (f.beforeAt) { params.push(f.beforeAt, f.beforeId ?? 0); where.push(`(at, id) < ($${params.length - 1}, $${params.length})`); }
+  params.push(f.limit);
+  const r = await pool.query(`SELECT * FROM audit_log ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY at DESC, id DESC LIMIT $${params.length}`, params);
+  return r.rows.map((x) => ({ id: Number(x.id), at: Number(x.at), actor: String(x.actor), role: String(x.role), userId: x.user_id == null ? null : Number(x.user_id), method: String(x.method), route: String(x.route),
+    action: String(x.action), entityId: x.entity_id ?? null, status: Number(x.status), detail: x.detail }));
+}
+export async function auditFacets(): Promise<{ who: { key: string; label: string }[]; actions: string[] }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const [a, b] = await Promise.all([
+    pool.query(`SELECT user_id, (array_agg(actor ORDER BY at DESC))[1] AS actor FROM audit_log GROUP BY user_id ORDER BY MAX(at) DESC LIMIT 100`),
+    pool.query(`SELECT action FROM audit_log GROUP BY action ORDER BY COUNT(*) DESC LIMIT 100`),
+  ]);
+  return { who: a.rows.map((x) => ({ key: x.user_id == null ? "main" : String(x.user_id), label: x.user_id == null ? "مدير النظام (الرمز الرئيسي)" : String(x.actor) })), actions: b.rows.map((x) => String(x.action)) };
+}
+export async function partnerResultOwner(id: number): Promise<number | null> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(`SELECT partner_id FROM partner_results WHERE id = $1`, [id]);
+  return r.rows[0] ? Number(r.rows[0].partner_id) : null;
 }
 
 // ------------------------------ answer quality (BR-KB-004/005, BR-MON-005, S6) ------------------------------

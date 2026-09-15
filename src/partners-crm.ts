@@ -195,6 +195,7 @@ function ptPaintCrumb() {
   var act = document.getElementById("crumbact");
   if (!act || (location.hash || "").slice(1) !== "partners") return;
   if (document.getElementById("ptnewtop")) return;
+  if (typeof meCan === "function" && !meCan("partners.manage")) return;
   act.innerHTML = '<button class="btn btn-teal ac-newtop" id="ptnewtop" data-pt="newpartner">' + ptIco("plus") + '<span class="lg">إضافة شريك</span><span class="sm">شريك</span></button>';
 }
 function vPartners() {
@@ -208,7 +209,7 @@ function vPartners() {
   if (!d.partners.length) {
     return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا شركاء بعد</b>' +
       "الشريك شركة متعاقدة تتولى التواصل الأولي مع العملاء لمنتج ما. حدّد لكل شريك مستهدفًا أسبوعيًا لكل منتج، وسجّل ما انتهى إليه كل تواصل: مهتم، غير مهتم، لم يرد. كل «مهتم» يُحوَّل فرصة بيع لفريق المبيعات." +
-      '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="ptnewempty" data-pt="newpartner" style="display:inline-flex;align-items:center;gap:6px">' + ptIco("plus") + "إضافة شريك</button></div></div></section></div>" + ptModal();
+      (typeof meCan !== "function" || meCan("partners.manage") ? '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="ptnewempty" data-pt="newpartner" style="display:inline-flex;align-items:center;gap:6px">' + ptIco("plus") + "إضافة شريك</button></div>" : "") + "</div></section></div>" + ptModal();
   }
   var isCur = d.week === d.currentWeek;
   h += '<div class="pt-bar"><span class="pt-week" role="group" aria-label="الأسبوع">' +
@@ -243,14 +244,14 @@ function ptPartnerCard(p) {
     '<div class="meta">' + meta.map(function (m) { return "<span>" + m + "</span>"; }).join("") + "</div>" +
     (p.opps.wonValue || p.opps.openValue ? '<div class="meta"><span>قيمة الفرص الرابحة: ' + acMoney(p.opps.wonValue) + "</span><span>القائمة: " + acMoney(p.opps.openValue) + "</span></div>" : "") + "</div>" +
     '<div class="acts">' + (p.status === "active" ? '<button class="btn btn-teal" id="ptrecord" data-pt="record">' + ptIco("plus") + "تسجيل نتائج</button>" : "") +
-    '<button class="btn btn-ghost" id="pttargets" data-pt="targets">تحديد المستهدف</button><button class="btn btn-ghost" id="ptedit" data-pt="editpartner">تعديل</button></div></div>';
+    (typeof meCan !== "function" || meCan("partners.manage") ? '<button class="btn btn-ghost" id="pttargets" data-pt="targets">تحديد المستهدف</button><button class="btn btn-ghost" id="ptedit" data-pt="editpartner">تعديل</button>' : "") + "</div></div>";
   if (p.status !== "active") h += '<div class="bd" style="padding:0 var(--s4) var(--s3)"><div class="pt-banner">الشريك موقوف: تُعرض نتائجه ولا تُسجَّل له نتائج جديدة. فعّله من «تعديل».</div></div>';
   return h + "</section>";
 }
 function ptProductTable(pid) {
   var prods = ptF.product ? [ptF.product] : ptAllProducts().filter(function (p) { return ptTargetsFor(pid, p).length || ptResultsFor(pid, p).length; });
   var h = '<section class="cf-sec pt-sec pt-prod"><div class="hd"><h2>حسب المنتج</h2><span class="s">المنشآت التي تم التواصل معها مقابل المستهدف</span></div>';
-  if (!prods.length) return h + '<div class="cf-state">لا مستهدفات ولا نتائج في هذا الأسبوع' + (pid !== "all" ? '.<button class="btn btn-ghost" data-pt="targets">تحديد المستهدف</button>' : " لأي شريك.") + "</div></section>";
+  if (!prods.length) return h + '<div class="cf-state">لا مستهدفات ولا نتائج في هذا الأسبوع' + (pid !== "all" && (typeof meCan !== "function" || meCan("partners.manage")) ? '.<button class="btn btn-ghost" data-pt="targets">تحديد المستهدف</button>' : pid !== "all" ? "." : " لأي شريك.") + "</div></section>";
   h += '<div class="cf-t"><div class="cf-hr" role="row"><span>المنتج</span><span>المستهدف</span><span>تم التواصل</span><span>الإنجاز</span><span>مهتم</span><span>غير مهتم</span><span>لم يرد</span></div>';
   prods.forEach(function (p) {
     var l = summarizeWeek(ptTargetsFor(pid, p), ptResultsFor(pid, p));
@@ -303,6 +304,8 @@ function ptResultCell(r, p) {
   if (!canChangeResult(r)) {
     var st = r.oppStage && typeof opStage === "function" ? opStage(r.oppStage).label : "";
     var linked = r.oppPartnerId !== r.partnerId;
+    /* A partner user is not shown a deal it did not bring (-1 from the server): the fact of the handover only. */
+    if (r.oppId === -1 || (typeof meCan === "function" && !meCan("opps.view"))) return '<span class="pt-rs">' + pill + '<span class="cf-sub">حُوّل للمبيعات</span></span>';
     return '<span class="pt-rs">' + pill + '<a href="#opps/' + r.oppId + '" title="تُتابَع من «فرص البيع»">' + (linked ? "رُبط بفرصة قائمة" : "حُوّل للمبيعات") + (st ? " · " + esc(st) : "") + "</a></span>";
   }
   if (ptArm[r.id] === "interest") {

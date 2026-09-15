@@ -45,6 +45,8 @@ import { PARTNERS_CRM_CSS, PARTNERS_CRM_JS } from "./partners-crm.js";
 import { PARTNER_DOMAIN_JS } from "./partner-domain.js";
 import { KNOWLEDGE_CRM_CSS, KNOWLEDGE_CRM_JS } from "./knowledge-crm.js";
 import { KNOWLEDGE_DOMAIN_JS } from "./knowledge-domain.js";
+import { USERS_CRM_CSS, USERS_CRM_JS } from "./users-crm.js";
+import { RBAC_DOMAIN_JS } from "./rbac-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -727,6 +729,7 @@ ${OPP_WORK_CRM_CSS}
 ${CAMPAIGN_RESULTS_CRM_CSS}
 ${PARTNERS_CRM_CSS}
 ${KNOWLEDGE_CRM_CSS}
+${USERS_CRM_CSS}
 ${PALETTE_CSS}
 /* LAST. The V3 shell and component language wins on cascade order — see revamp.ts. */
 ${REVAMP_CSS}
@@ -760,7 +763,7 @@ ${HOLD_CSS}
       <div class="logo">م</div>
       <div style="min-width:0;flex:1;text-align:start;">
         <div class="t1">مسار</div>
-        <div class="t2">عبدالعزيز المحسن</div>
+        <div class="t2" id="meName">عبدالعزيز المحسن</div>
       </div>
       <span class="chev">⌄</span>
     </button>
@@ -939,7 +942,7 @@ const SUBS = {
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
-  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"]],
+  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
 };
 
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
@@ -975,6 +978,8 @@ const TITLES = {
   account: ["سجل العميل", "بيانات العميل وجهات اتصاله وفرصه وحملاته ومؤشراته في شاشة واحدة"],
   divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
   team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
+  users: ["المستخدمون والصلاحيات", "من يدخل مسار، وبأي دور، وماذا يفتح له دوره"],
+  audit: ["سجل التدقيق", "كل عملية حفظ: من، وبأي دور، وماذا، ومتى"],
 };
 // The agent's real catalog (mirrors src/agent.ts seed KB; the KB module feeds this later).
 const PRODUCTS_FULL = [
@@ -1075,16 +1080,18 @@ function nav() {
   // customer list's «استيراد جهات» before it) followed the operator onto every later screen, including
   // the wizard (design review). Cleared on a route change only, so a repaint on the same route does not flicker.
   { const rk = (location.hash || "").slice(1); if (rk !== window.__crumbRoute) { window.__crumbRoute = rk; const ca = document.getElementById("crumbact"); if (ca) ca.innerHTML = ""; } }
-  document.getElementById("nav").innerHTML = NAV.map((x) => {
+  // S7: a door the signed-in role cannot open is not drawn (users-crm, rbac-domain). The server refuses it anyway.
+  document.getElementById("nav").innerHTML = NAV.filter((x) => typeof meDoorTarget !== "function" || meDoorTarget(x.id)).map((x) => {
     const b = doorBadge(x.id);
-    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'" title="' + (b ? b[2] : x.l) + '">' +
+    const to = typeof meDoorTarget === "function" ? meDoorTarget(x.id) : x.id;
+    return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + to + '\\'" title="' + (b ? b[2] : x.l) + '">' +
       '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#2563EB" : "#A2A9B4") + '</span><span class="lbl">' + x.l + "</span>" +
       (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
   }).join("");
 
   // The tab strip. Rendered only where a door actually has more than one destination, so a single
   // -destination door does not grow a strip of one tab that looks interactive and does nothing.
-  const subs = SUBS[cur] || [];
+  const subs = (SUBS[cur] || []).filter((sx) => typeof meCanOpen !== "function" || meCanOpen(sx[0]));
   // A PRODUCT RECORD gets the assistant-readiness band here instead of the tab row (founder, Sep 13):
   // «الهيكل التنظيمي» is a door, and a record's strip should answer whether the assistant can sell
   // THIS product. The band comes from products-crm so one readiness rule serves list, record and wizard.
@@ -4387,7 +4394,10 @@ async function gateUnauthorized() {
   }
   gate("رمز غير صحيح");
 }
-window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN); refresh(); };
+window.saveTok = () => { TOKEN = document.getElementById("tok").value.trim(); localStorage.setItem("massar_admin_token", TOKEN);
+  // S7: a new sign-in is a new person with a new role; forget the last one's before painting anything.
+  if (typeof ME !== "undefined") { ME = null; meLoad(); }
+  refresh(); };
 window.reloadProfile = () => { profileData = null; render(false); refresh(); };
 
 let _viewSig = "";
@@ -4434,6 +4444,8 @@ function render(fetchNew) {
   const afPos = afId && af.selectionStart != null ? af.selectionStart : null;
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   const b = document.getElementById("body");
+  // S7: a route the signed-in role cannot open says so, instead of painting a screen whose every read is refused.
+  if (TOKEN && typeof meCanOpen === "function" && !meCanOpen(cur)) { b.innerHTML = vDenied(cur); return; }
   if (cur === "kmon" || cur === "home") {
     if (!TOKEN) return gate();
     // FIRST FETCH PENDING. This used to return early without touching #body, so the busiest screen
@@ -4465,7 +4477,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4487,6 +4499,8 @@ function render(fetchNew) {
       : cur === "accounts" ? vAccounts()
       : cur === "account" ? vAccount((location.hash || "").split("/")[1] || "")
       : cur === "partners" ? vPartners()
+      : cur === "users" ? vUsers()
+      : cur === "audit" ? vAudit()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4499,6 +4513,7 @@ function render(fetchNew) {
   try { if (typeof acAfterPaint === "function") acAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof ptAfterPaint === "function") ptAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof kbAfterPaint === "function") kbAfterPaint(); } catch (e) { /* never block a paint */ }
+  try { if (typeof usAfterPaint === "function") usAfterPaint(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
@@ -4523,6 +4538,10 @@ function render(fetchNew) {
 // enabled, so it is gone rather than carried as decoration nobody can verify. The .rise entrance
 // transitions remain and are CSS-only.
 
+function rbacFetch(permission, url) {
+  if (typeof meCan === "function" && typeof ME !== "undefined" && ME && !meCan(permission)) return Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve(null) });
+  return fetch(url, { headers: { "x-admin-token": TOKEN } });
+}
 async function refresh(force) {
   const cur = (location.hash || "#kmon").slice(1).split("/")[0];
   if (TOKEN) {
@@ -4539,11 +4558,12 @@ async function refresh(force) {
         showTest = !(cache.contacts || []).some((c) => !c.test);   // no real contacts → reveal sandbox
       }
       const [er, kr, cr, ir, wr, tr] = await Promise.all([
-        fetch("/admin/entities", { headers: { "x-admin-token": TOKEN } }),
-        fetch("/admin/kb", { headers: { "x-admin-token": TOKEN } }),
-        fetch("/admin/campaigns", { headers: { "x-admin-token": TOKEN } }),
-        fetch("/admin/insights", { headers: { "x-admin-token": TOKEN } }),
-        fetch("/admin/intel/winloss" + (showTest ? "?all=1" : ""), { headers: { "x-admin-token": TOKEN } }),
+        // S7: a role is not sent every five seconds after reads it will be refused (a partner's poll was six 403s).
+        rbacFetch("customers.view", "/admin/entities"),
+        rbacFetch("knowledge.view", "/admin/kb"),
+        rbacFetch("campaigns.view", "/admin/campaigns"),
+        rbacFetch("conversations.view", "/admin/insights"),
+        rbacFetch("dashboards.view", "/admin/intel/winloss" + (showTest ? "?all=1" : "")),
         fetch("/admin/tags", { headers: { "x-admin-token": TOKEN } }),
       ]);
       if (er.ok) entities = await er.json();
@@ -4552,7 +4572,7 @@ async function refresh(force) {
       if (cr.ok) campaigns = await cr.json();
       if (ir.ok) { const rows = await ir.json(); insCache = {}; rows.forEach((r) => { insCache[r.phone] = r.data; }); }
       if (wr.ok) winloss = await wr.json();
-      try { const ar = await fetch("/admin/product-assets", { headers: { "x-admin-token": TOKEN } }); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
+      try { const ar = await rbacFetch("knowledge.view", "/admin/product-assets"); if (ar.ok) prodAssets = await ar.json(); } catch (e) {}
       const curR = (location.hash || "").slice(1).split("/")[0];
       if (curR === "customer") {
         // Read the scope here too: the very first refresh() runs before any hashchange fires, so a
@@ -4869,6 +4889,8 @@ ${PARTNERS_CRM_JS}
 ${PARTNER_DOMAIN_JS}
 ${KNOWLEDGE_CRM_JS}
 ${KNOWLEDGE_DOMAIN_JS}
+${USERS_CRM_JS}
+${RBAC_DOMAIN_JS}
 ${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain

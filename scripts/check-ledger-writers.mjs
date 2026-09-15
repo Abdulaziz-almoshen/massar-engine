@@ -49,7 +49,9 @@ const MUST_HAVE_WRITERS = ["track_stage_events", "opportunities", "targets", "pi
   // S5: «شركاء المبيعات» reads these.
   "partners", "partner_targets", "partner_results",
   // S6: «الثقة في الإجابات» and «دقة الإجابات» read these.
-  "answer_signals", "answer_reviews"];
+  "answer_signals", "answer_reviews",
+  // S7: the users screen and «سجل التدقيق».
+  "app_users", "audit_log"];
 
 for (const table of MUST_HAVE_WRITERS) {
   const writers = [];

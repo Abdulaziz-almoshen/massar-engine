@@ -29,7 +29,8 @@ import * as results from "./campaign-results-domain.js";
 import * as partnerDom from "./partner-domain.js";
 import * as know from "./knowledge-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import * as rbac from "./rbac-domain.js";
 import { monitorEventLoopDelay } from "node:perf_hooks";
 
 // THE RISK IS A BLOCKED LOOP, SO MEASURE THE LOOP. The queue scores contacts in synchronous JS on
@@ -47,6 +48,52 @@ import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
 await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+
+// ------------------------------ roles and the audit log (§22, NFR-001/002, S7) ------------------------------
+// ONE gate for every /admin route, before its handler: who is calling (authorize), and whether their role holds
+// the permission rbac-domain names for this route. An unlisted route is the system administrator's only. The
+// handlers' own adminOk() now reads this decision, so the 118 call sites need no edit and cannot drift from it.
+// A caller with no credential still reaches the handler, which answers 401 as it always has; a known caller
+// without the permission is refused here with 403.
+app.addHook("onRequest", async (req, reply) => {
+  const url = req.routeOptions?.url;
+  if (!url || !url.startsWith("/admin")) return;
+  const caller = authorize(req);
+  (req as any).rbacChecked = true;
+  if (!caller || caller.role === "rep") return;
+  const need = rbac.permissionFor(req.method, url);
+  const permitted = caller.role === "admin" || (need != null && rbac.can(caller.role, need.permission));
+  if (!permitted) return problem(reply, 403, "forbidden", "لا تملك صلاحية هذه العملية");
+  (req as any).rbacOk = true;
+  (req as any).caller = caller;
+  if (caller.userId) seenUser(caller.userId);
+});
+// NFR-002: every successful write, after it happened — who, in which role, what, on which record. Values are
+// summarised, never copied whole: a launch body carries phone numbers and a user write must never log a token.
+app.addHook("onResponse", async (req, reply) => {
+  const url = req.routeOptions?.url;
+  if (!url || !url.startsWith("/admin") || !rbac.isAuditable(req.method, reply.statusCode)) return;
+  const caller = (req as any).caller as Caller;
+  if (!caller) return;
+  const need = rbac.permissionFor(req.method, url);
+  // Reads that happen to be POSTs (a preview, a compose) carry no label and are not operations on a record.
+  if (!need || !need.label) return;
+  const params = (req.params ?? {}) as Record<string, string>;
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
+  db.writeAudit({ actor: caller.actor, role: caller.role, userId: caller.userId ?? null, method: req.method, route: url, action: need.label,
+    entityId: params.id ?? params.key ?? params.phone ?? (typeof body.product === "string" ? body.product : null), status: reply.statusCode, detail: auditDetail(body) });
+});
+const AUDIT_FIELDS = new Set(["product", "name", "stage", "status", "decision", "verdict", "week", "source", "kind", "role", "result", "title", "lost_reason", "outcome", "account_name", "campaignName", "objective"]);
+function auditDetail(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(body)) {
+    if (/token|secret|password/i.test(k)) continue;
+    if (Array.isArray(v)) out[k] = { count: v.length };
+    else if ((typeof v === "string" && AUDIT_FIELDS.has(k)) ) out[k] = v.slice(0, 120);
+    else if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+  }
+  return out;
+}
 
 // One shared token, no users, no sessions, no rotation — and until now no lockout, so an online
 // guessing attack had unlimited attempts against the credential that can message real clinics.
@@ -1465,7 +1512,7 @@ app.get("/rep", async (_req, reply) => {
 
 app.get("/rep/queue", async (req, reply) => {
   if (repSurfaceOff(reply)) return;
-  const caller = authorize(req);
+  const caller = repCaller(req);
   if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const rows = await db.repQueue(caller.actor, 50);
   return { ok: true, rep: caller.actor, count: rows.length, rows };
@@ -1473,7 +1520,7 @@ app.get("/rep/queue", async (req, reply) => {
 
 app.post("/rep/engagements", async (req, reply) => {
   if (repSurfaceOff(reply)) return;
-  const caller = authorize(req);
+  const caller = repCaller(req);
   if (!caller) return reply.code(401).send({ status: "unauthorized", error: "غير مصرّح" });
   const b = (req.body ?? {}) as Record<string, unknown>;
 
@@ -1508,7 +1555,7 @@ app.post("/rep/engagements", async (req, reply) => {
  *  picklist cannot offer a move the server would reject. */
 app.get("/rep/outcomes", async (req, reply) => {
   if (repSurfaceOff(reply)) return;
-  if (!authorize(req)) return reply.code(401).send({ status: "unauthorized" });
+  if (!repCaller(req)) return reply.code(401).send({ status: "unauthorized" });
   const stage = String((req.query as any)?.stage ?? "");
   const list = sales.STAGE_OUTCOMES.filter((o) => o.stage === stage);
   return { ok: true, stage, outcomes: list };
@@ -1525,7 +1572,42 @@ app.get("/rep/outcomes", async (req, reply) => {
  *
  *  Roles are positive grants, so a surface nobody has granted is closed. A rep token authenticates
  *  on /rep and is simply NOT an admin anywhere else. */
-export type Caller = { role: "admin" | "rep"; actor: string } | null;
+export type Caller = { role: rbac.Role | "rep"; actor: string; userId?: number; partnerId?: number | null } | null;
+
+// S7: users beside ADMIN_TOKEN. Held in memory by token hash so a request never waits on Postgres to be
+// authorised; reloaded at boot and after every user write, and retried on a miss at most once a minute (a user
+// created while the database was down becomes valid once it is back).
+let userCreds = new Map<string, { id: number; name: string; role: rbac.Role; partnerId: number | null }>();
+let userCredsAt = 0;
+let userCredsFlight: Promise<boolean> | null = null;
+/** Reloads the table. One query at a time, stamped before it starts, so wrong tokens arriving while Postgres is
+ *  slow cannot queue a query each (security review). Resolves false when the read failed. */
+function refreshUserCreds(): Promise<boolean> {
+  if (userCredsFlight) return userCredsFlight;
+  userCredsAt = Date.now();
+  userCredsFlight = db.activeUserCredentials().catch(() => null).then((rows) => {
+    userCredsFlight = null;
+    if (!rows) return false;
+    userCreds = new Map(rows.filter((r) => (rbac.ROLES as readonly string[]).includes(r.role)).map((r) => [r.hash, { id: r.id, name: r.name, role: r.role as rbac.Role, partnerId: r.partnerId }]));
+    return true;
+  });
+  return userCredsFlight;
+}
+/** After a user write, the in-memory table is corrected directly — a disabled user, a demoted role or a replaced token
+ *  takes effect in this process even when the reload behind it fails (security review, P2). */
+function applyUserCred(u: { id: number; name: string; role: string; partnerId: number | null; status: string }, newHash?: string): void {
+  let hash = newHash;
+  for (const [h, v] of userCreds) if (v.id === u.id) { if (!hash && !newHash) hash = h; userCreds.delete(h); }
+  if (hash && u.status === "active" && (rbac.ROLES as readonly string[]).includes(u.role)) userCreds.set(hash, { id: u.id, name: u.name, role: u.role as rbac.Role, partnerId: u.partnerId });
+}
+setInterval(() => { void refreshUserCreds(); }, 5 * 60_000).unref();
+function tokenHash(token: string): string { return createHash("sha256").update(token, "utf8").digest("hex"); }
+const userSeen = new Map<number, number>();
+function seenUser(id: number): void {
+  const last = userSeen.get(id) || 0;
+  if (Date.now() - last < 5 * 60_000) return;
+  userSeen.set(id, Date.now()); db.touchUser(id);
+}
 
 function authorize(req: any): Caller {
   const admin = req.headers["x-admin-token"];
@@ -1533,6 +1615,12 @@ function authorize(req: any): Caller {
     // The admin is one human today (assumption A-3), so a label is all the actor can be. Unlike the
     // old body-derived name, it cannot be spoofed into someone else's.
     return { role: "admin", actor: "اللوحة" };
+  }
+  if (typeof admin === "string" && admin.length >= 20 && admin.length <= 200) {
+    // A map lookup on the hash, not a compare on the secret: the hash of a guess reveals nothing about a stored one.
+    const u = userCreds.get(tokenHash(admin));
+    if (u) return { role: u.role, actor: u.name, userId: u.id, partnerId: u.partnerId };
+    if (Date.now() - userCredsAt > 60_000) void refreshUserCreds();
   }
   const rep = req.headers["x-rep-token"];
   if (typeof rep === "string" && rep) {
@@ -1553,13 +1641,28 @@ function secretEq(got: string, want: string): boolean {
  *  transcript. Lengths are compared first and separately — timingSafeEqual THROWS on a length
  *  mismatch, and the length of a token is not the secret worth protecting. */
 function adminOk(req: any): boolean {
+  // /admin routes: the onRequest gate already decided (role holds the route's permission). Anything else that
+  // asks — a route outside /admin — still requires the system administrator.
+  if ((req as any).rbacChecked) return (req as any).rbacOk === true;
   return authorize(req)?.role === "admin";
+}
+/** The partner a partner user records for, or null for every other role (which sees all partners). */
+function partnerScope(req: any): number | null {
+  const c = (req as any).caller as Caller;
+  return c && c.role === "partner" ? (c.partnerId ?? -1) : null;
 }
 
 /** /rep accepts a rep OR the admin, so the founder can walk the same screen the rep sees without a
  *  second credential. /admin never accepts a rep. */
 function repOk(req: any): boolean {
-  return authorize(req) !== null;
+  return repCaller(req) !== null;
+}
+/** /rep is the rep surface: a rep token, or a system administrator walking it. Since S7 authorize() also knows user
+ *  tokens, and «any caller» let a partner or an exec read the whole unowned pipeline and move stages there (security
+ *  review, P1). Roles are positive grants here too. */
+function repCaller(req: any): Caller {
+  const c = authorize(req);
+  return c && (c.role === "rep" || c.role === "admin") ? c : null;
 }
 /** WHO typed a fact. One operator today (assumption A-3), so the token is the authorization and
  *  this is only a label on the record.
@@ -1586,6 +1689,10 @@ function problem(reply: any, status: number, error: string, detail?: string, fie
 
 app.get("/admin/state", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
+  const caller = (req as any).caller as Caller;
+  // Every screen boots from this read, so every role may make it — but conversations are NFR-007 data: a role
+  // without conversations.view gets the shape with nothing in it.
+  if (caller && !rbac.can(caller.role, "conversations.view")) return { counters: {}, contacts: [], recentEvents: [], notifyNumber: null, restricted: true };
   return { ...tracker.snapshot(), notifyNumber: cfg.notifyNumber };
 });
 
@@ -1805,6 +1912,102 @@ async function withDb(reply: any, fn: () => Promise<unknown>): Promise<unknown> 
   }
 }
 
+// ------------------------------ «المستخدمون والصلاحيات» and «سجل التدقيق» (§22, NFR-002, S7) ------------------------------
+
+app.get("/admin/me", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const c = (req as any).caller as Caller;
+  if (!c || c.role === "rep") return problem(reply, 401, "unauthorized", "غير مصرّح");
+  return { ok: true, name: c.role === "admin" && !c.userId ? "مدير النظام" : c.actor, role: c.role, roleLabel: rbac.ROLE_LABELS[c.role],
+    permissions: (rbac.ROLE_GRANTS[c.role] || []).slice(), partnerId: c.partnerId ?? null, home: rbac.homeRouteFor(c.role), mainToken: !c.userId };
+});
+
+function newUserToken(): { token: string; hash: string; hint: string } {
+  const token = "mu_" + randomBytes(24).toString("base64url");
+  return { token, hash: tokenHash(token), hint: token.slice(-4) };
+}
+async function userFormRefs(): Promise<{ partners: { id: number; name: string }[]; members: { id: number; name: string }[] }> {
+  const [partners, team] = await Promise.all([db.listPartners(), activeMemberIds()]);
+  return { partners: partners.map((p) => ({ id: p.id, name: p.name })), members: team.members.map((m: any) => ({ id: Number(m.id), name: String(m.name) })) };
+}
+
+app.get("/admin/users", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  return withDb(reply, async () => ({ ok: true, users: await db.listUsers(), ...(await userFormRefs()) }));
+});
+
+app.post("/admin/users", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+  return withDb(reply, async () => {
+    const refs = await userFormRefs();
+    const c = rbac.checkUser(b, refs.partners.map((p) => p.id), refs.members.map((m) => m.id));
+    if (!c.ok) return problem(reply, 400, "invalid_field", c.reason, c.field);
+    const t = newUserToken();
+    let user: db.AppUser;
+    try { user = await db.createUser(c.value, t.hash, t.hint, adminName(req)); }
+    catch (e) { if (e instanceof db.NameTaken) return problem(reply, 409, "name_taken", "يوجد مستخدم بهذا الاسم — الأسماء تميّز المستخدمين في سجل التدقيق", "name"); throw e; }
+    applyUserCred(user, t.hash);
+    void refreshUserCreds();
+    // The token leaves the server once, in this response. Only its hash is stored.
+    return reply.code(201).header("Cache-Control", "no-store").send({ ok: true, user, token: t.token });
+  });
+});
+
+app.patch("/admin/users/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم المستخدم غير صحيح", "id");
+  const b = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+  const ifUpdatedAt = typeof b.ifUpdatedAt === "number" && Number.isInteger(b.ifUpdatedAt) ? b.ifUpdatedAt : null;
+  if (ifUpdatedAt == null) return problem(reply, 400, "invalid_field", "ifUpdatedAt مطلوب", "ifUpdatedAt");
+  const status = b.status === "active" || b.status === "disabled" ? b.status : null;
+  if (!status) return problem(reply, 400, "invalid_field", "حالة المستخدم غير صالحة", "status");
+  return withDb(reply, async () => {
+    const refs = await userFormRefs();
+    const c = rbac.checkUser(b, refs.partners.map((p) => p.id), refs.members.map((m) => m.id));
+    if (!c.ok) return problem(reply, 400, "invalid_field", c.reason, c.field);
+    let r;
+    try { r = await db.updateUser(id, { ...c.value, status }, ifUpdatedAt, adminName(req)); }
+    catch (e) { if (e instanceof db.NameTaken) return problem(reply, 409, "name_taken", "يوجد مستخدم بهذا الاسم", "name"); throw e; }
+    if (!r) return problem(reply, 404, "unknown_user", "لا مستخدم بهذا الرقم", "id");
+    if ("stale" in r) return problem(reply, 409, "stale_user", "عدّل شخص آخر هذا المستخدم بعد أن فتحته");
+    applyUserCred(r);
+    void refreshUserCreds();
+    return { ok: true, user: r };
+  });
+});
+
+app.post("/admin/users/:id/token", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم المستخدم غير صحيح", "id");
+  return withDb(reply, async () => {
+    const t = newUserToken();
+    const user = await db.rotateUserToken(id, t.hash, t.hint, adminName(req));
+    if (!user) return problem(reply, 404, "unknown_user", "لا مستخدم بهذا الرقم", "id");
+    applyUserCred(user, t.hash);
+    void refreshUserCreds();
+    return reply.header("Cache-Control", "no-store").send({ ok: true, user, token: t.token });
+  });
+});
+
+app.get("/admin/audit", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const q = (req.query ?? {}) as Record<string, string>;
+  const limit = Math.min(200, Math.max(1, Number(q.limit) || 100));
+  const cur = /^(\d+):(\d+)$/.exec(String(q.before || ""));
+  return withDb(reply, async () => {
+    const [rows, facets] = await Promise.all([
+      db.listAudit({ who: q.who ? String(q.who).slice(0, 20) : undefined, action: q.action ? String(q.action).slice(0, 120) : undefined,
+        beforeAt: cur ? Number(cur[1]) : undefined, beforeId: cur ? Number(cur[2]) : undefined, limit }),
+      db.auditFacets(),
+    ]);
+    const last = rows[rows.length - 1];
+    return { ok: true, rows, facets, next: rows.length === limit && last ? last.at + ":" + last.id : null };
+  });
+});
+
 // ------------------------------ «شركاء المبيعات» (BRD §17, S5) ------------------------------
 
 function partnerBody(req: any): Record<string, unknown> {
@@ -1825,10 +2028,17 @@ app.get("/admin/partners", async (req, reply) => {
     const [partners, wk, live] = await Promise.all([db.listPartners(), db.partnerWeek(week, partnerDom.addDays(week, 6)), liveProductNames()]);
     // Live products, plus any product this week's targets or results still name (an archived one): the tiles
     // and the tables must count the same rows, and a target on an archived product must stay clearable.
-    const extra = [...new Set([...wk.targets.map((t) => t.product), ...wk.results.map((r) => r.product)])].filter((p) => live.indexOf(p) < 0).sort();
     const products = live;
+    // A partner user sees its own company only (BR-PRT-004 for the partner; NFR-007 for everyone else's).
+    const scope = partnerScope(req);
+    const own = <T extends { partnerId?: number; id?: number }>(rows: T[], key: "partnerId" | "id") => scope == null ? rows : rows.filter((r) => r[key] === scope);
+    // …and nothing about deals it did not bring: an interest linked to someone else's open line shows as handed over,
+    // without that line's stage, its account or whose it is (security review: a partner could probe any phone).
+    const results = own(wk.results, "partnerId").map((r) => scope == null || r.oppPartnerId === scope ? r : { ...r, oppStage: null, entityId: null, oppPartnerId: null, oppId: r.oppId == null ? null : -1 });
+    const targets = own(wk.targets, "partnerId");
+    const extra = [...new Set([...targets.map((t) => t.product), ...results.map((r) => r.product)])].filter((p) => live.indexOf(p) < 0).sort();
     return { ok: true, week, archivedProducts: extra, weekEnd: partnerDom.addDays(week, 6), today: riyadhToday(), currentWeek: partnerDom.weekStartOf(riyadhToday()),
-      partners, products, targets: wk.targets, results: wk.results };
+      partners: own(partners, "id"), products, targets, results, scopedPartnerId: scope };
   });
 });
 
@@ -1894,6 +2104,8 @@ app.post("/admin/partners/:id/results", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم الشريك غير صحيح", "id");
+  const scopeR = partnerScope(req);
+  if (scopeR != null && scopeR !== id) return problem(reply, 403, "forbidden", "لا تملك صلاحية تسجيل نتائج لشريك آخر");
   const b = partnerBody(req);
   const list = Array.isArray(b.results) ? b.results : null;
   if (!list || !list.length) return problem(reply, 400, "invalid_field", "لا نتائج", "results");
@@ -1932,6 +2144,8 @@ app.patch("/admin/partner-results/:id", async (req, reply) => {
   const note = typeof b.note === "string" ? b.note.trim() : "";
   if (note.length > partnerDom.RESULT_NOTE_MAX) return problem(reply, 400, "invalid_field", "الملاحظة أطول من " + partnerDom.RESULT_NOTE_MAX + " حرفًا", "note");
   return withDb(reply, async () => {
+    const scopeP = partnerScope(req);
+    if (scopeP != null && (await db.partnerResultOwner(id)) !== scopeP) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
     const r = await db.updatePartnerResult(id, { result, note: note || null }, ifUpdatedAt, adminName(req), await db.defaultStageKey());
     if (!r) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
     if ("refused" in r) {
@@ -1949,6 +2163,8 @@ app.delete("/admin/partner-results/:id", async (req, reply) => {
   const id = idParam(req);
   if (id == null) return problem(reply, 400, "invalid_field", "رقم النتيجة غير صحيح", "id");
   return withDb(reply, async () => {
+    const scopeD = partnerScope(req);
+    if (scopeD != null && (await db.partnerResultOwner(id)) !== scopeD) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
     const r = await db.deletePartnerResult(id);
     if (!r) return problem(reply, 404, "unknown_result", "لا نتيجة بهذا الرقم", "id");
     if (r === "handed_over") return problem(reply, 409, "result_handed_over", "حُوّل هذا العميل إلى فريق المبيعات — لا تُحذف نتيجته");
@@ -3133,6 +3349,7 @@ const main = async () => {
   templates.assertButtonsHandled(agent.EMITTED_BUTTONS);
   tracker.setTestNumbers([cfg.notifyNumber]);  // the PM's own chat is sandbox traffic by definition
   await db.init();                            // memory-only if DATABASE_URL unset/down
+  await refreshUserCreds();                   // S7: user tokens beside ADMIN_TOKEN
   // Everything the process reads from Postgres into memory, in one place, because it must run at
   // TWO moments: boot, and the reconnect a latched-off pool makes 30s after Postgres returns.
   // Every step is idempotent — hydrate() self-guards against a second run (a reconnect after a
@@ -3167,6 +3384,7 @@ const main = async () => {
       if (made) log({ at: "boot", msg: `opp_auto backfill: ${made} opportunity line(s) from hot readings` });
     }
     await agent.refreshKb();
+    await refreshUserCreds();                 // S7: a boot during a database outage left no user able to sign in
     // The agent's account facts. Loaded once into a synchronous snapshot, then kept current
     // by every import and every fact write — systemPrompt is sync and must not wait on a query.
     await accounts.refresh();

@@ -59,6 +59,9 @@ ROUTES = [
     ("#accounts", "مصدر الإضافة"),
     # Both the empty state and the loaded screen name the three results; the loading and error states do not.
     ("#partners", "غير مهتم"),
+    # S7: the permissions matrix renders on the users screen whether or not any user exists.
+    ("#users", "مصفوفة الصلاحيات"),
+    ("#audit", "سجل التدقيق"),
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
