@@ -18,7 +18,8 @@ import * as segments from "./segments.js";
 import { checkOutbound } from "./outbound.js";
 import * as templates from "./templates.js";
 import { countPotentialClientsAcross, countPotentialClientsByProduct } from "./interest.js";
-import { CONFIRMED_INTEREST_STAGES, OPP_STAGES } from "./opps-domain.js";
+import { CONFIRMED_INTEREST_STAGES, OPP_STAGES, OPP_SOURCES as OPP_SOURCE_LABELS, calculateLineValue, isLinePriced } from "./opps-domain.js";
+import * as pipelineReport from "./pipeline-report-domain.js";
 import * as sysCfg from "./config-domain.js";
 import * as pd from "./product-domain.js";
 import * as ind from "./indicator-domain.js";
@@ -1085,6 +1086,45 @@ app.get("/admin/reports/rollups", async (req, reply) => {
       dept: { title: "لا شيء معلّق على أي إدارة", body: "لا إجراء مفتوح مسنَد إلى إدارة." },
       reason: { title: "لا خسائر مسجّلة", body: "لم تُغلق أي صفقة بنتيجة خسارة." },
     },
+  };
+});
+
+// «نظرة تنفيذية» — the five pipeline reports (pipeline-report-domain.ts). Computed on read from the
+// opportunities table and the stage ledger; nothing is cached, so the page can never disagree with
+// the board it sits beside.
+app.get("/admin/reports/pipeline", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  // A database blip must not read as «no pipeline»: the V5 board once said «لا فرص مسجّلة بعد» over
+  // six real deals for exactly this reason.
+  if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  const days = Number((req.query as any)?.days ?? 30);
+  if (!Number.isInteger(days) || days < 7 || days > 365) return problem(reply, 400, "invalid_field", "المدة بين 7 و365 يومًا", "days");
+  const [opps, events, ladder] = await Promise.all([db.listOpps(), db.listStageEvents(), db.listStages()]);
+  const report = pipelineReport.buildPipelineReport({
+    now: Date.now(), days, events,
+    stages: ladder.map((s) => ({
+      key: s.key, label: s.label, position: s.position, weightPct: s.weightPct,
+      // A rung the admin gave no SLA still stalls at the compiled default when the ladder says so,
+      // the same rule the board's «متأخرة» applies.
+      slaDays: s.slaDays ?? (sales.STALL_STAGES.includes(s.key) ? sales.STALL_DAYS : null),
+      terminal: s.terminal,
+    })),
+    lines: opps.map((o) => {
+      const facts = { stage: o.stage, salePrice: Number(o.sale_price), years: Number(o.years), quantity: Number(o.qty),
+        discountPercent: Number(o.discount), stageEnteredAt: Number(o.stage_at) };
+      return {
+        id: o.id, stage: o.stage, product: o.product, source: o.source,
+        value: calculateLineValue(facts), priced: isLinePriced(facts),
+        createdAt: Number(o.created_at), stageAt: Number(o.stage_at),
+      };
+    }),
+    sourceLabels: OPP_SOURCE_LABELS,
+  });
+  return {
+    ok: true, report,
+    stages: ladder.map((s) => ({ key: s.key, label: s.label, position: s.position, terminal: s.terminal })),
+    sourceLabels: OPP_SOURCE_LABELS,
+    valueBasis: { label: sales.VALUE_BASIS_LABEL, note: sales.VALUE_BASIS_NOTE },
   };
 });
 

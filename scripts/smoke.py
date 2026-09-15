@@ -48,7 +48,8 @@ ROUTES = [
     # data, so they go red if the endpoint behind the screen breaks — which is the whole reason
     # these two screens exist.
     ("#products", "جاهزية المساعد"),
-    ("#reports", "الخسائر بسبب التكامل"),
+    # «نظرة تنفيذية» is the default face of «التقارير» since 2026-09-15; its first card is the landmark.
+    ("#reports", "قمع المراحل"),
     ("#tasks", "الأولوية"),
     ("#notes", "ملاحظة"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),

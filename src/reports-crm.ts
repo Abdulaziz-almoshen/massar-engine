@@ -83,7 +83,20 @@ function rpAge(d) {
   return '<span class="crm-st ' + cls + '"><i></i><span class="rp-days">' + fmtN(n) + '</span> يومًا</span>';
 }
 
+/* «التقارير» has two faces. «نظرة تنفيذية» answers the CPO's questions about the whole pipeline
+   (pipeline-report-domain.ts); «تقارير التعثّر» is the original four — which deal is stuck, on whom. */
+var rpMode = "exec";
+window.rpSetMode = function (m) { rpMode = m === "stuck" ? "stuck" : "exec"; render(false); };
 function vReportsCrm() {
+  var h = '<div class="rp-tabs rp-modes" role="group" aria-label="نوع التقرير">' +
+    '<button class="rp-tab' + (rpMode === "exec" ? " on" : "") + '" aria-pressed="' + (rpMode === "exec") + '" onclick="rpSetMode(&quot;exec&quot;)">نظرة تنفيذية</button>' +
+    '<button class="rp-tab' + (rpMode === "stuck" ? " on" : "") + '" aria-pressed="' + (rpMode === "stuck") + '" onclick="rpSetMode(&quot;stuck&quot;)">تقارير التعثّر</button>' +
+    '<i class="ind"></i></div>';
+  setTimeout(function () { moveInd(document.querySelector(".rp-modes")); }, 0);
+  return h + (rpMode === "exec" ? vReportsExec() : vReportsStuck());
+}
+
+function vReportsStuck() {
   rpLoad();
   if (!rpList) return moSkeleton(4, ["w40", "w80", "w60"]);
   if (!rpList.length) return '<div class="crm-empty"><b>لا تقارير</b>لم يُعرَّف أي تقرير.</div>';
@@ -98,7 +111,7 @@ function vReportsCrm() {
 
   /* Placed after the strip is in the DOM; render() writes innerHTML, so the measure has to wait a
      frame or getBoundingClientRect reads zeros. */
-  setTimeout(function () { moveInd(document.querySelector(".rp-tabs")); }, 0);
+  setTimeout(function () { moveInd(document.querySelector(".rp-tabs:not(.rp-modes)")); }, 0);
 
   var cur = rpData[rpPick];
   if (!cur) return h + moSkeleton(4, ["w60", "w80", "w40"]);

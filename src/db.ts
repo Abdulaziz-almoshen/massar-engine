@@ -3643,6 +3643,26 @@ export async function runReport(def: {
   }));
 }
 
+/**
+ * The whole stage ledger, oldest first, for «نظرة تنفيذية». An event that a later row CORRECTS is
+ * left out: the correction is the fact, and counting both would move a deal twice. The table is one
+ * row per real stage change (a few per deal), so a full read is the honest size of the question.
+ */
+export async function listStageEvents(): Promise<{
+  oppId: number; fromStage: string | null; toStage: string; at: number; actor: string | null;
+}[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT e.opp_id, e.from_stage, e.to_stage, (EXTRACT(EPOCH FROM e.effective_at) * 1000)::bigint AS at, e.actor
+       FROM track_stage_events e
+      WHERE NOT EXISTS (SELECT 1 FROM track_stage_events c WHERE c.corrects_id = e.id)
+      ORDER BY e.effective_at, e.id`);
+  return r.rows.map((x: any) => ({
+    oppId: Number(x.opp_id), fromStage: x.from_stage ?? null, toStage: String(x.to_stage),
+    at: Number(x.at), actor: x.actor ?? null,
+  }));
+}
+
 export type QuarterLine = {
   quarter: number; startMs: number; endMs: number;
   target: number; achieved: number; wonCount: number; coveragePct: number | null;
