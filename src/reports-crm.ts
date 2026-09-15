@@ -86,14 +86,15 @@ function rpAge(d) {
 /* «التقارير» has two faces. «نظرة تنفيذية» answers the CPO's questions about the whole pipeline
    (pipeline-report-domain.ts); «تقارير التعثّر» is the original four — which deal is stuck, on whom. */
 var rpMode = "exec";
-window.rpSetMode = function (m) { rpMode = m === "stuck" ? "stuck" : "exec"; render(false); };
+window.rpSetMode = function (m) { rpMode = m === "stuck" || m === "kpis" ? m : "exec"; render(false); };
 function vReportsCrm() {
   var h = '<div class="rp-tabs rp-modes" role="group" aria-label="نوع التقرير">' +
     '<button class="rp-tab' + (rpMode === "exec" ? " on" : "") + '" aria-pressed="' + (rpMode === "exec") + '" onclick="rpSetMode(&quot;exec&quot;)">نظرة تنفيذية</button>' +
     '<button class="rp-tab' + (rpMode === "stuck" ? " on" : "") + '" aria-pressed="' + (rpMode === "stuck") + '" onclick="rpSetMode(&quot;stuck&quot;)">تقارير التعثّر</button>' +
+    '<button class="rp-tab' + (rpMode === "kpis" ? " on" : "") + '" aria-pressed="' + (rpMode === "kpis") + '" onclick="rpSetMode(&quot;kpis&quot;)">مؤشرات الأداء</button>' +
     '<i class="ind"></i></div>';
   setTimeout(function () { moveInd(document.querySelector(".rp-modes")); }, 0);
-  return h + (rpMode === "exec" ? vReportsExec() : vReportsStuck());
+  return h + (rpMode === "exec" ? vReportsExec() : rpMode === "kpis" && typeof vReportsKpis === "function" ? vReportsKpis() : vReportsStuck());
 }
 
 function vReportsStuck() {

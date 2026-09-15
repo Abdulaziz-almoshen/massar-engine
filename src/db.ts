@@ -2019,6 +2019,54 @@ export async function moveQuote(id: number, to: string, apply: boolean, by: stri
   } finally { client.release(); }
 }
 
+// ------------------------------ campaign results and KPIs (BRD §13, §23, S4) ------------------------------
+
+/** Everything the campaign chain past «مهتم» is computed from, in five reads. Attribution and counting are
+ *  campaign-results-domain's; this layer only fetches. */
+export async function campaignResultsInput(): Promise<{
+  lines: { id: number; phone: string | null; product: string; source: string; sourceRef: string | null; createdAt: number; stage: string; value: number; account: string }[];
+  hot: { phone: string; product: string; ts: number }[]; meetingLineIds: number[]; quoteLineIds: number[];
+}> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const [o, h, m, qt] = await Promise.all([
+    pool.query(`SELECT id, phone, product, source, source_ref, created_at, stage, account_name, ${OPP_VALUE_SQL} AS value FROM opportunities o`),
+    pool.query(`SELECT phone, product, ts FROM interest_tags WHERE level = 'hot'`),
+    pool.query(`SELECT DISTINCT opp_id FROM opp_activities WHERE kind = 'meeting' AND opp_id IS NOT NULL`),
+    // Every quote that left the building: a rejected quote was sent too.
+    pool.query(`SELECT DISTINCT opp_id FROM opp_quotes WHERE status <> 'draft'`),
+  ]);
+  return {
+    lines: o.rows.map((x) => ({ id: Number(x.id), phone: x.phone ?? null, product: String(x.product), source: String(x.source), sourceRef: x.source_ref ?? null,
+      createdAt: Number(x.created_at), stage: String(x.stage), value: Number(x.value) || 0, account: String(x.account_name) })),
+    hot: h.rows.map((x) => ({ phone: String(x.phone), product: String(x.product), ts: Number(x.ts) })),
+    meetingLineIds: m.rows.map((x) => Number(x.opp_id)),
+    quoteLineIds: qt.rows.map((x) => Number(x.opp_id)),
+  };
+}
+
+/** Human handoff (§23): real conversations (a customer wrote) and how many were handed to a person, either by
+ *  the assistant («handoff» outcome) or by an operator taking the chat. Test contacts are left out. */
+export async function handoffCounts(): Promise<{ conversations: number; handedOff: number }> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `SELECT COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM messages m WHERE m.phone = c.phone AND m.role = 'customer'))::int AS conversations,
+            COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM messages m WHERE m.phone = c.phone AND m.role = 'customer')
+                               AND (c.outcome = 'handoff' OR c.human = true))::int AS handed
+       FROM contacts c WHERE c.test = false`);
+  return { conversations: Number(r.rows[0]?.conversations) || 0, handedOff: Number(r.rows[0]?.handed) || 0 };
+}
+
+/** Customer and agent messages of real contacts since a moment, in thread order, for the reply-time median.
+ *  Bounded by time, not by a row cap: a LIMIT here would drop whole phones from the end of the order and bias
+ *  the median without saying so. */
+export async function replyTimeline(sinceMs: number): Promise<{ phone: string; role: string; ts: number }[]> {
+  if (!pool || !connected) throw new DbUnavailable();
+  const r = await pool.query(
+    `SELECT m.phone, m.role, m.ts FROM messages m JOIN contacts c ON c.phone = m.phone
+      WHERE c.test = false AND m.ts >= $1 AND m.role IN ('customer','agent') ORDER BY m.phone, m.ts`, [sinceMs]);
+  return r.rows.map((x) => ({ phone: String(x.phone), role: String(x.role), ts: Number(x.ts) }));
+}
+
 // ------------------------------ contact insights (فهم المساعد cache) ------------------------------
 
 export async function getInsightsRow(phone: string): Promise<{ data: unknown; turns_at: number; computed_at: number } | null> {
@@ -2249,15 +2297,15 @@ export async function createCampaign(name: string, product: string, message: str
 export async function listCampaigns(): Promise<{
   id: number; name: string; product: string | null; message: string | null; created_at: string;
   test: boolean; origin: Record<string, unknown> | null; objective: string | null;
-  targets: { phone: string; name: string | null }[];
+  targets: { phone: string; name: string | null; outcome: string | null }[];
 }[]> {
   if (!pool || !connected) return [];
   const cs = (await pool.query(`SELECT * FROM campaigns ORDER BY created_at DESC`)).rows;
-  const ts = (await pool.query(`SELECT campaign_id, phone, name FROM campaign_targets`)).rows;
+  const ts = (await pool.query(`SELECT campaign_id, phone, name, outcome FROM campaign_targets`)).rows;
   return cs.map((c) => ({
     id: Number(c.id), name: c.name, product: c.product, message: c.message, created_at: c.created_at,
     test: Boolean(c.test), origin: c.origin ?? null, objective: c.objective ?? null,
-    targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name })),
+    targets: ts.filter((t) => Number(t.campaign_id) === Number(c.id)).map((t) => ({ phone: t.phone, name: t.name, outcome: t.outcome ?? null })),
   }));
 }
 
@@ -2926,8 +2974,12 @@ export async function autoOppFromHot(phone: string, product: string, waName?: st
   // number, which is the last honest thing left to show.
   const ent = await pool.query(`SELECT name FROM entities WHERE phone = $1`, [phone]);
   const account = (ent.rows[0] && ent.rows[0].name) || waName || phone;
+  // The campaign that could have produced this reading: live, selling this product (or none), and whose
+  // message actually reached the phone. The newest target row alone once named a rehearsal or another product.
   const camp = await pool.query(
-    `SELECT campaign_id FROM campaign_targets WHERE phone = $1 ORDER BY campaign_id DESC LIMIT 1`, [phone]);
+    `SELECT t.campaign_id FROM campaign_targets t JOIN campaigns c ON c.id = t.campaign_id
+      WHERE t.phone = $1 AND c.test = false AND (c.product IS NULL OR c.product = $2) AND (t.outcome IS NULL OR t.outcome = 'sent')
+      ORDER BY c.created_at DESC LIMIT 1`, [phone, name]);
   const rows = await createOppLines(
     { account_name: account, phone, source: "whatsapp",
       source_ref: camp.rows[0] ? String(camp.rows[0].campaign_id) : null, created_by: "المساعد" },

@@ -39,6 +39,8 @@ import { ACCOUNTS_CRM_CSS, ACCOUNTS_CRM_JS } from "./accounts-crm.js";
 import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
 import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
 import { OPP_WORK_DOMAIN_JS } from "./opp-work-domain.js";
+import { CAMPAIGN_RESULTS_CRM_CSS, CAMPAIGN_RESULTS_CRM_JS } from "./campaign-results-crm.js";
+import { CAMPAIGN_RESULTS_DOMAIN_JS } from "./campaign-results-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -718,6 +720,7 @@ ${ACCOUNTS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
+${CAMPAIGN_RESULTS_CRM_CSS}
 ${PALETTE_CSS}
 /* LAST. The V3 shell and component language wins on cascade order — see revamp.ts. */
 ${REVAMP_CSS}
@@ -4849,6 +4852,8 @@ ${STAGE_TONE_JS}
 ${OPPS_CRM_JS}
 ${OPP_WORK_CRM_JS}
 ${OPP_WORK_DOMAIN_JS}
+${CAMPAIGN_RESULTS_CRM_JS}
+${CAMPAIGN_RESULTS_DOMAIN_JS}
 ${SALES_CRM_JS}
 ${PALETTE_JS}
 /* campaigns-crm must be initialised BEFORE the first refresh()/render(): its state vars are plain

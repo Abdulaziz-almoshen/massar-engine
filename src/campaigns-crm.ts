@@ -778,6 +778,8 @@ function vKmonDetailCrm(id, d) {
         '<div class="mb"><i style="width:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%;background:' + c[2] + ';"></i></div></div>';
     }).join("") + '</div>' +
     '<div style="font-size:12px;color:#656B76;margin-top:10px;">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</div>';
+    /* BR-MON-004/006: what the campaign led to after «مهتم» (campaign-results-crm). */
+    if (typeof crChainCard === "function") h += crChainCard(camp, st);
     return h;
   }
 

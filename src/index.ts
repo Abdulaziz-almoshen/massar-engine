@@ -25,6 +25,7 @@ import * as pd from "./product-domain.js";
 import * as ind from "./indicator-domain.js";
 import * as acct from "./account-domain.js";
 import * as work from "./opp-work-domain.js";
+import * as results from "./campaign-results-domain.js";
 import { activityByDay, activityFromCounts, readSeriousness } from "./signal-domain.js";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -980,6 +981,12 @@ app.get("/assets/indicator-template.xlsx", async (_req, reply) => {
 app.get("/admin/campaign-suggestions", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
+  return suggestionsPayload();
+});
+
+/** The suggestions and their adoption, shared by the campaigns page and «مؤشرات الأداء» so the KPI and the
+ *  panel can never count adoption two ways. */
+async function suggestionsPayload() {
   const days = suppressionDays();
   const since = Date.now() - days * 86_400_000;
   const [indicators, entities, catalogue, recent, withOrigin, opps, dismissals] = await Promise.all([
@@ -1009,7 +1016,7 @@ app.get("/admin/campaign-suggestions", async (req, reply) => {
     },
     dismissals: dismissals.slice(0, 20),
   };
-});
+}
 
 app.post("/admin/campaign-suggestions/dismiss", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
@@ -2752,6 +2759,70 @@ app.post("/admin/contact/test", async (req, reply) => {
 app.get("/admin/campaigns", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   return db.listCampaigns();
+});
+
+// ---- the campaign chain past «مهتم» and the §23 KPIs (client A BRD, S4) --------------------------
+// Read-only. The top of the funnel (sent, seen, replied, interested) stays on the page, computed from the
+// contact ledger its cards already use; these routes add what happened afterwards.
+async function computeCampaignResults() {
+  const [campaigns, input] = await Promise.all([db.listCampaigns(), db.campaignResultsInput()]);
+  // Only targets the message reached can earn a campaign anything (a refused send is not a contact).
+  const refs = campaigns.map((c) => ({ id: c.id, launchedAt: Number(c.created_at), product: c.product || null,
+    phones: c.targets.filter((t) => results.isReachedOutcome(t.outcome)).map((t) => String(t.phone)), test: c.test }));
+  const byCampaign = results.attributeLines(refs, input.lines);
+  const hotByCampaign = results.attributeHot(refs, input.hot);
+  const lineById = new Map(input.lines.map((l) => [l.id, l]));
+  return campaigns.map((c) => {
+    const lines = (byCampaign.get(c.id) || []).map((id) => lineById.get(id)!).filter(Boolean);
+    const summary = results.summarizeResults(hotByCampaign.get(c.id) || [],
+      lines.map((l) => ({ id: l.id, phone: l.phone, stage: l.stage, value: l.value })), input.meetingLineIds, input.quoteLineIds);
+    return { id: c.id, name: c.name, product: c.product, createdAt: Number(c.created_at), test: c.test, origin: c.origin, objective: c.objective, targeted: c.targets.length, results: summary,
+      lines: lines.map((l) => ({ id: l.id, account: l.account, product: l.product, stage: l.stage, value: l.value, phone: l.phone })) };
+  });
+}
+
+app.get("/admin/campaigns/:id/results", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = idParam(req);
+  if (id == null) return problem(reply, 400, "invalid_field", "رقم الحملة غير صحيح", "id");
+  return withDb(reply, async () => {
+    const one = (await computeCampaignResults()).find((c) => c.id === id);
+    if (!one) return problem(reply, 404, "unknown_campaign", "لا حملة بهذا الرقم", "id");
+    return { ok: true, attributionDays: results.ATTRIBUTION_DAYS, ...one };
+  });
+});
+
+app.get("/admin/kpis", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  return withDb(reply, async () => {
+    const per = resolvePeriod({});
+    const [all, sugg, handoff, timeline, perf, catalogue] = await Promise.all([
+      computeCampaignResults(), suggestionsPayload(), db.handoffCounts(), db.replyTimeline(Date.now() - 30 * 86_400_000),
+      "bad" in per ? Promise.resolve([]) : db.salesPerformance(per.startMs, per.endMs, per.year, per.quarter, per.isCurrentPeriod), productRows(),
+    ]);
+    const live = all.filter((c) => !c.test);
+    const sum = (k: keyof results.CampaignResults) => live.reduce((a, c) => a + c.results[k], 0);
+    const fromIndicators = live.filter((c) => Array.isArray((c.origin as any)?.indicatorIds) && (c.origin as any).indicatorIds.length);
+    const target = (perf as { target: number; achieved: number }[]).reduce((a, r) => ({ target: a.target + (Number(r.target) || 0), achieved: a.achieved + (Number(r.achieved) || 0) }), { target: 0, achieved: 0 });
+
+    return {
+      ok: true, attributionDays: results.ATTRIBUTION_DAYS,
+      campaigns: live.map((c) => ({ id: c.id, name: c.name, product: c.product, createdAt: c.createdAt, targeted: c.targeted, results: c.results })),
+      totals: { campaigns: live.length, qualified: sum("qualified"), opportunities: sum("opportunities"), meetings: sum("meetings"), quotes: sum("quotes"),
+        won: sum("won"), wonLines: sum("wonLines"), closedLines: sum("closedLines"), revenue: sum("revenue"), openValue: sum("openValue") },
+      adoption: { launched: sugg.adoption.launched, dismissed: sugg.adoption.dismissed, open: sugg.adoption.open, pct: results.adoptionRate(sugg.adoption.launched, sugg.adoption.dismissed) },
+      indicatorYield: { suggestionsNow: sugg.suggestions.length, campaigns: fromIndicators.length,
+        opportunities: fromIndicators.reduce((a, c) => a + c.results.opportunities, 0), revenue: fromIndicators.reduce((a, c) => a + c.results.revenue, 0) },
+      target: "bad" in per ? null : { year: per.year, quarter: per.quarter, target: target.target, achieved: target.achieved, pct: (() => { const v = sales.attainmentPct(target.achieved, target.target); return v === null ? null : Math.round(v); })() },
+      assistant: {
+        handoff: { ...handoff, pct: results.handoffRate(handoff.handedOff, handoff.conversations) },
+        medianReplySeconds: results.medianReplySeconds(timeline),
+        // Stated, not invented: the assistant emits no confidence for its answers, so there is nothing to average.
+        answerConfidence: null,
+        productsReady: { eligible: catalogue.filter((p) => !p.archived && p.eligible).length, total: catalogue.filter((p) => !p.archived).length },
+      },
+    };
+  });
 });
 
 app.get("/admin/kb", async (req, reply) => {
