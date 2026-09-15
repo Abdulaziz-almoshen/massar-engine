@@ -90,7 +90,10 @@ export type ImportParse = {
 };
 
 export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse {
-  const wb = XLSX.read(buffer, { type: "buffer", codepage: 65001 });
+  // The same inflation bound and row bound the indicator upload uses (security review: this path had
+  // the zip-bomb shape too). sheetRows stops parsing past the cap instead of reading it and discarding.
+  if (zipTooLarge(buffer)) throw new Error("الملف أكبر مما يمكن قراءته بعد فكّ ضغطه");
+  const wb = XLSX.read(buffer, { type: "buffer", codepage: 65001, sheetRows: MAX_ROWS + 2 });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) throw new Error("الملف لا يحتوي على أي ورقة بيانات");
   const grid: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: "", raw: false });
@@ -154,4 +157,95 @@ export function parseAudienceFile(buffer: Buffer, filename: string): ImportParse
     skipped,
     totalRows: grid.length - 1,
   };
+}
+
+/** Refuse a workbook whose sheets would inflate past what this machine can hold, BEFORE the xlsx
+ *  library inflates them. An .xlsx is a zip; its central directory states every entry's uncompressed
+ *  size. Measured by the security review: a 462KB file holding 108MB of sheet XML killed a 400MB
+ *  heap inside XLSX.read — on the process that also carries the WhatsApp webhook and «إيقاف». Files
+ *  that are not zips (CSV, legacy .xls) are bounded by the upload size instead. */
+export const MAX_UNZIPPED_BYTES = 40 * 1024 * 1024;
+export function zipTooLarge(buf: Buffer): boolean {
+  if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) return false;   // not a zip
+  const from = Math.max(0, buf.length - 65557);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= from; i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) return true;                                                  // a zip we cannot read the directory of
+  const entries = buf.readUInt16LE(eocd + 10);
+  let off = buf.readUInt32LE(eocd + 16);
+  let total = 0;
+  for (let n = 0; n < entries; n++) {
+    if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) return true;
+    const size = buf.readUInt32LE(off + 24);
+    if (size === 0xffffffff) return true;                                     // ZIP64: larger than we accept
+    total += size;
+    if (total > MAX_UNZIPPED_BYTES) return true;
+    off += 46 + buf.readUInt16LE(off + 28) + buf.readUInt16LE(off + 30) + buf.readUInt16LE(off + 32);
+  }
+  return false;
+}
+
+/** The first sheet of an Excel/CSV file as a plain grid, for indicator uploads. `overflow` is true when
+ *  the sheet holds more data rows than MAX_ROWS — the caller refuses it rather than silently keeping
+ *  the first 5,000 (eng + codex review). sheetRows bounds the parse itself. Phone-shaped numbers come
+ *  from the RAW cell, as in parseAudienceFile: a General-formatted 966512345678 formats as 9.66512E+11. */
+/** What the bytes actually are. The extension is a claim; a renamed text file or random bytes were
+ *  accepted as «spreadsheets» and showed as thousands of garbage rows (QA). */
+export function sniffSheet(buf: Buffer, filename: string): "zip" | "cfb" | "text" | "unknown" {
+  const ext = (filename.match(/\.([a-z0-9]+)$/i)?.[1] || "").toLowerCase();
+  if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04) return ext === "xlsx" ? "zip" : "unknown";
+  if (buf.length >= 8 && buf.readUInt32BE(0) === 0xd0cf11e0 && buf.readUInt32BE(4) === 0xa1b11ae1) return ext === "xls" ? "cfb" : "unknown";
+  if (ext !== "csv") return "unknown";
+  const sample = buf.subarray(0, Math.min(buf.length, 64_000));
+  let control = 0;
+  for (const b of sample) if (b === 0 || (b < 9) || (b > 13 && b < 32)) control++;
+  return control > sample.length * 0.01 ? "unknown" : "text";
+}
+
+/** A CSV as text. Excel's «CSV UTF-8» starts with a BOM, and an older Arabic Excel writes Windows-1256;
+ *  both used to reach SheetJS as bytes and come back as mojibake with every column shifted (QA). */
+export function decodeCsv(buf: Buffer): string {
+  let b = buf;
+  if (b.length >= 3 && b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) b = b.subarray(3);
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(b); }
+  catch { return new TextDecoder("windows-1256").decode(b); }
+}
+
+export function gridFromFile(buffer: Buffer, filename = "file.xlsx"): { grid: string[][]; overflow: boolean } {
+  const kind = sniffSheet(buffer, filename);
+  if (kind === "unknown") throw new Error("ليس ملف جدول بيانات صالحًا — استخدم XLSX أو XLS أو CSV");
+  if (kind === "text") {
+    // raw strings: a CSV phone «0500000810» must not become the number 500000810.
+    const wbText = XLSX.read(decodeCsv(buffer), { type: "string", raw: true, sheetRows: MAX_ROWS + 2 });
+    const sh = wbText.Sheets[wbText.SheetNames[0]];
+    const g: string[][] = (XLSX.utils.sheet_to_json(sh, { header: 1, defval: "", raw: false }) as unknown[][])
+      .map((row) => (row ?? []).map((c) => String(c ?? "").trim()));
+    return { grid: g.slice(0, MAX_ROWS + 1), overflow: g.length > MAX_ROWS + 1 };
+  }
+  if (zipTooLarge(buffer)) throw new Error("الملف أكبر مما يمكن قراءته بعد فكّ ضغطه");
+  const wb = XLSX.read(buffer, { type: "buffer", codepage: 65001, sheetRows: MAX_ROWS + 2 });
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) throw new Error("الملف لا يحتوي على أي ورقة بيانات");
+  const sheet = wb.Sheets[sheetName];
+  const rawGrid: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+  const grid: string[][] = rawGrid.map((row, r) => (row ?? []).map((raw, c) => {
+    if (typeof raw === "number" && Number.isInteger(raw) && String(raw).length >= 9) return String(raw);
+    const cell = sheet[XLSX.utils.encode_cell({ r, c })];
+    return String(cell && cell.w != null ? cell.w : raw ?? "").trim();
+  }));
+  return { grid: grid.slice(0, MAX_ROWS + 1), overflow: grid.length > MAX_ROWS + 1 };
+}
+
+/** The indicator fill-in template: the prototype's columns plus the phone, which is the strongest key. */
+export function buildIndicatorTemplateXlsx(): Buffer {
+  const rows = [
+    ["اسم العميل", "المعرف", "الجوال", "قيمة المؤشر", "الفترة", "ملاحظات"],
+    ["مجمع النور الطبي (مثال — امسح هذا الصف)", "C-1042", "0512345678", "87%", "الربع 2 2026", "استخدام مستقر"],
+    ["مستشفى الحياة (مثال)", "C-1077", "", "64%", "الربع 2 2026", ""],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 36 }, { wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 22 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "بيانات المؤشر");
+  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }

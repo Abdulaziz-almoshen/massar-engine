@@ -31,6 +31,8 @@ import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
 import { CONFIG_DOMAIN_JS } from "./config-domain.js";
 import { SETTINGS_CRM_CSS, SETTINGS_CRM_JS } from "./settings-crm.js";
+import { INDICATORS_CRM_CSS, INDICATORS_CRM_JS } from "./indicators-crm.js";
+import { INDICATOR_DOMAIN_JS } from "./indicator-domain.js";
 import { PALETTE_CSS, PALETTE_JS } from "./palette.js";
 
 export const DASHBOARD_HTML = `<!doctype html>
@@ -704,6 +706,7 @@ ${PRODUCTS_CRM_CSS}
 ${REPORTS_CRM_CSS}
 ${TARGETS_CRM_CSS}
 ${SETTINGS_CRM_CSS}
+${INDICATORS_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${PALETTE_CSS}
@@ -909,7 +912,9 @@ const NAV = [
 // rollup layer as the sector.
 const SUBS = {
   opps:      [["opps", "الفرص"], ["triage", "فرز الردود"], ["pipeline", "لوحة المتابعة"]],
-  customers: [["customers", "العملاء"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
+  // «مؤشرات الاستخدام» sits under العملاء because the prototype put it there (client A, Sep 15):
+  // an indicator is a statement about customers, and its list is read beside theirs.
+  customers: [["customers", "العملاء"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
@@ -920,6 +925,7 @@ const SUBS = {
 // a route ends up highlighting no door at all, or two.
 const DOOR_OF = (function () {
   const m = { customer: "customers",     // #customer/<phone> is a detail view of العملاء
+              indicator: "customers",    // #indicator/new and #indicator/<id> are the indicator form
               product: "products",       // #product/<name> and #sector/<name> are detail views
               sector: "products" };      //   of المنتجات — the door stays lit inside a drill
   for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
@@ -941,6 +947,8 @@ const TITLES = {
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
+  indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
+  indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
   divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
   team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
 };
@@ -1039,6 +1047,10 @@ function nav() {
     }
     return n ? [fmtN(n), cls, tip.join(" · ")] : null;
   };
+  // #crumbact belongs to the route that painted it. Nothing cleared it, so «إضافة مؤشر» (and the
+  // customer list's «استيراد جهات» before it) followed the operator onto every later screen, including
+  // the wizard (design review). Cleared on a route change only, so a repaint on the same route does not flicker.
+  { const rk = (location.hash || "").slice(1); if (rk !== window.__crumbRoute) { window.__crumbRoute = rk; const ca = document.getElementById("crumbact"); if (ca) ca.innerHTML = ""; } }
   document.getElementById("nav").innerHTML = NAV.map((x) => {
     const b = doorBadge(x.id);
     return '<button class="nv' + (x.id === cur ? " on" : "") + (PAL_SOON[x.id] ? " soon" : "") + '" onclick="location.hash=\\'' + x.id + '\\'" title="' + (b ? b[2] : x.l) + '">' +
@@ -1056,7 +1068,7 @@ function nav() {
   document.getElementById("subnav").innerHTML = band || (subs.length > 1
     ? subs.map((sx) => {
         const sb = badges[sx[0]];
-        return '<button class="sub' + (sx[0] === raw ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
+        return '<button class="sub' + (sx[0] === raw || (raw === "indicator" && sx[0] === "indicators") ? " on" : "") + (PAL_SOON[sx[0]] ? " soon" : "") + '" onclick="location.hash=\\'' + sx[0] + '\\'">' + sx[1] +
           (sb ? '<span class="sbdg">' + sb[0] + "</span>" : "") + "</button>";
       }).join("")
     : "");
@@ -1857,8 +1869,9 @@ function tagList() {
   entities.forEach((e) => (e.productTags || []).forEach((t) => { n[t] = (n[t] || 0) + 1; }));
   return tagReg.map((t) => ({ name: t.name, count: n[t.name] || 0, archived: !!t.archived }));
 }
-function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate); }
+function prodFilterOn() { return Boolean(prodFilter.uses || prodFilter.notUses || prodFilter.interest || prodFilter.candidate || (typeof wizIndF !== "undefined" && wizIndF)); }
 function entMatchesProduct(e) {
+  if (typeof indEntityInFilter === "function" && !indEntityInFilter(e)) return false;
   if (prodFilter.candidate && !entTagged(e, prodFilter.candidate)) return false;
   if (prodFilter.uses && !entUses(e, prodFilter.uses)) return false;
   if (prodFilter.notUses && entUses(e, prodFilter.notUses)) return false;
@@ -2172,7 +2185,9 @@ window.confirmLaunch = async () => {
     if (!msgOut.trim()) throw new Error("نص الرسالة فارغ");
     const r = await fetch("/admin/campaign/launch", { method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-      body: JSON.stringify({ targets, message: msgOut, name: campName, product: prod, templateId: tplId }) });
+      body: JSON.stringify({ targets, message: msgOut, name: campName, product: prod, templateId: tplId,
+        objective: (typeof wizObjective !== "undefined" && wizObjective) || undefined,
+        origin: typeof wizOriginOut === "function" ? wizOriginOut(targets) : undefined }) });
     const d = await r.json().catch(() => ({}));
     closeLaunch();
     if (!r.ok) { alertBar("تعذّر الإطلاق: " + esc(d.error || r.status), true); render(false); return; }
@@ -2204,6 +2219,7 @@ window.confirmLaunch = async () => {
     }
     alertBar(launchNote + ". فتحنا لك لوحة الحملة.", failedRows.length > 0);
     entSel.clear(); campName = ""; retargetCohort = null;
+    if (typeof wizAfterLaunch === "function") wizAfterLaunch();
     setTimeout(() => { location.hash = d.campaignId ? "kmon/" + d.campaignId : "kmon"; refresh(); }, 1200);
   } catch (e) {
     closeLaunch();
@@ -2260,7 +2276,7 @@ function vAffinityBand(selName, matched) {
       (owners ? " (" + fmtN(owners) + ")" : "") + "</button>" +
       '<span style="font-size:12px;color:#656B76;">الخدمة التي تبيعها هذه الحملة — لا داعي لإعادة اختيارها.</span></div>';
   }
-  h += '<div class="row">' + tagSel() +
+  h += '<div class="row">' + tagSel() + (typeof indWizardSelect === "function" ? indWizardSelect() : "") +
     sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
     sel("notUses", "لا يستخدم:", "من ليس لدينا سجل بأنه يستخدمها", (p) => p.uses) +
     sel("interest", "أبدى اهتمامًا بـ:", "من وسم المساعد اهتمامه بها في المحادثة", (p) => p.interest) +
@@ -2277,7 +2293,7 @@ function vAffinityBand(selName, matched) {
   }
   return h + "</div>";
 }
-window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "", candidate: "" }; entSel.clear(); render(false); };
+window.clearProdFilter = () => { prodFilter = { uses: "", notUses: "", interest: "", candidate: "" }; wizIndF = ""; entSel.clear(); render(false); };
 // The wizard reads the CATALOGUE (active tags) once it is loaded, with the same eligibility the
 // products section and the launch endpoint enforce — so a product created in المنتجات appears here,
 // and one the assistant cannot sell is shown but cannot be launched (V5 spec B′).
@@ -2318,7 +2334,10 @@ function vAimkt() {
     selProd = firstOk;
     selProdName = firstOk >= 0 ? reg[firstOk].name : "";
   }
-  if (selProd >= 0 && (!reg[selProd] || reg[selProd].eligible === false)) { selProd = -1; selProdName = ""; }
+  // Guarded by catalogueKnown, like the loss rule above: while the registry is still loading, reg is
+  // empty, and this line used to wipe a NAMED selection made before navigation (a suggestion's
+  // «إنشاء حملة», or «أطلق حملة» from a product) — the wizard then landed on the first product.
+  if (catalogueKnown && selProd >= 0 && (!reg[selProd] || reg[selProd].eligible === false)) { selProd = -1; selProdName = ""; }
   const lostSelection = selLost;
   const m = entMatches();
   const selN = launchTargets().length;
@@ -2356,7 +2375,12 @@ function vAimkt() {
       return '<button class="prod' + (i === selProd ? " on" : "") + '" aria-pressed="' + (i === selProd) + '" onclick="pick(' + i + ')"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + "</button>";
     }).join("") + "</div></div>";
 
-  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">2</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
+  // Client A's BRD: suggestions at campaign creation (BR-CAM-003), or the one this draft came from.
+  if (typeof sgWizardTop === "function") h = sgWizardTop() + h;
+  // BR-CAM-001: the objective is step 2, straight after the product — it decides the opener, so asking
+  // it below the message (the first build) put the decision after its consequence (UX review).
+  if (typeof wizObjectiveStep === "function") h += wizObjectiveStep();
+  h += '<div class="step"><div class="hd"><span class="num' + (selN ? " done" : "") + '">' + (typeof wizObjectiveStep === "function" ? "3" : "2") + '</span><div><div class="ht">من يتواصل معهم؟</div><div class="hs">اختر شريحة كاملة أو حدّد جهات بعينها — العدد يُحدَّث فورًا.</div></div>' +
     '<span style="flex:1"></span><span style="display:inline-flex;align-items:baseline;gap:7px;background:#EAF1FE;border:1px solid #DCE8FC;border-radius:11px;padding:9px 16px;"><span style="font-size:18px;font-weight:600;color:#2563EB;">' + fmtN(selN) + '</span><span style="font-size:12px;color:#2563EB;font-weight:600;">' + (retargetCohort ? "فئة أُعيد التواصل معها" : "مختار من " + fmtN(entities.length)) + "</span></span></div>";
   if (!retargetCohort) {
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
@@ -2407,7 +2431,7 @@ function vAimkt() {
   }
   h += "</div>";
 
-  h += '<div class="step"><div class="hd"><span class="num">3</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">اختر قالبًا معتمدًا، أو اكتب رسالتك. استخدم {name} لاسم الجهة و{{1}} لاسم الخدمة. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
+  h += '<div class="step"><div class="hd"><span class="num">' + (typeof wizObjectiveStep === "function" ? "4" : "3") + '</span><div><div class="ht">رسالة الافتتاح</div><div class="hs">اختر قالبًا معتمدًا، أو اكتب رسالتك. استخدم {name} لاسم الجهة و{{1}} لاسم الخدمة. بعد أول رد، يتولى المساعد البائع الحوار كاملًا.</div></div></div>' +
     // The template picker. Each card states WHO it is for, because the two templates open on
     // different premises — one on a pain we assume, one on usage we already observed. Sending the
     // «استخدام مرتفع» opener to a facility that has never used the service is a visible lie.
@@ -2448,11 +2472,13 @@ function vAimkt() {
     "</div></div></div>";
 
   const selEligible = !!reg[selProd] && reg[selProd].eligible !== false;
-  const can = selN > 0 && campMsg.trim() && selEligible;
+  const can = selN > 0 && campMsg.trim() && selEligible && (typeof wizObjective === "undefined" || !!wizObjective);
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
     '<label style="font-size:12px;font-weight:600;color:#14161A;flex:none;">اسم الحملة</label>' +
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:14px;font-weight:600;color:#14161A;border:1.5px solid #ECEEF2;border-radius:11px;padding:11px 14px;">' +
     "</div>";
+  // BR-CAM-007: the repeat-targeting warning sits right above the launch bar, where it is decided on.
+  if (typeof wizRepeatBlock === "function") h += wizRepeatBlock(selName);
   // Docked, not floating, and compact on a phone. He reviews on his own device and briefs by
   // screenshot: at 390px this bar was three lines tall, occupied about a quarter of the viewport,
   // and sat directly over the template cards — the feature he asked for, hidden by the chrome.
@@ -2465,7 +2491,7 @@ function vAimkt() {
     (audMode === "behaviour" && !retargetCohort
       ? '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:500;color:#14161A;">الشريحة محسوبة — الإطلاق ينتظر القوالب المعتمدة</div>' +
         '<div style="font-size:12px;color:#656B76;margin-top:4px;">استخدم «حسب الملف» للإطلاق الآن، أو انتقل إلى الرقم الإنتاجي لتفعيل الإرسال بالقوالب.</div></div>'
-      : '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:600;color:#14161A;">' + fmtN(selN) + " جهة استهداف · " + esc(selName) +
+      : '<div style="flex:1;min-width:200px;"><div style="font-size:14px;font-weight:600;color:#14161A;">' + pluralizeArabic(selN, "عميل واحد", "عميلان", "عملاء", "عميلًا", fmtN) + " · " + esc(selName) +
     // This chip used to claim the file was attached to the opener. It is not — the opener OFFERS
     // it and the preview caption twenty pixels above said so, so the screen contradicted itself.
     // State what will actually be sent, next to the button that sends it.
@@ -2475,13 +2501,17 @@ function vAimkt() {
       // No product at all: the catalogue is loading or failed, and step 1 already says which.
       ? '<span style="font-size:12px;color:#7A5600;max-width:240px;">لا منتج محدد — القائمة أعلاه تقول لماذا.</span>'
       : '<span style="font-size:12px;color:#7A5600;max-width:240px;">' + esc(reg[selProd].why || "لا يبيعه المساعد") + ' — <a href="#product/' + encodeURIComponent(selName) + '/knowledge" style="color:#1A47BE;font-weight:600;">افتح المنتج</a></span>') +
+    (typeof wizObjective !== "undefined" && !wizObjective && selN > 0 ? '<button type="button" onclick="wizGoObjective()" style="font-family:inherit;font-size:12px;font-weight:600;color:#7A5600;background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px;min-height:32px;">اختر هدف الحملة ↑</button>' : "") +
     '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
       ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:var(--z-overlay);align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #5B8DEF;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +
     '<div style="font-size:16px;font-weight:600;color:#14161A;margin-bottom:8px;">تأكيد إطلاق الحملة</div>' +
-    '<div style="font-size:14px;color:#33373E;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2563EB;">' + fmtN(selN) + ' مستهدف</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
+    // BR-CAM-006: the review is the confirmation — audience, product, objective, channel, timing, source
+    // and the message itself, in the one place the human approves them.
+    (typeof wizReviewSummary === "function" ? wizReviewSummary(selN, selName) : "") +
+    '<div style="font-size:14px;color:#33373E;line-height:2;margin-bottom:18px;">سيرسل المساعد رسالة الافتتاح إلى <b style="color:#2563EB;">' + pluralizeArabic(selN, "عميل واحد", "عميلين", "عملاء", "عميلًا", fmtN) + '</b> عبر واتساب (ساندبوكس)، ثم يتابع كل ردّ ببيع كامل. هذه الخطوة هي موافقتك البشرية على الإرسال.</div>' +
     (selN > 50 ? '<div style="font-size:12px;color:#B37F00;background:#FBF3DC;border-radius:10px;padding:10px 14px;line-height:1.9;margin-bottom:14px;">حد الدفعة الواحدة حاليًا <b>50</b> — قلّص الاختيار أو أطلق على دفعات. الإرسال الجماعي المجدول يأتي مع محرك الحملات القادم.</div>' : "") +
     '<div style="display:flex;gap:10px;"><button id="lgo" class="btn btn-teal" onclick="confirmLaunch()">تأكيد الإطلاق ✓</button>' +
     '<button class="btn" style="color:#33373E;background:#E5E8EE;" onclick="closeLaunch()">إلغاء</button></div></div></div>';
@@ -4220,6 +4250,8 @@ function vCustomer(ph) {
   // so a signal card put there would be exactly as buried as the prose it replaces. The whole
   // point is that these read without a click.
   h += vSignalBoard(d);
+  // BR-CUS-004: the indicators this customer sits in, outside the tab shell for the same reason.
+  h += typeof indCustomerBlock === "function" ? indCustomerBlock(c.phone) + inDrawer() : "";
   h += '<div class="crec">' + factsPanel + vAccountPanel(d) + '<div class="crecmain">';
   // فهم المساعد
   h += '<div class="card rise" style="margin:0;">' +
@@ -4400,7 +4432,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4417,6 +4449,8 @@ function render(fetchNew) {
       : cur === "products" ? vProductsCrm()
       : cur === "reports" ? vReportsCrm()
       : cur === "settings" || cur === "divisions" || cur === "team" ? vSettings(cur)
+      : cur === "indicators" ? vIndicators()
+      : cur === "indicator" ? vIndicatorForm((location.hash || "").split("/").slice(1).join("/"))
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4424,6 +4458,8 @@ function render(fetchNew) {
   // number-pop-in, applied once per paint. moNumber animates ONLY when the value differs from the
   // last render, which matters because #body is rewritten on every keystroke — an entrance replayed
   // on each one is the jump DESIGN.md §8.6 forbids.
+  // The indicators drawer adds its «in» class one frame after it is painted (indicators-crm).
+  try { if (typeof inAfterPaint === "function") inAfterPaint(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
@@ -4775,6 +4811,8 @@ ${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}
 ${TARGETS_CRM_JS}
 ${SETTINGS_CRM_JS}
+${INDICATORS_CRM_JS}
+${INDICATOR_DOMAIN_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}

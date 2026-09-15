@@ -121,6 +121,7 @@ function tgtMatches() {
     return Object.keys(tgtFilters).every(function (k) { return !tgtFilters[k] || ((e.attrs || {})[k] || "") === tgtFilters[k]; }) &&
       (!tgtProd || entUses(e, tgtProd)) &&
       (!tgtTagProd || (e.productTags || []).indexOf(tgtTagProd) >= 0) &&
+      (typeof indTargetsFilter !== "function" || indTargetsFilter(e)) &&
       (!q || e.name.includes(q) || e.phone.includes(q));
   });
 }
@@ -156,6 +157,8 @@ function tgtFacetBar() {
           esc(clip(p.name, 26)) + " (" + fmtN(p.uses) + ")</option>";
       }).join("") + "</select>";
   }
+  /* BR-CUS-003: filter the book by usage indicator (indicators-crm owns the membership read). */
+  if (typeof indTargetsSelect === "function") h += indTargetsSelect();
   h += '<span style="flex:1"></span><span class="hair"></span>';
   h += '<button class="btn btn-ghost" onclick="tgtOpenTags()">الوسوم' +
     (tagList().length ? " (" + fmtN(tagList().length) + ")" : "") + "</button>";
