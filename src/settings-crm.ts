@@ -102,7 +102,7 @@ function cfLoad(force) {
        adds a rung sees it on the board without a reload, and a paused rung stops being offered. */
     if (typeof OPP_ST !== "undefined") {
       OPP_ST = cfStages.map(function (s) {
-        return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: s.active, slaDays: s.slaDays, terminal: s.terminal };
+        return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: s.active, slaDays: s.slaDays, terminal: s.terminal, exitCriterion: s.exitCriterion || "" };
       });
     }
   }).catch(function () { cfFailed = true; })

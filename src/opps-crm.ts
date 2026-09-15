@@ -62,19 +62,29 @@ export const OPPS_CRM_CSS = `
   .ox-bar i::after { content:""; position:absolute; inset-inline:0; inset-block:-8px; }
   .ox-bar:hover i { opacity:.55; }
   .ox-bar i:hover, .ox-bar i.on { opacity:1; }
-  .ox-leg { display:flex; flex-wrap:wrap; gap:var(--s1) var(--s2); margin-top:var(--s3); }
-  .ox-lg { font-family:inherit; font-size:var(--t-xs); color:var(--ink-2); background:transparent;
-    border:1px solid transparent; border-radius:var(--r-pill); min-height:28px; padding:2px 10px;
+  /* The stage ribbon. Rungs are joined by a short connector so the row reads as ONE ladder in order,
+     not a tag cloud. A rung holding deals wears its soft tone; the filtered rung goes solid. */
+  .ox-leg { display:flex; flex-wrap:wrap; gap:var(--s2) 20px; margin-top:var(--s3); }
+  .ox-lg { position:relative; font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--tn-text, var(--ink-2)); background:var(--tn-soft, transparent);
+    border:1px solid transparent; border-radius:var(--r-pill); min-height:30px; padding:2px 12px 2px 10px;
     display:inline-flex; align-items:center; gap:6px; cursor:pointer;
-    transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
-  .ox-lg:hover { background:var(--accent-wash); }
-  .ox-lg.on { background:var(--accent-tint); border-color:var(--accent-mark); color:var(--accent-deep); }
-  .ox-lg b { font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
-  .ox-lg.on b { color:var(--accent-deep); }
+    transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease), color var(--fast) var(--ease), transform 160ms var(--ease); }
+  /* A rung that WRAPS to a new row starts that row: a connector there would point at nothing.
+     opMarkRibbonWraps() measures it after paint, because where a row breaks depends on the width. */
+  .ox-lg.wrap-start::before { display:none; }
+  .ox-lg + .ox-lg::before { content:""; position:absolute; inset-inline-start:-17px; top:50%; width:14px; height:2px;
+    margin-top:-1px; background:var(--line); border-radius:var(--r-pill); pointer-events:none; }
+  @media (hover:hover) and (pointer:fine) { .ox-lg:hover { border-color:var(--tn, var(--accent-mark)); } }
+  .ox-lg:active { transform:scale(0.97); }
+  .ox-lg.on { background:var(--tn, var(--accent)); border-color:var(--tn, var(--accent)); color:#FFFFFF; }
+  .ox-lg.on .ox-dot { background:#FFFFFF !important; }
+  .ox-lg b { font-weight:600; color:inherit; font-variant-numeric:tabular-nums; }
+  .ox-lg.on b, .ox-lg.on .n { color:#FFFFFF; border-color:rgba(255,255,255,.45); }
   /* The count sits behind a hairline, never a «·»: beside Arabic-Indic digits a middle dot reads as
      a zero («0»), and «· 5» rendered as «50» in the first screenshot of this legend. */
   .ox-lg .n { color:var(--muted); font-variant-numeric:tabular-nums; padding-inline-start:6px; border-inline-start:1px solid var(--line); line-height:14px; }
-  .ox-lg.zero b, .ox-lg.zero { color:var(--muted); font-weight:450; }
+  .ox-lg.zero:not(.on) { background:transparent; border-color:var(--line-soft); color:var(--muted); font-weight:450; }
+  .ox-lg.zero:not(.on) b { color:var(--muted); }
   .ox-mets { display:flex; align-items:stretch; border:1px solid var(--line-soft); border-radius:var(--r-md); }
   .ox-met { font-family:inherit; background:transparent; border:none; cursor:pointer; text-align:start;
     padding:var(--s2) var(--s3); min-width:112px; display:flex; flex-direction:column; gap:2px;
@@ -98,10 +108,11 @@ export const OPPS_CRM_CSS = `
     .ox-met { flex:1; min-width:0; padding-inline:var(--s2); }
     /* Two compact columns: the six stage filters stay operable without pushing the first deal
        below the fold. */
-    .ox-leg { display:grid; grid-template-columns:1fr 1fr; gap:2px var(--s2); margin-top:var(--s2); }
+    .ox-leg { display:grid; grid-template-columns:1fr 1fr; gap:4px var(--s2); margin-top:var(--s2); }
     .ox-lg { width:100%; display:grid; grid-template-columns:auto minmax(0,max-content) 1fr; grid-template-rows:auto auto;
       column-gap:6px; row-gap:0; align-items:center; text-align:start; border-radius:var(--r-sm); min-height:40px; padding:4px 6px; }
     .ox-lg > .ox-dot { grid-row:1; grid-column:1; }
+    .ox-lg + .ox-lg::before { display:none; }
     .ox-lg > span:not(.n) { grid-row:1; grid-column:2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
     /* The count follows its own label, with no hairline: at the far end of a two-column chip it read
        as belonging to the neighbouring stage. */
@@ -215,7 +226,12 @@ export const OPPS_CRM_CSS = `
     -webkit-box-orient:vertical; line-height:1.35; overflow-wrap:anywhere; }
   .ox-srcsub { display:none; font-size:var(--t-xs); color:var(--muted); align-items:center; gap:4px; }
   .ox-c-st { display:flex; flex-direction:column; gap:3px; }
-  .ox-stg { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); color:var(--ink); white-space:nowrap; }
+  /* The row's stage is a badge in its tone — the list is scanned by stage first, so the stage is the
+     cell a reader's eye should find without reading. */
+  .ox-stg { align-self:flex-start; display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:500;
+    color:var(--tn-text, var(--ink)); background:var(--tn-soft, transparent); border-radius:var(--r-pill);
+    padding:0 10px 0 8px; line-height:24px; white-space:nowrap; max-width:100%; }
+  .ox-stg > span { overflow:hidden; text-overflow:ellipsis; }
   .ox-sub { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
   .ox-warn { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; font-size:var(--t-xs); font-weight:500;
     color:var(--s-attn-text); box-shadow:inset 0 0 0 1px var(--s-attn-mark); border-radius:var(--r-pill);
@@ -296,10 +312,13 @@ export const OPPS_CRM_CSS = `
      used to widen its whole column to 520px. */
   .ox-kcol { flex:0 0 272px; width:272px; min-width:0; background:var(--surface); border-radius:var(--r-lg); padding:var(--s2);
     display:flex; flex-direction:column; gap:var(--s2); transition:box-shadow var(--fast) var(--ease); }
-  .ox-kcol.over { box-shadow:inset 0 0 0 2px var(--accent-mark); }
+  /* Each column is capped in its stage's tone, so the kanban and the ribbon above it name a rung the same way. */
+  .ox-kcol { box-shadow:inset 0 3px 0 var(--tn, transparent); }
+  .ox-kcol.over { box-shadow:inset 0 3px 0 var(--tn, transparent), inset 0 0 0 2px var(--accent-mark); }
   .ox-kh { padding:var(--s1) var(--s1) var(--s2); }
   .ox-kh .t { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-  .ox-kh .t .n { margin-inline-start:auto; font-size:var(--t-xs); font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ox-kh .t .n { margin-inline-start:auto; font-size:var(--t-xs); font-weight:600; color:var(--tn-text, var(--muted)); background:var(--tn-soft, transparent);
+    border-radius:var(--r-pill); padding:0 8px; line-height:20px; font-variant-numeric:tabular-nums; }
   .ox-kh .v { font-size:var(--t-xs); color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
   .ox-kc { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); padding:10px 12px;
     display:flex; flex-direction:column; gap:2px; cursor:pointer;
@@ -345,12 +364,42 @@ export const OPPS_CRM_CSS = `
   .ox-sec { display:flex; flex-direction:column; gap:var(--s2); }
   .ox-sec + .ox-sec { padding-top:var(--s4); border-top:1px solid var(--line-soft); }
   .ox-sech { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-  .ox-track { display:flex; gap:4px; }
-  .ox-track i { flex:1; height:6px; border-radius:var(--r-pill); background:var(--surface-2); cursor:pointer; position:relative;
-    transition:background var(--fast) var(--ease); }
-  .ox-track i::after { content:""; position:absolute; inset-inline:0; inset-block:-9px; }
-  .ox-track i:hover { background:var(--accent-mark); }
-  .ox-track i.on { background:var(--accent); }
+  /* ---- the stage stepper (tones: stage-tone-domain.ts, via --tn / --tn-soft / --tn-text) ---- */
+  .ox-steps { list-style:none; margin:0; padding:0; position:relative; display:flex; flex-direction:column; }
+  .ox-steps-pill { position:absolute; inset-inline:0; top:0; height:0; border-radius:var(--r-md); pointer-events:none;
+    background:var(--tn-soft); border-inline-start:3px solid var(--tn); }
+  .ox-step { position:relative; }
+  /* The connector runs from this rung's circle to the next one's: toned once the rung is passed. */
+  .ox-step:not(:last-of-type)::before { content:""; position:absolute; inset-inline-start:23px; top:32px; bottom:-8px;
+    width:2px; background:var(--line); border-radius:var(--r-pill); }
+  .ox-step.done::before { background:var(--tn); }
+  .ox-stb { position:relative; width:100%; font-family:inherit; display:flex; align-items:center; gap:var(--s2);
+    min-height:40px; padding:6px 12px; background:transparent; border:none; border-radius:var(--r-md); text-align:start;
+    cursor:pointer; color:var(--ink-2); transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
+  .ox-stb[disabled] { cursor:default; }
+  @media (hover:hover) and (pointer:fine) {
+    .ox-step:not(.current) .ox-stb:not([disabled]):hover { background:var(--surface); }
+    .ox-stb:not([disabled]):hover .go { opacity:1; }
+  }
+  .ox-stb:not([disabled]):active { transform:scale(0.98); }
+  .ox-stb .k { flex:none; width:24px; height:24px; border-radius:var(--r-pill); display:inline-flex; align-items:center;
+    justify-content:center; font-size:var(--t-xs); font-weight:600; font-variant-numeric:tabular-nums;
+    background:var(--paper); color:var(--muted); box-shadow:inset 0 0 0 1.5px var(--s-off-mark); position:relative; }
+  .ox-stb .k .ox-ico { width:14px; height:14px; stroke-width:2.25; }
+  .ox-stb .tx { display:flex; flex-direction:column; min-width:0; flex:1; }
+  .ox-stb .l { font-size:var(--t-sm); line-height:var(--lh-body); }
+  .ox-stb .go { font-size:var(--t-xs); font-weight:500; color:var(--accent-deep); opacity:0; transition:opacity var(--fast) var(--ease); }
+  .ox-stb:focus-visible .go { opacity:1; }
+  .ox-step.done .k { background:var(--tn); color:#FFFFFF; box-shadow:none; }
+  .ox-step.done .l { color:var(--tn-text); font-weight:500; }
+  .ox-step.current .k { background:var(--tn); color:#FFFFFF; box-shadow:0 0 0 3px var(--paper); }
+  .ox-step.current .l { color:var(--ink); font-weight:600; }
+  .ox-step.paused .l { color:var(--muted); }
+  .ox-steps.is-lost .ox-step .l { color:var(--muted); }
+  .ox-exit { display:flex; flex-direction:column; gap:2px; padding:0 12px 10px; padding-inline-start:44px;
+    font-size:var(--t-xs); color:var(--ink-2); line-height:var(--lh-body); position:relative; }
+  .ox-strow .ox-won:not([disabled]):hover { color:var(--s-issued-text); }
+  .ox-strow .ox-lost:not([disabled]):hover { color:var(--s-fail-text); }
   .ox-stnow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); color:var(--ink); }
   .ox-stnow b { font-weight:600; }
   .ox-stnow .ox-sub { white-space:normal; }
@@ -494,7 +543,9 @@ var opDelErr = "";
    isStageSelectable reads .active, and an undefined there would make every stage unselectable until
    «إعدادات النظام» had been loaded once. */
 var OPP_ST = OPP_STAGES.map(function (s) {
-  return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: true, slaDays: null, terminal: null };
+  var def = (typeof SALES_STAGES !== "undefined" ? SALES_STAGES : []).filter(function (x) { return x.key === s.key; })[0];
+  return { key: s.key, label: s.label, dot: s.dot, position: s.position, active: true, slaDays: null, terminal: null,
+    exitCriterion: def && def.exitCriterion ? def.exitCriterion : "" };
 });
 var OPP_SRC = OPP_SOURCES;
 var OPP_KCAP = 50;
@@ -525,18 +576,20 @@ function opSelectableStages(current) {
 }
 function opWonKey() { var s = OPP_ST.filter(function (x) { return isWonStage(x.key); })[0]; return s ? s.key : "won"; }
 function opLostKey() { var s = OPP_ST.filter(function (x) { return isLostStage(x.key); })[0]; return s ? s.key : "lost"; }
-/* ONE colour per stage, used by the summary bar, the legend, the row dot, the kanban header and
-   the drawer. Open stages are a single blue ramp that encodes ORDER only (DESIGN.md §5 Bar); the
-   two outcomes use the status channel. The domain's own dot colours are not used here: they were
-   eight unrelated hues, which is exactly why the V4 board read as a paint chart. */
-var OPP_RAMP = ["var(--blue-light)", "var(--accent-mark)", "var(--accent)", "var(--accent-press)", "var(--accent-deep)", "var(--s-review-text)"];
-function opColor(k) {
-  if (isWonStage(k)) return "var(--s-issued)";
-  if (isLostStage(k)) return "var(--s-fail)";
-  var open = opOpenStages();
-  for (var i = 0; i < open.length; i++) if (open[i].key === k) return OPP_RAMP[Math.min(i, OPP_RAMP.length - 1)];
-  return "var(--s-off-mark)";
+/* ONE identity per stage, used by the summary bar, the stage ribbon, the row badge, the kanban
+   header, the drawer stepper and «نظرة تنفيذية». V5 drew open stages from a single blue ramp — six
+   shades a reader could not tell apart, which is what the founder rejected on 2026-09-15. The tones
+   now come from stage-tone-domain.ts (measured, unit-tested); the label is always printed beside the
+   colour, so colour is never the only channel (DESIGN.md §3.0b). */
+function opTone(k) {
+  var open = opOpenStages(), idx = 0;
+  for (var i = 0; i < open.length; i++) if (open[i].key === k) idx = i;
+  return stageToneOf(k, opStage(k).terminal, idx);
 }
+function opColor(k) { return opTone(k).solid; }
+/* The three custom properties every toned element reads, so CSS decides WHERE a tone applies and the
+   domain decides WHAT it is. */
+function opToneVars(k) { var t = opTone(k); return "--tn:" + t.solid + ";--tn-soft:" + t.soft + ";--tn-text:" + t.text; }
 function opDot(k) { return '<i class="ox-dot" style="background:' + opColor(k) + '"></i>'; }
 
 /* Thin adapters: a ledger ROW (snake_case, as Postgres returns it) into the business tier's shape. */
@@ -747,10 +800,12 @@ function opSummary() {
     });
   }
   h += "</div>";
+  /* The stage RIBBON: every open rung by name, in ladder order, joined by a connector, each in its own
+     tone. A rung holding deals is filled with its soft tone; the filtered one goes solid. */
   h += '<div class="ox-leg" role="group" aria-label="المراحل المفتوحة — اضغط للتصفية">' + stages.map(function (s) {
     var on = opStg === s.st.key;
     return '<button class="ox-lg' + (on ? " on" : "") + (s.n ? "" : " zero") + '" aria-pressed="' + on + '"' +
-      ' onclick="opSetStg(&quot;' + s.st.key + '&quot;)">' + opDot(s.st.key) +
+      ' style="' + opToneVars(s.st.key) + '" onclick="opSetStg(&quot;' + s.st.key + '&quot;)">' + opDot(s.st.key) +
       "<span>" + esc(s.st.label) + "</span>" +
       (s.v ? "<b>" + opMoneyShort(s.v) + "</b>" : "") +
       '<span class="n" title="عدد البنود">' + fmtN(s.n) + "</span></button>";
@@ -862,7 +917,7 @@ function opWaRow() {
 /* ================================ LIST ================================ */
 function opStageCell(l) {
   var st = opStage(l.stage);
-  var h = '<span class="ox-stg">' + opDot(l.stage) + "<span>" + esc(st.label) + "</span></span>";
+  var h = '<span class="ox-stg" style="' + opToneVars(l.stage) + '">' + opDot(l.stage) + "<span>" + esc(st.label) + "</span></span>";
   if (opStalled(l)) h += '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>";
   else h += '<span class="ox-sub">' + opAgo(l) + "</span>";
   return h;
@@ -950,7 +1005,7 @@ function opKanbanView() {
     var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
     var unp = cards.filter(function (l) { return !opPriced(l); }).length;
     var cap = opKCap[st.key] || OPP_KCAP;
-    h += '<div class="ox-kcol" role="listitem" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">';
+    h += '<div class="ox-kcol" role="listitem" style="' + opToneVars(st.key) + '" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">';
     h += '<div class="ox-kh"><div class="t">' + opDot(st.key) + "<span>" + esc(st.label) + '</span><span class="n">' + fmtN(cards.length) + "</span></div>" +
       '<div class="v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "")
         : unp ? opNLine(unp) + " بلا تسعير" : "بلا قيمة مسعَّرة") + "</div></div>";
@@ -1130,6 +1185,68 @@ function opDrawerShell(labelId, head, body, foot) {
     '<div class="ox-db" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
     '<div class="ox-df">' + foot + "</div></div>";
 }
+/* The STAGE STEPPER. Every open rung by name, top to bottom: passed rungs carry their tone and a
+   check, the current one sits on a tinted pill with its age and its exit criterion, later rungs are
+   quiet. Each rung is a real button — the 6px bars it replaces were aria-hidden and named their
+   stage only in a tooltip, so the ladder could not be read without hovering every bar. A paused rung
+   stays visible and is disabled, the same rule isStageSelectable applies to the write. */
+var opStepPrev = null, opStepAnim = null;
+function opStepper(l, open, idx) {
+  var states = stageSteps(open.map(function (s) { return s.key; }), l.stage);
+  var selectable = {};
+  opSelectableStages(l.stage).forEach(function (s) { selectable[s.key] = 1; });
+  var h = '<ol class="ox-steps' + (opIsLost(l) ? " is-lost" : "") + '" aria-label="مراحل البيع">';
+  if (idx !== -1) h += '<li class="ox-steps-pill" aria-hidden="true" style="' + opToneVars(l.stage) + '"></li>';
+  open.forEach(function (s, i) {
+    var state = states[i], isCur = state === "current";
+    var paused = !selectable[s.key] && !isCur;
+    var can = !isCur && !paused && !oppBusy;
+    var said = state === "done" ? "مرحلة مكتملة" : isCur ? "المرحلة الحالية" : "مرحلة قادمة";
+    h += '<li class="ox-step ' + state + (paused ? " paused" : "") + '" style="' + opToneVars(s.key) + '"' + (isCur ? ' aria-current="step"' : "") + ">";
+    h += '<button type="button" class="ox-stb"' +
+      (can ? ' onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)"' : " disabled") +
+      ' aria-label="' + esc(s.label) + "، " + said + (paused ? "، موقوفة" : can ? "، نقل إليها" : "") + '">' +
+      '<span class="k" aria-hidden="true">' + (state === "done" ? opIco("check") : fmtN(i + 1)) + "</span>" +
+      '<span class="tx"><span class="l">' + esc(s.label) + "</span>" +
+      (isCur ? '<span class="ox-sub">' + opAgo(l) + "</span>" : paused ? '<span class="ox-sub">موقوفة</span>' : "") + "</span>" +
+      (can ? '<span class="go" aria-hidden="true">نقل</span>' : "") + "</button>";
+    if (isCur && s.exitCriterion) {
+      h += '<div class="ox-exit"><span class="ox-lbl">شرط الانتقال للمرحلة التالية</span><span>' + esc(s.exitCriterion) + "</span></div>";
+    }
+    h += "</li>";
+  });
+  return h + "</ol>";
+}
+/* The pill slides from the rung it sat on to the new one and takes the new rung's tone on the way:
+   the move is the confirmation that the stage changed. On-screen movement, so ease-in-out, 240ms,
+   transform only for position; reduced motion gets the new place with no travel. */
+function opPlaceStepPill() {
+  var steps = document.querySelector(".ox-steps");
+  var pill = steps && steps.querySelector(".ox-steps-pill");
+  var cur = steps && steps.querySelector(".ox-step.current");
+  if (!pill || !cur) { opStepPrev = null; return; }
+  var top = cur.offsetTop, hgt = cur.offsetHeight;
+  pill.style.transform = "translateY(" + top + "px)";
+  pill.style.height = hgt + "px";
+  var bg = getComputedStyle(pill).backgroundColor, bar = getComputedStyle(pill).borderInlineStartColor;
+  var prev = opStepPrev;
+  opStepPrev = { id: opOpen, top: top, h: hgt, bg: bg, bar: bar };
+  if (!pill.animate || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  var now = performance.now();
+  /* A save repaints the drawer within milliseconds of the click (pending, then saved), and innerHTML
+     replaces the pill that was sliding. The slide is therefore remembered and RESUMED on the new pill
+     at its elapsed time, or the move would be cut to a jump by its own confirmation. */
+  var run = opStepAnim && opStepAnim.id === opOpen && opStepAnim.to === top && now - opStepAnim.start < 240 ? opStepAnim : null;
+  if (!run) {
+    if (!prev || prev.id !== opOpen || prev.top === top) return;
+    run = opStepAnim = { id: opOpen, to: top, start: now, frames: [
+      { transform: "translateY(" + prev.top + "px)", height: prev.h + "px", backgroundColor: prev.bg, borderInlineStartColor: prev.bar },
+      { transform: "translateY(" + top + "px)", height: hgt + "px", backgroundColor: bg, borderInlineStartColor: bar },
+    ] };
+  }
+  var a = pill.animate(run.frames, { duration: 240, easing: "cubic-bezier(0.77, 0, 0.175, 1)" });
+  a.currentTime = now - run.start;
+}
 function opDetailDrawer(l) {
   var st = opStage(l.stage);
   var open = opOpenStages();
@@ -1141,17 +1258,13 @@ function opDetailDrawer(l) {
   /* المرحلة */
   var ssk = l.id + ":stage";
   b += '<section class="ox-sec" aria-labelledby="oxsec_st"><div class="ox-lr"><div class="ox-sech" id="oxsec_st">المرحلة</div>' + opFieldStatus(ssk, "oxd_stage_" + l.id) + "</div>";
+  b += opStepper(l, open, idx);
   if (opIsOpen(l)) {
-    b += '<div class="ox-track" aria-hidden="true">' + open.map(function (s) {
-      return '<i class="' + (s.key === l.stage ? "on" : "") + '" title="' + esc(s.label) + '" onclick="opSetStage(' + l.id + ',&quot;' + s.key + '&quot;)"></i>';
-    }).join("") + "</div>";
-    b += '<div class="ox-stnow">' + opDot(l.stage) + "<b>" + esc(st.label) + "</b>" +
-      '<span class="ox-sub">المرحلة ' + fmtN(idx + 1) + " من " + fmtN(open.length) + "، " + opAgo(l) + "</span>" +
-      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") + "</div>";
     b += '<div class="ox-strow">' +
-      opSelect("oxd_stage_" + l.id, "نقل إلى مرحلة", l.stage, opSelectableStages(l.stage).map(function (s) { return [s.key, s.label] ; }), false, "opSetStageSel") +
-      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
-      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
+      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
+      '<span style="flex:1"></span>' +
+      '<button class="btn btn-ghost ox-won" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
+      '<button class="btn btn-ghost ox-lost" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
   } else {
     b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
       '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
@@ -1272,11 +1385,24 @@ function opCreateDrawer() {
 
 /* After every paint: remember the resting toolbar height; play the drawer entrance once, restore
    its scroll, move focus in. */
+function opMarkRibbonWraps() {
+  var prev = null;
+  Array.prototype.forEach.call(document.querySelectorAll(".ox-leg .ox-lg"), function (el) {
+    el.classList.toggle("wrap-start", !!prev && Math.abs(el.offsetTop - prev.offsetTop) > 4);
+    prev = el;
+  });
+}
+if (!window.__oxRibbonResize) {
+  window.__oxRibbonResize = 1;
+  window.addEventListener("resize", function () { opMarkRibbonWraps(); });
+}
 function opAfterRender() {
+  opMarkRibbonWraps();
   var tb = document.querySelector(".ox-tb");
   if (tb && !opSelIds().length) opTbH = Math.round(tb.getBoundingClientRect().height);
   var dr = document.querySelector(".ox-dr");
-  if (!dr) return;
+  if (!dr) { opStepPrev = null; return; }
+  opPlaceStepPill();
   var db = document.getElementById("oxdb");
   if (db && opDrScroll) db.scrollTop = opDrScroll;
   if (!opDrShown) {

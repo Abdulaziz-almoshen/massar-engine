@@ -21,12 +21,14 @@ import { MOTION_CSS, MOTION_JS } from "./motion.js";
 import { SEHA_CSS, SEHA_JS } from "./seha.js";
 import { PRODUCTS_CRM_CSS, PRODUCTS_CRM_JS, PRODUCTS_DRILL_JS } from "./products-crm.js";
 import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
+import { EXEC_REPORTS_CSS, EXEC_REPORTS_JS } from "./exec-reports-crm.js";
 import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { REVAMP_CSS, HOLD_CSS, HOLD_JS } from "./revamp.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
 import { SALES_DOMAIN_JS } from "./sales-domain.js";
+import { STAGE_TONE_JS } from "./stage-tone-domain.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
 import { CONFIG_DOMAIN_JS } from "./config-domain.js";
@@ -702,6 +704,7 @@ ${RECORD_TABS_CSS}
 ${TASKS_CRM_CSS}
 ${PRODUCTS_CRM_CSS}
 ${REPORTS_CRM_CSS}
+${EXEC_REPORTS_CSS}
 ${TARGETS_CRM_CSS}
 ${SETTINGS_CRM_CSS}
 ${SALES_CRM_CSS}
@@ -939,7 +942,7 @@ const TITLES = {
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
   pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
-  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "أين تتعثّر الصفقات، ولماذا تُخسر"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
   divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
   team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
@@ -4773,12 +4776,14 @@ ${HOLD_JS}
 ${PRODUCTS_CRM_JS}
 ${PRODUCTS_DRILL_JS}
 ${REPORTS_CRM_JS}
+${EXEC_REPORTS_JS}
 ${TARGETS_CRM_JS}
 ${SETTINGS_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}
 ${SALES_DOMAIN_JS}
+${STAGE_TONE_JS}
 ${OPPS_CRM_JS}
 ${SALES_CRM_JS}
 ${PALETTE_JS}
