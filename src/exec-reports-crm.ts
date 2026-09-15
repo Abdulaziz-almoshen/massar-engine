@@ -299,7 +299,8 @@ function rxFunnel(f) {
     '<span class="rx-fig"><b>' + fmtN(f.won) + "</b> ربح · " + fmtN(f.lost) + " خسارة</span></div>";
   body += "</div>";
   var sig = f.weakest
-    ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) + "</span>"
+    ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) +
+      (f.lostUnplaced ? "، و" + fmtN(f.lostUnplaced) + " خسارة بلا مرحلة معروفة" : "") + "</span>"
     : f.lostUnplaced
       ? "<b>" + fmtN(f.lostUnplaced) + "</b><span>خسارة بلا مرحلة معروفة، فلا يمكن تحديد موضع تسرّبها</span>"
     : f.measured
@@ -378,7 +379,9 @@ function rxSources(s) {
   });
   body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--accent)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-mark)"></i>لم تتقدّم</span></div>';
   var best = s.rows.filter(function (r) { return r.source === s.best; })[0];
-  var sig = best
+  var sig = s.level || s.leadTie
+    ? "<b>" + rxPct(s.topPct) + "</b><span>" + (s.level ? "المصادر المؤهلة متساوية في التقدّم" : "مصدران أو أكثر يتقاسمان أعلى تقدّم") + "</span>"
+    : best
     ? "<b>" + rxPct(best.advancedPct) + "</b><span>أعلى تقدّم بين " + opPl(s.eligible, "مصدر واحد", "مصدرين", "مصادر", "مصدرًا") + " لكلٍّ منها بندان أو أكثر — «" + esc(labels[best.source] || best.source) + "»</span>"
     : '<b class="none">—</b><span>لا ترتيب بعد: يُقارن المصدر حين يملك بندين أو أكثر، ' + (s.eligible ? "ولا يملك ذلك الآن إلا مصدر واحد" : "ولا مصدر يملك ذلك الآن") + "</span>";
   return rxCard("src", "مصادر الفرص", "أي قناة تُنتج فرصًا تتقدّم فعلًا؟", sig, body, s.action, false);

@@ -137,6 +137,7 @@ export function buildFunnel(
   const ladderKeys = ladder.map((s) => s.key);
   // A LOST deal is placed at the rung it was lost FROM (its last move into lost), not the furthest it
   // ever reached: a deal won, reopened and lost at «تواصل أولي» leaked at contact, not before signature.
+  const furthest = lines.map((l) => furthestIndex(stages, l, hist.get(l.id) ?? []));
   const idx = lines.map((l) => {
     const h = hist.get(l.id) ?? [];
     if (isLost(stages, l.stage)) {
@@ -166,7 +167,8 @@ export function buildFunnel(
     });
     return {
       key: st.key, label: st.label,
-      reached: idx.filter((f) => f >= i).length,
+      // REACHED is how far the ledger shows each deal got; only moved/failed use the loss placement.
+      reached: furthest.filter((f) => f >= i).length,
       now: lines.filter((l) => l.stage === st.key).length,
       decided: moved + failed, moved,
       conversionPct: pctOf(moved, moved + failed),
@@ -321,7 +323,10 @@ export type SourceReport = {
   source: string; lines: number; value: number; advanced: number; advancedPct: number | null;
   wonCount: number; lostCount: number; winRatePct: number | null;
 };
-export type Sources = { rows: SourceReport[]; best: string | null; eligible: number; level: boolean; action: NextAction | null };
+export type Sources = {
+  rows: SourceReport[]; best: string | null; eligible: number; level: boolean; leadTie: boolean;
+  topPct: number | null; action: NextAction | null;
+};
 
 export function buildSources(
   stages: readonly ReportStage[], lines: readonly ReportLine[], events: readonly ReportEvent[],
@@ -352,20 +357,23 @@ export function buildSources(
   const bottom = eligible.length >= 2 ? byAdvance[byAdvance.length - 1] : null;
   // Level channels are not a ranking: naming one «best» on a tie contradicted the action beside it.
   const level = !!top && !!bottom && (top.advancedPct ?? 0) === (bottom.advancedPct ?? 0);
-  const best = level ? null : top;
+  // Two channels tied for first: neither is «the best», even when a third trails them.
+  const leadTie = eligible.length >= 2 && (byAdvance[0].advancedPct ?? 0) === (byAdvance[1].advancedPct ?? 0);
+  const best = level || leadTie ? null : top;
   const worst = level ? null : bottom;
   const firstKey = openLadder(stages)[0]?.key ?? null;
   const name = (k: string) => labels[k] ?? k;
   let action: NextAction | null = null;
-  if (best && worst && (best.advancedPct ?? 0) > (worst.advancedPct ?? 0)) {
+  if (top && worst && (top.advancedPct ?? 0) > (worst.advancedPct ?? 0)) {
     action = { text: "راجع بنود «" + name(worst.source) + "» العالقة في التواصل الأولي: تقدّم منها " + fmt(worst.advancedPct ?? 0) +
-      "٪ فقط، مقابل " + fmt(best.advancedPct ?? 0) + "٪ من «" + name(best.source) + "».", stage: firstKey, source: worst.source };
+      "٪ فقط، مقابل " + fmt(top.advancedPct ?? 0) + "٪ " + (leadTie ? "لأفضل المصادر" : "من «" + name(top.source) + "»") + ".",
+      stage: firstKey, source: worst.source };
   } else if (level && top) {
     action = { text: "المصادر المؤهلة متساوية: تقدّم " + fmt(top.advancedPct ?? 0) + "٪ من فرص كلٍّ منها — لا قناة تستحق تحويل الجهد إليها بعد.", stage: null };
   } else if (rows.length) {
     action = { text: "لا مقارنة بين المصادر بعد: يُقارن المصدر حين يملك بندين أو أكثر.", stage: null };
   }
-  return { rows, best: best ? best.source : null, eligible: eligible.length, level, action };
+  return { rows, best: best ? best.source : null, eligible: eligible.length, level, leadTie, topPct: top ? top.advancedPct : null, action };
 }
 
 // ------------------------------------------------------------------------------------------------

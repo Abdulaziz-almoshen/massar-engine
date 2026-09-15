@@ -1401,6 +1401,16 @@ function opMarkRibbonWraps() {
     prev = el;
   });
 }
+if (!window.__oxStepFocusOut) {
+  window.__oxStepFocusOut = 1;
+  document.addEventListener("focusin", function (e) {
+    if (opStepFocus && e.target && e.target.closest && !e.target.closest(".ox-steps")) opStepFocus = "";
+  });
+  /* A pointer press elsewhere is also a choice to leave, even on something that cannot take focus. */
+  document.addEventListener("pointerdown", function (e) {
+    if (opStepFocus && e.target && e.target.closest && !e.target.closest(".ox-steps")) opStepFocus = "";
+  });
+}
 if (!window.__oxRibbonResize) {
   window.__oxRibbonResize = 1;
   window.addEventListener("resize", function () { opMarkRibbonWraps(); });
@@ -1420,8 +1430,9 @@ function opAfterRender() {
     var lost = !ae || ae === document.body || (ae.closest && ae.closest(".ox-steps"));
     var sf = document.getElementById(opStepFocus);
     if (sf && lost && ae !== sf) sf.focus({ preventScroll: true });
-    var fs = opFState[opStepFocus.split("_")[1] + ":stage"];
-    if (!fs || fs.s !== "pending") opStepFocus = "";
+    /* Remembered until the user deliberately focuses something OUTSIDE the stepper (the focusin
+       listener below): the «حُفظ» status clears itself 1.6s later with one more repaint, and
+       forgetting at «saved» dropped focus to <body> on that repaint (Claude review, round 2). */
   }
   var db = document.getElementById("oxdb");
   if (db && opDrScroll) db.scrollTop = opDrScroll;

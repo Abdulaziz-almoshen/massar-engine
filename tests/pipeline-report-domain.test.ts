@@ -192,6 +192,22 @@ describe("buildSources", () => {
     expect(s.action?.text).toBe("راجع بنود «حملة واتساب» العالقة في التواصل الأولي: تقدّم منها 0٪ فقط، مقابل 100٪ من «زيارة».");
     expect(s.action).toMatchObject({ stage: "contact", source: "whatsapp" });
   });
+  it("two channels tied for first are not «best» even when a third trails", () => {
+    const hist: ReportEvent[] = [];
+    const mk = (source: string, stage: string) => line({ source, stage });
+    const rows = [mk("a", "present"), mk("a", "contact"), mk("b", "present"), mk("b", "contact"), mk("c", "contact"), mk("c", "contact")];
+    const s = buildSources(STAGES, rows, hist, {});
+    expect(s.leadTie).toBe(true);
+    expect(s.best).toBeNull();
+    expect(s.action?.text).toContain("لأفضل المصادر");
+    expect(s.action?.source).toBe("c");
+  });
+  it("a re-placed loss keeps its REACHED count on the ledger's furthest rung", () => {
+    const d = line({ stage: "lost" });
+    const f = buildFunnel(STAGES, [d], [ev(d.id, null, "tech", 30), ev(d.id, "tech", "won", 20),
+      ev(d.id, "won", "contact", 10), ev(d.id, "contact", "lost", 2)]);
+    expect(f.steps.map((x) => x.reached)).toEqual([1, 1, 1, 1]);
+  });
   it("two level channels are not ranked, and the action says they are level", () => {
     const s = buildSources(STAGES, [line({ source: "a" }), line({ source: "a" }), line({ source: "b" }), line({ source: "b" })], [], {});
     expect(s.best).toBeNull();
