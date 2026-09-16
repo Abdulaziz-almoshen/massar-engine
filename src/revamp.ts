@@ -27,48 +27,65 @@ export const REVAMP_CSS = `
 body { background: var(--canvas); }
 .app { background: var(--canvas); gap: var(--s3); padding: var(--s3); }
 
+/* THE RAIL IS NAVY (founder, 2026-09-16). His prototype runs a navy gradient rail with grouped
+   labels and a gold-tinted active row; Massar shipped the white version of it and he rejected the
+   result twice. A white rail on a white-card page gives the app no spine — every surface is the
+   same value, so nothing frames anything. Values and their measured ratios: DESIGN.md §2, "The
+   rail". */
 aside {
   width: 244px;
-  background: var(--paper);
-  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--rail-1), var(--rail-2));
+  color: var(--rail-ink);
+  border: none;
   border-radius: var(--r-lg);
   box-shadow: none;
   overflow: hidden;
 }
 
 /* The brand block stops being a bordered strip and becomes part of the panel. */
-.switcher { height: 60px; padding: 12px 14px; border-bottom: none; border-radius: var(--r-lg); }
-.switcher:hover { background: var(--accent-wash); }
+.switcher { height: 60px; padding: 12px 14px; border-bottom: none; border-radius: var(--r-lg); color: var(--rail-on-ink); }
+.switcher:hover { background: var(--rail-hover); }
 .switcher .logo { width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--grad); }
-.switcher .t1 { font-weight: 600; }
+.switcher .t1 { font-weight: 600; color: var(--rail-on-ink); }
+.switcher .t2, .switcher .chev { color: var(--rail-ink); }
 
 /* Search leaves the rail on wide screens (it becomes the top bar's anchor, see section 2) and
    stays here on narrow ones, where there is no top bar to hold it. */
 .navsearch {
   height: 40px; border-radius: var(--r-md); border: none;
-  background: var(--surface); color: var(--muted);
+  background: var(--rail-hover); color: var(--rail-ink);
 }
-.navsearch:hover { background: var(--surface-2); border-color: transparent; color: var(--ink-2); }
-.navsearch kbd { background: var(--paper); border-radius: var(--r-sm); }
+.navsearch:hover { background: rgba(255,255,255,.14); border-color: transparent; color: var(--rail-on-ink); }
+.navsearch kbd { background: rgba(255,255,255,.14); color: var(--rail-ink); border-color: transparent; border-radius: var(--r-sm); }
+.navsearch svg { color: var(--rail-ink); }
 
 nav { padding: var(--s2) 10px; }
-.grp { font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 12px; }
+/* The group heading is the prototype's: small, heavy, tracked, and the one place a positive
+   letter-spacing is legal on Latin-free Arabic — it reads as a divider, not as a label. */
+.grp { font-size: var(--t-xs); font-weight: 700; color: var(--rail-grp); letter-spacing: .6px;
+  padding: 15px 12px 8px; }
 
-/* The nav item is a pill with a real touch height, and the active one is the accent tint with an
-   accent-weight label — not a grey fill. DESIGN.md 3.10: 44px under a coarse pointer. */
+/* The active row is a GOLD tint, not a blue one. The rail is already blue: a blue selection on a
+   blue ground has nothing to be selected against, which is why the white-rail version needed the
+   accent tint and this one does not. */
 .nv {
-  height: 42px; border-radius: var(--r-md); padding-inline: 12px; gap: 12px;
-  font-weight: 500; color: var(--muted); margin-bottom: 2px;
+  height: 42px; border-radius: 10px; padding-inline: 12px; gap: 12px;
+  font-weight: 500; color: var(--rail-ink); margin-bottom: 2px;
   transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
-.nv:hover { background: var(--accent-wash); color: var(--ink); }
-.nv.on { background: var(--accent-tint); color: var(--accent-deep); font-weight: 700; }
-.nv.on .gx > * { background-color: var(--accent-deep); border-color: var(--accent-deep); }
-.nv.on .g-tr { background: none; border-bottom-color: var(--accent-deep); }
-.nv:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nv:hover { background: var(--rail-hover); color: var(--rail-on-ink); }
+.nv.on { background: var(--rail-on-bg); color: var(--rail-on-ink); font-weight: 700; }
+.nv .gx > * { background-color: var(--rail-ink); border-color: var(--rail-ink); }
+.nv.on .gx > * { background-color: var(--rail-on-ink); border-color: var(--rail-on-ink); }
+.nv .g-tr { background: none; border-bottom-color: var(--rail-ink); }
+.nv.on .g-tr { background: none; border-bottom-color: var(--rail-on-ink); }
+.nv:focus-visible { outline: 2px solid var(--rail-on-ink); outline-offset: -2px; }
+.nv .bdg { background: rgba(255,255,255,.16); color: var(--rail-on-ink); }
 
-.collapse { height: 40px; border-radius: var(--r-md); }
-.collapse:hover { background: var(--accent-wash); }
+.collapse { height: 40px; border-radius: var(--r-md); color: var(--rail-ink); }
+.collapse:hover { background: var(--rail-hover); color: var(--rail-on-ink); }
+.userbox { color: var(--rail-ink); border-block-start-color: rgba(255,255,255,.14); }
+.userbox .u1 { color: var(--rail-on-ink); }
 
 /* ============================ 2. THE TOP BAR ============================
    The crumb strip becomes the page's own header: taller, on the canvas rather than on white, with
@@ -582,7 +599,8 @@ body, .app {
 /* The rail is a surface ON the weave and covers it. The CONTENT column must not: it is the page,
    and it is where the weave does its work — behind the cards, between them, in every gutter. It
    stays transparent so the fixed weave on .app shows through while the column scrolls over it. */
-aside { background-color: var(--paper); }
+/* The rail paints its own navy gradient (section 1) — it must not be given the weave or a ground. */
+aside { background-image: linear-gradient(180deg, var(--rail-1), var(--rail-2)); background-color: var(--rail-2); }
 .body { background-color: transparent; }
 
 /* 7.8 THE PRIMARY BUTTON IS A PRESSED OBJECT. A flat blue rectangle with a soft drop shadow is the

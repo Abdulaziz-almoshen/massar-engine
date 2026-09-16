@@ -51,21 +51,30 @@ export const HOME_CRM_CSS = `
    nothing: no point of view, no context, no way to tell at a glance whether the year is going well.
    DESIGN.md list rule 13 says a page must have a point of view — one figure leads at the size that
    says so. «نسبة الإنجاز» is that figure here, and it carries the bar it is a percentage OF. */
+/* THE CARD GRAMMAR IS THE PROTOTYPE'S (founder, 2026-09-16). His card is: a small muted label on
+   its own line, then a BASELINE ROW of a 28px/800 figure beside a 12px unit. Massar stacked a
+   600-weight figure under a label and let the unit wrap to a third line, so the card read as a
+   form field rather than as a number. Hierarchy here is carried by WEIGHT (500 label -> 800
+   figure), which is why DESIGN.md now allows 800 on a leading figure and nowhere else. */
 .hm-kpis { display:grid; grid-template-columns:1.5fr repeat(3, minmax(0,1fr)); gap:var(--s3); }
-.hm-kpi { position:relative; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
-  padding:var(--s4); display:flex; flex-direction:column; gap:4px; min-width:0; overflow:hidden;
-  /* an inner top highlight: a hairline card still has to read as a SURFACE, not as a drawn rectangle */
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), var(--sh-0); }
-.hm-kpi .l { font-size:var(--t-xs); color:var(--muted); font-weight:500; }
-.hm-kpi .n { font-size:var(--t-2xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums;
-  line-height:1.15; letter-spacing:0; }
-.hm-kpi .n.none { color:var(--muted); font-size:var(--t-xl); }
-.hm-kpi .u { font-size:var(--t-xs); color:var(--muted); font-weight:500; }
-/* the lead tile: bigger figure, the accent ground, and the meter that gives the percentage a subject */
+.hm-kpi { position:relative; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-xl);
+  padding:18px 18px 16px; display:flex; flex-direction:column; min-width:0; overflow:hidden;
+  box-shadow:var(--specular), var(--sh-0); }
+.hm-kpi .l { font-size:var(--t-xs); color:var(--muted); font-weight:500; margin-block-end:12px; }
+/* baseline, not center: the unit must sit on the figure's baseline or it floats mid-digit */
+.hm-kpi .n { display:flex; align-items:baseline; gap:7px; flex-wrap:wrap;
+  font-size:var(--t-2xl); font-weight:800; color:var(--fig); font-variant-numeric:tabular-nums;
+  line-height:1; letter-spacing:0; }
+.hm-kpi .n.none { color:var(--muted); font-size:var(--t-xl); font-weight:600; }
+/* «مليون ر.س» is not part of the figure: it rides beside it at label weight, on its baseline */
+.hm-kpi .n .uu { font-size:var(--t-xs); color:var(--muted); font-weight:450; letter-spacing:0; }
+.hm-kpi.lead .n .uu { color:var(--ink-2); font-size:var(--t-sm); }
+.hm-kpi .u { font-size:var(--t-xs); color:var(--muted); font-weight:450; margin-block-start:10px; }
+/* the lead tile: the accent ground, the biggest figure, and the meter that gives the percentage a subject */
 .hm-kpi.lead { background:linear-gradient(180deg, var(--accent-tint), var(--paper) 78%);
   border-color:var(--accent-mark); }
 .hm-kpi.lead .l { color:var(--accent-deep); font-weight:600; }
-.hm-kpi.lead .n { font-size:var(--t-num); font-weight:700; color:var(--accent-deep); line-height:1.05; }
+.hm-kpi.lead .n { font-size:var(--t-3xl); color:var(--accent-deep); }
 .hm-kpi.lead .u { color:var(--ink-2); }
 .hm-meter { height:8px; border-radius:var(--r-pill); background:var(--paper);
   box-shadow:inset 0 0 0 1px var(--accent-mark); overflow:hidden; margin-block-start:var(--s2); }
@@ -93,11 +102,20 @@ export const HOME_CRM_CSS = `
   .hm-st:not([disabled]):hover { box-shadow:var(--sh-3); transform:translateY(-2px); border-color:var(--tn, var(--line)); }
 }
 .hm-st:not([disabled]):active { transform:scale(0.98); transition-duration:120ms; }
-.hm-st .t { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); font-weight:600; color:var(--tn-text, var(--ink)); }
-.hm-st .n { font-size:var(--t-2xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
-.hm-st .n .u { font-size:var(--t-sm); font-weight:500; color:var(--tn-text, var(--muted)); }
+/* The prototype's own layout: the state's name and its dot at the inline-END of the first row, the
+   COUNT big at the inline-start of that same row, then the definition, then the money in the state's
+   own colour. Massar had the name on one line and a small count under it, so four cards read as four
+   labels rather than as four quantities. */
+/* .hm-hd, not .hd — .hd is the page shell above, and a nested .hd inherited its column flow, which
+   put the state's name under its own count instead of beside it. */
+.hm-hd { display:flex; align-items:baseline; gap:var(--s3); }
+.hm-st .t { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); font-weight:700;
+  color:var(--tn-text, var(--ink)); margin-inline-start:auto; text-align:end; }
+.hm-st .n { font-size:var(--t-2xl); font-weight:800; color:var(--fig); font-variant-numeric:tabular-nums; line-height:1; }
+.hm-st .n .u { font-size:var(--t-xs); font-weight:500; color:var(--muted); margin-inline-start:5px; }
 .hm-st .hint { font-size:var(--t-xs); color:var(--muted); line-height:1.7; }
-.hm-st .v { font-size:var(--t-xs); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; margin-top:auto; }
+.hm-st .v { font-size:var(--t-sm); font-weight:700; color:var(--tn-text, var(--ink-2));
+  font-variant-numeric:tabular-nums; margin-top:auto; }
 /* the share of the whole pipeline — the figure above is a count, this says how big a slice it is */
 .hm-sh { height:6px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; margin-block-start:var(--s2); }
 .hm-sh i { display:block; height:100%; border-radius:var(--r-pill); background:var(--tn, var(--accent));
@@ -261,6 +279,15 @@ window.hmOpenState = function (key) {
   location.hash = "#opps";
 };
 
+/* Split a printed figure into the numeral and whatever trails it, so «6.3 مليون ر.س» draws as a
+   28px/800 number with its unit riding on the baseline beside it — the prototype's own shape.
+   Falls back to printing the whole string when there is no leading numeral to split on. */
+function hmFigure(text) {
+  var s = String(text == null ? "" : text);
+  var m = s.match(/^\\s*([0-9][0-9.,]*)\\s*([\\s\\S]*)$/);
+  if (!m) return '<span class="n">' + s + "</span>";
+  return '<span class="n">' + m[1] + (m[2] ? '<span class="uu">' + m[2] + "</span>" : "") + "</span>";
+}
 function hmIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function hmMoney(v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; }
 /* Mark, soft ground and text — the four-value status contract (DESIGN.md §2). The soft value is the
@@ -296,8 +323,8 @@ function vHomeHealth() {
       (off ? "" : ' onclick="hmOpenState(&quot;' + b.key + '&quot;)"') +
       ' title="' + esc(b.hint) + (off ? "" : " — افتح هذه الفرص") + '">' +
       (off ? "" : '<span class="go" aria-hidden="true">' + hmIco("chevS") + "</span>") +
-      '<span class="t">' + esc(b.label) + "</span>" +
-      '<span class="n">' + fmtN(b.count) + '<span class="u"> · ' + fmtN(share) + "٪</span></span>" +
+      '<span class="hm-hd"><span class="n">' + fmtN(b.count) + '<span class="u">' + fmtN(share) + "٪</span></span>" +
+      '<span class="t">' + esc(b.label) + "</span></span>" +
       '<span class="hint">' + esc(b.hint) + "</span>" +
       '<span class="v">' + hmMoney(b.value) + "</span>" +
       '<span class="hm-sh" aria-hidden="true"><i style="width:' + share + '%"></i></span></button>';
@@ -372,18 +399,19 @@ function vHomeKpis() {
       (unit ? '<span class="u">' + unit + "</span>" : "") + (extra || "") +
       (cls === "lead" ? "" : '<span class="rule" aria-hidden="true"></span>') + "</div>";
   };
-  var money = function (v) { return '<span class="n">' + hmMoney(v) + "</span>"; };
+  var money = function (v) { return hmFigure(hmMoney(v)); };
   /* The meter is what makes the percentage mean something: it is 49٪ OF a bar you can see. */
   var meter = pct === null ? "" :
     '<span class="hm-meter" aria-hidden="true"><i style="width:' + Math.max(0, Math.min(100, pct)) + '%"></i></span>';
   return '<div class="hm-kpis">' +
     kpi("lead", "", "نسبة الإنجاز",
-      pct === null ? '<span class="n none">لا مستهدف</span>' : '<span class="n">' + fmtN(pct) + "٪</span>",
+      pct === null ? '<span class="n none">لا مستهدف</span>' : '<span class="n">' + fmtN(pct) + '٪<span class="uu">من المستهدف</span></span>',
       pct === null ? "حدِّد المستهدفات ليُحسب الإنجاز" : hmMoney(achieved) + " من " + hmMoney(target), meter) +
     kpi("", "var(--s-off)", "المستهدف الإجمالي", target ? money(target) : '<span class="n none">—</span>',
       target ? "لكل القطاعات" : "لم يُحدَّد مستهدف بعد", "") +
     kpi("", "var(--s-issued)", "المحقق الإجمالي", money(achieved), "من الصفقات الرابحة", "") +
-    kpi("", "var(--accent)", "الفرص المفتوحة", '<span class="n">' + fmtN(st.openCount) + "</span>", hmMoney(st.openValue), "") +
+    kpi("", "var(--accent)", "الفرص المفتوحة",
+      '<span class="n">' + fmtN(st.openCount) + '<span class="uu">فرصة</span></span>', hmMoney(st.openValue) + " قيمةً", "") +
     "</div>";
 }
 

@@ -158,6 +158,18 @@ export const DASHBOARD_HTML = `<!doctype html>
        border, so nothing moves by a pixel when a state changes, and it gives raised surfaces a
        one-pixel specular along the top edge. Both are free — no layout, no colour token.
        --well is the opposite: a recessed track, for the ground under a bar or inside a field. */
+    /* THE RAIL, from the founder's own prototype (2026-09-16). His «لوحة المدير التنفيذي» runs a
+       navy gradient rail with grouped labels and a gold-tinted active row; Massar shipped a white
+       rail with a blue-tinted one, and he rejected the result twice. The prototype IS the product
+       spec (CLAUDE.md §1), so its values are adopted — with one correction: its own group label
+       #A9C2E0 measures 3.60:1 on the rail top and fails the §3.0 floor, so the label is lightened
+       to #D9E2F0 (5.05:1). Every other value here was measured before it was drawn:
+       --rail-ink 4.51 on --rail-1 and 6.78 on --rail-2; white on the active row 6.23. */
+    --rail-1:#2F5F94; --rail-2:#1F4470; --rail-ink:#CDD6E6; --rail-grp:#D9E2F0;
+    --rail-on-ink:#FFFFFF;
+    --rail-on-bg:rgba(201,162,39,.14); --rail-hover:rgba(255,255,255,.08);
+    /* The figure ink: the prototype's leading numbers are a deep navy, not the body ink. 14.52:1. */
+    --fig:#13294B;
     --specular:inset 0 1px 0 rgba(255,255,255,.9);
     --well:inset 0 1px 2px rgba(20,22,26,.06), inset 0 0 0 1px rgba(20,22,26,.08);
     --fill-face:inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(20,22,26,.14);
