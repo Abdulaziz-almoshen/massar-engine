@@ -40,6 +40,7 @@ import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
 import { HOME_CRM_CSS, HOME_CRM_JS } from "./home-crm.js";
 import { ORG_CRM_CSS, ORG_CRM_JS } from "./org-crm.js";
 import { YEAR_TARGETS_CSS, YEAR_TARGETS_JS } from "./year-targets-crm.js";
+import { KB_HUB_CSS, KB_HUB_JS } from "./knowledge-hub-crm.js";
 import { HOME_DOMAIN_JS } from "./home-domain.js";
 import { ACCEPTANCE_DOMAIN_JS } from "./acceptance-domain.js";
 import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
@@ -731,6 +732,7 @@ ${ACCOUNTS_CRM_CSS}
 ${HOME_CRM_CSS}
 ${ORG_CRM_CSS}
 ${YEAR_TARGETS_CSS}
+${KB_HUB_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
@@ -959,7 +961,7 @@ const SUBS = {
   // conversation list is one view OF those customers, not the door to them. Every #customers link
   // still works; only which route the door lands on changed.
   accounts:  [["accounts", "العملاء"], ["customers", "المحادثات"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
-  products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
+  products:  [["products", "المنتجات"], ["knowledge", "معرفة المنتج"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
   settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
@@ -994,6 +996,7 @@ const TITLES = {
   board: ["لوحة المتابعة", "أدر فرص البيع واسحبها بين المراحل"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
   targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["الهيكل التنظيمي", "القطاعات والإدارات والموظفون، وما يرتبط بكل منها"],
+  knowledge: ["معرفة المنتج", "ما يعرفه المساعد عن كل منتج، وما ينقصه ليبيعه"],
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
   indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
   indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
@@ -2450,6 +2453,11 @@ function wizProducts() {
     name: p.product, sc: null, seed: !!p.embedded,
     hub: p.kb && p.kb.state === "approved" ? { product: p.product, source_filename: p.kb.source } : null,
     eligible: !!p.eligible, why: pxReadiness(p).word,
+    // The assistant's readiness for THIS product, the same score «معرفة المنتج» prints. The founder's
+    // prototype picks the product by it, and it is the one number that predicts how the conversation
+    // will go — «معرفة معتمدة ✓» said the file exists, not whether it covers what a buyer asks.
+    kscore: p.knowledgeScore && typeof p.knowledgeScore.score === "number" ? p.knowledgeScore.score : null,
+    kready: !!(p.knowledgeScore && p.knowledgeScore.ready),
   }));
 }
 function vAimkt() {
@@ -2509,10 +2517,13 @@ function vAimkt() {
       // Say which knowledge this service actually has. Removing the invented scores collapsed
       // every card onto the «Product Hub» branch, which claimed uploaded knowledge for six
       // services that have none — a new false claim in place of the old one.
+      const kb = x.kscore === null ? ""
+        : '<span class="chip ' + (x.kready ? "c-teal" : "c-warn") + '" title="درجة معرفة المساعد بهذا المنتج">' +
+          fmtN(x.kscore) + "٪ معرفة</span>";
       const inner = '<div style="height:6px;"></div>' + (x.eligible === false
         ? '<span class="chip c-warn">' + esc(x.why || "لا يبيعه المساعد") + "</span>"
-        : x.hub ? '<span class="chip c-teal">معرفة معتمدة ✓</span>'
-        : '<span class="chip c-grey">معرفة مدمجة</span>');
+        : kb + (x.hub ? '<span class="chip c-teal">معرفة معتمدة ✓</span>'
+        : '<span class="chip c-grey">معرفة مدمجة</span>'));
       const pa = prodAssets.some((a) => a.product === x.name) ? ' <span class="chip c-grey">ملف تعريفي 📎</span>' : "";
       if (x.eligible === false) {
         return '<button class="prod prod-off" aria-disabled="true" title="' + esc(x.why || "لا يبيعه المساعد") + '" data-prod="' + esc(x.name) + '" onclick="wizOpenProd(this.dataset.prod)"><div class="pn">' + esc(x.name) + "</div>" + inner + pa + '<div style="font-size:var(--t-xs);color:#1A47BE;font-weight:600;margin-top:6px;">افتح المنتج لإكماله</div></button>';
@@ -4598,7 +4609,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit" || cur === "org" || cur === "board") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit" || cur === "org" || cur === "board" || cur === "knowledge") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4626,6 +4637,7 @@ function render(fetchNew) {
       : cur === "audit" ? vAudit()
       : cur === "org" ? vOrg()
       : cur === "board" ? vOppsBoard()
+      : cur === "knowledge" ? vKnowledgeHub()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -5005,6 +5017,7 @@ ${ACCEPTANCE_DOMAIN_JS}
 ${HOME_CRM_JS}
 ${ORG_CRM_JS}
 ${YEAR_TARGETS_JS}
+${KB_HUB_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}
