@@ -37,6 +37,8 @@ import { INDICATORS_CRM_CSS, INDICATORS_CRM_JS } from "./indicators-crm.js";
 import { INDICATOR_DOMAIN_JS } from "./indicator-domain.js";
 import { ACCOUNTS_CRM_CSS, ACCOUNTS_CRM_JS } from "./accounts-crm.js";
 import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
+import { HOME_CRM_CSS, HOME_CRM_JS } from "./home-crm.js";
+import { HOME_DOMAIN_JS } from "./home-domain.js";
 import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
 import { OPP_WORK_DOMAIN_JS } from "./opp-work-domain.js";
 import { CAMPAIGN_RESULTS_CRM_CSS, CAMPAIGN_RESULTS_CRM_JS } from "./campaign-results-crm.js";
@@ -723,6 +725,7 @@ ${TARGETS_CRM_CSS}
 ${SETTINGS_CRM_CSS}
 ${INDICATORS_CRM_CSS}
 ${ACCOUNTS_CRM_CSS}
+${HOME_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
@@ -1626,7 +1629,11 @@ function vHome(d) {
   // The executive band leads الرئيسية: sectors, the five worst-attaining products, and the four
   // quarters. Placed FIRST because DESIGN.md §7.13 asks a page to have a point of view, and the
   // question this screen answers for a founder is «أين نحن من المستهدف», not «من ردّ اليوم».
-  const execBand = (typeof vExecBand === "function") ? vExecBand() : "";
+  // The founder's prototype opens on the executive figures: four numbers, the health of the pipeline
+  // (every open deal in exactly one state, each one a door into its own deals), and the partners'
+  // week. Then the sector / product / quarter bands this screen already had.
+  const execOpen = (typeof vHomeExec === "function") ? vHomeExec() : "";
+  const execBand = execOpen + ((typeof vExecBand === "function") ? vExecBand() : "");
   const csAll = d.contacts || [];
   const cs = showTest ? csAll : csAll.filter((c) => !c.test);
   const nTest = csAll.filter((c) => c.test).length;
@@ -4973,6 +4980,8 @@ ${INDICATORS_CRM_JS}
 ${INDICATOR_DOMAIN_JS}
 ${ACCOUNTS_CRM_JS}
 ${ACCOUNT_DOMAIN_JS}
+${HOME_DOMAIN_JS}
+${HOME_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}
