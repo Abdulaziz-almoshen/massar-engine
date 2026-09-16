@@ -241,6 +241,23 @@ def main() -> int:
                 failures.append(f"{route}: landmark «{landmark}» missing from #body")
             if errors:
                 failures.append(f"{route}: {len(errors)} runtime error(s) — {errors[0]}")
+            # HORIZONTAL OVERFLOW. Added 2026-09-16 after الرئيسية shipped scrolling sideways: the
+            # deck escaped .body's gutter with a hardcoded -32px, and .body's real gutter is 4px
+            # (revamp.ts §2 overrides the base rule), so every width was 56px too wide. tsc, the
+            # design gate and the landmark assertion were all green — nothing here could see a box
+            # wider than its container, and the founder found it before the gate did.
+            # A page may scroll DOWN. It may never scroll sideways: a wide table or chart owns its
+            # own overflow-x container, per DESIGN.md. Measured against #body, the scroll element.
+            over = page.evaluate(
+                "() => { const d = document.querySelector('.body');"
+                " return d ? d.scrollWidth - d.clientWidth : 0; }")
+            if over and over > 2:
+                wide = page.evaluate(
+                    "() => { const d = document.querySelector('.body'); if (!d) return '';"
+                    " const cw = d.clientWidth;"
+                    " const e = [...d.querySelectorAll('*')].find(x => x.getBoundingClientRect().width > cw + 2);"
+                    " return e ? e.tagName + '.' + String(e.className).slice(0, 40) : 'unknown'; }")
+                failures.append(f"{route}: scrolls sideways by {over}px — widest child {wide}")
 
             ok = len(failures) == before
             note = "«" + landmark + "»" + ("  (فارغة بشكل صحيح)" if is_honest_empty else "")

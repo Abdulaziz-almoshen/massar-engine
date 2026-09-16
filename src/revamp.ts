@@ -585,16 +585,14 @@ input[type="checkbox"]:focus-visible::before {
   .btn { min-height: 44px; }
 }
 
-/* 7.7 THE PAGE IS WOVEN, NOT PAINTED. A flat #F6F7F9 behind white cards gives the eye nothing to
-   sit on, and the cards read as drawn rectangles rather than as paper. One repeating hairline
-   every 8px at 45 degrees, at 4% ink, fixes that for the cost of one gradient and no element.
-   45deg, not -45deg: the weave leans with the reading direction in RTL.
-   background-attachment: fixed — it must not scroll with the content, or it becomes a pattern. */
+/* 7.7 THE PAGE IS WHITE (founder, 2026-09-16). It was a tinted canvas carrying a 45-degree hairline
+   weave, which existed to stop white cards floating on flat grey. Direction A removed the reason:
+   below the deck there are no cards at all, just ruled rows, so the page can be one white plane and
+   the hairlines between rows do the dividing. The weave on a white ground would be visible texture
+   for its own sake, so it goes with the tint — decoration that carries no data. */
 body, .app {
-  background-color: var(--canvas);
-  background-image: repeating-linear-gradient(45deg,
-    transparent 0 7px, rgba(20,22,26,.04) 7px 8px);
-  background-attachment: fixed;
+  background-color: var(--paper);
+  background-image: none;
 }
 /* The rail is a surface ON the weave and covers it. The CONTENT column must not: it is the page,
    and it is where the weave does its work — behind the cards, between them, in every gutter. It
@@ -634,6 +632,27 @@ aside, .px-rh, .hm-pt, .ox-sum {
   animation: rvPop 160ms var(--ease-out) both;
   transform-origin: 100% 0;   /* RTL: menus open from the inline-start corner, which is the right */
 }
+
+/* 7.9b THE SPARKLINE, on the terms of the chart the founder pointed at (21st.dev line-charts-8).
+   A 2px monotone curve with NO area fill and one dashed reference line — the old one was straight
+   segments under a gradient wash, which reads as a decorative smear rather than as a series.
+   The draw is 1500ms decelerating, measured off the reference frame by frame (5% at 100ms, 57% at
+   500ms, settled at 1500ms). That is far over the 300ms UI bound on purpose: this is an
+   explanatory animation, not a control responding to a press, and it plays ONCE per page load —
+   .kstrip.draw is set by vHome on the first paint only, because #body is rewritten on every data
+   load and a 1.5s redraw on each one is the jump DESIGN.md §8.6 forbids. */
+.spk-base { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; fill: none; }
+.spk-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; }
+.kstrip.draw .spk-line {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: spkDraw 1500ms var(--ease-out) forwards;
+}
+@keyframes spkDraw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .kstrip.draw .spk-line { animation: none; stroke-dashoffset: 0; }
+}
+/* the spark gets real room now that it carries a curve instead of a smear */
+.kcard .ksp { width: 116px; height: 38px; opacity: 1; }
 
 /* 7.10a BELOW THE DECK, NOTHING IS A CARD (founder's chosen direction A, 2026-09-16).
    The deck is the page's one object with an edge. Everything under it is ruled rows on a single

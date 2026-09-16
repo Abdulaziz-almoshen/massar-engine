@@ -20,7 +20,12 @@ export const HOME_CRM_CSS = `
    leading figure and the whole pipeline. It escapes .body's padding with negative margins rather
    than by restructuring the shell — .body owns the page gutter and nothing else may assume it.
    Values and their measured ratios: DESIGN.md §2, "The deck". */
-.hm-deck { margin:calc(var(--s4) * -1 - 6px) calc(var(--s5) * -1) var(--s5); padding:34px 40px 30px;
+/* The escape is --s1, because .body's gutter is 4px — NOT the 30px/32px the base stylesheet
+   declares, which revamp.ts §2 overrides. Escaping by 32 made the deck 56px wider than the
+   content box and gave الرئيسية a horizontal scrollbar at every width. A child cannot read its
+   parent's padding, so this value is matched to the measured one and stated here rather than
+   guessed from the rule that no longer applies. */
+.hm-deck { margin:calc(var(--s1) * -1) calc(var(--s1) * -1) var(--s5); padding:34px 40px 30px;
   background:linear-gradient(135deg, var(--deck-1), var(--deck-2)); color:#fff;
   position:relative; overflow:hidden; }
 /* one broad accent bloom, top inline-start. Decoration that carries no data gets no more than this. */
@@ -82,7 +87,7 @@ export const HOME_CRM_CSS = `
 .hm-key[disabled] b { color:var(--deck-mut); }
 
 @media (max-width: 900px) {
-  .hm-deck { margin-inline:calc(var(--s3) * -1); padding:var(--s4) var(--s3) var(--s4); }
+  .hm-deck { padding:var(--s4) var(--s3) var(--s4); }
   .hm-stats { margin-inline-start:0; gap:var(--s4); }
   .hm-arc { width:88px; height:88px; }
 }

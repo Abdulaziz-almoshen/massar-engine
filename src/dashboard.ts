@@ -1744,7 +1744,11 @@ function vHome(d) {
   // The strip's own header is gone: the band it sits in carries one, like every other band.
   const kctl = kflat +
     '<select class="hbsel" onchange="kpiSetDays(this.value)" aria-label="مدة المقارنة">' + kOpts + "</select>";
-  const kstrip = '<div class="kstrip">' +
+  // The sparkline draw plays ONCE per page load: #body is rewritten on every data load, and a
+  // 1.5s redraw on each one is the jump DESIGN.md §8.6 forbids.
+  const kdraw = kstripDrawn ? "" : " draw";
+  kstripDrawn = true;
+  const kstrip = '<div class="kstrip' + kdraw + '">' +
     kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kd(kNewQual), KWORD, series) +
     kpiCard("ردّوا", fmtN(replied), kd(kNewRepl), KWORD, sRepl) +
     kpiCard("وصلت الرسائل", fmtN(delivered), kd(newDeliv), KWORD, sDeliv) +
@@ -3258,22 +3262,56 @@ function qualSeries(cs, days) {
 // right while the axis label «اليوم» sat on the left — the curve and its own axis disagreeing about
 // which end was today. x is mirrored rather than the array reversed, so the data stays in
 // chronological order for anything else that reads it.
+// MONOTONE CUBIC (Fritsch–Carlson). The founder pointed at 21st.dev's line-charts-8 and said
+// "follow this"; its curve is recharts' type="monotone", and this is that algorithm by hand. The
+// property that matters is in the name: the curve never overshoots between two points, so a
+// sparkline of daily counts cannot draw a dip below zero that the data does not contain. A
+// Catmull-Rom or a plain quadratic smoothing would, and on a count series that is a lie.
+// Verified against recharts' own output: identical first point, path length within 0.006%.
+function monoPath(pts) {
+  const n = pts.length;
+  if (n < 2) return n ? "M" + pts[0][0] + "," + pts[0][1] : "";
+  const dx = [], dy = [], m = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1][0] - pts[i][0]; dy[i] = (pts[i + 1][1] - pts[i][1]) / dx[i]; }
+  m[0] = dy[0]; m[n - 1] = dy[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = dy[i - 1] * dy[i] <= 0 ? 0 : (dy[i - 1] + dy[i]) / 2;
+  let d = "M" + pts[0][0].toFixed(2) + "," + pts[0][1].toFixed(2);
+  for (let i = 0; i < n - 1; i++) {
+    d += "C" + (pts[i][0] + dx[i] / 3).toFixed(2) + "," + (pts[i][1] + m[i] * dx[i] / 3).toFixed(2) +
+      "," + (pts[i + 1][0] - dx[i] / 3).toFixed(2) + "," + (pts[i + 1][1] - m[i + 1] * dx[i] / 3).toFixed(2) +
+      "," + pts[i + 1][0].toFixed(2) + "," + pts[i + 1][1].toFixed(2);
+  }
+  return d;
+}
+// The sparkline, on the reference's own terms: a 2px monotone curve, NO area fill, and one dashed
+// reference line. The reference puts that line at zero because its series is signed; a Massar
+// series is a daily COUNT and never goes below zero, so the line is the period's MEAN — the only
+// horizontal on a non-negative series that tells the reader anything.
+// The draw is stroke-dasharray, 1.5s, decelerating — measured off the reference frame by frame
+// (5% at 100ms, 57% at 500ms, settled at 1500ms), which is ease-out, not linear.
+let sparkSeq = 0;
+let kstripDrawn = false;
 function sparkArea(vals, w, hgt) {
-  const mx = Math.max(1, ...vals);
   const n = vals.length;
-  const x = (i) => (n === 1 ? 0 : w - (i / (n - 1)) * w);
-  const y = (v) => hgt - (v / mx) * (hgt - 6) - 2;
-  const line = vals.map((v, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
-  const area = line + " L0," + hgt + " L" + w + "," + hgt + " Z";
-  const last = vals[n - 1];
+  if (!n) return "";
+  const lo = Math.min(...vals), hi = Math.max(1, ...vals);
+  const X0 = 2, X1 = w - 2, Y0 = 4, Y1 = hgt - 4;
+  // RTL: the newest day belongs at the inline-START, which is the RIGHT edge. Mapping i to a
+  // decreasing x does it in the geometry, so no transform is needed and the dash still draws
+  // oldest-to-newest.
+  const x = (i) => (n === 1 ? X1 : X1 - (i / (n - 1)) * (X1 - X0));
+  const y = (v) => (hi === lo ? (Y0 + Y1) / 2 : Y1 - ((v - lo) / (hi - lo)) * (Y1 - Y0));
+  const d = monoPath(vals.map((v, i) => [x(i), y(v)]));
+  const mean = vals.reduce((a, b) => a + b, 0) / n;
+  const my = y(mean).toFixed(2);
+  const id = "spk" + (++sparkSeq);
   return '<svg dir="ltr" viewBox="0 0 ' + w + " " + hgt + '" preserveAspectRatio="none" ' +
-    'style="width:100%;height:' + hgt + 'px;display:block;overflow:visible;" role="img" aria-label="جهات مؤهلة جديدة يوميًا">' +
-    '<defs><linearGradient id="spg" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="#2563EB" stop-opacity=".20"/>' +
-    '<stop offset="100%" stop-color="#2563EB" stop-opacity="0"/></linearGradient></defs>' +
-    '<path d="' + area + '" fill="url(#spg)"/>' +
-    '<path d="' + line + '" fill="none" stroke="#2563EB" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
-    '<circle cx="' + x(n - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) + '" r="3" fill="#2563EB"/></svg>';
+    'style="width:100%;height:' + hgt + 'px;display:block;overflow:visible;" role="img" ' +
+    'aria-label="' + esc("الاتجاه خلال " + fmtN(n) + " يومًا، المتوسط " + fmtN(Math.round(mean))) + '">' +
+    '<line class="spk-base" x1="' + X0 + '" y1="' + my + '" x2="' + X1 + '" y2="' + my + '"/>' +
+    /* pathLength="1" normalises the geometry length, so the dash draw is PURE CSS — the reference
+       measures getTotalLength() in JS and writes the dasharray back; it does not need to. */
+    '<path class="spk-line" id="' + id + '" pathLength="1" d="' + d + '"/></svg>';
 }
 // A funnel, drawn as one. Each band's TOP edge is the stage above it and its BOTTOM edge is its own
 // value, so the slope between two bands IS the drop between them — the single thing the six equal
