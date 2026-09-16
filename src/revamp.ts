@@ -496,6 +496,150 @@ input[type="checkbox"]:focus-visible::before {
   .kpis { grid-template-columns: 1fr; }
   .rv-hero .v { font-size: 28px; }
 }
+
+/* ============================ 7. THE UNSEEN DETAILS ============================
+   Every rule here fixes something no reader will ever name, and every one of them is felt. They
+   are declared once, on the shared primitives, so they reach every screen rather than the screen
+   whose turn it was.
+
+   7.1 PRESS. A control that does not move when pressed does not feel like it heard you. Every
+   pressable thing gets scale(0.97) at 140ms — under the 160ms button-feedback bound, and applied
+   to TRANSFORM only so it stays off the layout and paint path. */
+.btn, .sh-tile.go, .sh-card.go, .crm-kpi.crm-click {
+  transition: transform 140ms var(--ease), filter var(--fast) var(--ease),
+              box-shadow var(--base) var(--ease), border-color var(--base) var(--ease);
+}
+.btn:not([disabled]):active { transform: scale(0.97); }
+.sh-card.go:active, .sh-tile.go:active, .crm-kpi.crm-click:active { transform: scale(0.98); }
+
+/* 7.2 HOVER IS NOT A TAP. .btn:hover was unguarded, so on a phone every tap left the button
+   sitting in its hover state until something else was touched. Hover belongs to a real pointer. */
+.btn:hover { filter: none; }
+@media (hover: hover) and (pointer: fine) {
+  .btn:not([disabled]):hover { filter: brightness(.97); }
+}
+
+/* 7.3 THE CARD READS AS A SURFACE. A 1px hairline draws a rectangle; a hairline plus a one-pixel
+   inner highlight along the top edge makes the same rectangle read as something lying ON the page.
+   It costs no layout and no colour token — it is the paper catching the light. */
+.card, .sh-tile, .sh-card, .sh-empty, .crm-kpi, .crm-tbl {
+  box-shadow: var(--specular), var(--sh-0);
+}
+/* The hero is a solid accent surface: a white highlight on it would be a seam, not a light. */
+.sh-tile.lead { box-shadow: none; }
+
+/* 7.3b THE BAR IS THE MOST-DRAWN OBJECT IN MASSAR — coverage, attainment, readiness, quarters,
+   partner weeks, pipeline share. Every one of them was a flat grey rectangle with a flat blue
+   rectangle inside it. A track is a groove: it takes the recessed ring. A fill is a face: it takes
+   the one-pixel specular. Nothing about the data changes; the object stops looking printed. */
+.crm-bar, .hm-meter, .hm-sh, .hm-split, .sh-stack, .px-qc .trk, .px-hi .meter,
+.kh-meter .bar, .yt-qc .bar, .kb-meter .track, .pc-qc .trk {
+  box-shadow: var(--well);
+}
+.crm-bar i, .hm-meter i, .hm-sh i, .hm-split i, .sh-stack i, .px-qc .trk i, .px-hi .meter i,
+.kh-meter .bar i, .yt-qc .bar i, .kb-meter .track i, .pc-qc .trk i {
+  box-shadow: var(--fill-face);
+}
+
+/* 7.4 NUMBERS ARE A COLUMN, NOT A SENTENCE. Proportional digits make a stack of figures ragged and
+   make a changing figure jump. Tabular everywhere a figure is drawn, once. */
+.sh-tile .v, .sh-card .money, .crm-kpi .crm-v, .crm-pct, .crm-tbl .crm-money {
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+
+/* 7.5 THE FOCUS RING IS NOT OPTIONAL. Any pressable element that never declared one picks this up,
+   rather than inheriting Chromium's default blue on a blue button. interior.dev's shape: an INSET
+   ring plus a 6% wash, so focusing something never changes its box and never overlaps its neighbour
+   the way an outset ring on a flush row does. */
+.sh-tile.go:focus-visible, .sh-card.go:focus-visible, .crm-kpi.crm-click:focus-visible,
+.crm-row.crm-click:focus-visible {
+  outline: none; background: var(--accent-wash);
+  box-shadow: inset 0 0 0 2px var(--accent), var(--specular);
+}
+
+/* 7.6 A COARSE POINTER NEEDS 44px. DESIGN.md 3.10, applied where the query actually requires it. */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+}
+
+/* 7.7 THE PAGE IS WOVEN, NOT PAINTED. A flat #F6F7F9 behind white cards gives the eye nothing to
+   sit on, and the cards read as drawn rectangles rather than as paper. One repeating hairline
+   every 8px at 45 degrees, at 4% ink, fixes that for the cost of one gradient and no element.
+   45deg, not -45deg: the weave leans with the reading direction in RTL.
+   background-attachment: fixed — it must not scroll with the content, or it becomes a pattern. */
+body, .app {
+  background-color: var(--canvas);
+  background-image: repeating-linear-gradient(45deg,
+    transparent 0 7px, rgba(20,22,26,.04) 7px 8px);
+  background-attachment: fixed;
+}
+/* The rail is a surface ON the weave and covers it. The CONTENT column must not: it is the page,
+   and it is where the weave does its work — behind the cards, between them, in every gutter. It
+   stays transparent so the fixed weave on .app shows through while the column scrolls over it. */
+aside { background-color: var(--paper); }
+.body { background-color: transparent; }
+
+/* 7.8 THE PRIMARY BUTTON IS A PRESSED OBJECT. A flat blue rectangle with a soft drop shadow is the
+   default every framework ships. A sub-pixel dark rim plus a complete inner white ring reads as a
+   bevel from every side, and costs nothing: no layout, no extra element, no colour token. */
+.btn-teal, .btn-dark {
+  box-shadow: 0 0 0 .5px rgba(20,22,26,.55), inset 0 0 0 1px rgba(255,255,255,.16);
+}
+.btn-teal:focus-visible, .btn-dark:focus-visible {
+  box-shadow: 0 0 0 .5px rgba(20,22,26,.55), inset 0 0 0 1px rgba(255,255,255,.16),
+              0 0 0 3px rgba(37,99,235,.45);
+}
+
+/* 7.9 A CARD'S SHADOW IS SIX NEARLY-INVISIBLE LAYERS, NOT ONE. Each stop is at 1–3% ink; alone
+   none of them is visible, and the stack reads as air under the card. Collapsing them into a
+   single 0 4px 12px rgba(0,0,0,.08) is exactly what makes a surface look cheap. Kept off the
+   flush list row, which by DESIGN.md 5 never has a shadow. */
+aside, .px-rh, .hm-pt, .ox-sum {
+  box-shadow: var(--specular),
+    0 18px 47px rgba(16,24,40,.03), 0 7.5px 19px rgba(16,24,40,.02),
+    0 4px 10.5px rgba(16,24,40,.02), 0 2.3px 5.8px rgba(16,24,40,.012),
+    0 1.2px 3.1px rgba(16,24,40,.012), 0 .5px 1.3px rgba(16,24,40,.012);
+}
+
+/* 7.10 A MENU BELONGS TO ITS TRIGGER. Scaling from the centre makes a dropdown look like it was
+   always there and just became visible; scaling from the trigger's own corner makes it look like
+   it came OUT of the button. 160ms, from 0.95 — never from 0, because nothing arrives from
+   nothing. */
+@keyframes rvPop { from { opacity: 0; transform: scale(.95); } to { opacity: 1; transform: none; } }
+.px-menu, .ox-menu, .cf-menu {
+  animation: rvPop 160ms var(--ease-out) both;
+  transform-origin: 100% 0;   /* RTL: menus open from the inline-start corner, which is the right */
+}
+
+/* 7.10b THE HOME PAGE IS ONE SYSTEM. Its opening band (hm-*) was rebuilt to the reference
+   language; the three report panels below it (pc-g3) were still the old flat boxes, so the screen
+   changed grammar halfway down. Same material, same header rhythm, same recessed tracks. */
+.pc-g3 .sh-sec.card3 { box-shadow: var(--specular), var(--sh-0); }
+@media (hover: hover) and (pointer: fine) {
+  .pc-g3 .sh-sec.card3:hover { box-shadow: var(--specular), var(--lift); }
+}
+.pc-g3 .sh-sec.card3 { transition: box-shadow var(--base) var(--ease); }
+/* The panel title takes the same step off the body as «صحة خط البيع» above it, and the strapline
+   the same muted --t-xs. Two header styles on one screen is two systems on one screen. */
+.pc-g3 .sh-h { font-size: var(--t-md); font-weight: 600; color: var(--ink); }
+.pc-g3 .sh-hs { font-size: var(--t-xs); color: var(--muted); line-height: 1.7; }
+/* The quarter tiles are tiles, not tinted rectangles: a recessed ground and tabular figures. */
+.pc-qc { box-shadow: var(--well); }
+.pc-qc .v, .pc-qc .t, .pc-qc .k { font-variant-numeric: tabular-nums; }
+
+/* 7.11 TABULAR FIGURES, EVERYWHERE A FIGURE IS DRAWN. Proportional digits make a column of numbers
+   ragged and make a changing number jump sideways. This is the cheapest quality upgrade available
+   and it costs one declaration. */
+.hm-kpi .n, .hm-st .n, .hm-fig .n, .px-hi .n, .yt-kpi .n, .og-t .n, .rx-n, .in-k .n {
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .sh-tile.go, .sh-card.go, .crm-kpi.crm-click { transition: none; }
+  .btn:not([disabled]):active, .sh-card.go:active, .sh-tile.go:active,
+  .crm-kpi.crm-click:active { transform: none; }
+  .sh-card.go:hover, .sh-tile.go:hover, .crm-kpi.crm-click:hover { transform: none; }
+}
 `;
 
 // ---------------------------------------------------------------------------------------------

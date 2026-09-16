@@ -137,6 +137,31 @@ export const DASHBOARD_HTML = `<!doctype html>
        large surface or a distance the eye has to follow. Exit is faster than entry. */
     --fast:150ms; --base:220ms; --slow:320ms; --ease:cubic-bezier(.2,.8,.2,1);
     --flash:900ms; --spinner-delay:300ms; --stagger:24ms;
+    /* THREE NAMED CURVES, added 2026-09-16 after reading transitions.dev and interior.dev end to
+       end. --ease stays the default; these exist because one curve cannot answer three questions.
+       --ease-out is for something ARRIVING or LEAVING (fast first, so the eye is paid immediately).
+       --ease-io is for something MOVING on screen between two places it already occupies — a tab
+       indicator, a thumb. --ease-drawer is Ionic's sheet curve, for a surface travelling its own
+       height. ease-IN is deliberately absent: it delays the first frame, which is the frame the
+       reader is watching hardest. */
+    --ease-out:cubic-bezier(.22,1,.36,1);
+    --ease-io:cubic-bezier(.77,0,.175,1);
+    --ease-drawer:cubic-bezier(.32,.72,0,1);
+    /* Enter is SLOWER than exit: arriving is information, leaving is only getting out of the way. */
+    --d-in:250ms; --d-out:150ms;
+    /* Distance and blur travel together with opacity on every enter. 4/8/12px, never 40 — a long
+       trip reads as lag. Blur bridges a crossfade so two states do not sit visibly on top of
+       each other; blur(0) is always written out, because blur -> none does not interpolate. */
+    --dist-1:4px; --dist-2:8px; --dist-3:12px; --blur-1:2px; --blur-2:3px;
+
+    /* MATERIAL. interior.dev draws every edge as a ring INSIDE a box-shadow rather than as a
+       border, so nothing moves by a pixel when a state changes, and it gives raised surfaces a
+       one-pixel specular along the top edge. Both are free — no layout, no colour token.
+       --well is the opposite: a recessed track, for the ground under a bar or inside a field. */
+    --specular:inset 0 1px 0 rgba(255,255,255,.9);
+    --well:inset 0 1px 2px rgba(20,22,26,.06), inset 0 0 0 1px rgba(20,22,26,.08);
+    --fill-face:inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(20,22,26,.14);
+    --lift:0 1px 2px rgba(16,24,40,.06), 0 8px 18px -12px rgba(16,24,40,.5);
   }
 
   /* interior.dev, failure 3: "Motion is the only channel." With reduced motion on, the

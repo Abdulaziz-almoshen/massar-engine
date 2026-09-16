@@ -1875,10 +1875,12 @@ function vExecBand() {
     h += '</div></div>';
   }
 
+  /* The accounting-basis caveat («قيمة العقد الكاملة… الأساس المحاسبي لم يُحسم») is OFF the home
+     screen by founder instruction, 2026-09-16. It is not deleted: it belongs where someone is
+     acting on the figure — «التقارير» (rp-basis) and the executive report (rx-basis) both still
+     print it — not on the opening band a founder reads for position. */
   h += '<div class="sh-sec card3"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
-    pcQuarterChart(pcQuarters) +
-    '<div class="pc-note"><b>' + esc(pcQuarters.valueBasis.label) + '</b><br>' +
-    esc(pcQuarters.valueBasis.note) + '</div></div>';
+    pcQuarterChart(pcQuarters) + '</div>';
   h += '</div>';
   return h;
 }
