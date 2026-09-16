@@ -741,6 +741,73 @@ nav, #nav { position: relative; }
 .nv.on { background: transparent; }
 @media (prefers-reduced-motion: reduce) { .nv-glide { transition: none; } }
 
+/* ============================ 8. THE REVAMP, EVERY SCREEN ============================
+   Section 7 fixed الرئيسية. An in-page audit of twelve screens then measured the same two defects
+   everywhere else, so this section is the same system applied by MEASURED class name rather than
+   by the handful section 7 happened to list.
+
+   THE AUDIT, 2026-09-16 (share of visible strings set at 12px · surfaces drawing a real border):
+     targets 85%/49 · accounts 81%/1 · settings 75%/9 · home 73%/10 · org 71%/7 · partners 69%/4
+     perf 67%/11 · kmon 65%/5 · users 57%/16 · opps 55%/48 · products 52%/2 · reports 50%/6
+
+   8.1 EVERY SURFACE TAKES THE RING. These are the classes the audit actually found drawing a
+   border, not a guess: 160 surfaces across the product. border-color goes transparent rather than
+   the border being removed, so no box collapses by 2px and no screen reflows. */
+.cf-r, .cf-sec, .ox-card, .trow, .tgtopp, .crm-kpi, .yt-r, .yt-sec, .yt-kpi,
+.perf-set, .kcard, .rx-card, .ac-card, .in-card, .pt-card, .us-card {
+  border-color: transparent;
+  box-shadow: var(--shadow-card);
+}
+/* A row inside a list is NOT a card: it keeps a hairline between siblings and takes no shadow,
+   per DESIGN.md 5. The ring above would have given every table row its own floating edge. */
+.trow, .yt-r, .cf-r {
+  box-shadow: none;
+  border-block-start: 1px solid var(--line-soft);
+}
+
+/* 8.2 THE BUTTON IS NOT A FOOTNOTE. The audit found 76 buttons set at 12px — DESIGN.md's base is
+   --t-sm, and 12px is the LABEL size. A product whose every control is one step below its body
+   text reads as provisional, and that is a large part of what "old style" was describing. */
+.btn { font-size: var(--t-sm); }
+.btn.btn-sm, .ac-dec .btn, .in-a2 .btn { font-size: var(--t-xs); }
+
+/* 8.3 A PERCENTAGE IS A FIGURE, NOT A CHIP. «نسبة الإنجاز» on المستهدفات was 12px/600 — the single
+   number that whole screen exists to report, drawn at label size. Same rule as the exec row. */
+.yt-pct, .crm-pct, .px-he.px-c-tg { font-size: var(--t-lg); font-weight: 800;
+  font-variant-numeric: tabular-nums; }
+
+/* 8.4 THE NAME OF A THING LEADS ITS ROW. Row titles were 12px beside 12px values, so nothing in a
+   list ranked. The name takes the body size and the weight; its sub-line keeps the label size. */
+.sh-card .nm, .crm-row .crm-nm, .cf-r .nm, .tgtopp .nm, .ox-cl .a, .us-card .nm {
+  font-size: var(--t-sm); font-weight: 600;
+}
+
+/* 8.5 THE LIST ROW, which is what four of the twelve screens ARE. جهات الاستهداف draws 41 rows
+   whose every cell is 12px, so the entity's NAME — the only thing a reader is scanning for — has
+   exactly the same weight as its phone number and its stage. A list where nothing ranks is a list
+   you read linearly, which is the slowest way to use a table.
+   The first cell leads; the rest stay at label size and step back in ink. */
+.trow > *:first-child { font-size: var(--t-sm); font-weight: 600; color: var(--ink); }
+.trow > *:not(:first-child) { color: var(--ink-2); }
+.trow { min-height: 56px; }
+/* The header is a label row, not a grey band: on a white plane a filled strip reads as another
+   surface, and the table already has an edge. */
+.thead { background: transparent; border-block-end: 1px solid var(--line); font-weight: 600; }
+
+/* 8.6 ONE PRIMARY PER SCREEN (DESIGN.md 3.7). «رفع ملف Excel/CSV» was a BLACK button sitting beside
+   the accent one, so جهات الاستهداف offered two things that both looked like the main action — and
+   neither of them is: the main action there is adding a target. Black is retired to a ghost. */
+.btn-dark { background: var(--paper); color: var(--ink); box-shadow: var(--ring-soft); }
+@media (hover: hover) and (pointer: fine) { .btn-dark:not([disabled]):hover { background: var(--surface); } }
+
+/* 8.7 THE TWO THINGS LEFT ON «المستهدفات والأداء». The product table still drew its header as a grey
+   filled band — a second surface colour inside a card that already has one — and every quarter with
+   no data drew a HATCHED bar. Hatching reads as «broken», not as «nothing recorded»: five products
+   with no target made the screen look like a rendering fault. A flat well says the same thing and
+   says it quietly. The header loses its fill and keeps a rule, like every other header here. */
+.yt-r.hdr { background: transparent; border-block-end: 1px solid var(--line); }
+.yt-qc.none .bar { background: var(--well); }
+
 /* 7.11 TABULAR FIGURES, EVERYWHERE A FIGURE IS DRAWN. Proportional digits make a column of numbers
    ragged and make a changing number jump sideways. This is the cheapest quality upgrade available
    and it costs one declaration. */
