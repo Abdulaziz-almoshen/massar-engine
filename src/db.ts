@@ -2087,17 +2087,36 @@ function quoteFrom(x: any): QuoteRow {
     createdAt: Number(x.created_at), statusBy: x.status_by ?? null, statusAt: x.status_at == null ? null : Number(x.status_at) };
 }
 
-export async function oppWork(oppId: number): Promise<{ activities: ActivityRow[]; quotes: QuoteRow[]; lossEvents: { at: number; key: string | null; note: string | null; actor: string | null }[] } | null> {
+export type StageEventRow = {
+  at: number; fromStage: string | null; toStage: string;
+  outcomeKey: string | null; reason: string | null; actor: string | null;
+};
+
+export async function oppWork(oppId: number): Promise<{
+  activities: ActivityRow[]; quotes: QuoteRow[];
+  lossEvents: { at: number; key: string | null; note: string | null; actor: string | null }[];
+  stageEvents: StageEventRow[];
+} | null> {
   if (!pool || !connected) throw new DbUnavailable();
   const exists = await pool.query(`SELECT 1 FROM opportunities WHERE id = $1`, [oppId]);
   if (!exists.rows.length) return null;
-  const [a, q, e] = await Promise.all([
+  const [a, q, e, j] = await Promise.all([
     pool.query(`SELECT * FROM opp_activities WHERE opp_id = $1 ORDER BY occurred_on DESC, id DESC LIMIT 200`, [oppId]),
     pool.query(`SELECT * FROM opp_quotes WHERE opp_id = $1 ORDER BY created_at DESC, id DESC LIMIT 100`, [oppId]),
     pool.query(`SELECT recorded_at, outcome_key, outcome_reason, actor FROM track_stage_events WHERE opp_id = $1 AND to_stage = 'lost' ORDER BY recorded_at DESC LIMIT 10`, [oppId]),
+    // The deal's own journey: every transition, oldest first, so «نتائج المراحل» can say what each
+    // rung came to. Ordered by effective_at (when it HAPPENED) — recorded_at is when we heard.
+    pool.query(
+      `SELECT from_stage, to_stage, outcome_key, outcome_reason, actor,
+              (EXTRACT(EPOCH FROM effective_at) * 1000)::bigint AS at
+         FROM track_stage_events WHERE opp_id = $1 ORDER BY effective_at ASC, id ASC LIMIT 200`, [oppId]),
   ]);
   return { activities: a.rows.map(activityFrom), quotes: q.rows.map(quoteFrom),
-    lossEvents: e.rows.map((x) => ({ at: Number(x.recorded_at), key: x.outcome_key ?? null, note: x.outcome_reason ?? null, actor: x.actor ?? null })) };
+    lossEvents: e.rows.map((x) => ({ at: Number(x.recorded_at), key: x.outcome_key ?? null, note: x.outcome_reason ?? null, actor: x.actor ?? null })),
+    stageEvents: j.rows.map((x: any) => ({
+      at: Number(x.at), fromStage: x.from_stage ?? null, toStage: String(x.to_stage),
+      outcomeKey: x.outcome_key ?? null, reason: x.outcome_reason ?? null, actor: x.actor ?? null,
+    })) };
 }
 
 /** BR-OPP-003. A next step given with the activity also becomes the line's «الخطوة التالية» — the board

@@ -489,6 +489,34 @@ function vAccount(idRaw) {
     (a.ownerName ? '<div class="ac-owner"><span class="ac-av" aria-hidden="true">' + acIni(a.ownerName) + '</span><span><span class="nm">' + esc(a.ownerName) + '</span><br><span class="rl">' +
       esc([owner ? (owner.role === "sales" ? "مبيعات" : owner.role === "support" ? "دعم" : owner.role === "manager" ? "مدير" : owner.role) : "لم يعد نشطًا في الفريق", owner && owner.division ? owner.division : ""].filter(Boolean).join(" · ")) + "</span></span></div>"
       : '<div class="bd"><div class="empty">لا موظف مسؤول عن هذا العميل.</div></div>') + "</section>";
+  /* «مدراء المنتجات المعنيون بالحساب» (the prototype's 360 screen). The account manager owns the
+     RELATIONSHIP; each product this customer is targeted with has its own manager, and when a
+     question is about a product it is that person who answers it. Derived from the catalogue —
+     product → owner — so nothing new is stored and nobody is named who is not the recorded owner. */
+  if (typeof pcLoad === "function") pcLoad(false);
+  var acPm = [];
+  (function () {
+    var cat = (typeof pcCat !== "undefined" && pcCat) || [];
+    var mine = acProducts({ productTags: a.productTags, usesProducts: a.usesProducts, oppProducts: a.oppProducts });
+    var by = {};
+    mine.forEach(function (pn) {
+      for (var i = 0; i < cat.length; i++) {
+        if (cat[i].product !== pn) continue;
+        var who = String(cat[i].owner || "").trim();
+        if (!who) return;
+        if (!by[who]) { by[who] = { name: who, products: [] }; acPm.push(by[who]); }
+        by[who].products.push(pn);
+        return;
+      }
+    });
+  })();
+  if (acPm.length) {
+    side += acCard("مدراء المنتجات المعنيون", fmtN(acPm.length), '<a href="#products">كل المنتجات</a>',
+      acPm.map(function (m) {
+        return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(m.name) + '</span>' +
+          '<span class="grow"><span>' + esc(m.name) + '</span><span class="sub">' + esc(m.products.join("، ")) + "</span></span></div>";
+      }).join(""));
+  }
   side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", acMayEdit() ? '<button class="lnk" id="acedit_contacts" data-ac="edit">إدارة</button>' : "",
     a.contacts.length ? a.contacts.map(function (c) {
       return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(c.name) + '</span><span class="grow"><span>' + esc(c.name) +

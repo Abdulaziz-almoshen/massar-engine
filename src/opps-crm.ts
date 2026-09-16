@@ -1353,6 +1353,9 @@ function opDetailDrawer(l) {
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
     "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
+  /* «نتائج المراحل» sits above the activities: what each rung came to is the story of the deal, and
+     the activities are the work inside it. */
+  if (typeof owJourneySection === "function") b += owJourneySection(l);
   if (typeof owActivitiesSection === "function") b += owActivitiesSection(l) + owQuotesSection(l);
   b += opEscSection(l);
   /* بنود أخرى لهذه الجهة */

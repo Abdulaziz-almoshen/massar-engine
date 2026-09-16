@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canMoveQuote, checkActivity, checkLossReason, checkOppWorkDomainClosure, checkQuote, isLossClose,
-  LOSS_REASON_LABELS, LOSS_REASONS, OPP_WORK_DOMAIN_JS,
-} from "../src/opp-work-domain.js";
+  LOSS_REASON_LABELS, LOSS_REASONS, OPP_WORK_DOMAIN_JS, stageJourney, journeyPct } from "../src/opp-work-domain.js";
 import { DEPARTMENTS, STAGE_OUTCOMES } from "../src/sales-domain.js";
 
 describe("loss reasons (BRULE-009, BR-RPT-003)", () => {
@@ -97,5 +96,49 @@ describe("the page seam", () => {
     expect(page.checkActivity({ kind: "call", occurredOn: "2026-09-15", summary: "x" }, "2026-09-15", DEPARTMENTS))
       .toEqual(checkActivity({ kind: "call", occurredOn: "2026-09-15", summary: "x" }, "2026-09-15", DEPARTMENTS));
     expect(page.checkQuote({ salePrice: "5" }, "2026-09-15")).toEqual(checkQuote({ salePrice: "5" }, "2026-09-15"));
+  });
+});
+
+describe("stageJourney — «نتائج المراحل»", () => {
+  const ladder = ["contact", "discovery", "demo", "negotiate", "won"];
+  const ev = (at: number, fromStage: string | null, toStage: string, outcomeKey?: string, reason?: string) =>
+    ({ at, fromStage, toStage, outcomeKey: outcomeKey ?? null, reason: reason ?? null, actor: "سارة" });
+
+  it("reads each rung's outcome from the event that LEFT it", () => {
+    const j = stageJourney(ladder, [
+      ev(1, null, "contact"),
+      ev(2, "contact", "discovery", "interested", "رأى قيمة أولية"),
+      ev(3, "discovery", "demo", "qualified", "الحاجة واضحة"),
+    ], "demo");
+    const by = Object.fromEntries(j.map((s) => [s.key, s]));
+    expect(by.contact.state).toBe("done");
+    expect([by.contact.outcomeKey, by.contact.reason]).toEqual(["interested", "رأى قيمة أولية"]);
+    expect(by.discovery.outcomeKey).toBe("qualified");
+    // the rung it sits on has not ended, so it carries no verdict
+    expect(by.demo.state).toBe("current");
+    expect(by.demo.outcomeKey).toBeNull();
+    expect(by.negotiate.state).toBe("future");
+  });
+
+  it("a rung the deal never entered is «skipped», never silently done", () => {
+    const j = stageJourney(ladder, [ev(1, null, "contact"), ev(2, "contact", "negotiate", "fast")], "negotiate");
+    const by = Object.fromEntries(j.map((s) => [s.key, s.state]));
+    expect(by).toEqual({ contact: "done", discovery: "skipped", demo: "skipped", negotiate: "current", won: "future" });
+  });
+
+  it("a line with no logged history still shows where it is", () => {
+    const j = stageJourney(ladder, [], "discovery");
+    const by = Object.fromEntries(j.map((s) => [s.key, s.state]));
+    expect(by.discovery).toBe("current");
+    expect(by.contact).toBe("future");   // nothing was logged, so nothing is claimed about it
+    expect(j.find((s) => s.key === "discovery")!.reachedAt).toBeNull();
+  });
+
+  it("journeyPct counts the rungs behind it, and refuses a stage off the ladder", () => {
+    expect(journeyPct(ladder, "contact")).toBe(20);
+    expect(journeyPct(ladder, "demo")).toBe(60);
+    expect(journeyPct(ladder, "won")).toBe(100);
+    expect(journeyPct(ladder, "retired_rung")).toBeNull();
+    expect(journeyPct([], "contact")).toBeNull();
   });
 });

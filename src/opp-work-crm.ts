@@ -10,6 +10,33 @@
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const OPP_WORK_CRM_CSS = `
+/* «نتائج المراحل» — the deal's own journey down the ladder */
+.ow-jsub { font-size:var(--t-xs); color:var(--muted); margin-block-start:2px; }
+.ow-jpct { display:flex; align-items:center; gap:var(--s3); margin-block:var(--s2) var(--s3); }
+.ow-jpct .l { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
+.ow-jpct .bar { flex:1; height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
+.ow-jpct .bar i { display:block; height:100%; background:var(--accent); border-radius:var(--r-pill);
+  transition:width 320ms cubic-bezier(0.23, 1, 0.32, 1); }
+.ow-jpct .v { font-size:var(--t-xs); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+.ow-j { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.ow-js { position:relative; display:grid; grid-template-columns:16px minmax(0,1fr); gap:var(--s3);
+  padding-block:8px; padding-inline-start:2px; }
+.ow-js .dot { width:9px; height:9px; border-radius:var(--r-pill); background:var(--tn, var(--accent)); margin-block-start:5px; justify-self:center; }
+.ow-js.future .dot, .ow-js.skipped .dot { background:transparent; box-shadow:inset 0 0 0 1.5px var(--s-off-mark, #D8DCE3); }
+/* the thread between the rungs, so the column reads as one journey rather than four rows */
+.ow-js::before { content:""; position:absolute; inset-block-start:16px; inset-block-end:-8px;
+  inset-inline-start:9px; width:1px; background:var(--line-soft); }
+.ow-js:last-child::before { display:none; }
+.ow-js .hd { display:flex; align-items:baseline; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); }
+.ow-js .hd b { color:var(--ink); font-weight:600; }
+.ow-js .res { font-size:var(--t-xs); font-weight:500; color:var(--tn-text, var(--ink-2)); background:var(--tn-soft, var(--surface-2));
+  border-radius:var(--r-pill); padding:2px 9px; }
+.ow-js.future .res, .ow-js.skipped .res { color:var(--muted); background:var(--surface-2); }
+.ow-js .at { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; margin-inline-start:auto; }
+.ow-js .why { display:block; font-size:var(--t-xs); color:var(--muted); line-height:1.8; margin-block-start:3px; }
+.ow-js.current .hd b { color:var(--accent-deep); }
+@media (prefers-reduced-motion: reduce) { .ow-jpct .bar i { transition:none; } }
+
 .ow-scrim { position:fixed; inset:0; background:rgba(16,24,40,.42); z-index:var(--z-toast); opacity:0; transition:opacity 140ms var(--ease); }
 .ow-scrim.in { opacity:1; transition-duration:200ms; }
 .ow-lossm { position:fixed; inset:0; z-index:var(--z-toast); display:flex; align-items:flex-start; justify-content:center; padding:10vh var(--s3) var(--s3); pointer-events:none; }
@@ -207,6 +234,64 @@ function owLoad(oppId, force) {
   pxGet("/admin/opps/" + fmtId(oppId) + "/work").then(function (j) { owWork[oppId] = { data: j, failed: false, loading: false }; })
     .catch(function () { owWork[oppId] = { data: w ? w.data : null, failed: true, loading: false }; })
     .then(function () { if (opOpen === oppId) opRender(); });
+}
+
+/* ---------------- «نتائج المراحل» ----------------
+   The prototype's opportunity screen answers «ماذا حدث في كل مرحلة؟» — the outcome recorded when the
+   deal left each rung, its reason, and the action it produced. Massar logged every one of those
+   transitions from the first day of the stage ledger and never showed them on the record.
+   A rung the deal skipped says so; a rung it never reached says «لم تُسجَّل». */
+function owOutcomeOf(key) {
+  var all = (typeof STAGE_OUTCOMES !== "undefined" && STAGE_OUTCOMES) || [];
+  for (var i = 0; i < all.length; i++) if (all[i].key === key) return all[i];
+  return null;
+}
+function owStamp(ms) {
+  if (!ms) return "";
+  try { return fmtD(ms); } catch (e) { return ""; }
+}
+function owJourneySection(l) {
+  owLoad(l.id, false);
+  var w = owWork[l.id] || {};
+  var ladder = (typeof OPP_ST !== "undefined" ? OPP_ST : []).map(function (s) { return s.key; });
+  var b = '<section class="ox-sec" aria-labelledby="oxsec_j"><div class="ox-sech" id="oxsec_j">نتائج المراحل</div>' +
+    '<div class="ow-jsub">نتيجة كل مرحلة وسببها عبر دورة البيع</div>';
+  if (!w.data && w.loading) return b + '<div class="ox-hint2" aria-busy="true">جارٍ قراءة سجل المراحل…</div></section>';
+  if (!w.data && w.failed) {
+    return b + '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر قراءة سجل المراحل.' +
+      '<button class="btn btn-ghost" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div></section>';
+  }
+  var evs = (w.data && w.data.stageEvents) || [];
+  var steps = stageJourney(ladder, evs, l.stage);
+  var pct = journeyPct(ladder, l.stage);
+  if (pct !== null) {
+    b += '<div class="ow-jpct"><span class="l">نسبة الإنجاز في الدورة</span>' +
+      '<span class="bar"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="v">' + fmtN(pct) + "٪</span></div>";
+  }
+  b += '<ol class="ow-j">' + steps.map(function (st) {
+    var stage = typeof opStage === "function" ? opStage(st.key) : { label: st.key };
+    var o = st.outcomeKey ? owOutcomeOf(st.outcomeKey) : null;
+    var said = st.state === "current" ? "الحالية"
+      : st.state === "skipped" ? "لم تمرّ بها"
+      : st.state === "future" ? "لم تُسجَّل"
+      : o ? o.label : (st.leftAt ? "انتقلت دون تسجيل نتيجة" : "لم تُسجَّل");
+    var why = st.reason || (o ? o.reason : "");
+    var act = o ? o.nextAction : "";
+    return '<li class="ow-js ' + st.state + '"' + (typeof opToneVars === "function" ? ' style="' + opToneVars(st.key) + '"' : "") + ">" +
+      '<span class="dot" aria-hidden="true"></span>' +
+      '<span class="bd"><span class="hd"><b>' + esc(stage.label) + "</b>" +
+      '<span class="res">' + esc(said) + "</span>" +
+      (st.leftAt || st.reachedAt ? '<span class="at">' + esc(owStamp(st.leftAt || st.reachedAt)) + "</span>" : "") + "</span>" +
+      (st.state === "done" && (why || act)
+        ? '<span class="why">' + (why ? "السبب: " + esc(why) : "") + (why && act ? " · " : "") + (act ? "الإجراء: " + esc(act) : "") + "</span>"
+        : st.state === "current" && typeof opAgo === "function" ? '<span class="why">' + esc(opAgo(l)) + "</span>" : "") +
+      "</span></li>";
+  }).join("") + "</ol>";
+  if (!evs.length) {
+    b += '<div class="ox-hint2">لا انتقالات مسجّلة لهذا البند بعد — يُسجَّل الانتقال تلقائيًا عند تغيير المرحلة.</div>';
+  }
+  return b + "</section>";
 }
 
 /* ---------------- «الأنشطة» ---------------- */

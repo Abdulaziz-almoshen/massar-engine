@@ -140,9 +140,87 @@ export function canMoveQuote(from: string, to: string): boolean {
   return false;
 }
 
+/**
+ * «نتائج المراحل» — what each rung of the ladder came to, from the deal's own transition log.
+ *
+ * The founder's prototype prints this as the heart of an opportunity: for every stage, the outcome
+ * recorded when the deal left it, the reason given, and «لم تُسجَّل» for a rung it never reached. It
+ * is a READING of track_stage_events, so three rules keep it honest:
+ *
+ *   1. A rung is «reached» only if an event moved the deal INTO it. A stage the deal skipped is not
+ *      quietly marked done because a later stage was reached — the log says what happened, and a
+ *      screen that fills gaps is inventing history.
+ *   2. The outcome shown on a rung is the one recorded on the event that LEFT it (from_stage), not
+ *      the one that entered it: the outcome is the verdict on the stage just finished.
+ *   3. The rung the deal sits on now is «الحالية» and carries no outcome — it has not ended.
+ *
+ * `ladder` is the administrator's own stage list, passed in; this function never decides the rungs.
+ */
+export type JourneyEvent = { at: number; fromStage: string | null; toStage: string; outcomeKey?: string | null; reason?: string | null; actor?: string | null };
+export type JourneyStep = {
+  key: string; state: "done" | "current" | "skipped" | "future";
+  reachedAt: number | null; leftAt: number | null;
+  outcomeKey: string | null; reason: string | null; actor: string | null;
+};
+
+export function stageJourney(ladder: readonly string[], events: readonly JourneyEvent[], currentStage: string): JourneyStep[] {
+  var reached: Record<string, number> = {};
+  var left: Record<string, number> = {};
+  var outcome: Record<string, { key: string | null; reason: string | null; actor: string | null }> = {};
+  var everSeen = false;
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i];
+    var to = String(e.toStage || "");
+    if (to && reached[to] === undefined) reached[to] = Number(e.at) || 0;
+    var from = e.fromStage == null ? "" : String(e.fromStage);
+    if (from) {
+      left[from] = Number(e.at) || 0;
+      outcome[from] = {
+        key: e.outcomeKey == null ? null : String(e.outcomeKey),
+        reason: e.reason == null ? null : String(e.reason),
+        actor: e.actor == null ? null : String(e.actor),
+      };
+    }
+    everSeen = true;
+  }
+  // The deal is on a rung right now even when nothing was ever logged (a line created straight onto
+  // a stage), so the current rung counts as reached with an unknown date rather than as «future».
+  if (currentStage && reached[currentStage] === undefined) reached[currentStage] = 0;
+  var curIdx = ladder.indexOf(currentStage);
+  var out: JourneyStep[] = [];
+  for (var j = 0; j < ladder.length; j++) {
+    var k = ladder[j];
+    var was = reached[k] !== undefined;
+    var state: JourneyStep["state"] = k === currentStage ? "current"
+      : was ? "done"
+      // Behind the current rung and never entered: skipped, and said so — not silently «done».
+      : (curIdx >= 0 && j < curIdx && everSeen) ? "skipped"
+      : "future";
+    out.push({
+      key: k, state: state,
+      reachedAt: was && reached[k] ? reached[k] : null,
+      leftAt: left[k] === undefined ? null : left[k],
+      outcomeKey: k === currentStage ? null : (outcome[k] ? outcome[k].key : null),
+      reason: k === currentStage ? null : (outcome[k] ? outcome[k].reason : null),
+      actor: k === currentStage ? null : (outcome[k] ? outcome[k].actor : null),
+    });
+  }
+  return out;
+}
+
+/** How far along the ladder the deal is, as a whole percent of the rungs BEHIND it — null when the
+ *  stage is not on the ladder at all (an archived rung), because a made-up position is worse than
+ *  none. A terminal rung is 100٪ by arithmetic, not by special case. */
+export function journeyPct(ladder: readonly string[], currentStage: string): number | null {
+  if (!ladder.length) return null;
+  var i = ladder.indexOf(currentStage);
+  if (i < 0) return null;
+  return Math.round(((i + 1) / ladder.length) * 100);
+}
+
 // ------------------------------------------------------------------------------------------ the seam
 
-const DOMAIN_FNS = [checkLossReason, isLossClose, checkActivity, checkQuote, canMoveQuote] as const;
+const DOMAIN_FNS = [checkLossReason, isLossClose, checkActivity, checkQuote, canMoveQuote, stageJourney, journeyPct] as const;
 const INJECTED = ["LOSS_REASONS", "LOSS_REASON_LABELS", "LOSS_OTHER_KEY", "LOSS_NOTE_MAX", "ACTIVITY_KINDS", "ACTIVITY_KIND_LABELS",
   "ACTIVITY_SUMMARY_MAX", "ACTIVITY_NEXT_MAX", "ACTIVITY_OWNER_MAX", "QUOTE_STATUSES", "QUOTE_STATUS_LABELS", "QUOTE_NOTE_MAX"] as const;
 
