@@ -2014,7 +2014,10 @@ function vAudienceColumns() {
   audShown = AUDIENCE_FIELDS.map((f) => audGroupFor(f.key));
   const rows = AUDIENCE_FIELDS.map((f, fi) => {
     const g = audShown[fi];
-    if (!g.values.length && !g.missing) return "";
+    // A column with no values is not a filter: «الكل» and «بدون (16)» select the same sixteen
+    // accounts. Production's imported sheets carry no «الأهمية» column at all, and a row that can
+    // only say «everyone» would read as a broken control rather than as an empty column.
+    if (!g.values.length) return "";
     const cur = audFilters[f.key] || "";
     return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
       '<span style="font-size:12px;font-weight:600;color:#656B76;min-width:52px;">' + esc(f.label) + ":</span>" +
