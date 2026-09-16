@@ -1671,14 +1671,9 @@ function vPending() {
 }
 
 function vHome(d) {
-  // The executive band leads الرئيسية: sectors, the five worst-attaining products, and the four
-  // quarters. Placed FIRST because DESIGN.md §7.13 asks a page to have a point of view, and the
-  // question this screen answers for a founder is «أين نحن من المستهدف», not «من ردّ اليوم».
-  // The founder's prototype opens on the executive figures: four numbers, the health of the pipeline
-  // (every open deal in exactly one state, each one a door into its own deals), and the partners'
-  // week. Then the sector / product / quarter bands this screen already had.
-  const execOpen = (typeof vHomeExec === "function") ? vHomeExec() : "";
-  const execBand = execOpen + ((typeof vExecBand === "function") ? vExecBand() : "");
+  // The executive bands lead الرئيسية: DESIGN.md §7.13 asks a page to have a point of view, and the
+  // question this screen answers for a founder is «أين نحن من المستهدف», not «من ردّ اليوم». The
+  // band list is assembled at the end of this function and handed to hdBands, which numbers it.
   const csAll = d.contacts || [];
   const cs = showTest ? csAll : csAll.filter((c) => !c.test);
   const nTest = csAll.filter((c) => c.test).length;
@@ -1720,9 +1715,10 @@ function vHome(d) {
     ? '<span class="ksflat">لا تغيّر خلال ' + (kpiDays === 7 ? "آخر 7 أيام" : "آخر " + fmtN(kpiDays) + " يومًا") + "</span>"
     : "";
   const kd = (v) => (allFlat ? null : v);
-  const kstrip = '<div class="kshead"><h2>الإحصاءات</h2>' + kflat +
-    '<select class="hbsel" onchange="kpiSetDays(this.value)" aria-label="مدة المقارنة">' + kOpts + "</select></div>" +
-    '<div class="kstrip rise">' +
+  // The strip's own header is gone: the band it sits in carries one, like every other band.
+  const kctl = kflat +
+    '<select class="hbsel" onchange="kpiSetDays(this.value)" aria-label="مدة المقارنة">' + kOpts + "</select>";
+  const kstrip = '<div class="kstrip">' +
     kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kd(kNewQual), KWORD, series) +
     kpiCard("ردّوا", fmtN(replied), kd(kNewRepl), KWORD, sRepl) +
     kpiCard("وصلت الرسائل", fmtN(delivered), kd(newDeliv), KWORD, sDeliv) +
@@ -1735,7 +1731,12 @@ function vHome(d) {
   // (2026-09-08). NOTHING IS ORPHANED: #customers is a nav door of its own and #aimkt is a tab
   // under الحملات, so both screens keep a route and a way to be clicked. This page also carried
   // the only two primary-weight buttons on it, against DESIGN.md 3.7's one-primary rule.
-  let h = execBand + '<div class="ptitle rise"><div><h1>مركز القيادة</h1></div></div>';
+  // ONE PAGE, ONE GRAMMAR (founder, 2026-09-16: «the UI is very bad»). الرئيسية was an executive
+  // dashboard with its own titles sitting on top of the older campaign home with its own — two
+  // <h1>s, three section-header styles, three KPI card designs, 2,554px of scroll. Every band is
+  // now a numbered .hd-sec with one header, in the order the questions are asked, and the tail is
+  // two columns instead of a ribbon of full-width cards. Nothing was deleted: the campaign
+  // telemetry and the analytics are bands 5 and 6 rather than a second dashboard.
   // «جهات في قوائمك» is deliberately NOT called «جهات الاستهداف»: the funnel below uses that label
   // for the people a campaign actually reached, while this counts the whole imported book. One
   // label over two different numbers on one screen is the contradiction that rule exists to stop.
@@ -1743,26 +1744,32 @@ function vHome(d) {
   // and the same fourteen-day series — the audit found «جهات مهتمة ومؤهلة» printed twice on one
   // page. Two cards saying one thing is not emphasis, it is repetition, and the strip says it
   // better because it says it beside its four peers.
-  h += kstrip;
   // «ما يستحق المتابعة الآن» removed from الرئيسية on the founder's instruction (2026-09-06).
   // vActionQueue is left defined and #opps still carries «لوحة الفرز الكاملة», which was already
   // the link this card pointed at — the ranking is not lost, only its second home on this page.
-  h += vHomeCharts(cs);
   // «كيف صُنّفت المحادثات؟» removed from الرئيسية on the founder's instruction (2026-09-06).
-  // vWinLoss is left defined; the win/loss judgement still reaches #reports and the intel route.
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;">';
-  h += '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;">أحدث الحملات</h3><a href="#kmon" style="font-size:12px;font-weight:600;color:#2563EB;text-decoration:none;">الكل ←</a></div>' +
+  const latest = '<div class="card" style="margin:0;"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><h3 style="margin:0;font-size:14px;">أحدث الحملات</h3><a href="#kmon" style="font-size:12px;font-weight:600;color:#1A47BE;text-decoration:none;">الكل ←</a></div>' +
     (campaigns.length
       ? '<div style="margin-top:10px;">' + campaigns.slice(0, 5).map((cp) => {
           const st = campStats(cp);
-          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #E5E8EE;">' +
+          return '<a href="#kmon/' + cp.id + '" style="text-decoration:none;display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #ECEEF2;">' +
             '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:#14161A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(cp.name) + (campIsTest(cp) ? ' <span class="chip">تجريبية</span>' : "") + "</div>" +
             '<div style="font-size:12px;color:#656B76;margin-top:3px;">' + (cp.product ? esc(cp.product) + " · " : "") + fmtD(cp.created_at) + "</div></div>" +
             '<span class="chip c-blue">' + fmtN(st.targeted) + ' مستهدف</span><span class="chip c-teal">شوهدت ' + fmtN(st.seen) + '</span><span class="chip ' + (st.replied ? "c-ok" : "c-grey") + '">ردّوا ' + fmtN(st.replied) + "</span></a>";
         }).join("") + "</div>"
       : '<div style="font-size:12px;color:#656B76;margin-top:12px;">لا حملات بعد — أطلق الأولى من «إنشاء حملة».</div>') + "</div>";
-  h += "</div>";
-  return h;
+  // The wide chart keeps the room fourteen labelled columns need; the campaign list sits BESIDE it
+  // rather than under it, which is what stopped this page being a 2,554px ribbon.
+  const analytics = '<div class="hd-split"><div class="hd-col">' + vHomeCharts(cs) + "</div>" +
+    '<div class="hd-col">' + latest + ((typeof winLossBoard === "function") ? winLossBoard() : "") + "</div></div>";
+  const bands = ((typeof vHomeExecBands === "function") ? vHomeExecBands() : []).concat([
+    ["أين نحن من المستهدف", "القطاعات، والمنتجات الأقل إنجازًا، والأرباع الأربعة.",
+      (typeof vExecBand === "function") ? vExecBand() : "", '<a class="go" href="#perf">المستهدفات والأداء ←</a>'],
+    ["نشاط الحملات", "ما تحرّك في الفترة المختارة.", kstrip, kctl],
+    ["التحليلات", "أرقام حية من الحملات والمحادثات" + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط"),
+      analytics, '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
+  ]);
+  return (typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join("");
 }
 
 // Segment groups derive from whatever columns the imported file carried:
@@ -3467,7 +3474,9 @@ function vHomeCharts(cs) {
   });
   const sizeRows = [...bySize.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
   const secRows = [...bySec.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  let h = '<div class="sec" style="margin-top:4px;">التحليلات <span class="meta">أرقام حية من الحملات والمحادثات' + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</span></div>";
+  // The «التحليلات» heading moved OUT of here and onto the band that carries this body, so the page
+  // has one header style rather than one per author.
+  let h = "";
   // «مسار التحويل التسويقي» removed on the founder's instruction (2026-09-08). ROW A went with it:
   // the rates were the only thing left in a two-column grid, which would have parked them in one
   // half of an otherwise empty row. They move into the row below instead of going full width —
@@ -3484,7 +3493,8 @@ function vHomeCharts(cs) {
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
   h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2563EB") : '<div style="font-size:12px;color:#656B76;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
-  h += winLossBoard();
+  // winLossBoard is NOT here any more: vHome puts it in the rail beside «أحدث الحملات», so the two
+  // columns of the analytics band end at roughly the same depth instead of one trailing a hole.
   h += "</div>";
   // «تركيبة قائمتك» removed on the founder's instruction (2026-09-06). The other three charts on
   // this row stay. cityRows/sizeRows/secRows are still computed above and still feed #targets.

@@ -522,9 +522,15 @@ input[type="checkbox"]:focus-visible::before {
 /* 7.3 THE CARD READS AS A SURFACE. A 1px hairline draws a rectangle; a hairline plus a one-pixel
    inner highlight along the top edge makes the same rectangle read as something lying ON the page.
    It costs no layout and no colour token — it is the paper catching the light. */
-.card, .sh-tile, .sh-card, .sh-empty, .crm-kpi, .crm-tbl {
+.card, .sh-tile, .sh-card, .sh-empty, .crm-kpi, .crm-tbl, .kcard {
   box-shadow: var(--specular), var(--sh-0);
 }
+/* One KPI family on الرئيسية. The campaign strip and the executive tiles were two card designs on
+   one page — same job, same size, different weight, different padding — which is the reader having
+   to learn the page twice. */
+.kcard { border-radius: var(--r-lg); padding: var(--s4); }
+.kcard .kk { font-weight: 500; }
+.kcard .kv { letter-spacing: 0; font-variant-numeric: tabular-nums; }
 /* The hero is a solid accent surface: a white highlight on it would be a seam, not a light. */
 .sh-tile.lead { box-shadow: none; }
 

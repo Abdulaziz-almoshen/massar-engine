@@ -9,6 +9,33 @@
 // No backticks in this file (gate: check-crm-literals).
 
 export const HOME_CRM_CSS = `
+/* ===== THE HOME DASHBOARD SHELL =====
+   الرئيسية was two dashboards stacked: the executive band on top of the older campaign home, each
+   with its own page title, its own section-header style and its own KPI card. Three card designs,
+   three header styles, two <h1>s, 2,554px of scroll — the reader had to learn the page twice.
+   One grammar now. Every band is a .hd-sec with the same header, numbered so the page has a spine,
+   and the tail is two columns instead of a ribbon of full-width cards. */
+.hd { display:flex; flex-direction:column; gap:var(--s6); }
+.hd-sec { display:flex; flex-direction:column; gap:var(--s3); scroll-margin-top:var(--s4); }
+.hd-h { display:flex; align-items:baseline; gap:var(--s3); flex-wrap:wrap; min-height:28px; }
+.hd-h h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); line-height:var(--lh-tight); letter-spacing:0; }
+/* The index is the spine: it tells the reader how many questions this page answers and where they
+   are in them. Tabular so the column of numbers does not wobble down the page. */
+.hd-h .ix { align-self:center; flex:none; font-size:var(--t-xs); font-weight:600; color:var(--muted);
+  font-variant-numeric:tabular-nums; background:var(--surface); box-shadow:var(--well);
+  border-radius:var(--r-sm); padding:3px 8px; }
+.hd-h .s { font-size:var(--t-xs); color:var(--muted); line-height:1.7; }
+.hd-h .sp { flex:1; }
+.hd-h .go { font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--accent-deep);
+  background:none; border:0; cursor:pointer; padding:6px 8px; border-radius:var(--r-sm); text-decoration:none;
+  transition:background var(--fast) var(--ease), transform 140ms var(--ease); }
+@media (hover:hover) and (pointer:fine) { .hd-h .go:hover { background:var(--accent-bar-hover); } }
+.hd-h .go:active { transform:scale(0.97); }
+/* The tail: the wide chart keeps the room it needs, the lists sit beside it instead of under it. */
+.hd-split { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:var(--s3); align-items:start; }
+.hd-col { display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
+@media (max-width: 1100px) { .hd-split { grid-template-columns:minmax(0,1fr); } }
+
 .hm { display:flex; flex-direction:column; gap:var(--s5); }
 .hm-h { display:flex; align-items:baseline; gap:var(--s3); flex-wrap:wrap; }
 .hm-h h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
@@ -119,16 +146,23 @@ export const HOME_CRM_CSS = `
    It plays ONCE per page load: #body is rewritten on every data load and keystroke, and an
    entrance replayed on each one is the jump §8.6 forbids — hence the .hm-in gate, set by
    vHomeExec on the first paint only. Never scale(0): the tiles start at their own size. */
-.hm-in .hm-kpis > *, .hm-in .hm-health > *, .hm-in .hm-pt { animation:hmRise var(--base) var(--ease) both; }
-.hm-in .hm-kpis > :nth-child(2), .hm-in .hm-health > :nth-child(2) { animation-delay:var(--stagger); }
-.hm-in .hm-kpis > :nth-child(3), .hm-in .hm-health > :nth-child(3) { animation-delay:calc(var(--stagger) * 2); }
-.hm-in .hm-kpis > :nth-child(4), .hm-in .hm-health > :nth-child(4) { animation-delay:calc(var(--stagger) * 3); }
-.hm-in .hm-pt { animation-delay:calc(var(--stagger) * 4); }
+/* The bands themselves arrive, not just the tiles inside the first two: the page reads top to
+   bottom, so the choreography follows the reading order. Capped at six by DESIGN.md §8's rule
+   (8 items / 200ms total) — beyond that a stagger stops being rhythm and becomes waiting. */
+.hm-in .hd-sec { animation:hmRise var(--base) var(--ease-out) both; }
+.hm-in .hd-sec:nth-child(2) { animation-delay:var(--stagger); }
+.hm-in .hd-sec:nth-child(3) { animation-delay:calc(var(--stagger) * 2); }
+.hm-in .hd-sec:nth-child(4) { animation-delay:calc(var(--stagger) * 3); }
+.hm-in .hd-sec:nth-child(5) { animation-delay:calc(var(--stagger) * 4); }
+.hm-in .hd-sec:nth-child(n+6) { animation-delay:calc(var(--stagger) * 5); }
+.hm-in .hm-kpis > :nth-child(2), .hm-in .hm-health > :nth-child(2) { animation:hmRise var(--base) var(--ease-out) both var(--stagger); }
+.hm-in .hm-kpis > :nth-child(3), .hm-in .hm-health > :nth-child(3) { animation:hmRise var(--base) var(--ease-out) both calc(var(--stagger) * 2); }
+.hm-in .hm-kpis > :nth-child(4), .hm-in .hm-health > :nth-child(4) { animation:hmRise var(--base) var(--ease-out) both calc(var(--stagger) * 3); }
 @keyframes hmRise { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .hm-ring .arc, .hm-meter i, .hm-sh i { transition:none; }
-  .hm-in .hm-kpis > *, .hm-in .hm-health > *, .hm-in .hm-pt { animation:none; }
+  .hm-in .hd-sec, .hm-in .hm-kpis > *, .hm-in .hm-health > * { animation:none; }
   .hm-st:not([disabled]):hover { transform:none; }
 }
 @media (max-width: 1100px) { .hm-kpis, .hm-health { grid-template-columns:repeat(2, minmax(0,1fr)); } }
@@ -139,6 +173,21 @@ export const HOME_CRM_CSS = `
 `;
 
 export const HOME_CRM_JS = `
+/* ---------- the shell ----------
+   One header for every band on الرئيسية. Taking the list and numbering it HERE, rather than letting
+   each band print its own index, is what keeps the spine contiguous when a band is missing: a role
+   without partners.view drops that band and the numbering closes up instead of skipping a number. */
+function hdBands(list) {
+  var n = 0;
+  return '<div class="hd' + hmEnterCls() + '">' + list.filter(function (b) { return b && b[2]; }).map(function (b) {
+    n++;
+    return '<section class="hd-sec"' + (b[4] ? ' id="' + b[4] + '"' : "") + '><div class="hd-h">' +
+      '<span class="ix" aria-hidden="true">' + fmtN(n) + "</span><h2>" + b[0] + "</h2>" +
+      (b[1] ? '<span class="s">' + b[1] + "</span>" : "") +
+      '<span class="sp"></span>' + (b[3] || "") + "</div>" + b[2] + "</section>";
+  }).join("") + "</div>";
+}
+
 /* ---------- what the bands read ---------- */
 var hmEsc = null, hmEscLoading = false, hmEscFailed = false;
 var hmPt = null, hmPtLoading = false, hmPtFailed = false, hmPtWeek = "";
@@ -223,24 +272,22 @@ var HM_TONE = {
   rejected: "--tn:#D9534F;--tn-soft:#FBE7E6;--tn-text:#8E2A27"
 };
 
+/* Body only — the shell owns the header (hdBands), so every band on الرئيسية wears one. */
 function vHomeHealth() {
   if (typeof opLoad === "function") opLoad(false);
   hmEscLoad(false);
   var loading = (typeof oppLoading !== "undefined" && oppLoading) || hmEscLoading;
   var failed = (typeof oppFailed !== "undefined" && oppFailed) || hmEscFailed;
-  var h = '<section class="hm"><div class="hm-h"><h2>صحة خط البيع</h2>' +
-    '<span class="s">كل فرصة في حالة واحدة فقط — والمجموع هو خط البيع كاملًا.</span><span class="sp"></span>' +
-    (hmEscFailed ? '<span class="s" role="alert">تعذّر قراءة سجل التصعيد — «بانتظار الدعم» غير مكتملة.</span><button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button>' : "") +
-    "</div>";
+  var h = "";
   if (!((typeof oppRows !== "undefined" && oppRows)) && loading) {
-    return h + '<div class="hm-state" aria-busy="true">جارٍ قراءة الفرص…</div></section>';
+    return '<div class="hm-state" aria-busy="true">جارٍ قراءة الفرص…</div>';
   }
   if (!((typeof oppRows !== "undefined" && oppRows)) && failed) {
-    return h + '<div class="hm-state" role="alert">' + hmIco("warn") + 'تعذّر تحميل الفرص.<button class="hm-lnk" onclick="opRetry()">أعد المحاولة</button></div></section>';
+    return '<div class="hm-state" role="alert">' + hmIco("warn") + 'تعذّر تحميل الفرص.<button class="hm-lnk" onclick="opRetry()">أعد المحاولة</button></div>';
   }
   var st = hmHealth();
   if (!st.total) {
-    return h + '<div class="hm-state">لا فرص مسجّلة بعد — تظهر الحالات هنا فور تسجيل أول فرصة في «فرص البيع».</div></section>';
+    return '<div class="hm-state">لا فرص مسجّلة بعد — تظهر الحالات هنا فور تسجيل أول فرصة في «فرص البيع».</div>';
   }
   h += '<div class="hm-health">' + st.buckets.map(function (b) {
     var off = !b.count;
@@ -254,7 +301,7 @@ function vHomeHealth() {
       '<span class="hint">' + esc(b.hint) + "</span>" +
       '<span class="v">' + hmMoney(b.value) + "</span>" +
       '<span class="hm-sh" aria-hidden="true"><i style="width:' + share + '%"></i></span></button>';
-  }).join("") + "</div></section>";
+  }).join("") + "</div>";
   return h;
 }
 
@@ -262,17 +309,15 @@ function vHomeHealth() {
 function vHomePartners() {
   if (typeof meCan === "function" && !meCan("partners.view")) return "";
   hmPtLoad(false);
-  var h = '<section class="hm"><div class="hm-h"><h2>ملخص أداء شركاء المبيعات</h2>' +
-    '<span class="s">' + (hmPtWeek ? "أسبوع " + esc(hmPtWeek) : "الأسبوع الحالي") + "</span><span class=\\"sp\\"></span>" +
-    '<a class="hm-lnk" href="#partners">عرض التفاصيل ←</a></div>';
-  if (!hmPt && hmPtLoading) return h + '<div class="hm-state" aria-busy="true">جارٍ قراءة أسبوع الشركاء…</div></section>';
+  var h = "";
+  if (!hmPt && hmPtLoading) return '<div class="hm-state" aria-busy="true">جارٍ قراءة أسبوع الشركاء…</div>';
   if (!hmPt) {
-    return h + '<div class="hm-state" role="alert">' + hmIco("warn") + 'تعذّر تحميل أداء الشركاء.<button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button></div></section>';
+    return '<div class="hm-state" role="alert">' + hmIco("warn") + 'تعذّر تحميل أداء الشركاء.<button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button></div>';
   }
   var wk = summarizeWeek(hmPt.targets || [], hmPt.results || []);
   var b = partnerWeekBand(wk);
   if (!b.target && !b.contacted) {
-    return h + '<div class="hm-state">لا مستهدفات ولا نتائج في هذا الأسبوع — تُحدَّد من «شركاء المبيعات».</div></section>';
+    return '<div class="hm-state">لا مستهدفات ولا نتائج في هذا الأسبوع — تُحدَّد من «شركاء المبيعات».</div>';
   }
   var pct = wholePct(attainmentPct(b.contacted, b.target));
   var R = 33, C = 2 * Math.PI * R;
@@ -309,7 +354,7 @@ function vHomePartners() {
       '<span><i style="background:#767D89"></i>لم يردوا</span>' +
       '<span><i style="background:#E5E8EE"></i>لم يُتواصل بهم بعد</span></span>';
   }
-  h += "</div></section>";
+  h += "</div>";
   return h;
 }
 
@@ -342,13 +387,23 @@ function vHomeKpis() {
     "</div>";
 }
 
-/* The whole executive opening, in the prototype's order.
-   hmEntered gates the entrance animation to the FIRST paint: #body is rewritten on every data load,
-   and an entrance that replays on each one is the jump DESIGN.md §8.6 forbids. */
+/* The executive bands, as data for the shell rather than as finished HTML. vHome appends the
+   campaign bands to this list, so the whole page is one numbered sequence with one header style
+   instead of an executive dashboard with its own titles sitting on top of a second one with its
+   own. Order is the order the questions are asked: where are we, what is stuck, why, who is
+   working it.
+   hmEntered gates the entrance to the FIRST paint: #body is rewritten on every data load, and an
+   entrance that replays on each one is the jump DESIGN.md §8.6 forbids. */
 var hmEntered = false;
-function vHomeExec() {
-  var cls = hmEntered ? "hm" : "hm hm-in";
-  hmEntered = true;
-  return '<div class="' + cls + '">' + vHomeKpis() + vHomeHealth() + vHomePartners() + "</div>";
+function hmEnterCls() { var c = hmEntered ? "" : " hm-in"; hmEntered = true; return c; }
+function vHomeExecBands() {
+  var escFail = hmEscFailed
+    ? '<span class="s" role="alert">تعذّر قراءة سجل التصعيد — «بانتظار الدعم» غير مكتملة.</span><button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button>'
+    : "";
+  return [
+    ["الأداء التجاري", "المحقق من مستهدف السنة، والكتاب المفتوح خلفه.", vHomeKpis(), '<a class="go" href="#perf">المستهدفات والأداء ←</a>'],
+    ["صحة خط البيع", "كل فرصة في حالة واحدة فقط — والمجموع هو خط البيع كاملًا.", vHomeHealth(), escFail || '<a class="go" href="#opps">كل الفرص ←</a>'],
+    ["شركاء المبيعات", (hmPtWeek ? "أسبوع " + esc(hmPtWeek) : "الأسبوع الحالي"), vHomePartners(), '<a class="go" href="#partners">عرض التفاصيل ←</a>']
+  ];
 }
 `;
