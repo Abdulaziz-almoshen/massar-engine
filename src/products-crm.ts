@@ -214,20 +214,29 @@ export const PRODUCTS_CRM_CSS = `
 .px-back { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:600; color:var(--muted);
   text-decoration:none; border-radius:var(--r-sm); align-self:flex-start; min-height:24px; }
 .px-back:hover { color:var(--accent-deep); }
-.px-head { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s3) var(--s4);
-  display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
-.px-head .tt { flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:var(--s2); }
-.px-head h1 { margin:0; font-size:var(--t-xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); letter-spacing:0;
-  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.px-head .meta { display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; font-size:var(--t-xs); color:var(--muted); }
-.px-head .meta .px-fi { display:inline-flex; align-items:center; gap:6px; }
-.px-head .meta label { font-weight:600; color:var(--muted); }
-.px-head .meta select, .px-head .meta input { font-family:inherit; height:32px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
-  border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; }
-.px-head .meta input { width:150px; }
-.px-head .meta select:focus, .px-head .meta input:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
-.px-head .end { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; position:relative; }
-.px-head .end .btn { height:38px; font-size:var(--t-sm); }
+/* ===== the record header =====
+   It used to be a form: three bare selects for القطاع/القسم/المسؤول sitting where a title belongs,
+   so the first thing the record said was «fill me in» rather than «this is the product». The facts
+   are now read-only chips; each chip opens «البيانات», the tab that owns that write. */
+.px-rh { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
+  padding:var(--s4); display:flex; align-items:flex-start; gap:var(--s3); flex-wrap:wrap; }
+.px-rh .tt { flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:var(--s2); }
+.px-rh h1 { margin:0; font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); letter-spacing:0;
+  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; overflow-wrap:anywhere; }
+.px-rh .meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.px-chip { font-family:inherit; display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); color:var(--muted);
+  background:var(--surface); border:1px solid var(--line-soft); border-radius:var(--r-pill); padding:4px 11px;
+  min-width:0; max-width:100%; text-align:start;
+  transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease), transform 160ms var(--ease); }
+.px-chip b { font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.px-chip.none b { font-weight:450; color:var(--muted-2, var(--muted)); }
+button.px-chip { cursor:pointer; }
+@media (hover:hover) and (pointer:fine) { button.px-chip:hover { background:var(--accent-wash); border-color:var(--accent-mark); } }
+button.px-chip:active { transform:scale(0.97); }
+button.px-chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.px-rh .end { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; position:relative; }
+.px-rh .end .btn { height:38px; font-size:var(--t-sm); }
+@media (pointer: coarse) { button.px-chip { min-height:36px; } }
 .px-why { font-size:var(--t-xs); color:var(--s-attn-text); max-width:220px; line-height:1.4; }
 .px-menu { position:absolute; inset-block-start:calc(100% + 4px); inset-inline-end:0; z-index:var(--z-dropdown); background:var(--paper);
   border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); min-width:220px; padding:4px; }
@@ -266,10 +275,52 @@ export const PRODUCTS_CRM_CSS = `
 .px-swb[aria-current="page"] { background:var(--accent-tint); color:var(--accent-deep); border-color:var(--accent-mark); font-weight:600; }
 @media (prefers-reduced-motion: reduce) { .px-hi .meter i, .px-swb { transition:none; } }
 @media (pointer: coarse) { .px-swb { min-height:44px; display:inline-flex; align-items:center; } }
+/* ===== the record's own tab rail =====
+   Five sections stacked in one column meant «المعرفة» — the thing that decides whether the assistant
+   can sell the product at all — was the fourth scroll down, and the founder read it as living outside
+   the record. Each section is now a destination with its own name, «معرفة المنتج» among them, and the
+   rail sticks so the record never loses its place. Same gliding-indicator idiom as the deal drawer. */
+.px-tabs { position:sticky; inset-block-start:0; z-index:var(--z-sticky); display:flex; gap:2px; margin-block:var(--s3) 0;
+  padding-block-start:var(--s2); border-block-end:1px solid var(--line); overflow-x:auto; scrollbar-width:none;
+  background:color-mix(in srgb, var(--canvas) 86%, transparent); backdrop-filter:blur(8px); }
+.px-tabs::-webkit-scrollbar { display:none; }
+.px-tab { position:relative; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--muted);
+  background:none; border:0; cursor:pointer; padding:9px 14px 12px; white-space:nowrap; border-radius:var(--r-sm) var(--r-sm) 0 0;
+  display:inline-flex; align-items:center; gap:7px;
+  transition:color var(--fast) var(--ease), background var(--fast) var(--ease); }
+.px-tab .n { font-size:var(--t-xs); font-variant-numeric:tabular-nums; color:var(--muted);
+  background:var(--surface-2); border-radius:var(--r-pill); padding:1px 7px; }
+.px-tab .dot { width:6px; height:6px; border-radius:50%; background:var(--s-attn-mark, #B37F00); flex:none; }
+.px-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+.px-tab[aria-selected="true"] { color:var(--accent-deep); font-weight:600; }
+.px-tab[aria-selected="true"] .n { color:var(--accent-deep); background:var(--accent-tint); }
+@media (hover:hover) and (pointer:fine) { .px-tab:not([aria-selected="true"]):hover { color:var(--ink); background:var(--surface); } }
+.px-tab:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.px-tabs .ind { position:absolute; inset-block-end:-1px; height:2px; background:var(--accent); border-radius:var(--r-pill);
+  transition:transform 240ms cubic-bezier(0.77, 0, 0.175, 1), width 240ms cubic-bezier(0.77, 0, 0.175, 1); }
+.px-tabs .ind.noanim { transition:none; }
+@media (pointer: coarse) { .px-tab { min-height:44px; } }
+/* Entering content, so ease-OUT and a 4px rise — never scale(0): nothing arrives out of nothing. */
+.px-pane { animation:pxPane 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+@keyframes pxPane { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) {
+  .px-tabs .ind { transition:none; }
+  .px-pane { animation:none; }
+}
+/* «البيانات»: the editors the header used to wear, given a form's own shape and labels */
+.px-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--s3); }
+.px-form .px-fl { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.px-form label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
+.px-form select, .px-form input { font-family:inherit; height:38px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
+  border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:10px; width:100%; min-width:0; }
+.px-form select:focus, .px-form input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
+.px-form select:disabled, .px-form input:disabled { background:var(--surface); color:var(--muted); }
+.px-form .row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:18px; }
 .px-rec { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); align-items:start; }
-/* Below the two-column breakpoint the readiness and related links come straight after the header:
-   they answer «can the assistant sell this?» before any figure does (spec §record, phone). */
-.px-side { display:flex; flex-direction:column; gap:var(--s3); order:-1; }
+/* Below the two-column breakpoint the related links come AFTER the open tab. Readiness moved to the
+   band, so the rail is no longer the record's answer — the tab the reader just chose is, and putting
+   the rail first pushed that tab's content off the first screen on a phone. */
+.px-side { display:flex; flex-direction:column; gap:var(--s3); order:1; }
 @container pxw (min-width: 1100px) {
   .px-rec { grid-template-columns:minmax(0,1fr) 320px; }
   .px-side { position:sticky; inset-block-start:var(--s3); order:0; }
@@ -471,6 +522,10 @@ var pxPkgEdit = null;         /* { product, id (0 = new), d: {name,listPrice,yea
 var pxQConfirm = {};          /* "product|year|quarter" -> true while a clear awaits confirmation */
 var pxUp = {};                /* "product|kind" -> { s: busy|failed|done, m } */
 var pxMenuOpen = false;
+/* The record's open tab. Keyed by product so moving along the switcher rail keeps the section you
+   were reading; "" means «take it from the route, else نظرة عامة». */
+var pxTab = {};
+var pxTabPrev = "";           /* the tab the indicator sat on before this repaint — it glides from there */
 var pxSheet = null;           /* create draft */
 var pxSheetErr = "", pxSheetBusy = false, pxDrShown = false;
 var pxModal = null;           /* { kind:"rename", product, to, impact, err, busy } */
@@ -1009,6 +1064,10 @@ function pxTargetsSection(p) {
 function pxKnowledgeSection(p) {
   var name = p.product, b = "", kn = pxKnow[name];
   var upA = pxUp[name + "|asset"], upK = pxUp[name + "|kb"];
+  /* The score leads: on a tab named «معرفة المنتج» the first question is «كم نسبة الجاهزية، وأي قسم
+     ناقص؟» — the two files are how you fix it, so they come after the answer, not before it. */
+  if (typeof kbScoreBlock === "function") b += kbScoreBlock(p, kn);
+  if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
   /* intro PDF */
   b += '<div class="px-file"><span class="px-cells"><i class="' + (p.asset ? "" : "miss") + '"></i></span><div><div class="t">الملف التعريفي (PDF)</div><div class="d">يُرسله المساعد للعميل عند طلب التفاصيل' +
     (p.asset ? ' · <bdi>' + esc(p.asset.filename) + "</bdi>" + (p.asset.size ? " · " + fmtN(Math.max(1, Math.round(p.asset.size / 1024))) + " ك.ب" : "") + (p.asset.updatedAt ? " · " + fmtD(p.asset.updatedAt) : "") : " · لا ملف مرفق") +
@@ -1029,9 +1088,6 @@ function pxKnowledgeSection(p) {
       ? '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
         '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb">'
       : "") + "</div></div>";
-  if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
-  /* S6: the weighted section score and the editor (knowledge-crm). */
-  if (typeof kbScoreBlock === "function") b += kbScoreBlock(p, kn);
   var ap = pxAppr[name] || {};
   if (kn && kn.draftMd) {
     b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</div>" +
@@ -1061,7 +1117,7 @@ function pxKnowledgeSection(p) {
         return '<div class="px-li" style="cursor:default;grid-template-columns:120px minmax(0,1fr);"><span class="s">' + esc(x[0]) + '</span><span class="a" style="white-space:normal">' + esc(x[1]) + "</span></div>";
       }).join("") + "</div></details>";
   }
-  return pxSection("knowledge", "المعرفة والملفات", "", b);
+  return pxSection("knowledge", "معرفة المنتج", "ما يقرؤه المساعد قبل أن يردّ على عميل", b);
 }
 var PX_RD_LABELS = { knowledge: "معرفة المساعد", asset: "ملف تعريفي", price: "سعر منشور", lock: "يميّزه المساعد في المحادثة" };
 var PX_RD_GOTO = { knowledge: "knowledge", asset: "knowledge", price: "pricing", lock: "" };
@@ -1174,6 +1230,110 @@ function pxHero(p, rd) {
     "</div>";
 }
 
+/* ===================== the record's tabs ===================== */
+/* The deep-link segment a tab answers to. The four keys are RESERVED_SECTIONS, so an old link
+   (#product/<name>/knowledge, and the readiness band's «أكمله») still lands on the right tab. */
+var PX_SEC_TAB = { performance: "overview", pricing: "pricing", targets: "targets", knowledge: "knowledge" };
+
+function pxTabsFor(p) {
+  var ks = p.knowledgeScore || null;
+  var score = ks && typeof ks.score === "number" ? ks.score : null;
+  var pkgs = (p.packages || []).length;
+  var perf = (pcPerf[pcPerfYear] || {})[p.product];
+  var blank = perf && typeof perf.targetQuarters === "number" ? 4 - perf.targetQuarters : 0;
+  return [
+    { k: "overview", l: "نظرة عامة", n: "", warn: false },
+    /* The founder's note: «معرفة المنتج» belongs inside the record, not only in the door beside it. */
+    { k: "knowledge", l: "معرفة المنتج", n: score === null ? "" : fmtN(score) + "٪", warn: !!(ks && !ks.ready) },
+    { k: "pricing", l: "الأسعار والباقات", n: pkgs ? fmtN(pkgs) : "", warn: !pkgs && !(p.pricingNote || "") },
+    { k: "targets", l: "المستهدفات", n: "", warn: blank > 0 },
+    { k: "settings", l: "البيانات والإدارة", n: "", warn: false }
+  ];
+}
+/* Saved choice first, then the route, then the first tab — so the switcher rail keeps your section. */
+function pxCurTab(p) {
+  var tabs = pxTabsFor(p), keys = tabs.map(function (t) { return t.k; });
+  var saved = pxTab[p.product];
+  if (saved && keys.indexOf(saved) >= 0) return saved;
+  var r = typeof pxParseProductRoute === "function" ? pxParseProductRoute() : null;
+  var sec = r && r.section ? PX_SEC_TAB[r.section] : "";
+  return sec && keys.indexOf(sec) >= 0 ? sec : keys[0];
+}
+function pxSetTab(product, key, focusId) {
+  pxTab[product] = key;
+  render(false);
+  if (focusId) { var el = document.getElementById(focusId); if (el) el.focus(); }
+}
+function pxTabStrip(p) {
+  var on = pxCurTab(p);
+  return '<div class="px-tabs" role="tablist" aria-label="أقسام المنتج">' + pxTabsFor(p).map(function (t) {
+    return '<button type="button" class="px-tab" role="tab" data-pxtab="' + t.k + '" id="pxtab_' + t.k + '"' +
+      ' aria-selected="' + (t.k === on) + '" aria-controls="pxpane_' + t.k + '" tabindex="' + (t.k === on ? "0" : "-1") + '" data-px="tab" data-t="' + t.k + '">' + t.l +
+      (t.n ? '<span class="n">' + t.n + "</span>" : "") +
+      (t.warn ? '<span class="dot" aria-hidden="true"></span><span class="px-sr">يحتاج إكمالًا</span>' : "") + "</button>";
+  }).join("") + '<i class="ind" aria-hidden="true"></i></div>';
+}
+/* The indicator element is rebuilt with every repaint, so a plain measure would make it JUMP. It is
+   placed on the PREVIOUS tab first without a transition, then moved on the next frame — the glide
+   the drawer has, across a full re-render. */
+function pxPlaceTabs() {
+  var strip = document.querySelector(".px-tabs");
+  if (!strip) { pxTabPrev = ""; return; }
+  var ind = strip.querySelector(".ind"), on = strip.querySelector('[aria-selected="true"]');
+  if (!ind || !on) return;
+  var put = function (el, anim) {
+    var sb = strip.getBoundingClientRect(), ob = el.getBoundingClientRect();
+    var rtl = getComputedStyle(strip).direction === "rtl";
+    /* Logical offset: in RTL the strip's inline start is its RIGHT edge. */
+    var off = rtl ? sb.right - ob.right : ob.left - sb.left;
+    if (!anim) ind.classList.add("noanim");
+    ind.style.width = ob.width + "px";
+    ind.style.transform = "translateX(" + (rtl ? -off : off) + "px)";
+  };
+  var prev = pxTabPrev ? strip.querySelector('[data-pxtab="' + pxTabPrev + '"]') : null;
+  if (prev && prev !== on) {
+    put(prev, false);
+    requestAnimationFrame(function () {
+      void ind.offsetWidth;                /* commit the start position before the transition is armed */
+      ind.classList.remove("noanim");
+      put(on, true);
+    });
+  } else put(on, false);
+  pxTabPrev = on.getAttribute("data-pxtab");
+}
+
+/* «البيانات والإدارة»: the three editors the header used to wear, plus rename and archive.
+   knowledge.edit owns every product write (the same permission /admin/products enforces), so a
+   read-only role sees the values and no controls. */
+function pxMetaSection(p) {
+  var name = p.product, may = pxMayEditKb() && !p.archived;
+  var dis = may ? "" : " disabled";
+  var b = '<div class="px-form">';
+  b += '<div class="px-fl"><label for="pxf_sector">القطاع</label>' +
+    '<select id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + dis + '><option value="">بلا قطاع</option>' +
+    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+    '<span class="row">' + (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
+  if (typeof cfDivs !== "undefined" && cfDivs.length) {
+    b += '<div class="px-fl"><label for="pxf_division">القسم</label>' +
+      '<select id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا قسم</option>' +
+      cfDivs.map(function (d) { return '<option value="' + d.id + '"' + (String(p.divisionId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; }).join("") +
+      '</select><span class="row">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span></div>";
+  }
+  var ov = pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "");
+  b += '<div class="px-fl"><label for="pxf_owner">مدير المنتج</label>' +
+    '<input id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(ov) + '" data-pxfield="owner"' + dis + ">" +
+    '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
+    '<span class="row">' + pxStatusSlot(name + "|owner", "pxf_owner") + "</span></div>";
+  b += "</div>";
+  b += '<div class="px-note">' + (p.createdAt ? "أُنشئ " + fmtD(p.createdAt) + " · " : "") +
+    (may ? "يُحفظ كل حقل فور تغييره." : "العرض فقط — تعديل بيانات المنتج يتطلب صلاحية إدارة معرفة المنتج.") + "</div>";
+  if (pxMayEditKb() && !p.embedded && !p.archived) {
+    b += '<div style="display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;">' +
+      '<button class="btn btn-ghost" data-px="rename">إعادة تسمية المنتج</button></div>';
+  }
+  return pxSection("settings", "بيانات المنتج", "", b);
+}
+
 function vProductDrill(name, section) {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
   if (typeof cfLoad === "function") cfLoad(false);
@@ -1193,20 +1353,24 @@ function vProductDrill(name, section) {
   var rd = pxReadiness(p);
   var kn = pxKnow[name];
   var approvePrimary = !!(kn && (kn.draftMd || (kn.state === "legacy" && kn.md)));
+  void section;   /* the route's section picks the TAB now (pxCurTab), it no longer scrolls the page */
+  var tab = pxCurTab(p);
+  var chip = function (label, value, focusId) {
+    var has = !!value, body = '<span>' + label + "</span><b>" + (has ? esc(value) : "بلا تحديد") + "</b>";
+    var cls = "px-chip" + (has ? "" : " none");
+    return pxMayEditKb() && !p.archived
+      ? '<button type="button" class="' + cls + '" data-px="tab" data-t="settings" data-f="' + focusId + '" title="' + esc(label + " — يُحرَّر في «البيانات والإدارة»") + '">' + body + "</button>"
+      : '<span class="' + cls + '">' + body + "</span>";
+  };
+  var sectorName = (pcSectorList || []).filter(function (s) { return String(s.id) === String(p.sectorId); }).map(function (s) { return s.name; })[0] || "";
+  var divName = (typeof cfDivs !== "undefined" ? cfDivs : []).filter(function (d) { return String(d.id) === String(p.divisionId); }).map(function (d) { return d.name; })[0] || "";
+
   var h = '<div class="px">' + back;
-  h += '<div class="px-head"><div class="tt"><h1>' + esc(p.product) + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</h1>" +
-    '<div class="meta"><span class="px-fi"><label for="pxf_sector">القطاع</label><select id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قطاع</option>' +
-    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
-    (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span>" +
-    (typeof cfDivs !== "undefined" && cfDivs.length
-      ? '<span class="px-fi"><label for="pxf_division">القسم</label><select id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + (p.archived ? " disabled" : "") + '><option value="">بلا قسم</option>' +
-        cfDivs.map(function (d) { return '<option value="' + d.id + '"' + (String(p.divisionId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; }).join("") +
-        "</select>" + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span>"
-      : "") +
-    '<span class="px-fi"><label for="pxf_owner">المسؤول</label><input id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "")) + '" data-pxfield="owner"' + (p.archived ? " disabled" : "") + ">" +
-    pxStatusSlot(name + "|owner", "pxf_owner") + "</span>" +
-    '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
-    (p.createdAt ? "<span>أُنشئ " + fmtD(p.createdAt) + "</span>" : "") + "</div></div>";
+  h += '<header class="px-rh"><div class="tt"><h1>' + esc(p.product) + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</h1>" +
+    '<div class="meta">' + chip("القطاع", sectorName + (sectorName && p.sectorAssumed ? " (مُستنتَج)" : ""), "pxf_sector") +
+    (typeof cfDivs !== "undefined" && cfDivs.length ? chip("القسم", divName, "pxf_division") : "") +
+    chip("مدير المنتج", p.owner || "", "pxf_owner") +
+    (p.embedded ? '<span class="px-chip"><span>كتالوج المساعد</span><b>مضمَّن</b></span>' : "") + "</div></div>";
   h += '<div class="end">';
   if (p.archived) {
     h += '<button class="btn btn-teal" data-px="restore">استعادة المنتج</button>';
@@ -1220,17 +1384,27 @@ function vProductDrill(name, section) {
       ? '<button role="menuitem" aria-disabled="true">إعادة تسمية</button><button role="menuitem" aria-disabled="true">أرشفة المنتج</button><div class="why">مضمَّن في كتالوج المساعد — إعادة التسمية والأرشفة تتطلبان تحديث الكتالوج.</div>'
       : '<button role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
   }
-  h += "</div></div>";
-  h += pxSwitcher(p) + pxHero(p, rd);
-  h += '<div class="px-rec"><div class="px-main">' + pxPerfSection(p) + pxPricingSection(p) + pxTargetsSection(p) + pxKnowledgeSection(p);
-  if (!p.embedded && !p.archived) {
-    h += '<section class="px-sec" id="pxsec_archive"><div class="px-sech"><h2>أرشفة المنتج</h2></div><div class="px-secb"><div class="px-note" id="pxarch_note">' +
-      (pxModal && pxModal.kind === "archiveImpact" ? "" : "الأرشفة تُخفي المنتج من القوائم ومعالج الحملات وتوقف استخدام المساعد لمعرفته وملفه، ويبقى تاريخه كما هو. يمكن استعادته.") + "</div>" +
-      '<div><button class="rv-hold" data-do="pxArchive" data-arg="' + esc(p.product) + '" data-idle="أرشفة المنتج" data-holding="استمر بالضغط للأرشفة…" data-armed="اضغط مرة أخرى للأرشفة" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">أرشفة المنتج</span></button></div></div></section>';
+  h += "</div></header>";
+  h += pxSwitcher(p) + pxHero(p, rd) + pxTabStrip(p);
+
+  /* One tab is painted at a time. Each pane is the tablist's panel, so a screen reader moving off
+     the tab lands in the section it names. */
+  var pane = "";
+  if (tab === "overview") pane = pxPerfSection(p);
+  else if (tab === "knowledge") pane = pxKnowledgeSection(p);
+  else if (tab === "pricing") pane = pxPricingSection(p);
+  else if (tab === "targets") pane = pxTargetsSection(p);
+  else {
+    pane = pxMetaSection(p);
+    if (pxMayEditKb() && !p.embedded && !p.archived) {
+      pane += '<section class="px-sec" id="pxsec_archive"><div class="px-sech"><h2>أرشفة المنتج</h2></div><div class="px-secb"><div class="px-note" id="pxarch_note">' +
+        (pxModal && pxModal.kind === "archiveImpact" ? "" : "الأرشفة تُخفي المنتج من القوائم ومعالج الحملات وتوقف استخدام المساعد لمعرفته وملفه، ويبقى تاريخه كما هو. يمكن استعادته.") + "</div>" +
+        '<div><button class="rv-hold" data-do="pxArchive" data-arg="' + esc(p.product) + '" data-idle="أرشفة المنتج" data-holding="استمر بالضغط للأرشفة…" data-armed="اضغط مرة أخرى للأرشفة" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">أرشفة المنتج</span></button></div></div></section>';
+    }
   }
-  h += '</div><aside class="px-side" aria-label="الجاهزية والمرتبط">' + pxSide(p, rd) + "</aside></div>";
+  h += '<div class="px-rec"><div class="px-main px-pane" id="pxpane_' + tab + '" role="tabpanel" tabindex="0" aria-labelledby="pxtab_' + tab + '">' + pane + "</div>" +
+    '<aside class="px-side" aria-label="المرتبط بهذا المنتج">' + pxSide(p, rd) + "</aside></div>";
   h += "</div>";
-  if (section) setTimeout(function () { var el = document.getElementById("pxsec_" + section); if (el && !el.dataset.pxJumped) { el.dataset.pxJumped = "1"; el.scrollIntoView({ block: "start" }); } }, 30);
   return h + pxRenameModal() + (typeof kbEditor === "function" ? kbEditor() : "");
 }
 
@@ -1462,10 +1636,16 @@ document.addEventListener("click", function (ev) {
   else if (a === "rename") { pxOpenRename(cur); }
   else if (a === "renamesave") { pxRenameSave(); }
   else if (a === "modalclose") { pxModal = null; render(false); pxFocusMenu(); }
-  else if (a === "archivejump") { render(false); var s = document.getElementById("pxsec_archive"); if (s) { s.scrollIntoView({ block: "center" }); var hb = s.querySelector(".rv-hold"); if (hb) hb.focus(); } }
+  else if (a === "tab") { if (cur) pxSetTab(cur, t.getAttribute("data-t"), t.getAttribute("data-f") || ""); }
+  else if (a === "archivejump") {
+    if (cur) pxTab[cur] = "settings";
+    render(false);
+    var s = document.getElementById("pxsec_archive"); if (s) { s.scrollIntoView({ block: "center" }); var hb = s.querySelector(".rv-hold"); if (hb) hb.focus(); }
+  }
   else if (a === "restore") { pxRestore(cur); }
   else if (a === "launch") { if (typeof launchWithProduct === "function") launchWithProduct(nm); }
-  else if (a === "jump") { var el = document.getElementById("pxsec_" + t.getAttribute("data-s")); if (el) el.scrollIntoView({ block: "start" }); }
+  /* The readiness band's «أكمله» names a SECTION; on the record that section is a tab. */
+  else if (a === "jump") { var sk = t.getAttribute("data-s"); if (cur) pxSetTab(cur, PX_SEC_TAB[sk] || sk); }
   else if (a === "year") { pcPerfYear = Number(t.getAttribute("data-y")); pcPerfLoad(pcPerfYear, false); render(false); }
   else if (a === "pkgadd") { pxPkgEdit = { product: cur, id: 0, d: { name: "", scope: "", years: "1", listPrice: "" }, err: "", busy: false }; render(false); var f = document.getElementById("pxpk_n"); if (f) f.focus(); }
   else if (a === "pkgedit") { var p = pxRow(cur), id = Number(t.getAttribute("data-id")); var k = p ? (p.packages || []).filter(function (x) { return x.id === id; })[0] : null;
@@ -1516,6 +1696,24 @@ document.addEventListener("input", function (ev) {
   var md = t.getAttribute("data-pxmodal"); if (md && pxModal) { pxModal[md] = t.value; pxModal.err = ""; }
 });
 document.addEventListener("keydown", function (ev) {
+  /* A real tablist moves with the arrows. RTL reverses them: ArrowLeft walks FORWARD because the
+     next tab sits to the left of the current one. */
+  var tb = ev.target && ev.target.getAttribute ? ev.target.getAttribute("data-pxtab") : null;
+  if (tb && ["ArrowRight", "ArrowLeft", "Home", "End"].indexOf(ev.key) >= 0) {
+    var strip = ev.target.closest(".px-tabs");
+    var nm = (location.hash || "").slice(1).split("/")[0] === "product" ? pxParseProductRoute().name : "";
+    if (strip && nm) {
+      var all = [].slice.call(strip.querySelectorAll("[data-pxtab]")), i = all.indexOf(ev.target);
+      var rtl = getComputedStyle(strip).direction === "rtl";
+      var n = ev.key === "Home" ? 0 : ev.key === "End" ? all.length - 1
+        : i + (ev.key === "ArrowLeft" ? (rtl ? 1 : -1) : (rtl ? -1 : 1));
+      n = (n + all.length) % all.length;
+      ev.preventDefault();
+      var k = all[n].getAttribute("data-pxtab");
+      pxSetTab(nm, k, "pxtab_" + k);
+      return;
+    }
+  }
   var dr = document.querySelector(".px-dr") || document.querySelector(".px-modal .box");
   if (ev.key === "Enter" && pxModal && ev.target && ev.target.id === "pxm_to") { ev.preventDefault(); pxRenameSave(); return; }
   if (!dr) { if (ev.key === "Escape" && pxMenuOpen) { pxMenuOpen = false; render(false); } return; }

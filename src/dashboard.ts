@@ -4652,6 +4652,8 @@ function render(fetchNew) {
   try { if (typeof ptAfterPaint === "function") ptAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof kbAfterPaint === "function") kbAfterPaint(); } catch (e) { /* never block a paint */ }
   try { if (typeof usAfterPaint === "function") usAfterPaint(); } catch (e) { /* never block a paint */ }
+  // The product record's tab indicator glides from the tab it was on, across a full repaint.
+  try { if (typeof pxPlaceTabs === "function") pxPlaceTabs(); } catch (e) { /* never block a paint */ }
   try {
     document.querySelectorAll(".crm-kpi .crm-v, .pc-qc .v").forEach(function (el, i) {
       moNumber(el, (el.textContent || "").trim() + "#" + i);
