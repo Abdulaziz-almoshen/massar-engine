@@ -15,6 +15,80 @@ export const HOME_CRM_CSS = `
    three header styles, two <h1>s, 2,554px of scroll — the reader had to learn the page twice.
    One grammar now. Every band is a .hd-sec with the same header, numbered so the page has a spine,
    and the tail is two columns instead of a ribbon of full-width cards. */
+/* ===== THE DECK =====
+   Founder's chosen direction A. A full-bleed dark band, continuous with the rail, carrying the
+   leading figure and the whole pipeline. It escapes .body's padding with negative margins rather
+   than by restructuring the shell — .body owns the page gutter and nothing else may assume it.
+   Values and their measured ratios: DESIGN.md §2, "The deck". */
+.hm-deck { margin:calc(var(--s4) * -1 - 6px) calc(var(--s5) * -1) var(--s5); padding:34px 40px 30px;
+  background:linear-gradient(135deg, var(--deck-1), var(--deck-2)); color:#fff;
+  position:relative; overflow:hidden; }
+/* one broad accent bloom, top inline-start. Decoration that carries no data gets no more than this. */
+.hm-deck::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(900px 300px at 85% -30%, rgba(37,99,235,.55), transparent 70%); }
+.hm-deck > * { position:relative; }
+.hm-dtop { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-block-end:26px; }
+.hm-dtop h2 { margin:0; font-size:var(--t-lg); font-weight:700; color:#fff; line-height:var(--lh-tight); }
+.hm-dtop .s { font-size:var(--t-xs); color:var(--deck-mut); }
+.hm-dtop .sp { flex:1; }
+.hm-dtop a { font-size:var(--t-xs); color:var(--deck-lnk); text-decoration:none; font-weight:600;
+  padding:6px 8px; border-radius:var(--r-sm); transition:background var(--fast) var(--ease), transform 140ms var(--ease); }
+@media (hover:hover) and (pointer:fine) { .hm-dtop a:hover { background:rgba(255,255,255,.10); } }
+.hm-dtop a:active { transform:scale(0.97); }
+
+.hm-dbody { display:flex; align-items:flex-end; gap:var(--s6); flex-wrap:wrap; }
+.hm-hero { display:flex; align-items:flex-end; gap:var(--s4); min-width:0; }
+/* --t-3xl is 40px; the deck's figure is the one place the page goes bigger, and DESIGN.md's ladder
+   tops out at --t-num (44). clamp() keeps it from crowding the stats on a laptop. */
+.hm-hero .big { font-size:clamp(var(--t-3xl), 7vw, 96px); font-weight:800; line-height:.84;
+  letter-spacing:-3px; font-variant-numeric:tabular-nums; }
+.hm-hero .cap { margin-block-end:14px; min-width:0; }
+.hm-hero .cap b { display:block; font-size:var(--t-sm); font-weight:600; color:var(--deck-ink); }
+.hm-hero .cap span { display:block; font-size:var(--t-xs); color:var(--deck-mut); margin-block-start:3px; }
+.hm-arc { flex:none; width:118px; height:118px; position:relative; }
+.hm-arc svg { transform:rotate(-90deg); }
+.hm-arc .track { fill:none; stroke:rgba(255,255,255,.16); stroke-width:11; }
+.hm-arc .arc { fill:none; stroke:var(--deck-pc); stroke-width:11; stroke-linecap:round;
+  transition:stroke-dashoffset 420ms var(--ease-out); }
+.hm-arc .v { position:absolute; inset:0; display:grid; place-items:center;
+  font-size:var(--t-sm); font-weight:700; color:var(--deck-lnk); font-variant-numeric:tabular-nums; }
+
+.hm-stats { display:flex; gap:var(--s6); flex-wrap:wrap; margin-inline-start:auto; }
+.hm-stat .k { font-size:var(--t-xs); color:var(--deck-mut); margin-block-end:7px; }
+.hm-stat .v { display:flex; align-items:baseline; gap:6px; font-size:var(--t-2xl); font-weight:800;
+  line-height:1; font-variant-numeric:tabular-nums; }
+.hm-stat .v s { text-decoration:none; font-size:var(--t-xs); font-weight:500; color:var(--deck-mut); }
+.hm-stat .s { font-size:var(--t-xs); color:var(--deck-mut); margin-block-start:5px; }
+
+/* THE PIPELINE IS ONE RAIL. Four cards made the reader compare four boxes; one rail shows the
+   split at a glance and each key opens exactly the deals it counted. */
+.hm-prail-wrap { margin-block-start:30px; }
+.hm-prail-l { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-block-end:10px; }
+.hm-prail-l b { font-size:var(--t-sm); font-weight:600; color:var(--deck-ink); }
+.hm-prail-l span { font-size:var(--t-xs); color:var(--deck-mut); }
+.hm-prail { display:flex; height:16px; border-radius:var(--r-pill); overflow:hidden;
+  background:rgba(255,255,255,.13); box-shadow:inset 0 1px 2px rgba(0,0,0,.25); }
+.hm-prail i { display:block; height:100%; transition:width var(--slow) var(--ease); }
+.hm-keys { display:flex; gap:26px; flex-wrap:wrap; margin-block-start:14px; }
+.hm-key { font-family:inherit; display:flex; align-items:baseline; gap:8px; font-size:var(--t-xs);
+  color:#B9CCE6; background:none; border:0; padding:6px 8px; border-radius:var(--r-sm); cursor:pointer;
+  text-align:start; transition:background var(--fast) var(--ease), transform 140ms var(--ease); }
+.hm-key[disabled] { cursor:default; color:var(--deck-mut); }
+@media (hover:hover) and (pointer:fine) { .hm-key:not([disabled]):hover { background:rgba(255,255,255,.10); color:#fff; } }
+.hm-key:not([disabled]):active { transform:scale(0.97); }
+.hm-key:focus-visible { outline:2px solid #fff; outline-offset:-2px; }
+.hm-key em { width:9px; height:9px; border-radius:3px; flex:none; font-style:normal; align-self:center; }
+.hm-key b { font-size:var(--t-lg); font-weight:800; color:#fff; font-variant-numeric:tabular-nums; }
+.hm-key[disabled] b { color:var(--deck-mut); }
+
+@media (max-width: 900px) {
+  .hm-deck { margin-inline:calc(var(--s3) * -1); padding:var(--s4) var(--s3) var(--s4); }
+  .hm-stats { margin-inline-start:0; gap:var(--s4); }
+  .hm-arc { width:88px; height:88px; }
+}
+@media (pointer: coarse) { .hm-key { min-height:44px; align-items:center; } }
+@media (prefers-reduced-motion: reduce) { .hm-arc .arc, .hm-prail i { transition:none; } }
+
 .hd { display:flex; flex-direction:column; gap:var(--s6); }
 .hd-sec { display:flex; flex-direction:column; gap:var(--s3); scroll-margin-top:var(--s4); }
 .hd-h { display:flex; align-items:baseline; gap:var(--s3); flex-wrap:wrap; min-height:28px; }
@@ -282,11 +356,14 @@ window.hmOpenState = function (key) {
 /* Split a printed figure into the numeral and whatever trails it, so «6.3 مليون ر.س» draws as a
    28px/800 number with its unit riding on the baseline beside it — the prototype's own shape.
    Falls back to printing the whole string when there is no leading numeral to split on. */
+/* hmMoney returns MARKUP (opMoneyShort wraps its figure in <bdi>). Anything that wants to measure,
+   split or re-escape a printed figure has to see the text, not the tags. */
+function hmPlain(html) { return String(html == null ? "" : html).replace(/<[^>]*>/g, ""); }
 function hmFigure(text) {
-  var s = String(text == null ? "" : text);
+  var s = hmPlain(text);
   var m = s.match(/^\\s*([0-9][0-9.,]*)\\s*([\\s\\S]*)$/);
-  if (!m) return '<span class="n">' + s + "</span>";
-  return '<span class="n">' + m[1] + (m[2] ? '<span class="uu">' + m[2] + "</span>" : "") + "</span>";
+  if (!m) return '<span class="n">' + esc(s) + "</span>";
+  return '<span class="n">' + esc(m[1]) + (m[2] ? '<span class="uu">' + esc(m[2]) + "</span>" : "") + "</span>";
 }
 function hmIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function hmMoney(v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; }
@@ -424,13 +501,93 @@ function vHomeKpis() {
    entrance that replays on each one is the jump DESIGN.md §8.6 forbids. */
 var hmEntered = false;
 function hmEnterCls() { var c = hmEntered ? "" : " hm-in"; hmEntered = true; return c; }
+/* The deck: one band that answers «أين نحن» and «ما الذي يحتاج تدخلًا» together. It is NOT a
+   .hd-sec — it is full-bleed and carries its own header, because the whole point is that it reads
+   as one dark object continuous with the rail rather than as a section of the page. */
+function vHomeDeck() {
+  if (typeof pcLoad === "function") pcLoad(false);
+  if (typeof opLoad === "function") opLoad(false);
+  hmEscLoad(false);
+  var secs = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.sectors) || [];
+  var target = 0, achieved = 0;
+  secs.forEach(function (s) { target += Number(s.target) || 0; achieved += Number(s.achieved) || 0; });
+  var pct = wholePct(attainmentPct(achieved, target));
+  var st = hmHealth();
+  var left = Math.max(0, target - achieved);
+
+  var R = 50, C = 2 * Math.PI * R;
+  var dash = pct === null ? 0 : Math.max(0, Math.min(100, pct)) / 100 * C;
+  var h = '<section class="hm-deck" aria-labelledby="hmdeck_h">';
+  h += '<div class="hm-dtop"><h2 id="hmdeck_h">الأداء التجاري</h2>' +
+    '<span class="s">' + (typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year
+      ? "السنة المالية " + esc(String(pcQuarters.year)) : "السنة الحالية") + "</span>" +
+    '<span class="sp"></span><a href="#perf">المستهدفات والأداء ←</a></div>';
+
+  /* The figure and its ring. The unit rides the caption, not the numeral — a 96px figure with
+     «مليون ر.س» inline is unreadable at that size.
+     hmMoney returns MARKUP (opMoneyShort wraps the figure in <bdi>), so the tags are stripped
+     before the split and the plain parts are escaped. Escaping the markup printed «<bdi>» on the
+     deck in 96px type — the first render of this band said so, loudly. */
+  var money = hmPlain(hmMoney(achieved)), num = money, unit = "";
+  var m = money.match(/^\\s*([0-9][0-9.,]*)\\s*([\\s\\S]*)$/);
+  if (m) { num = m[1]; unit = m[2]; }
+  h += '<div class="hm-dbody"><div class="hm-hero">' +
+    '<div class="hm-arc"><svg viewBox="0 0 118 118" width="118" height="118" role="img" aria-label="' +
+      esc("نسبة الإنجاز " + (pct === null ? "غير محسوبة" : fmtN(pct) + "٪")) + '">' +
+      '<circle class="track" cx="59" cy="59" r="' + R + '"></circle>' +
+      '<circle class="arc" cx="59" cy="59" r="' + R + '" stroke-dasharray="' + C.toFixed(1) +
+      '" stroke-dashoffset="' + (C - dash).toFixed(1) + '"></circle></svg>' +
+      '<span class="v">' + (pct === null ? "—" : fmtN(pct) + "٪") + "</span></div>" +
+    '<span class="big">' + esc(num) + "</span>" +
+    '<span class="cap"><b>' + (unit ? esc(unit) + " محققة" : "محققة") + "</b>" +
+      '<span>' + (target ? "من مستهدف " + hmMoney(target) : "لم يُحدَّد مستهدف للسنة بعد") + "</span></span></div>";
+
+  var stat = function (k, v, u, s) {
+    return '<div class="hm-stat"><div class="k">' + k + '</div><div class="v">' + v +
+      (u ? "<s>" + u + "</s>" : "") + '</div><div class="s">' + s + "</div></div>";
+  };
+  var splitv = function (txt) {
+    var p = hmPlain(txt);
+    var x = p.match(/^\\s*([0-9][0-9.,]*)\\s*([\\s\\S]*)$/);
+    return x ? [x[1], x[2]] : [p, ""];
+  };
+  var ob = splitv(hmMoney(st.openValue)), lb = splitv(hmMoney(left));
+  h += '<div class="hm-stats">' +
+    stat("الكتاب المفتوح", esc(ob[0]), esc(ob[1]), fmtN(st.openCount) + " فرصة قائمة") +
+    (target ? stat("المتبقّي للمستهدف", esc(lb[0]), esc(lb[1]), left ? "حتى نهاية السنة" : "تحقق المستهدف") : "") +
+    "</div></div>";
+
+  /* The pipeline as ONE rail. Each key opens exactly the deals it counted — the same read the
+     four cards used, so nothing can disagree. */
+  var tone = { on_track: "var(--deck-ok)", late: "var(--deck-warn)", support: "var(--deck-info)", rejected: "var(--deck-bad)" };
+  if (st.total) {
+    h += '<div class="hm-prail-wrap"><div class="hm-prail-l"><b>صحة خط البيع</b>' +
+      '<span>' + fmtN(st.total) + " فرصة، كل واحدة في حالة واحدة فقط</span>" +
+      (hmEscFailed ? '<span class="s" role="alert">تعذّر قراءة سجل التصعيد.</span>' : "") + "</div>";
+    h += '<div class="hm-prail" role="img" aria-label="' + esc("توزيع خط البيع: " +
+      st.buckets.map(function (b) { return b.label + " " + fmtN(b.count); }).join("، ")) + '">' +
+      st.buckets.map(function (b) {
+        var w = st.total ? (b.count / st.total) * 100 : 0;
+        return '<i style="width:' + w.toFixed(2) + "%;background:" + (tone[b.key] || "var(--deck-info)") + '"></i>';
+      }).join("") + "</div>";
+    h += '<div class="hm-keys">' + st.buckets.map(function (b) {
+      var off = !b.count;
+      return '<button type="button" class="hm-key"' + (off ? " disabled" : "") +
+        (off ? "" : ' onclick="hmOpenState(&quot;' + b.key + '&quot;)"') +
+        ' title="' + esc(b.hint) + (off ? "" : " — افتح هذه الفرص") + '">' +
+        '<em style="background:' + (tone[b.key] || "var(--deck-info)") + '"></em>' +
+        "<b>" + fmtN(b.count) + "</b>" + esc(b.label) +
+        (b.value ? " · " + hmMoney(b.value) : "") + "</button>";
+    }).join("") + "</div></div>";
+  }
+  return h + "</section>";
+}
+
+/* «الأداء التجاري» and «صحة خط البيع» are no longer bands: the deck above carries both, and
+   carrying them twice is the page-duplication defect this project has caught three times. What is
+   left here is everything the deck does NOT answer. */
 function vHomeExecBands() {
-  var escFail = hmEscFailed
-    ? '<span class="s" role="alert">تعذّر قراءة سجل التصعيد — «بانتظار الدعم» غير مكتملة.</span><button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button>'
-    : "";
   return [
-    ["الأداء التجاري", "المحقق من مستهدف السنة، والكتاب المفتوح خلفه.", vHomeKpis(), '<a class="go" href="#perf">المستهدفات والأداء ←</a>'],
-    ["صحة خط البيع", "كل فرصة في حالة واحدة فقط — والمجموع هو خط البيع كاملًا.", vHomeHealth(), escFail || '<a class="go" href="#opps">كل الفرص ←</a>'],
     ["شركاء المبيعات", (hmPtWeek ? "أسبوع " + esc(hmPtWeek) : "الأسبوع الحالي"), vHomePartners(), '<a class="go" href="#partners">عرض التفاصيل ←</a>']
   ];
 }

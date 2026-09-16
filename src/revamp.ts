@@ -635,6 +635,33 @@ aside, .px-rh, .hm-pt, .ox-sum {
   transform-origin: 100% 0;   /* RTL: menus open from the inline-start corner, which is the right */
 }
 
+/* 7.10a BELOW THE DECK, NOTHING IS A CARD (founder's chosen direction A, 2026-09-16).
+   The deck is the page's one object with an edge. Everything under it is ruled rows on a single
+   white plane: the panels lose their borders, radii and shadows, and the ROWS inside them carry
+   hairlines instead. That is the whole reason the direction was picked — a page of bordered
+   rectangles reads as an admin panel from 2018, and the founder said exactly that three times. */
+.pc-g3 { grid-template-columns: minmax(0,1fr); gap: var(--s5); }
+.pc-g3 .sh-sec.card3 {
+  background: transparent; border: 0; box-shadow: none; border-radius: 0; padding: 0;
+}
+/* the list inside a section becomes one white plane with ruled rows */
+.pc-g3 .sh-cards { background: var(--paper); border-radius: var(--r-xl); overflow: hidden; gap: 0; }
+.pc-g3 .sh-card {
+  background: transparent; border: 0; border-radius: 0; box-shadow: none;
+  border-block-start: 1px solid var(--line-soft); padding: var(--s3) var(--s4);
+}
+.pc-g3 .sh-cards > .sh-card:first-child { border-block-start: 0; }
+.pc-g3 .sh-card.go:hover { transform: none; box-shadow: none; background: var(--accent-wash); }
+/* the two charts sit on the same plane, with the same radius and no edge */
+.pc-g3 .pc-chart, .pc-g3 .pcq {
+  background: var(--paper); border-radius: var(--r-xl); padding: var(--s4);
+}
+.pc-g3 .pcq { height: auto; }
+.pc-g3 .pcq .sub2 { display: revert; }
+
+/* The partners band takes the same plane: one white surface, no hairline edge. */
+.hm-pt { border: 0; border-radius: var(--r-xl); box-shadow: none; }
+
 /* 7.10b THE HOME PAGE IS ONE SYSTEM. Its opening band (hm-*) was rebuilt to the reference
    language; the three report panels below it (pc-g3) were still the old flat boxes, so the screen
    changed grammar halfway down. Same material, same header rhythm, same recessed tracks. */

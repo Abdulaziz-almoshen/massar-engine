@@ -170,6 +170,20 @@ export const DASHBOARD_HTML = `<!doctype html>
     --rail-on-bg:rgba(201,162,39,.14); --rail-hover:rgba(255,255,255,.08);
     /* The figure ink: the prototype's leading numbers are a deep navy, not the body ink. 14.52:1. */
     --fig:#13294B;
+    /* THE DECK (founder's chosen direction A, 2026-09-16). A full-bleed dark band at the top of
+       الرئيسية, continuous with the rail, carrying the leading figure and the pipeline as ONE
+       segmented rail. It exists because a page of bordered white cards on grey has no focal point:
+       four tiles at the same value compete and none wins. The deck is the one dark surface in the
+       product and it is the answer to «أين نحن».
+       Every value measured on BOTH gradient stops before it was drawn:
+         --deck-ink  12.88 / 9.20   --deck-mut  6.38 / 4.56   --deck-lnk 12.04 / 8.60
+         --deck-pc    7.87 / 5.62   white       16.05 / 11.46
+       The state marks are the BRIGHT tier, not the page's own: --s-sched-mark (2.89) and
+       --s-fail (2.89) both fail 3:1 on the bottom stop, so the rail uses #7FB3F5 (5.28) and
+       #E0645F (3.36). A mark must clear every ground it can land on — including this one. */
+    --deck-1:#11213D; --deck-2:#1B3A63;
+    --deck-ink:#DCE7FA; --deck-mut:#8DA5C8; --deck-lnk:#CFE0FF; --deck-pc:#8FB6FF;
+    --deck-ok:#2E9E6B; --deck-warn:#D6A01F; --deck-info:#7FB3F5; --deck-bad:#E0645F;
     --specular:inset 0 1px 0 rgba(255,255,255,.9);
     --well:inset 0 1px 2px rgba(20,22,26,.06), inset 0 0 0 1px rgba(20,22,26,.08);
     --fill-face:inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(20,22,26,.14);
@@ -1781,7 +1795,10 @@ function vHome(d) {
     ["التحليلات", "أرقام حية من الحملات والمحادثات" + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط"),
       analytics, '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
   ]);
-  return (typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join("");
+  // The deck is full-bleed and sits ABOVE the numbered bands: it is one dark object continuous with
+  // the rail, not a section of the page, so it carries its own header and escapes .body's padding.
+  const deck = (typeof vHomeDeck === "function") ? vHomeDeck() : "";
+  return deck + ((typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join(""));
 }
 
 // Segment groups derive from whatever columns the imported file carried:
