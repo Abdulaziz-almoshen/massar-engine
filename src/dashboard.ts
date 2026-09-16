@@ -184,6 +184,25 @@ export const DASHBOARD_HTML = `<!doctype html>
     --deck-1:#11213D; --deck-2:#1B3A63;
     --deck-ink:#DCE7FA; --deck-mut:#8DA5C8; --deck-lnk:#CFE0FF; --deck-pc:#8FB6FF;
     --deck-ok:#2E9E6B; --deck-warn:#D6A01F; --deck-info:#7FB3F5; --deck-bad:#E0645F;
+    /* BEAUTIFULUI.DEV, adopted whole on the founder's instruction (2026-09-16: «100% use this site
+       on the dashboard»). Its values were read off the live page with getComputedStyle.
+       The one idea everything else hangs off: AN EDGE IS A RING INSIDE A SHADOW, NEVER A BORDER.
+       «0 0 0 1px» occupies no layout, so a surface that gains or loses an edge — selected, focused,
+       hovered — never moves its neighbours by a pixel, and nested surfaces never double their
+       hairlines. And its card shadow is SIX stops at 1-3% ink: each one is invisible alone and the
+       stack reads as air. Collapsing them into one «0 4px 12px rgba(0,0,0,.08)» is precisely what
+       makes a surface look cheap, which is what the founder kept calling "old style". */
+    --ring:0 0 0 1px #D8DCE3;
+    --ring-soft:0 0 0 1px #ECEEF2;
+    --sh-sm:0 18px 47px 0 rgba(16,24,40,.03), 0 7.5px 19px 0 rgba(16,24,40,.02),
+            0 4px 10.5px 0 rgba(16,24,40,.02), 0 2.3px 5.8px 0 rgba(16,24,40,.012),
+            0 1.2px 3.1px 0 rgba(16,24,40,.012), 0 .5px 1.3px 0 rgba(16,24,40,.012);
+    --sh-md:0 17.5px 23.4px 0 rgba(16,24,40,.04), 0 9.4px 12.5px 0 rgba(16,24,40,.03),
+            0 5.25px 7px 0 rgba(16,24,40,.02), 0 2.79px 3.72px -2px rgba(16,24,40,.012);
+    --shadow-card:var(--ring), var(--sh-sm);
+    --shadow-raised:var(--ring), var(--sh-md);
+    /* Its radius ladder is concentric and strict: chip 6 → control 8 → card 10 → window 14. */
+    --r-chip:6px; --r-ctl:8px; --r-card:10px; --r-win:14px;
     --specular:inset 0 1px 0 rgba(255,255,255,.9);
     --well:inset 0 1px 2px rgba(20,22,26,.06), inset 0 0 0 1px rgba(20,22,26,.08);
     --fill-face:inset 0 1px 0 rgba(255,255,255,.34), inset 0 -1px 0 rgba(20,22,26,.14);
@@ -1166,6 +1185,42 @@ function nav() {
       '<span class="gx">' + ic(x.i, 16, x.id === cur ? "#2563EB" : "#A2A9B4") + '</span><span class="lbl">' + x.l + "</span>" +
       (b ? '<span class="bdg ' + b[1] + '">' + b[0] + "</span>" : "") + "</button>";
   }).join("");
+  // beautifului.dev's sidebar glide: ONE highlight that MOVES between destinations, instead of
+  // each item animating its own fill. #nav's innerHTML is replaced on every paint, so the element
+  // is new each time and a naive placement would never animate — it is put on the PREVIOUS item's
+  // geometry with no transition, then moved on the next frame, the same trick the product record's
+  // tab indicator uses. Geometry only, no layout reads inside the loop above.
+  try {
+    const nvEl = document.getElementById("nav");
+    if (nvEl) {
+      const g = document.createElement("i");
+      g.className = "nv-glide noanim";
+      // FIRST child, not appended: positioned siblings paint in DOM order, so the items land on
+      // top of the glide without either side needing a z-index (DESIGN.md 2 forbids an integer one).
+      nvEl.insertBefore(g, nvEl.firstChild);
+      const on = nvEl.querySelector(".nv.on");
+      if (!on) { navGlidePrev = null; } else {
+        const put = (top, h) => {
+          g.style.height = h + "px";
+          g.style.transform = "translateY(" + top + "px)";
+          g.style.opacity = "1";
+        };
+        const now = { top: on.offsetTop, h: on.offsetHeight };
+        if (navGlidePrev && navGlidePrev.top !== now.top) {
+          put(navGlidePrev.top, navGlidePrev.h);
+          requestAnimationFrame(() => {
+            void g.offsetWidth;            // commit the start position before arming the transition
+            g.classList.remove("noanim");
+            put(now.top, now.h);
+          });
+        } else {
+          put(now.top, now.h);
+          requestAnimationFrame(() => g.classList.remove("noanim"));
+        }
+        navGlidePrev = now;
+      }
+    }
+  } catch (e) { /* the rail must paint even if the glide cannot */ }
 
   // The tab strip. Rendered only where a door actually has more than one destination, so a single
   // -destination door does not grow a strip of one tab that looks interactive and does nothing.
@@ -3291,6 +3346,10 @@ function monoPath(pts) {
 // (5% at 100ms, 57% at 500ms, settled at 1500ms), which is ease-out, not linear.
 let sparkSeq = 0;
 let kstripDrawn = false;
+// The rail's glide remembers where it was, so it can move between destinations across a repaint
+// that destroys it. Declared at top level; every reader is inside render(), which runs long after
+// this script has evaluated.
+let navGlidePrev = null;
 function sparkArea(vals, w, hgt) {
   const n = vals.length;
   if (!n) return "";

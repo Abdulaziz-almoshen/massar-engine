@@ -536,12 +536,21 @@ input[type="checkbox"]:focus-visible::before {
   .btn:not([disabled]):hover { filter: brightness(.97); }
 }
 
-/* 7.3 THE CARD READS AS A SURFACE. A 1px hairline draws a rectangle; a hairline plus a one-pixel
-   inner highlight along the top edge makes the same rectangle read as something lying ON the page.
-   It costs no layout and no colour token — it is the paper catching the light. */
-.card, .sh-tile, .sh-card, .sh-empty, .crm-kpi, .crm-tbl, .kcard {
-  box-shadow: var(--specular), var(--sh-0);
+/* 7.3 EVERY EDGE IS A RING, NEVER A BORDER (beautifului.dev, adopted whole 2026-09-16).
+   «0 0 0 1px» inside the shadow occupies no layout: a surface that gains or loses an edge never
+   moves its neighbours, and nested surfaces never double their hairlines. The card shadow is six
+   stops at 1-3% ink — invisible one at a time, air as a stack. The single «0 4px 12px» it replaces
+   is exactly what read as "old style".
+   border-color: transparent, not «border:0» — removing the border would collapse every box by
+   2px and reflow six screens. */
+.card, .sh-tile, .sh-card, .sh-empty, .crm-kpi, .crm-tbl, .kcard, .hm-kpi, .hm-st, .hm-pt {
+  border-color: transparent;
+  box-shadow: var(--shadow-card);
+  border-radius: var(--r-win);
 }
+/* The radius ladder is concentric: a chip inside a control inside a card inside a window. */
+.chip, .crm-st, .px-chip, .kd { border-radius: var(--r-pill); }
+.btn, .inp, .navsearch { border-radius: var(--r-ctl); }
 /* One KPI family on الرئيسية. The campaign strip and the executive tiles were two card designs on
    one page — same job, same size, different weight, different padding — which is the reader having
    to learn the page twice. */
@@ -696,6 +705,41 @@ aside, .px-rh, .hm-pt, .ox-sum {
 /* The quarter tiles are tiles, not tinted rectangles: a recessed ground and tabular figures. */
 .pc-qc { box-shadow: var(--well); }
 .pc-qc .v, .pc-qc .t, .pc-qc .k { font-variant-numeric: tabular-nums; }
+
+/* 7.10c THE ROW, on beautifului.dev's terms. Three mechanics, all measured off its records table:
+   (1) hover is a background FILL one step off the surface, applied in 120ms ease-out — not a
+       border, not a shadow, so the row never changes size;
+   (2) it is applied to the CELLS, not the row, so a sticky column keeps its own opaque ground;
+   (3) it is switched OFF under (hover:none) — a touch device fires hover on tap and leaves the
+       row highlighted until something else is touched, which reads as a stuck selection. */
+.crm-row.crm-click, .rt-row, .trow, .sh-card.go, .px-li, .kh-r, .yt-r {
+  transition: background-color 120ms var(--ease-out), color 120ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .crm-row.crm-click:hover, .trow:hover, .px-li:hover { background: var(--surface); }
+}
+@media (hover: none) {
+  .crm-row.crm-click:hover, .trow:hover, .px-li:hover, .sh-card.go:hover,
+  .crm-tbl tr:hover td { background: none; }
+}
+
+/* 7.10d THE SIDEBAR GLIDE. One absolutely-positioned highlight animating top and height, instead
+   of each nav item animating its own background. The selected row then MOVES between destinations
+   rather than one fading out while another fades in — the same idea as the record's tab indicator,
+   which is why both use the 240ms on-screen-movement curve rather than an ease-out. */
+nav, #nav { position: relative; }
+/* No z-index on either side: the glide is inserted as the FIRST child, and positioned siblings
+   paint in DOM order, so the items land on top of it for free. DESIGN.md 2 forbids an integer
+   z-index, and a surface that needs one between two steps is usually telling you to fix the order
+   instead — here it was. */
+.nv-glide { position: absolute; inset-inline: 0; inset-block-start: 0; height: 0; border-radius: 10px;
+  background: var(--rail-on-bg); opacity: 0; pointer-events: none;
+  transition: transform 240ms var(--ease-io), height 240ms var(--ease-io), opacity var(--fast) var(--ease); }
+.nv-glide.noanim { transition: none; }
+.nv { position: relative; }
+/* The glide carries the selection now, so the item's own fill would double it. */
+.nv.on { background: transparent; }
+@media (prefers-reduced-motion: reduce) { .nv-glide { transition: none; } }
 
 /* 7.11 TABULAR FIGURES, EVERYWHERE A FIGURE IS DRAWN. Proportional digits make a column of numbers
    ragged and make a changing number jump sideways. This is the cheapest quality upgrade available
