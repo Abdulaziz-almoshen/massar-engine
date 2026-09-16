@@ -808,6 +808,16 @@ nav, #nav { position: relative; }
 .yt-r.hdr { background: transparent; border-block-end: 1px solid var(--line); }
 .yt-qc.none .bar { background: var(--well); }
 
+/* 8.8 THE GREY FILL, which the ring pass could not see. §8.1 gave these cards a ring and left their
+   background alone, so «العملاء» and «الأداء» still drew three GREY KPI cards beside one blue one:
+   four filled surfaces, no white, and the tint that was supposed to mark the leading figure marked
+   nothing because it was one fill among four. A probe of computed backgrounds found every one —
+   --surface #EFF1F5 on .crm-kpi, .perf-kpi, and on the filter and header bands .ac-f / .cf-hr.
+   The card goes white and keeps the ring; the LEAD card keeps its blue, and now it is the only
+   tinted thing in the strip, which is the whole point of tinting it. */
+.crm-kpi:not(.crm-lead), .perf-kpi:not(.lead) { background: var(--paper); }
+.ac-f, .cf-hr { background: transparent; border-block-end: 1px solid var(--line-soft); }
+
 /* 7.11 TABULAR FIGURES, EVERYWHERE A FIGURE IS DRAWN. Proportional digits make a column of numbers
    ragged and make a changing number jump sideways. This is the cheapest quality upgrade available
    and it costs one declaration. */
