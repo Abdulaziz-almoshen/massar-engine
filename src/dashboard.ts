@@ -1848,8 +1848,11 @@ function vHome(d) {
   const analytics = '<div class="hd-split"><div class="hd-col">' + vHomeCharts(cs) + "</div>" +
     '<div class="hd-col">' + latest + ((typeof winLossBoard === "function") ? winLossBoard() : "") + "</div></div>";
   const bands = ((typeof vHomeExecBands === "function") ? vHomeExecBands() : []).concat([
+    // NOT «المستهدفات والأداء ←» — the deck already carries that link, and the audit found the
+    // string printed twice on one screen. A second copy of a link is not emphasis, it is a reader
+    // checking whether the two go to the same place.
     ["أين نحن من المستهدف", "القطاعات، والمنتجات الأقل إنجازًا، والأرباع الأربعة.",
-      (typeof vExecBand === "function") ? vExecBand() : "", '<a class="go" href="#perf">المستهدفات والأداء ←</a>'],
+      (typeof vExecBand === "function") ? vExecBand() : "", '<a class="go" href="#products">كل المنتجات ←</a>'],
     ["نشاط الحملات", "ما تحرّك في الفترة المختارة.", kstrip, kctl],
     ["التحليلات", "أرقام حية من الحملات والمحادثات" + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط"),
       analytics, '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
@@ -3613,12 +3616,18 @@ function vHomeCharts(cs) {
   // three-per-row standard governs the rows of small reports; the board is the page's one wide
   // chart, exactly as the reference lays it out.
   h += '<div style="margin-bottom:16px;">' + activityBoard(cs) + "</div>";
+  // A SECTION THAT CAN ONLY DRAW DASHES IS NOT AN EMPTY STATE, IT IS NOISE. An audit of the live
+  // page counted 11 of its 140 visible strings as «0» or «—»: «معدلات الأداء» was four rows of
+  // dashes (every rate divides by a targeted count of zero) and «الاهتمام حسب الخدمة» was a
+  // sentence saying it would appear later. Both are drawn only when they have something to say;
+  // the band's own strapline already tells the reader the numbers are live.
+  const hasReach = agg.targeted > 0;
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">';
-  h += ratesStrip(agg);
+  if (hasReach) h += ratesStrip(agg);
   // Four distributions, one idiom. They answer the same shape of question — «how does the book
   // split by X» — so drawing three of them as columns, tiles and bars taught a difference that
   // does not exist. Teal is the accent; the ramp behind it is neutral.
-  h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", prodRows.length ? hbarRows(prodRows, "#2563EB") : '<div style="font-size:12px;color:#656B76;margin-top:14px;">تظهر عند أول وسم اهتمام.</div>');
+  if (prodRows.length) h += chartCard("الاهتمام حسب الخدمة", "من تصنيفات المساعد", hbarRows(prodRows, "#2563EB"));
   // winLossBoard is NOT here any more: vHome puts it in the rail beside «أحدث الحملات», so the two
   // columns of the analytics band end at roughly the same depth instead of one trailing a hole.
   h += "</div>";

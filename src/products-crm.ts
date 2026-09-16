@@ -21,6 +21,40 @@ export const PRODUCTS_CRM_CSS = `
    produces an unreadable third column is not a standard, it is a shape. align-items:stretch so the
    three cards in a row share a baseline and an edge; the content inside each decides its own
    height. */
+/* ===== THE EXEC ROW =====
+   An audit of the live الرئيسية found 108 of its 140 visible strings set at 12px: one 96px figure
+   on the deck and then a flat field of identical small text. A page with two type sizes has no
+   hierarchy, it has a headline and a footnote. This row builds the MIDDLE tier the page was
+   missing — name at --t-sm/700, figure at --t-lg/700, share at --t-xl/800 — so a reader scanning
+   the body lands on figures instead of on a wall. */
+.ex-rows{background:var(--paper);border-radius:var(--r-win,14px);overflow:hidden}
+.ex-row{display:grid;grid-template-columns:minmax(0,1.3fr) 150px 140px minmax(120px,1fr) 78px;
+  align-items:center;gap:var(--s3);width:100%;padding:var(--s3) var(--s4);text-align:start;
+  font-family:inherit;background:none;border:0;border-block-start:1px solid var(--line-soft);
+  color:inherit;transition:background 120ms var(--ease-out)}
+.ex-rows > .ex-row:first-child{border-block-start:0}
+.ex-row.go{cursor:pointer}
+@media (hover:hover) and (pointer:fine){.ex-row.go:hover{background:var(--surface)}}
+@media (hover:none){.ex-row.go:hover{background:none}}
+.ex-row.go:active{transform:scale(.995)}
+.ex-row:focus-visible{outline:none;background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent)}
+.ex-row .nm{font-size:var(--t-sm);font-weight:700;color:var(--ink);min-width:0;overflow-wrap:anywhere}
+.ex-row .nm em{display:block;font-style:normal;font-size:var(--t-xs);font-weight:400;color:var(--muted);margin-block-start:3px}
+.ex-row .fig{font-size:var(--t-lg);font-weight:700;color:var(--fig);font-variant-numeric:tabular-nums}
+.ex-row .of{font-size:var(--t-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.ex-row .fig.none,.ex-row .of.none{color:var(--muted);font-weight:400;font-size:var(--t-sm)}
+.ex-row .trk{height:10px;border-radius:var(--r-pill);background:var(--surface-2);overflow:hidden;
+  box-shadow:var(--well)}
+.ex-row .trk i{display:block;height:100%;border-radius:var(--r-pill);background:var(--accent);
+  box-shadow:var(--fill-face);transition:width var(--slow) var(--ease)}
+.ex-row .pct{font-size:var(--t-xl);font-weight:800;font-variant-numeric:tabular-nums;text-align:start;line-height:1}
+.ex-row .pct.none{font-size:var(--t-lg);color:var(--muted);font-weight:400}
+@media (prefers-reduced-motion:reduce){.ex-row .trk i{transition:none}.ex-row.go:active{transform:none}}
+@media (max-width:900px){
+  .ex-row{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
+  .ex-row .trk{grid-column:1 / -1}
+}
+
 .pc-g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);
   align-items:stretch;margin-block-end:var(--s4)}
 .pc-g3 .sh-sec.card3{margin-block-end:0;background:var(--paper,#fff);
@@ -1763,7 +1797,11 @@ document.addEventListener("click", function (ev) {
   var row = ev.target && ev.target.closest ? ev.target.closest("[data-go]") : null;
   if (!row) return;
   var kind = row.getAttribute("data-go"), nm = row.getAttribute("data-nm");
-  if (!kind || !nm) return;
+  if (!kind) return;
+  /* «بلا قطاع» has no board of its own — it is a catalogue gap, so it routes to the list where the
+     gap is closed. Without this branch the row built #products/بلا قطاع, a record that cannot exist. */
+  if (kind === "products") { location.hash = "products"; return; }
+  if (!nm) return;
   location.hash = kind + "/" + encodeURIComponent(nm);
 });
 
@@ -1855,22 +1893,20 @@ function vExecBand() {
   // chart row itself.
   var h = '<div class="pc-g3">';
   h += '<div class="sh-sec card3"><div class="sh-h">القطاعات</div>' +
-    '<div class="sh-hs">اضغط قطاعًا للوحته.</div>' +
-    pcSectorChart(secs) + '</div>';
+    '<div class="sh-hs">المحقق مقابل المستهدف السنوي. اضغط قطاعًا للوحته.</div>' +
+    pcSectorRows(secs) + '</div>';
 
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
   var untargeted = prods.length - targeted.length;
   if (targeted.length) {
     h += '<div class="sh-sec card3"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
       '<div class="sh-hs">الأقل إنجازًا أولًا' +
-      (untargeted ? ' · ' + pxNProd(untargeted) + ' بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="sh-cards">';
+      (untargeted ? ' · ' + pxNProd(untargeted) + ' بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="ex-rows">';
     targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
-      var c = p.coveragePct;
-      var cls = c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad");
-      h += '<div class="sh-card go" data-go="product" data-nm="' + esc(p.product) + '">' +
-        '<div><div class="nm">' + esc(p.product) + '</div>' +
-        '<div class="sub">' + pcMoney(p.achieved) + ' من ' + pcMoney(p.annualTarget) + '</div></div>' +
-        '<div class="end"><span class="crm-st ' + cls + '"><i></i>' + fmtN(c) + '٪</span></div></div>';
+      h += exRow({
+        go: "product", nm: p.product, sub: pcSectorOfProduct(p),
+        fig: p.achieved, of: p.annualTarget, pct: p.coveragePct
+      });
     });
     h += '</div></div>';
   }
@@ -1897,6 +1933,60 @@ function vExecBand() {
 
    A sector with nothing in it still gets a row, at «—». Dropping empty sectors would quietly
    change the denominator of what the reader thinks they are looking at. */
+/* ONE row, used by both exec lists. It carries the middle tier of type the page was missing:
+   the name at --t-sm/700, the figure at --t-lg/700, the share at --t-xl/800. Tone is on the SHARE
+   only — the figure stays ink, because a coloured figure and a coloured percentage of the same
+   fact is one meaning said twice in two channels. */
+function exRow(o) {
+  var pct = o.pct === null || o.pct === undefined ? null : Math.round(o.pct);
+  var tone = pct === null ? "var(--muted)"
+    : pct >= 100 ? "#12633F" : pct >= 70 ? "var(--accent-deep)" : pct >= 30 ? "#7A5600" : "#8E2A27";
+  var w = pct === null ? 0 : Math.max(0, Math.min(100, pct));
+  var has = Number(o.fig) > 0;
+  var hasT = Number(o.of) > 0;
+  return '<button type="button" class="ex-row go" data-go="' + o.go + '" data-nm="' + esc(o.nm) + '">' +
+    '<span class="nm">' + esc(o.nm) + (o.sub ? "<em>" + esc(o.sub) + "</em>" : "") + "</span>" +
+    '<span class="fig' + (has ? "" : " none") + '">' + (has ? pcMoney(o.fig) : "—") + "</span>" +
+    '<span class="of' + (hasT ? "" : " none") + '">' + (hasT ? "من " + pcMoney(o.of) : "لم يُحدَّد") + "</span>" +
+    '<span class="trk"><i style="width:' + w + "%;background:" + tone + '"></i></span>' +
+    '<span class="pct' + (pct === null ? " none" : "") + '"' + (pct === null ? "" : ' style="color:' + tone + '"') + ">" +
+    (pct === null ? "—" : fmtN(pct) + "٪") + "</span></button>";
+}
+/* The sector a product sells into, for the row's sub-line. The catalogue owns the mapping. */
+function pcSectorOfProduct(p) {
+  if (p.sector) return p.sector;
+  var cat = (typeof pcCat !== "undefined" && pcCat) || [];
+  for (var i = 0; i < cat.length; i++) if (cat[i].product === p.product) return cat[i].sector || "";
+  return "";
+}
+/* The sectors, in the same row grammar as the products — they answer the same shape of question,
+   so drawing one as a bar chart and the other as cards taught a difference that does not exist. */
+function pcSectorRows(secs) {
+  /* «بلا قطاع» IS SHOWN when it carries value. Filtering it out silently changed the denominator
+     the reader thinks they are looking at — the same rule the old chart stated for empty sectors,
+     applied to the bucket that is not empty. It is not cosmetic here: «تكامل الأنظمة» carries
+     3,100,000 of the year's 3,111,000 achieved and has NO sector, so hiding the bucket made
+     «قطاع المستشفيات» read 11,000 / 0٪ directly under a deck reading 3.1 مليون / 49٪. Two figures
+     on one screen that cannot both be right is the defect this row exists to expose, not hide. */
+  var list = (secs || []).filter(function (sc) {
+    return !sc.isUnclassified || Number(sc.achieved) > 0 || Number(sc.weightedOpen) > 0 || Number(sc.target) > 0;
+  });
+  if (!list.length) return "";
+  return '<div class="ex-rows">' + list.map(function (sc) {
+    var opens = Number(sc.openCount) || 0;
+    var tgt = Number(sc.target) || 0, won = Number(sc.achieved) || 0;
+    var sub = opens ? fmtN(opens) + " فرصة مفتوحة" : "بلا فرص مفتوحة";
+    /* The unclassified bucket says WHY it is here and what to do, because a row called «بلا قطاع»
+       carrying most of the year's revenue is a catalogue problem, not a sales one. */
+    if (sc.isUnclassified) sub = "منتجات بلا قطاع — حدِّد قطاعها من «المنتجات» لتدخل الحساب أعلاه · " + sub;
+    return exRow({
+      go: sc.isUnclassified ? "products" : "sector", nm: sc.sector,
+      sub: sub,
+      fig: won, of: tgt,
+      pct: tgt > 0 ? (won / tgt) * 100 : null
+    });
+  }).join("") + "</div>";
+}
 function pcSectorChart(secs) {
   var list = (secs || []).filter(function (sc) { return !sc.isUnclassified; });
   if (!list.length) return "";
