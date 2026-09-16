@@ -39,7 +39,9 @@ import { ACCOUNTS_CRM_CSS, ACCOUNTS_CRM_JS } from "./accounts-crm.js";
 import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
 import { HOME_CRM_CSS, HOME_CRM_JS } from "./home-crm.js";
 import { ORG_CRM_CSS, ORG_CRM_JS } from "./org-crm.js";
+import { YEAR_TARGETS_CSS, YEAR_TARGETS_JS } from "./year-targets-crm.js";
 import { HOME_DOMAIN_JS } from "./home-domain.js";
+import { ACCEPTANCE_DOMAIN_JS } from "./acceptance-domain.js";
 import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
 import { OPP_WORK_DOMAIN_JS } from "./opp-work-domain.js";
 import { CAMPAIGN_RESULTS_CRM_CSS, CAMPAIGN_RESULTS_CRM_JS } from "./campaign-results-crm.js";
@@ -728,6 +730,7 @@ ${INDICATORS_CRM_CSS}
 ${ACCOUNTS_CRM_CSS}
 ${HOME_CRM_CSS}
 ${ORG_CRM_CSS}
+${YEAR_TARGETS_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
@@ -4603,7 +4606,9 @@ function render(fetchNew) {
     // the importer, and there was no list to click a customer FROM.
     b.innerHTML = cur === "aimkt" ? vAimkt()
       : cur === "targets" ? vTargetsCrm()
-      : cur === "perf" ? vSalesPerf()
+      // «المستهدفات» answers the YEAR first (what each product is asked to sell, and how the target
+      // was spread over the quarters), then the quarter-at-a-time performance table below it.
+      : cur === "perf" ? vYearTargets() + vSalesPerf()
       : cur === "opps" ? vOppsCrm()
       : cur === "triage" ? vMorningList()
       : cur === "pipeline" ? vActivityCrm()
@@ -4996,8 +5001,10 @@ ${INDICATOR_DOMAIN_JS}
 ${ACCOUNTS_CRM_JS}
 ${ACCOUNT_DOMAIN_JS}
 ${HOME_DOMAIN_JS}
+${ACCEPTANCE_DOMAIN_JS}
 ${HOME_CRM_JS}
 ${ORG_CRM_JS}
+${YEAR_TARGETS_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}

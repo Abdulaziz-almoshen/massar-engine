@@ -26,6 +26,32 @@ export const REPORTS_CRM_CSS = `
 .rp-q{font-size:12px;color:var(--ink2,#33373E);margin-block-end:4px}
 .rp-tot{font-size:12px;color:var(--muted,#656B76);margin-block-end:14px;font-variant-numeric:tabular-nums}
 .rp-days{font-variant-numeric:tabular-nums;font-weight:600}
+/* قبول المنتجات — one row per product, worst first */
+/* auto-fit, because the «قليلة البيانات» tile only appears when it has a count — a fixed four-column
+   grid left it orphaned on a row of its own. */
+.ac-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:var(--s3);margin-block-end:var(--s4)}
+.ac-tile{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s4);
+  display:flex;flex-direction:column;gap:4px;border-inline-start:3px solid var(--tn,var(--line))}
+.ac-tile .n{font-size:var(--t-2xl);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.ac-tile .l{font-size:var(--t-xs);color:var(--muted)}
+.ac-tbl{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.ac-r{display:grid;grid-template-columns:minmax(0,1.5fr) 150px 64px 64px 64px 118px minmax(0,1.1fr);
+  align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-top:1px solid var(--line-soft);font-size:var(--t-sm)}
+.ac-r:first-of-type{border-top:0}
+.ac-r.hdr{font-size:var(--t-xs);font-weight:600;color:var(--muted);background:var(--surface);border-top:0}
+.ac-r .nm{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.ac-r .nm .sub{display:block;font-weight:400;margin-block-start:2px}
+.ac-r .sub{font-size:var(--t-xs);color:var(--muted)}
+.ac-r .num{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:var(--t-xs)}
+.ac-pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-xs);font-weight:500;
+  border-radius:var(--r-pill);padding:3px 10px;background:var(--tn-soft,var(--surface-2));color:var(--tn-text,var(--ink-2))}
+.ac-why{font-size:var(--t-xs);color:var(--ink-2);overflow-wrap:anywhere}
+.ac-why .none{color:var(--muted)}
+@media (max-width:820px){
+  .ac-r{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
+  .ac-r.hdr{display:none}
+  .ac-r .num,.ac-why{grid-column:1 / -1}
+}
 .rp-basis{font-size:12px;color:var(--muted,#656B76);margin-block-start:18px;line-height:1.7;
   padding-inline-start:9px;border-inline-start:2px solid var(--line2,#D8DCE3);max-width:66ch}
 `;
@@ -86,15 +112,19 @@ function rpAge(d) {
 /* «التقارير» has two faces. «نظرة تنفيذية» answers the CPO's questions about the whole pipeline
    (pipeline-report-domain.ts); «تقارير التعثّر» is the original four — which deal is stuck, on whom. */
 var rpMode = "exec";
-window.rpSetMode = function (m) { rpMode = m === "stuck" || m === "kpis" ? m : "exec"; render(false); };
+window.rpSetMode = function (m) { rpMode = m === "stuck" || m === "kpis" || m === "accept" ? m : "exec"; render(false); };
 function vReportsCrm() {
   var h = '<div class="rp-tabs rp-modes" role="group" aria-label="نوع التقرير">' +
     '<button class="rp-tab' + (rpMode === "exec" ? " on" : "") + '" aria-pressed="' + (rpMode === "exec") + '" onclick="rpSetMode(&quot;exec&quot;)">نظرة تنفيذية</button>' +
     '<button class="rp-tab' + (rpMode === "stuck" ? " on" : "") + '" aria-pressed="' + (rpMode === "stuck") + '" onclick="rpSetMode(&quot;stuck&quot;)">تقارير التعثّر</button>' +
+    '<button class="rp-tab' + (rpMode === "accept" ? " on" : "") + '" aria-pressed="' + (rpMode === "accept") + '" onclick="rpSetMode(&quot;accept&quot;)">قبول المنتجات</button>' +
     '<button class="rp-tab' + (rpMode === "kpis" ? " on" : "") + '" aria-pressed="' + (rpMode === "kpis") + '" onclick="rpSetMode(&quot;kpis&quot;)">مؤشرات الأداء</button>' +
     '<i class="ind"></i></div>';
   setTimeout(function () { moveInd(document.querySelector(".rp-modes")); }, 0);
-  return h + (rpMode === "exec" ? vReportsExec() : rpMode === "kpis" && typeof vReportsKpis === "function" ? vReportsKpis() : vReportsStuck());
+  return h + (rpMode === "exec" ? vReportsExec()
+    : rpMode === "accept" ? vReportsAccept()
+    : rpMode === "kpis" && typeof vReportsKpis === "function" ? vReportsKpis()
+    : vReportsStuck());
 }
 
 function vReportsStuck() {
@@ -197,6 +227,73 @@ function vReportRollups() {
     h += '</div>';
   }
   h += '</div>';
+  return h;
+}
+
+/* ============================ قبول المنتجات ============================
+   The prototype's last report, and the one Massar could not produce: how the market RECEIVED each
+   product. Every figure here is a count of real lines — the classification is acceptance-domain's,
+   and the denominator is printed beside every rate, because «100٪» of one decided deal and of forty
+   are different findings. */
+var AC_TONE = {
+  accepted: "--tn:#12633F;--tn-soft:#E6F3EC;--tn-text:#12633F",
+  struggling: "--tn:#B37F00;--tn-soft:#FBF2DC;--tn-text:#7A5600",
+  rejected: "--tn:#8E2A27;--tn-soft:#FBE9E8;--tn-text:#8E2A27",
+  unsold: "--tn:#A2A9B4;--tn-soft:var(--surface-2);--tn-text:var(--muted)",
+  thin: "--tn:#5B8DEF;--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"
+};
+function acAttainOf(product) {
+  var rows = (typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.byProduct) || [];
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].product === product) {
+      return typeof wholePct === "function" ? wholePct(attainmentPct(rows[i].achieved, rows[i].annualTarget)) : null;
+    }
+  }
+  return null;
+}
+function vReportsAccept() {
+  if (typeof opLoad === "function") opLoad(false);
+  if (typeof pcLoad === "function") pcLoad(false);
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : null;
+  var h = '<div class="rp-q">تقييم المنتجات من ناحية قبول العملاء — يصنّف كل منتج بنتائج صفقاته المحسومة: ما بيع جيدًا، وما تعثّر، وما جرّبه العملاء ورفضوه، وما لم يُحسم فيه شيء بعد.</div>';
+  if (!rows) {
+    return h + (typeof oppFailed !== "undefined" && oppFailed
+      ? '<div class="rp-state" role="alert">تعذّر تحميل الفرص.<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>'
+      : moSkeleton(4, ["w40", "w80", "w60"]));
+  }
+  var cat = ((typeof pcCat !== "undefined" && pcCat) || []).filter(function (p) { return !p.archived; }).map(function (p) { return p.product; });
+  var list = productAcceptance(rows.map(function (l) {
+    return { product: l.product, stage: l.stage, lostReason: l.lost_reason };
+  }), cat, isWonStage, isLostStage, acAttainOf);
+  if (!list.length) {
+    return h + shEmpty("chart", "لا منتجات بعد", "يظهر هذا التقرير حين يُسجَّل أول منتج في «المنتجات».");
+  }
+  var totals = acceptanceTotals(list);
+  h += '<div class="ac-tiles">' + totals.filter(function (t) { return t.key !== "thin" || t.count; }).map(function (t) {
+    return '<div class="ac-tile" style="' + (AC_TONE[t.key] || "") + '"><span class="n">' + fmtN(t.count) + "</span>" +
+      '<span class="l">' + esc(t.label) + "</span>" +
+      '<span class="l">' + esc(ACCEPT_HINTS[t.key] || "") + "</span></div>";
+  }).join("") + "</div>";
+  h += '<div class="ac-tbl">' +
+    '<div class="ac-r hdr"><span>المنتج</span><span>حالة القبول</span><span>مبيعة</span><span>خاسرة</span><span>مفتوحة</span><span>نسبة الإنجاز</span><span>أبرز سبب عدم القبول</span></div>';
+  list.forEach(function (r) {
+    var why = r.topReason
+      ? esc((typeof LOSS_REASON_LABELS !== "undefined" && LOSS_REASON_LABELS[r.topReason]) || r.topReason) +
+        (r.topReasonCount > 1 ? ' <span class="none">(' + fmtN(r.topReasonCount) + ")</span>" : "")
+      : r.lost ? '<span class="none">لم يُسجَّل سبب</span>' : '<span class="none">—</span>';
+    h += '<div class="ac-r"><span class="nm">' + esc(r.product) +
+      (r.decided ? '<span class="sub">فوز ' + fmtN(r.winRatePct) + "٪ · " + fmtN(r.won) + " من " + fmtN(r.decided) + " محسومة</span>" : '<span class="sub">لا صفقة محسومة</span>') + "</span>" +
+      '<span><span class="ac-pill" style="' + (AC_TONE[r.state] || "") + '">' + esc(ACCEPT_LABELS[r.state]) + "</span></span>" +
+      '<span class="num">' + fmtN(r.won) + "</span>" +
+      '<span class="num">' + fmtN(r.lost) + "</span>" +
+      '<span class="num">' + fmtN(r.open) + "</span>" +
+      '<span class="num">' + (r.attainmentPct === null ? "—" : fmtN(r.attainmentPct) + "٪ من المستهدف") + "</span>" +
+      '<span class="ac-why">' + why + "</span></div>";
+  });
+  h += "</div>";
+  h += '<div class="rp-basis"><b>كيف صُنِّف كل منتج؟</b><br>' +
+    "بنسبة الفوز بين الصفقات المحسومة وحدها: " + fmtN(ACCEPT_GOOD_PCT) + "٪ فأكثر «مقبولة»، ودون " + fmtN(ACCEPT_BAD_PCT) + "٪ «غير مقبولة»، وما بينهما «متعثّرة». " +
+    "المنتج الذي لم تُحسم له صفقة «لم يُبع بعد» مهما كثرت فرصه المفتوحة — الفرصة المفتوحة سؤال لا إجابة. وصفقة محسومة واحدة لا تكفي لحكم.</div>";
   return h;
 }
 `;
