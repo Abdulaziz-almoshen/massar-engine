@@ -1013,6 +1013,31 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_log_actor ON audit_log (actor, at DESC);
 `,
   },
+  {
+    version: "017-importance-backfill",
+    sql: `
+-- BR-CAM-002 made «الأهمية» a campaign audience filter, read from entities.importance. Migration 009
+-- moved «القطاع» and «المدينة» out of the imported attributes into their columns and left importance
+-- behind, so every account imported before slice S2 and never re-imported reads «بدون» — a filter the
+-- wizard offered yesterday as a spreadsheet chip and would have lost today.
+--
+-- Same discipline as 009: only a TEXT attribute moves, trimmed, and only a word the product already
+-- knows (account-domain IMPORTANCE_WORDS). Anything else stays NULL rather than becoming a guess about
+-- how much a customer matters.
+UPDATE entities SET importance = CASE lower(btrim(attrs->>'الأهمية'))
+    WHEN 'عالية' THEN 'high' WHEN 'عالي' THEN 'high' WHEN 'مرتفعة' THEN 'high' WHEN 'high' THEN 'high'
+    WHEN 'متوسطة' THEN 'medium' WHEN 'متوسط' THEN 'medium' WHEN 'medium' THEN 'medium'
+    WHEN 'منخفضة' THEN 'low' WHEN 'منخفض' THEN 'low' WHEN 'low' THEN 'low' END
+ WHERE importance IS NULL AND jsonb_typeof(attrs->'الأهمية') = 'string';
+UPDATE entities SET importance = CASE lower(btrim(attrs->>'درجة الأهمية'))
+    WHEN 'عالية' THEN 'high' WHEN 'عالي' THEN 'high' WHEN 'مرتفعة' THEN 'high' WHEN 'high' THEN 'high'
+    WHEN 'متوسطة' THEN 'medium' WHEN 'متوسط' THEN 'medium' WHEN 'medium' THEN 'medium'
+    WHEN 'منخفضة' THEN 'low' WHEN 'منخفض' THEN 'low' WHEN 'low' THEN 'low' END
+ WHERE importance IS NULL AND jsonb_typeof(attrs->'درجة الأهمية') = 'string';
+UPDATE entities SET sector = left(btrim(attrs->>'الشريحة'), 80)
+ WHERE sector IS NULL AND jsonb_typeof(attrs->'الشريحة') = 'string' AND btrim(attrs->>'الشريحة') <> '';
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1528,6 +1553,10 @@ export async function counts(): Promise<{ contacts: number; messages: number; ev
 
 export type EntityRow = {
   id: number; name: string; phone: string; size: string | null; city: string | null;
+  /** The S2 account columns, verbatim. BR-CAM-002 filters a campaign audience on these rather than on
+   *  whatever columns the imported spreadsheet happened to carry, so an account added by hand is
+   *  segmentable too. `city` above is the same column; it is also folded into attrs for the old chips. */
+  sector: string | null; importance: string | null;
   /** proposed | approved | rejected — a rejected account is left out of campaign audiences and suggestions. */
   approval: string;
   attrs: Record<string, string>;
@@ -1539,7 +1568,7 @@ export type EntityRow = {
 
 export async function listEntities(): Promise<EntityRow[]> {
   if (!pool || !connected) return [];
-  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts, product_tags, approval FROM entities ORDER BY name`);
+  const r = await pool.query(`SELECT id, name, phone, size, city, attrs, facts, product_tags, approval, sector, importance FROM entities ORDER BY name`);
   // Legacy size/city columns fold into attrs so the UI reads one uniform attribute map.
   return r.rows.map((x) => ({
     ...x, id: Number(x.id),

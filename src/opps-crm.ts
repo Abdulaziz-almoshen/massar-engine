@@ -418,6 +418,8 @@ export const OPPS_CRM_CSS = `
   .ox-fld { display:flex; flex-direction:column; gap:6px; min-width:0; }
   .ox-fld > label, .ox-fld > .l { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
   .ox-fld .req { color:var(--s-fail-text); }
+  /* the same value an editor would type, printed for a role that may only read */
+  .ox-ro { font-size:var(--t-sm); color:var(--ink); min-height:38px; display:flex; align-items:center; overflow-wrap:anywhere; }
   .ox-fld .inp, .ox-fld select.inp { width:100%; min-height:38px; height:38px; font-size:var(--t-sm); border-radius:var(--r-sm); }
   .ox-fld .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
   .ox-fld .inp.num:placeholder-shown { text-align:start; }
@@ -526,6 +528,13 @@ var opOwn = "all";           /* all | __none | <owner name> */
 /* Exact product, set by links from a product record so the list reproduces that record's count. */
 var opProd = "";
 var opShort = "";            /* "" | open | stalled | unpriced — the summary's shortcut metrics */
+/* BR-RPT-004 — the drill from a report card that names a population no board filter can express
+   («راكدة»: open lines with no stage movement in the window, which is read from the stage ledger and
+   not from anything a line carries). The report hands over the very ids it counted, so the list that
+   opens is the one the sentence measured — never a similar-looking recomputation. Cleared like any
+   other filter, and the chip says where it came from. */
+var opIds = null;            /* null = off, else { id: 1 } */
+var opIdsLabel = "";
 var opDragId = null;
 var opOpen = 0;              /* id of the line whose drawer is open; 0 = none */
 var opArm = 0;
@@ -687,9 +696,15 @@ function opLoad(force) {
    across the #body rewrite that every change causes. */
 function opRender() { render(false); }
 
+/* A role that may READ deals but not change them (exec, and the product manager per §22) gets the
+   board without its write controls. The server refuses the write either way — this is so the screen
+   stops offering work the reader cannot do, which is the whole of BR-SEC-002's «view only». */
+function opMayEdit() { return typeof meCan !== "function" || meCan("opps.edit"); }
+
 /* ---- filters ---- */
 function opBaseMatch(l) {
   var q = opQ.trim();
+  if (opIds && !opIds[l.id]) return false;
   if (opProd && l.product !== opProd) return false;
   if (opSrc !== "all" && l.source !== opSrc) return false;
   if (opOwn === "__none" && String(l.owner || "").trim()) return false;
@@ -715,7 +730,7 @@ function opLines() {
     return opShortMatch(l);
   });
 }
-function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort || opProd; }
+function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort || opProd || !!opIds; }
 function opSorted() {
   var rows = opLines().slice();
   var pos = {}; OPP_ST.forEach(function (st, i) { pos[st.key] = i; });
@@ -845,7 +860,9 @@ function opLadderNotice() {
     '<button class="btn btn-ghost" data-op="ladderretry">أعد المحاولة</button></div>';
 }
 function opToolbar() {
-  var sel = opSelIds();
+  /* Selection exists to drive the bulk stage move and owner assign — both writes. A role that may
+     only read never selects, so the branch below cannot be reached; the guard keeps it explicit. */
+  var sel = opMayEdit() ? opSelIds() : [];
   var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص"' + (sel.length && opTbH ? ' style="min-height:' + opTbH + 'px"' : "") + ">";
   if (sel.length) {
     var all = opLines();
@@ -877,6 +894,9 @@ function opToolbar() {
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
   if (opProd) h += '<button class="px-toggle" aria-pressed="true" onclick="opClearProd()" title="إزالة تصفية المنتج">المنتج: ' + esc(opProd) + " " + opIco("x") + "</button>";
+  /* A drill from «التقارير» is a filter like any other, and it says so — landing on a shortened list
+     with no visible reason is how a reader concludes the board lost their deals. */
+  if (opIds) h += '<button class="px-toggle" aria-pressed="true" onclick="opClearIds()" title="إزالة تصفية التقرير">من التقرير: ' + esc(opIdsLabel || "بنود محدّدة") + " " + opIco("x") + "</button>";
   if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()" aria-label="مسح التصفية" title="مسح التصفية">' + opIco("x") + "مسح</button>";
   h += "</span>";
   /* The view switch sits OUTSIDE the scrolling filter strip, so it can never be scrolled out of
@@ -885,7 +905,8 @@ function opToolbar() {
     '<button aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
     '<button aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
-  h += opSheet
+  h += !opMayEdit() ? ""
+    : opSheet
     ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
     : '<button class="btn btn-teal ox-add" id="oxadd" onclick="opOpenSheet(this.id)">' + opIco("plus") + "إضافة فرصة</button>";
   h += '<span class="ox-brk" aria-hidden="true"></span>';
@@ -906,7 +927,9 @@ function opWaRow() {
       var pr = opReadProduct(c);
       return '<div class="ox-wa-r"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
         '<span class="pr">' + (pr ? "سأل عن " + esc(pr) : "لم تُقرأ خدمة بعد") + "</span>" +
-        '<button class="btn btn-ghost" id="oxwa_' + esc(c.phone) + '" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;,this.id)">فتح فرصة</button></div>';
+        (opMayEdit()
+          ? '<button class="btn btn-ghost" id="oxwa_' + esc(c.phone) + '" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;,this.id)">فتح فرصة</button>'
+          : '<a class="ox-lnk" href="#customer/' + esc(c.phone) + '">افتح المحادثة</a>') + "</div>";
     }).join("") +
     '<div class="ox-wa-f"><a class="ox-lnk" href="#triage">' + (un.length > shown.length ? "و" + opNEnt(un.length - shown.length) + " أخرى · " : "") +
       "كل الردود في «فرز الردود» ←</a></div></div>";
@@ -932,8 +955,10 @@ function opSrcCell(l) {
 function opRowHtml(l) {
   var nm = esc(l.account_name);
   var h = '<div class="ox-r' + (opSel[l.id] ? " is-sel" : "") + (opOpen === l.id && !opSheet ? " is-open" : "") + '" role="row" onclick="opRowClick(event,' + l.id + ')">';
-  h += '<div class="ox-c ox-c-chk" role="cell"><input type="checkbox" id="oxs_' + l.id + '"' + (opSel[l.id] ? " checked" : "") +
-    ' aria-label="تحديد ' + nm + " — " + esc(l.product) + '" onclick="event.stopPropagation();opToggleSel(' + l.id + ')"></div>';
+  h += '<div class="ox-c ox-c-chk" role="cell">' + (opMayEdit()
+    ? '<input type="checkbox" id="oxs_' + l.id + '"' + (opSel[l.id] ? " checked" : "") +
+      ' aria-label="تحديد ' + nm + " — " + esc(l.product) + '" onclick="event.stopPropagation();opToggleSel(' + l.id + ')">'
+    : "") + "</div>";
   h += '<div class="ox-c ox-c-ac" role="cell">' +
     (l.phone ? '<a class="ox-lnk" href="#customer/' + esc(l.phone) + '" title="ملف العميل" onclick="event.stopPropagation()">' + nm + "</a>"
              : '<span class="ox-nm">' + nm + "</span>") +
@@ -962,7 +987,8 @@ function opListView() {
   var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
   var h = '<div class="ox-t" role="table" aria-label="بنود الفرص">';
   h += '<div class="ox-hr" role="row">' +
-    '<div class="ox-c ox-c-chk" role="columnheader"><input type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()"></div>' +
+    '<div class="ox-c ox-c-chk" role="columnheader">' + (opMayEdit()
+      ? '<input type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()">' : "") + "</div>" +
     '<div role="columnheader">الجهة</div><div role="columnheader">المنتج</div><div role="columnheader">المرحلة</div>' +
     '<div class="ox-hv" role="columnheader">القيمة</div><div class="ox-hsrc" role="columnheader">المصدر</div>' +
     '<div role="columnheader">المسؤول</div><div role="columnheader">الخطوة التالية</div><div role="columnheader"><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">تفاصيل</span></div></div>';
@@ -1005,14 +1031,17 @@ function opKanbanView() {
     var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
     var unp = cards.filter(function (l) { return !opPriced(l); }).length;
     var cap = opKCap[st.key] || OPP_KCAP;
-    h += '<div class="ox-kcol" role="listitem" style="' + opToneVars(st.key) + '" data-col="' + esc(st.key) + '" ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)">';
+    h += '<div class="ox-kcol" role="listitem" style="' + opToneVars(st.key) + '" data-col="' + esc(st.key) + '"' +
+      (opMayEdit() ? ' ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)"' : "") + ">";
     h += '<div class="ox-kh"><div class="t">' + opDot(st.key) + "<span>" + esc(st.label) + '</span><span class="n">' + fmtN(cards.length) + "</span></div>" +
       '<div class="v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "")
         : unp ? opNLine(unp) + " بلا تسعير" : "بلا قيمة مسعَّرة") + "</div></div>";
     cards.slice(0, cap).forEach(function (l) {
-      h += '<div class="ox-kc' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="true"' +
+      /* Dragging a card IS a stage change, so a read-only role gets a card that opens and does not move. */
+      h += '<div class="ox-kc' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="' + (opMayEdit() ? "true" : "false") + '"' +
         ' aria-label="' + esc(l.account_name) + " — " + esc(l.product) + '"' +
-        ' ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()" onclick="opOpenLine(' + l.id + ',this.id)" onkeydown="opCardKey(event,' + l.id + ',this.id)">' +
+        (opMayEdit() ? ' ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()"' : "") +
+        ' onclick="opOpenLine(' + l.id + ',this.id)" onkeydown="opCardKey(event,' + l.id + ',this.id)">' +
         '<span class="a">' + esc(l.account_name) + "</span>" +
         '<span class="p">' + esc(l.product) + (l.created_by === "المساعد" ? ' <span class="ox-auto">تلقائي</span>' : "") + "</span>" +
         '<span class="m"><b class="' + (opPriced(l) ? "" : "unp") + '">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</b>" +
@@ -1054,6 +1083,12 @@ function opField(l, key, label, type) {
   var id = "oxd_" + key + "_" + l.id, sk = l.id + ":" + key, st = opFState[sk];
   var cur = l[key] == null ? "" : l[key];
   if (key === "sale_price" && Number(cur) === 0) cur = "";
+  /* Read-only role: the same fact, printed. An input the reader can type into and never save is a
+     promise the screen cannot keep. */
+  if (!opMayEdit()) {
+    return '<div class="ox-fld"><div class="ox-lr"><span class="ox-lbl">' + label + "</span></div>" +
+      '<div class="ox-ro">' + (String(cur) === "" ? "—" : esc(String(cur))) + "</div></div>";
+  }
   var val = st && st.s !== "saved" ? st.v : cur;
   var num = type === "number";
   var rng = key === "years" ? ' min="1" max="20" step="1"' : key === "discount" ? ' min="0" max="100"' : key === "qty" ? ' min="1" step="1"' : key === "sale_price" ? ' min="0"' : "";
@@ -1101,7 +1136,11 @@ function opEscSection(l) {
   var failed = !!opEscFailed[l.id] && !opEscRows[l.id];
   var b = '<section class="ox-sec" aria-labelledby="oxsec_e"><div class="ox-sech" id="oxsec_e">التصعيد والدعم' +
     (open.length ? '<span class="ox-cnt">' + fmtN(open.length) + " مفتوح</span>" : "") + "</div>";
-  if (!opEsc || opEsc.oppId !== l.id) {
+  if (!opMayEdit()) {
+    /* Recording an escalation writes to the opportunity, so a read-only role reads the log and adds
+       nothing to it. */
+    b += rows.length ? "" : '<div class="ox-hint2">لا تصعيد مسجّل على هذه الفرصة.</div>';
+  } else if (!opEsc || opEsc.oppId !== l.id) {
     b += '<div class="ox-escacts">' +
       '<button class="btn btn-ghost" data-op="escalate" data-i="' + l.id + '">' + opIco("up") + "تصعيد</button>" +
       '<button class="btn btn-ghost" data-op="support" data-i="' + l.id + '">' + opIco("help") + "طلب دعم</button>" +
@@ -1139,7 +1178,8 @@ function opEscSection(l) {
         '<span class="m">' + (r.createdAt ? fmtD(r.createdAt) : "") + (r.createdBy ? " · " + esc(r.createdBy) : "") +
         '<span class="dl">' + esc((typeof DELIVERY_LABELS !== "undefined" && DELIVERY_LABELS[r.delivery]) || r.delivery) + "</span></span>" +
         (r.resolvedAt ? '<span class="ok">' + opIco("check") + "أُغلق</span>"
-          : '<button class="btn btn-ghost" data-op="escdone" data-i="' + r.id + '" data-o="' + r.oppId + '">تم</button>') + "</div>";
+          : opMayEdit() ? '<button class="btn btn-ghost" data-op="escdone" data-i="' + r.id + '" data-o="' + r.oppId + '">تم</button>'
+          : '<span class="ox-sub">مفتوح</span>') + "</div>";
     }).join("") + "</div>";
   }
   return b + "</section>";
@@ -1207,7 +1247,7 @@ function opStepper(l, open, idx) {
   open.forEach(function (s, i) {
     var state = states[i], isCur = state === "current";
     var paused = !selectable[s.key] && !isCur;
-    var can = !isCur && !paused && !oppBusy;
+    var can = !isCur && !paused && !oppBusy && opMayEdit();
     var said = state === "done" ? "مرحلة مكتملة" : isCur ? "المرحلة الحالية" : "مرحلة قادمة";
     h += '<li class="ox-step ' + state + (paused ? " paused" : "") + '" style="' + opToneVars(s.key) + '"' + (isCur ? ' aria-current="step"' : "") + ">";
     h += '<button type="button" class="ox-stb" id="oxst_' + l.id + "_" + esc(s.key) + '"' +
@@ -1272,12 +1312,14 @@ function opDetailDrawer(l) {
     b += '<div class="ox-strow">' +
       (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
       '<span style="flex:1"></span>' +
-      '<button class="btn btn-ghost ox-won" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
-      '<button class="btn btn-ghost ox-lost" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button></div>';
+      (opMayEdit()
+        ? '<button class="btn btn-ghost ox-won" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
+          '<button class="btn btn-ghost ox-lost" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button>'
+        : "") + "</div>";
   } else {
     b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
       '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
-      '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button></div>';
+      (opMayEdit() ? '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button>' : "") + "</div>";
     if (typeof owLostBlock === "function") b += owLostBlock(l);
   }
   b += "</section>";
@@ -1327,8 +1369,10 @@ function opDetailDrawer(l) {
   var foot = (opDelErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opDelErr) + "</span>" : "") +
     (l.phone ? '<a class="btn btn-ghost" href="#customer/' + esc(l.phone) + '" style="text-decoration:none;">ملف العميل ←</a>' : "") +
     '<span class="sp"></span>' +
-    '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
-    ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>';
+    (opMayEdit()
+      ? '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
+        ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>'
+      : "");
   return opDrawerShell("oxdrt", head, b, foot);
 }
 
@@ -1550,7 +1594,14 @@ window.opSetSrc = function (v) { opSrc = v; opResetScope(); opRender(); };
 window.opSetOwn = function (v) { opOwn = v; opResetScope(); opRender(); };
 window.opSetShort = function (v) { opShort = opShort === v ? "" : v; opResetScope(); opRender(); };
 window.opSetStat = function (v) { opStat = v; opRender(); };
-window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opProd = ""; opResetScope(); opRender(); };
+window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opProd = ""; opIds = null; opIdsLabel = ""; opResetScope(); opRender(); };
+/* The report's drill: ids it counted, and the words it counted them with. */
+window.opClearIds = function () { opIds = null; opIdsLabel = ""; opResetScope(); opRender(); };
+window.opSetIds = function (ids, label) {
+  opIds = null;
+  if (ids && ids.length) { opIds = {}; for (var i = 0; i < ids.length; i++) opIds[ids[i]] = 1; opIdsLabel = String(label || ""); }
+  else opIdsLabel = "";
+};
 window.opClearProd = function () { opProd = ""; opResetScope(); opRender(); };
 window.opSearch = function (el) {
   opQ = el.value; clearTimeout(window.__opq);
@@ -1759,6 +1810,7 @@ window.opDrop = async function (e, stage, el) {
 /* ---- create ---- */
 function opBlankLine() { return { product: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
 window.opOpenSheet = function (opener) {
+  if (!opMayEdit()) return;  // the button is hidden; this closes the keyboard/console path too
   opSheet = { name: "", phone: "", source: "call", source_ref: "", owner: "", lines: [opBlankLine()] };
   opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opOpener = opener || "oxadd";
   opRender();
@@ -1772,6 +1824,7 @@ window.opLineDel = function (i) { opSheet.lines.splice(i, 1); opRender(); };
    the campaign that reached it — every value already in the ledger. The form asks only what it is
    worth. */
 window.opFromContact = function (phone, opener) {
+  if (!opMayEdit()) return;  // the create drawer is a write; the control is hidden, this seals the path
   var c = contactByPhone(phone);
   var ent = entities.find(function (e) { return e.phone === phone; });
   var cp = opLastCampaign(phone);
@@ -1786,6 +1839,7 @@ window.opFromContact = function (phone, opener) {
 /* The door from جهات الاستهداف: record the deal on the object you are standing on, then land on the
    board that will hold it. One candidate tag prefills the service; two prefill nothing. */
 window.opFromEntity = function (id) {
+  if (!opMayEdit()) return;  // «فرصة +» on an account or a target row — same write, same gate
   var e = entities.find(function (x) { return x.id === id; });
   if (!e) return;
   var line = opBlankLine();

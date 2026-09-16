@@ -37,7 +37,7 @@ export const SEHA_CSS = `
 .sh-cards{display:grid;gap:var(--s2)}
 .sh-card{background:var(--paper);border-radius:var(--r-md);box-shadow:var(--sh-1);
   padding:var(--s3) var(--s4);display:grid;grid-template-columns:1fr auto;gap:var(--s3);
-  align-items:center;border:1px solid transparent;text-align:start;font:inherit;color:inherit;
+  align-items:center;border:1px solid transparent;text-align:start;font:inherit;color:inherit;text-decoration:none;
   transition:box-shadow var(--base) var(--ease),transform var(--base) var(--ease),border-color var(--base) var(--ease)}
 .sh-card.go{cursor:pointer}
 .sh-card.go:hover{box-shadow:var(--sh-3);transform:translateY(-2px);border-color:var(--blue-wash)}

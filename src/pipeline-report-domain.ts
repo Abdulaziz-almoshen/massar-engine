@@ -108,7 +108,15 @@ export function furthestIndex(
 export type NextAction = {
   text: string; stage: string | null;
   source?: string | null; product?: string | null; shortcut?: "stalled" | "unpriced" | "open" | null;
+  /** BR-RPT-004: some populations are not expressible as board filters — «الراكدة» is read from the
+   *  stage ledger, not from anything a line carries. Such an action hands the board the exact ids it
+   *  counted (`ids`) instead of a filter, so the list that opens is the one the sentence measured. */
+  ids?: number[] | null; idsLabel?: string | null; idsMore?: number;
 };
+
+/** How many ids one drill may carry. A board filter is a rule; a drill is a list, and a list has to
+ *  stay small enough to travel in the report payload. Beyond this the card says «الأولى N». */
+export const QUIET_IDS_MAX = 300;
 
 // ------------------------------------------------------------------------------------------------
 // 1. قمع المراحل — where the ladder leaks
@@ -386,6 +394,9 @@ export type Movement = {
   days: number; totals: MoveCounts; wonValue: number; lostValue: number; advancedValue: number;
   weeks: { startMs: number; endMs: number; counts: MoveCounts }[];
   quietOpen: number; openLines: number; action: NextAction | null;
+  /** The ids behind `quietOpen`, for the drill. Capped, with `quietMore` saying how many were left
+   *  out, because a pipeline of ten thousand stale lines must not put ten thousand ids in a page. */
+  quietIds: number[]; quietMore: number;
 };
 
 export function classifyMove(stages: readonly ReportStage[], e: ReportEvent): MoveKind | null {
@@ -442,12 +453,19 @@ export function buildMovement(
   const lostValue = valueOf(new Set([...lostDeals].filter((id) => { const l = byId.get(id); return !!l && isLost(stages, l.stage); })));
   const advancedValue = valueOf(advancedDeals);
   const open = lines.filter((l) => !isWon(stages, l.stage) && !isLost(stages, l.stage));
-  const quietOpen = open.filter((l) => !moved.has(l.id)).length;
+  const quiet = open.filter((l) => !moved.has(l.id));
+  const quietOpen = quiet.length;
+  const quietIds = quiet.slice(0, QUIET_IDS_MAX).map((l) => l.id);
+  const quietMore = quietOpen - quietIds.length;
   const action: NextAction | null = !open.length ? null : quietOpen
     ? { text: "حرّك الراكد: " + nOpenLine(quietOpen) + " من أصل " + fmt(open.length) + " " + notMoved(quietOpen) +
-        " خلال " + nDay(days) + " — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.", stage: null }
+        " خلال " + nDay(days) + " — حدّد خطوة تالية، أو أغلق ما لم يعد قائمًا.", stage: null,
+        // The cap travels WITH the filter, not only on the button that opened it: the board says
+        // «أول 300» beside the chip, so nobody reads a capped list as the whole finding.
+        ids: quietIds, idsMore: quietMore,
+        idsLabel: quietMore ? "راكدة " + nDay(days) + " · أول " + fmt(quietIds.length) : "راكدة " + nDay(days) }
     : { text: "كل البنود المفتوحة تحركت خلال " + nDay(days) + " — لا راكد يحتاج قرارًا.", stage: null };
-  return { days, totals, wonValue, lostValue, advancedValue, weeks, quietOpen, openLines: open.length, action };
+  return { days, totals, wonValue, lostValue, advancedValue, weeks, quietOpen, openLines: open.length, action, quietIds, quietMore };
 }
 
 // ------------------------------------------------------------------------------------------------

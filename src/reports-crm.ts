@@ -127,12 +127,19 @@ function vReportsStuck() {
 
   h += '<div class="rp-tot">' + fmtN(cur.count) + ' فرصة · ' + fmtN(Math.round(cur.totalValue)) + ' ر.س</div>';
   h += '<div class="sh-cards">';
+  /* BR-RPT-004: the row IS the deal — «#opps/<id>» is the record's own URL, so a blocked deal opens
+     where it can be acted on, and the link is shareable. A row whose opportunity id never arrived
+     stays inert rather than linking somewhere plausible. */
   cur.rows.forEach(function (r) {
-    h += '<div class="sh-card"><div><div class="nm">' + esc(r.account || "—") + '</div>' +
+    var inner = '<div><div class="nm">' + esc(r.account || "—") + '</div>' +
       '<div class="sub">' + esc(r.product) + ' · ' + esc(rpStage(r.stage)) +
         (r.dept ? ' · ' + esc(r.dept) : '') + '</div></div>' +
       '<div class="end"><span class="money">' + fmtN(Math.round(r.value)) + ' ر.س</span>' +
-      rpAge(r.daysWaiting) + '</div></div>';
+      rpAge(r.daysWaiting) + '</div>';
+    h += r.oppId
+      ? '<a class="sh-card go" href="#opps/' + fmtId(r.oppId) + '" title="افتح هذه الفرصة">' + inner +
+        '<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">افتح فرصة ' + esc(r.account || r.product) + "</span></a>"
+      : '<div class="sh-card">' + inner + '</div>';
   });
   h += '</div>';
 

@@ -28,7 +28,9 @@ export const KNOWLEDGE_CRM_CSS = `
 .kb-secs { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
 .kb-sec { display:flex; align-items:center; gap:6px; font-family:inherit; font-size:var(--t-xs); color:var(--ink); background:var(--surface); border:none; border-radius:var(--r-sm);
   padding:7px 9px; cursor:pointer; text-align:start; min-width:0; }
-.kb-sec:hover { background:var(--surface-2); }
+button.kb-sec:hover { background:var(--surface-2); }
+/* a role without knowledge.edit reads the same eight sections; they just do not open an editor */
+span.kb-sec { cursor:default; }
 .kb-sec i { width:8px; height:8px; border-radius:var(--r-pill); flex:none; background:var(--s-issued); }
 .kb-sec.short i { background:var(--s-attn-mark); }
 .kb-sec.missing i { background:transparent; box-shadow:inset 0 0 0 1.5px var(--s-off-mark); }
@@ -60,7 +62,7 @@ export const KNOWLEDGE_CRM_CSS = `
 .aq button[aria-pressed="true"].no { background:var(--s-fail-soft); color:var(--s-fail-text); box-shadow:none; }
 .aq button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 @media (pointer:coarse) { .aq button { min-height:36px; } }
-.kb-score .btn:active, .kb-sec:active { transform:scale(.97); }
+.kb-score .btn:active, button.kb-sec:active { transform:scale(.97); }
 .kb-score .btn, .kb-sec { transition:transform 140ms var(--ease), background var(--fast) var(--ease); }
 .kb-sec:focus-visible, .kb-score .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 @media (max-width: 720px) { .kb-secs { grid-template-columns:repeat(2, minmax(0,1fr)); } }
@@ -78,19 +80,24 @@ function kbMeter(score, cls) {
 }
 /* The block on the record. It scores what the assistant reads now (or the embedded entry when there is no
    document); a pending draft's score is shown on the draft itself. */
+/* knowledge.edit — exec and sales read the readiness and write no knowledge (§22). */
+function kbMayEdit() { return typeof meCan !== "function" || meCan("knowledge.edit"); }
 function kbScoreBlock(p, kn) {
   if (!kn || !kn.score) return "";
   var s = kn.score, hasDoc = !!(kn.md && kn.md.trim());
   if (!hasDoc && !kn.embeddedBasis) {
     return '<div class="kb-score"><div class="kb-top"><span><span class="lbl">جاهزية المعرفة</span><br><span class="sub">' +
       (kn.draftMd ? "لا معرفة معتمدة بعد — المسودة أدناه بانتظار الاعتماد." : "لا معرفة مكتوبة لهذا المنتج. اكتبها قسمًا قسمًا، أو ارفع ملفًا يُستخلص منه.") + '</span></span><span class="sp" style="flex:1"></span>' +
-      '<button class="btn btn-teal" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "اكتب المعرفة") + "</button></div></div>";
+      (kbMayEdit() ? '<button class="btn btn-teal" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "اكتب المعرفة") + "</button>" : "") + "</div></div>";
   }
   var basis = kn.state === "approved" ? "المعرفة المعتمدة" : kn.state === "legacy" ? "النص الحالي (غير معتمد)" : "المعرفة المدمجة في المساعد";
   var h = '<div class="kb-score"><div class="kb-top"><span><span class="lbl">جاهزية المعرفة</span><br><span class="sub">' + esc(basis) + " · ثمانية أقسام بأوزان · الحد " + fmtN(KB_READY_MIN) + "٪</span></span>" +
-    kbMeter(s.score) + '<button class="btn btn-ghost" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "تحرير الأقسام") + "</button></div>";
+    kbMeter(s.score) + (kbMayEdit() ? '<button class="btn btn-ghost" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "تحرير الأقسام") + "</button>" : "") + "</div>";
   h += '<div class="kb-secs">' + s.sections.map(function (x) {
     var st = x.state === "done" ? "مكتمل" : x.state === "short" ? "قصير" : "ناقص";
+    if (!kbMayEdit()) {
+      return '<span class="kb-sec ' + x.state + '" title="' + esc(x.label) + ": " + st + '"><i aria-hidden="true"></i><span class="n">' + esc(x.label) + '</span><span class="w">' + fmtN(x.weight) + "٪</span></span>";
+    }
     return '<button class="kb-sec ' + x.state + '" data-kb="open" data-s="' + x.key + '" id="kbsec_' + x.key + '" aria-label="' + esc(x.label) + ": " + st + " — وزنه " + fmtN(x.weight) + '٪"><i aria-hidden="true"></i><span class="n">' + esc(x.label) + '</span><span class="w">' + fmtN(x.weight) + "٪</span></button>";
   }).join("") + "</div>";
   if (s.missing.length) {

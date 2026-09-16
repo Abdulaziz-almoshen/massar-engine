@@ -211,6 +211,83 @@ export function accountMatches(a: AccountFilterRow, f: AccountFilter): boolean {
   return true;
 }
 
+// ------------------------------------------------------- BR-CAM-002: the audience by account column
+//
+// The campaign wizard could already narrow an audience, but only by the COLUMNS THE IMPORTED FILE
+// happened to carry (segGroups reads entities.attrs). That makes the segment an artefact of whoever
+// prepared the spreadsheet: an account added by hand through «الحسابات» has no attrs at all and is
+// therefore invisible to every chip on that step, and «القطاع» means one thing in one upload and
+// another in the next. S2 gave an account real columns — sector, city, importance — and BR-CAM-002
+// asks the wizard to filter on THOSE. The import columns stay, below these, for anything the account
+// record has no field for (نوع المنشأة، عدد الأسرّة…).
+//
+// The empty value is a value. «بدون» (AUDIENCE_NONE) selects the accounts where the column was never
+// filled — the operator needs to see them to fix them, and silently folding them into «الكل» is how
+// a book of 400 accounts launches to 120 without anyone noticing.
+
+export const AUDIENCE_NONE = "__none__";
+/** The spreadsheet headers each account column is read from — the same list accountFieldsFromAttrs
+ *  accepts, plus «المدينة» for the city. The wizard hides an imported chip whose header is in here,
+ *  because the account column now carries that fact and two chips over one fact can disagree. */
+export const AUDIENCE_ATTR_KEYS: readonly string[] = [
+  "القطاع", "الشريحة", "القطاع/الشريحة", "sector",
+  "الأهمية", "درجة الأهمية", "importance",
+  "المدينة", "city",
+];
+export const AUDIENCE_FIELDS = [
+  { key: "sector", label: "القطاع" },
+  { key: "city", label: "المدينة" },
+  { key: "importance", label: "الأهمية" },
+] as const;
+export type AudienceFieldKey = (typeof AUDIENCE_FIELDS)[number]["key"];
+export type AudienceRow = { sector?: string | null; city?: string | null; importance?: string | null };
+export type AudienceFilter = Partial<Record<AudienceFieldKey, string>>;
+
+/** One account's value for one audience column, trimmed; "" when the column was never filled. */
+export function audienceValueOf(a: AudienceRow, key: string): string {
+  var v = key === "sector" ? a.sector : key === "city" ? a.city : key === "importance" ? a.importance : null;
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** An unset field matches everything; AUDIENCE_NONE matches only the accounts missing that column. */
+export function audienceMatches(a: AudienceRow, f: AudienceFilter): boolean {
+  for (var i = 0; i < AUDIENCE_FIELDS.length; i++) {
+    var key = AUDIENCE_FIELDS[i].key;
+    var want = f ? (f as Record<string, string>)[key] : "";
+    if (!want) continue;
+    var have = audienceValueOf(a, key);
+    if (want === AUDIENCE_NONE) { if (have) return false; }
+    else if (have !== want) return false;
+  }
+  return true;
+}
+
+/** The chips the wizard draws: each column's values with live counts, commonest first, plus how many
+ *  accounts have that column empty. Counts are of the rows PASSED IN, so they answer «كم سيبقى؟» for
+ *  the audience as it stands, not for the whole book. */
+export function audienceGroups(rows: readonly AudienceRow[], max?: number):
+  { key: string; label: string; values: [string, number][]; missing: number }[] {
+  var cap = typeof max === "number" && max > 0 ? max : 12;
+  var out: { key: string; label: string; values: [string, number][]; missing: number }[] = [];
+  for (var i = 0; i < AUDIENCE_FIELDS.length; i++) {
+    var key = AUDIENCE_FIELDS[i].key;
+    var counts: Record<string, number> = {}; var seen: Record<string, number> = {}; var order: string[] = []; var missing = 0;
+    for (var j = 0; j < rows.length; j++) {
+      var v = audienceValueOf(rows[j], key);
+      if (!v) { missing++; continue; }
+      if (counts[v] === undefined) { counts[v] = 0; seen[v] = order.length; order.push(v); }
+      counts[v]++;
+    }
+    // Commonest first; ties keep first-seen order, so the chips do not reshuffle between renders.
+    // The tiebreak reads a recorded index, never order.indexOf — that would move under the sort.
+    order.sort(function (a, b) { return counts[b] - counts[a] || seen[a] - seen[b]; });
+    var values: [string, number][] = [];
+    for (var k = 0; k < order.length && k < cap; k++) values.push([order[k], counts[order[k]]]);
+    out.push({ key: key, label: AUDIENCE_FIELDS[i].label, values: values, missing: missing });
+  }
+  return out;
+}
+
 /** «مستهدف · فرصة قائمة · تم البيع» for one product, from that account's lines of it. A won line wins
  *  over an open one; an account whose every line for the product was lost reads «خسارة». */
 export function productStatusOf(product: string, lines: readonly { product: string; stage: string }[]): string {
@@ -276,12 +353,14 @@ export function accountFieldsFromAttrs(attrs: Readonly<Record<string, string>>):
 
 // ---------------------------------------------------------------------------------------- the seam
 
-const DOMAIN_FNS = [phoneDigits, phoneShapeProblem, checkAccount, checkApproval, accountMatches, productStatusOf] as const;
+const DOMAIN_FNS = [phoneDigits, phoneShapeProblem, checkAccount, checkApproval, accountMatches, productStatusOf,
+  audienceValueOf, audienceMatches, audienceGroups] as const;
 
 const INJECTED = [
   "ACCOUNT_APPROVALS", "ACCOUNT_APPROVAL_LABELS", "ACCOUNT_IMPORTANCE", "ACCOUNT_IMPORTANCE_LABELS",
   "ACCOUNT_SOURCES", "ACCOUNT_SOURCE_LABELS", "PRODUCT_STATUS_LABELS",
   "ACCOUNT_NAME_MAX", "ACCOUNT_CITY_MAX", "ACCOUNT_SECTOR_MAX", "CONTACT_NAME_MAX", "CONTACT_ROLE_MAX", "CONTACT_EMAIL_MAX", "CONTACTS_MAX",
+  "AUDIENCE_FIELDS", "AUDIENCE_NONE", "AUDIENCE_ATTR_KEYS",
 ] as const;
 
 export const ACCOUNT_DOMAIN_JS: string = [
@@ -300,6 +379,9 @@ export const ACCOUNT_DOMAIN_JS: string = [
   "var CONTACT_ROLE_MAX = " + CONTACT_ROLE_MAX + ";",
   "var CONTACT_EMAIL_MAX = " + CONTACT_EMAIL_MAX + ";",
   "var CONTACTS_MAX = " + CONTACTS_MAX + ";",
+  "var AUDIENCE_FIELDS = " + JSON.stringify(AUDIENCE_FIELDS) + ";",
+  "var AUDIENCE_NONE = " + JSON.stringify(AUDIENCE_NONE) + ";",
+  "var AUDIENCE_ATTR_KEYS = " + JSON.stringify(AUDIENCE_ATTR_KEYS) + ";",
   ...DOMAIN_FNS.map((fn) => fn.toString()),
 ].join("\n");
 
@@ -312,7 +394,7 @@ export function checkAccountDomainClosure(): string[] {
     const src = fn.toString().replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ").replace(/"[^"\n]*"/g, '""');
     for (const id of src.match(/\b[A-Za-z_$][A-Za-z0-9_$]*\b/g) ?? []) {
       if (/^[A-Z][A-Z0-9_]+$/.test(id) && (INJECTED as readonly string[]).indexOf(id) === -1) problems.push(fn.name + " references " + id);
-      if (/^(calculateLineValue|isLostStage|isOpenStage|isWonStage|summarizeAccountOpps|accountFieldsFromAttrs)$/.test(id) && shipped.indexOf(id) === -1) problems.push(fn.name + " references " + id);
+      if (/^(calculateLineValue|isLostStage|isOpenStage|isWonStage|summarizeAccountOpps|accountFieldsFromAttrs|audienceValueOf)$/.test(id) && shipped.indexOf(id) === -1) problems.push(fn.name + " references " + id);
     }
   }
   return problems;

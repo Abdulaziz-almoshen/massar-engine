@@ -30,6 +30,8 @@ export const EXEC_REPORTS_CSS = `
 /* DESIGN.md §3.10: 44px on a coarse pointer, the same floor the board's controls already meet. */
 @media (pointer:coarse) {
   .rx-seg button, button.rx-act, .rx-ref { min-height:44px; }
+  /* two classes, so the funnel's own 28px row height does not outrank the touch floor */
+  button.rx-row, .rx-fun button.rx-row { min-height:44px; }
 }
 
 /* KPI strip: one lead figure, the rest support it (DESIGN.md §5 Tile). */
@@ -63,9 +65,19 @@ button.rx-act:active { transform:scale(0.98); }
 @media (hover:hover) and (pointer:fine) { button.rx-act:hover { background:var(--accent-bar-hover); } }
 button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--accent-deep); font-weight:500; }
 
-/* shared row grammar: a label column, a track, a figure column */
-.rx-row { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto); align-items:center;
+/* shared row grammar: a label column, a track, a figure column, and the drill caret (BR-RPT-004 —
+   reserved on every row so drillable and inert rows keep one alignment) */
+.rx-row { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px; align-items:center;
   column-gap:var(--s2); min-height:30px; }
+.rx-open { width:14px; display:flex; align-items:center; justify-content:center; color:var(--accent-deep); }
+.rx-open svg { width:13px; height:13px; }
+button.rx-row { font-family:inherit; width:100%; text-align:start; background:none; border:0; border-radius:var(--r-sm);
+  padding:2px 6px; margin-inline:-6px; cursor:pointer; color:inherit;
+  transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
+button.rx-row:active { transform:scale(0.98); }
+/* the drill sentence, for a screen reader only: aria-label would REPLACE the row's own figures */
+.rx-say { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@media (hover:hover) and (pointer:fine) { button.rx-row:hover { background:var(--accent-bar-hover); } }
 .rx-lab { font-size:var(--t-xs); color:var(--ink-2); display:flex; align-items:center; gap:6px; min-width:0; line-height:1.3; }
 .rx-lab .ox-dot { flex:none; }
 .rx-fig { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; text-align:end; white-space:nowrap; }
@@ -82,7 +94,7 @@ button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--accent-deep
 .rx-fun .rx-row { min-height:28px; }
 .rx-fun .band { height:20px; display:flex; justify-content:center; }
 .rx-fun i { display:block; height:100%; min-width:3px; border-radius:var(--r-sm); background:var(--tn); animation:rxGrow 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-.rx-conv { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto); column-gap:var(--s2); }
+.rx-conv { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px; column-gap:var(--s2); }
 .rx-conv span { grid-column:2; justify-self:center; font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; line-height:18px; }
 .rx-conv.weak span { color:var(--s-attn-text); background:var(--s-attn-soft); border-radius:var(--r-pill); padding:0 8px; font-weight:500; }
 
@@ -95,8 +107,9 @@ button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--accent-deep
 .rx-stack i { display:block; height:100%; min-width:4px; }
 .rx-legend { display:flex; flex-wrap:wrap; gap:4px var(--s3); font-size:var(--t-xs); color:var(--ink-2); }
 .rx-legend span { display:inline-flex; align-items:center; gap:5px; }
-.rx-prow { grid-template-columns:minmax(120px,1.1fr) minmax(0,1.6fr) minmax(120px,auto); padding-block:6px; border-top:1px solid var(--line-soft); }
-.rx-prow:first-of-type { border-top:none; }
+/* two classes: a product row is a <button> now, and button.rx-row must not outrank its separator */
+.rx-row.rx-prow { grid-template-columns:minmax(120px,1.1fr) minmax(0,1.6fr) minmax(120px,auto) 14px; padding-block:6px; border-top:1px solid var(--line-soft); }
+.rx-row.rx-prow:first-of-type { border-top:none; }
 .rx-pn { display:flex; flex-direction:column; min-width:0; }
 .rx-pn b { font-size:var(--t-sm); font-weight:600; color:var(--ink); line-height:1.35; overflow-wrap:anywhere; }
 .rx-pn span { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
@@ -134,8 +147,8 @@ button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--accent-deep
 }
 @container rxw (max-width: 520px) {
   .rx-card { padding:var(--s3); }
-  .rx-row, .rx-conv { grid-template-columns:minmax(84px,104px) minmax(0,1fr) auto; }
-  .rx-prow { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; }
+  .rx-row, .rx-conv { grid-template-columns:minmax(84px,104px) minmax(0,1fr) auto 14px; }
+  .rx-row.rx-prow { grid-template-columns:minmax(0,1fr) auto 14px; row-gap:6px; }
   .rx-prow .rx-stack { grid-column:1 / -1; grid-row:2; }
   .rx-kpi { padding:var(--s2) var(--s3); }
 }
@@ -181,10 +194,30 @@ window.rxGo = function (i) {
   if (!a || typeof opStg === "undefined") { location.hash = "#opps"; return; }
   opQ = ""; opStat = "all"; opOwn = "all";
   opStg = a.stage || "all"; opSrc = a.source || "all"; opProd = a.product || ""; opShort = a.shortcut || "";
+  /* BR-RPT-004: a population the board cannot express arrives as the ids the card counted. */
+  if (typeof opSetIds === "function") opSetIds(a.ids || null, a.idsLabel || "");
   opSel = {}; if (typeof PAGE !== "undefined") PAGE.opps = 1;
   location.hash = "#opps";
 };
 var rxActions = [];
+/* BR-RPT-004 — every FIGURE on a card opens the records behind it, not only the card's next action.
+   The row carries the filter it is drawn from, so «قمع المراحل» opens that rung, a product row opens
+   that product and a source row opens that channel. What opens is what the board can prove it holds
+   NOW: a funnel row counts everything that ever reached the rung, so its button says «الآن» and its
+   own now-count, and nobody reads the shorter list as a contradiction. */
+function rxRow(cls, inner, drill, label, style) {
+  var st = style ? ' style="' + style + '"' : "";
+  /* The chevron column is reserved on EVERY row, drillable or not, so a rung with nothing to open
+     does not shift its band out of line with the rungs above it. */
+  var caret = '<span class="rx-open" aria-hidden="true">' + (drill ? opIco("chevS") : "") + "</span>";
+  if (!drill) return '<div class="rx-row' + (cls ? " " + cls : "") + '"' + st + ">" + inner + caret + "</div>";
+  rxActions.push(drill);
+  /* The sentence is APPENDED, not an aria-label: a label would replace the accessible name computed
+     from the row, and the figures the row exists to report would stop being announced. */
+  return '<button type="button" class="rx-row rx-drill' + (cls ? " " + cls : "") + '"' + st +
+    ' title="' + esc(label) + '" onclick="rxGo(' + (rxActions.length - 1) + ')">' + inner + caret +
+    '<span class="rx-say">' + esc(label) + "</span></button>";
+}
 
 function rxPct(p) { return p === null || p === undefined ? "—" : fmtN(p) + "٪"; }
 function rxLabel(key) {
@@ -210,10 +243,13 @@ function rxCard(id, title, question, signal, body, action, wide) {
   if (signal) h += '<div class="rx-sig">' + signal + "</div>";
   h += body;
   if (action) {
-    var drills = action.stage || action.source || action.product || action.shortcut;
+    var drills = action.stage || action.source || action.product || action.shortcut || (action.ids && action.ids.length);
     if (drills) {
       rxActions.push(action);
-      h += '<button class="rx-act" onclick="rxGo(' + (rxActions.length - 1) + ')">' + opIco("warn") + "<span>" + esc(action.text) + '</span><span class="go">افتح هذه البنود</span></button>';
+      /* A drill that carries ids may be capped; the button says so rather than opening «كل الراكد»
+         and showing three hundred of a thousand. */
+      var go = action.idsMore ? "افتح أول " + fmtN((action.ids || []).length) : "افتح هذه البنود";
+      h += '<button class="rx-act" onclick="rxGo(' + (rxActions.length - 1) + ')">' + opIco("warn") + "<span>" + esc(action.text) + '</span><span class="go">' + go + '</span></button>';
     } else {
       h += '<div class="rx-act">' + opIco("check") + "<span>" + esc(action.text) + "</span></div>";
     }
@@ -278,25 +314,27 @@ function rxConv(st) {
 }
 function rxFunnel(f) {
   var top = Math.max(1, f.steps.length ? f.steps[0].reached : 0, f.won);
-  var body = '<div class="rx-fun" role="list">';
+  var body = '<div class="rx-fun">';
   f.steps.forEach(function (s, i) {
     if (i > 0) {
       var prev = f.steps[i - 1];
       var weak = f.weakest && f.weakest.from === prev.key;
       body += '<div class="rx-conv' + (weak ? " weak" : "") + '" aria-hidden="true"><span>' + rxConv(prev) + "</span></div>";
     }
-    body += '<div class="rx-row" role="listitem" style="' + rxTone(s.key) + '">' +
-      '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
+    body += rxRow("", '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
       '<span class="band"><i style="width:' + Math.round((s.reached / top) * 100) + '%"></i></span>' +
-      '<span class="rx-fig"><b>' + fmtN(s.reached) + "</b> وصلت · " + fmtN(s.now) + " الآن</span></div>";
+      '<span class="rx-fig"><b>' + fmtN(s.reached) + "</b> وصلت · " + fmtN(s.now) + " الآن</span>",
+      s.now ? { text: "", stage: s.key } : null,
+      "افتح بنود «" + s.label + "» في «فرص البيع» — " + fmtN(s.now) + " الآن", rxTone(s.key));
   });
   var last = f.steps[f.steps.length - 1];
   if (last) body += '<div class="rx-conv' + (f.weakest && f.weakest.from === last.key ? " weak" : "") + '" aria-hidden="true"><span>' + rxConv(last) + "</span></div>";
   var wonKey = f.wonKey || "won";
-  body += '<div class="rx-row" role="listitem" style="' + rxTone(wonKey) + '">' +
-    '<span class="rx-lab">' + rxDotFor(wonKey) + esc(rxLabel(wonKey)) + "</span>" +
+  body += rxRow("", '<span class="rx-lab">' + rxDotFor(wonKey) + esc(rxLabel(wonKey)) + "</span>" +
     '<span class="band"><i style="width:' + Math.round((f.won / top) * 100) + '%"></i></span>' +
-    '<span class="rx-fig"><b>' + fmtN(f.won) + "</b> ربح · " + fmtN(f.lost) + " خسارة</span></div>";
+    '<span class="rx-fig"><b>' + fmtN(f.won) + "</b> ربح · " + fmtN(f.lost) + " خسارة</span>",
+    f.won ? { text: "", stage: wonKey } : null,
+    "افتح الصفقات الرابحة — " + fmtN(f.won), rxTone(wonKey));
   body += "</div>";
   var sig = f.weakest
     ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) +
@@ -312,7 +350,7 @@ function rxFunnel(f) {
 function rxVelocity(v) {
   var scale = 1;
   v.steps.forEach(function (s) { scale = Math.max(scale, s.maxOpenDays || 0, s.slaDays || 0, s.medianDoneDays || 0); });
-  var body = '<div role="list">';
+  var body = "<div>";
   v.steps.forEach(function (s) {
     var fig;
     if (s.openCount) {
@@ -321,11 +359,12 @@ function rxVelocity(v) {
     } else {
       fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : opPl(s.medianDoneDays, "يومًا واحدًا", "يومين", "أيام", "يومًا"));
     }
-    body += '<div class="rx-row" role="listitem" style="' + rxTone(s.key) + '">' +
-      '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
+    body += rxRow("", '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
       '<span class="rx-track">' + (s.openCount ? '<i style="width:' + Math.max(2, Math.round(((s.maxOpenDays || 0) / scale) * 100)) + '%"></i>' : "") +
         (s.slaDays ? '<em class="rx-sla" title="المهلة ' + fmtN(s.slaDays) + ' يومًا" style="inset-inline-start:' + Math.min(100, Math.round((s.slaDays / scale) * 100)) + '%"></em>' : "") + "</span>" +
-      '<span class="rx-fig">' + fig + "</span></div>";
+      '<span class="rx-fig">' + fig + "</span>",
+      s.openCount ? { text: "", stage: s.key } : null,
+      "افتح بنود «" + s.label + "» المفتوحة — " + fmtN(s.openCount), rxTone(s.key));
   });
   body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--ink-2);width:2px;height:12px;border-radius:0"></i>مهلة المرحلة</span><span>الأرقام بالأيام · الشريط = أقدم بند في المرحلة الآن</span></div>';
   var bn = v.steps.filter(function (s) { return s.key === v.bottleneck; })[0];
@@ -341,16 +380,17 @@ function rxProducts(p) {
   var legend = '<div class="rx-legend">' + (rxData.stages || []).filter(function (s) { return used[s.key]; })
     .sort(function (a, b) { return a.position - b.position; })
     .map(function (s) { return "<span>" + rxDotFor(s.key) + esc(s.label) + "</span>"; }).join("") + "</div>";
-  var body = legend + '<div role="list">';
+  var body = legend + "<div>";
   p.rows.forEach(function (r) {
     var said = r.byStage.map(function (x) { return rxLabel(x.key) + " " + fmtN(x.n); }).join("، ");
-    body += '<div class="rx-row rx-prow" role="listitem">' +
-      '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></span>" +
+    body += rxRow("rx-prow", '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></span>" +
       '<span class="rx-stack" role="img" aria-label="' + esc(said) + '">' + r.byStage.map(function (x) {
         return '<i style="flex:' + x.n + ' 1 0;background:' + rxColor(x.key) + '" title="' + esc(rxLabel(x.key)) + " " + fmtN(x.n) + '"></i>';
       }).join("") + "</span>" +
       '<span class="rx-fig">' + (r.openLines - r.unpricedOpen > 0 ? "<b>" + opMoneyShort(r.openValue) + "</b> مفتوحة" : r.openLines ? "بلا تسعير" : "لا مفتوح") +
-        (r.wonValue ? "<br>" + opMoneyShort(r.wonValue) + " ربح" : "") + "</span></div>";
+        (r.wonValue ? "<br>" + opMoneyShort(r.wonValue) + " ربح" : "") + "</span>",
+      { text: "", stage: null, product: r.product },
+      "افتح بنود «" + r.product + "» — " + fmtN(r.lines));
   });
   body += "</div>";
   var top = p.rows[0];
@@ -369,13 +409,14 @@ function rxSources(s) {
   var max = 1;
   s.rows.forEach(function (r) { max = Math.max(max, r.lines); });
   var labels = rxData.sourceLabels || {};
-  var body = '<div class="rx-src" role="list">';
+  var body = '<div class="rx-src">';
   s.rows.forEach(function (r) {
-    body += '<div class="rx-row" role="listitem">' +
-      '<span class="rx-lab">' + opIco(r.source in OPP_ICO ? r.source : "other") + esc(labels[r.source] || r.source) + "</span>" +
+    body += rxRow("", '<span class="rx-lab">' + opIco(r.source in OPP_ICO ? r.source : "other") + esc(labels[r.source] || r.source) + "</span>" +
       '<span class="rx-track" style="width:' + Math.max(8, Math.round((r.lines / max) * 100)) + '%"><i style="width:' + (r.advancedPct || 0) + '%"></i></span>' +
       '<span class="rx-fig"><b>' + fmtN(r.lines) + "</b> · تقدّم " + rxPct(r.advancedPct) + " (" + fmtN(r.advanced) + ") · فوز " + rxPct(r.winRatePct) +
-        (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></div>";
+        (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span>",
+      { text: "", stage: null, source: r.source },
+      "افتح فرص «" + (labels[r.source] || r.source) + "» — " + fmtN(r.lines));
   });
   body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--accent)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-mark)"></i>لم تتقدّم</span></div>';
   var best = s.rows.filter(function (r) { return r.source === s.best; })[0];

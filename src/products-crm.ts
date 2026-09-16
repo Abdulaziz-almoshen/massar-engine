@@ -487,6 +487,9 @@ function pxNPkg(n) { return pxPl(n, "باقة واحدة", "باقتان", "با
 function pxNCamp(n) { return pxPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
 function pxNEnt(n) { return pxPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
 function pxIco(n, cls) { return typeof opIco === "function" ? opIco(n, cls) : ""; }
+/* The product record is open to everyone with knowledge.view (DOOR_PERMISSIONS.product); writing the
+   knowledge is knowledge.edit, the same permission the section editor is gated on. */
+function pxMayEditKb() { return typeof meCan !== "function" || meCan("knowledge.edit"); }
 function pxToast(msg, bad, act, fn) { if (typeof opToast === "function") opToast(msg, bad, act, fn); else moToast(msg); }
 
 /* The shared product registry (tagReg) feeds the opps drawer, the customers/targets filters and the
@@ -990,8 +993,12 @@ function pxKnowledgeSection(p) {
     : p.embedded ? "لا ملف — المساعد يبيع من المعرفة المدمجة فقط" : "لا ملف معرفة — المساعد لا يبيع هذا المنتج";
   b += '<div class="px-file"><span class="px-cells"><i class="' + (kst === "approved" ? "" : kst === "legacy" || p.draft ? "pend" : "miss") + '"></i></span><div><div class="t">ملف المعرفة</div><div class="d">يقرأه المساعد ليجيب عن الأسعار والاعتراضات · ' + sub +
     (upK && upK.s === "busy" ? ' · <span class="ox-fs pend">جارٍ استخلاص المعرفة… قد يستغرق دقيقة</span>' : upK && upK.s === "failed" ? ' · <span class="px-err">' + esc(upK.m) + "</span>" : "") + '</div></div><div class="acts">' +
-    '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
-    '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb"></div></div>';
+    /* knowledge.edit — the readiness meter above is a read; uploading, approving and discarding are
+       writes, and a role without the permission must not be offered them beside a hidden editor. */
+    (pxMayEditKb()
+      ? '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
+        '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb">'
+      : "") + "</div></div>";
   if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
   /* S6: the weighted section score and the editor (knowledge-crm). */
   if (typeof kbScoreBlock === "function") b += kbScoreBlock(p, kn);
@@ -1003,13 +1010,15 @@ function pxKnowledgeSection(p) {
       (typeof kbDraftLine === "function" ? kbDraftLine(kn) : "") +
       '<div class="px-md">' + mdRender(kn.draftMd) + "</div>" +
       (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
-      '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
-      '<button class="rv-hold" data-do="pxDiscard" data-arg="' + esc(name) + '" data-idle="تجاهل المسودة" data-holding="استمر بالضغط للتجاهل…" data-armed="اضغط مرة أخرى للتجاهل" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">تجاهل المسودة</span></button></div></div>';
+      (pxMayEditKb()
+        ? '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
+          '<button class="rv-hold" data-do="pxDiscard" data-arg="' + esc(name) + '" data-idle="تجاهل المسودة" data-holding="استمر بالضغط للتجاهل…" data-armed="اضغط مرة أخرى للتجاهل" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">تجاهل المسودة</span></button></div>'
+        : "") + "</div>";
   }
   if (kn && kn.state === "legacy" && kn.md) {
     b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "نص مستخدم قبل تسجيل الاعتماد — راجعه ثم اعتمده ليعود إليه المساعد</div>" +
       '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
-      '<div class="acts"><button class="btn ' + (kn.draftMd ? "btn-ghost" : "btn-teal") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div></div>";
+      (pxMayEditKb() ? '<div class="acts"><button class="btn ' + (kn.draftMd ? "btn-ghost" : "btn-teal") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div>" : "") + "</div>";
   } else if (kn && kn.state === "approved" && kn.md) {
     b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'النص المعتمد <span class="src">يُحدَّث برفع ملف جديد أو من «تحرير الأقسام»، ثم اعتماده</span></summary><div class="px-md">' + mdRender(kn.md) + "</div></details>";
   } else if (!kn && !pxKnowFailed[name] && kst !== "none") {

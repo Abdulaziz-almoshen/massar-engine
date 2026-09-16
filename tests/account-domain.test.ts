@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG_DOMAIN_JS, isEmailShaped } from "../src/config-domain.js";
 import {
-  ACCOUNT_DOMAIN_JS, accountFieldsFromAttrs, accountMatches, checkAccount, checkAccountDomainClosure, checkApproval,
+  ACCOUNT_DOMAIN_JS, AUDIENCE_NONE, accountFieldsFromAttrs, accountMatches, audienceGroups, audienceMatches,
+  audienceValueOf, checkAccount, checkAccountDomainClosure, checkApproval,
   phoneDigits, phoneShapeProblem, productStatusOf, summarizeAccountOpps,
 } from "../src/account-domain.js";
 
@@ -148,5 +149,42 @@ describe("accountFieldsFromAttrs (customer sheet columns)", () => {
     expect(r.importance).toBeNull();
     expect(r.contact?.email).toBeNull();
     expect(accountFieldsFromAttrs({}).contact).toBeNull();
+  });
+});
+
+describe("campaign audience by account column (BR-CAM-002)", () => {
+  const rows = [
+    { sector: "رعاية صحية", city: "الرياض", importance: "high" },
+    { sector: "رعاية صحية", city: "جدة", importance: "medium" },
+    { sector: "حكومي", city: "الرياض", importance: "high" },
+    { sector: null, city: "الرياض", importance: null },
+    { sector: "  ", city: "  ", importance: "low" },
+  ];
+  it("an unset field matches everything", () => {
+    expect(rows.every((r) => audienceMatches(r, {}))).toBe(true);
+    expect(rows.every((r) => audienceMatches(r, { sector: "" }))).toBe(true);
+  });
+  it("filters on the account's own columns, and combines them", () => {
+    expect(rows.filter((r) => audienceMatches(r, { sector: "رعاية صحية" })).length).toBe(2);
+    expect(rows.filter((r) => audienceMatches(r, { city: "الرياض", importance: "high" })).length).toBe(2);
+    expect(rows.filter((r) => audienceMatches(r, { sector: "حكومي", city: "جدة" })).length).toBe(0);
+  });
+  it("«بدون» selects the accounts whose column was never filled — whitespace counts as empty", () => {
+    expect(rows.filter((r) => audienceMatches(r, { sector: AUDIENCE_NONE })).length).toBe(2);
+    expect(audienceValueOf({ city: "  الرياض " }, "city")).toBe("الرياض");
+    expect(audienceValueOf({}, "sector")).toBe("");
+  });
+  it("groups count the rows passed in, commonest first, and report the empties", () => {
+    const g = audienceGroups(rows);
+    expect(g.map((x) => x.key)).toEqual(["sector", "city", "importance"]);
+    expect(g[0].values).toEqual([["رعاية صحية", 2], ["حكومي", 1]]);
+    expect(g[0].missing).toBe(2);
+    expect(g[1].values[0]).toEqual(["الرياض", 3]);
+    expect(g[2].missing).toBe(1);
+  });
+  it("ties keep first-seen order and the cap is honoured", () => {
+    const many = ["د", "ج", "ب", "أ"].map((s) => ({ sector: s }));
+    expect(audienceGroups(many)[0].values.map((v) => v[0])).toEqual(["د", "ج", "ب", "أ"]);
+    expect(audienceGroups(many, 2)[0].values.length).toBe(2);
   });
 });

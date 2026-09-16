@@ -200,6 +200,10 @@ function inNCamp(n) { return inPl(n, "حملة واحدة", "حملتان", "ح�
 function inNOpp(n) { return inPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
 function inIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function inToast(m, bad, act, fn) { if (typeof opToast === "function") opToast(m, bad, act, fn); else alertBar(m, bad); }
+/* indicators.edit — exec and sales read the indicators and create none (§22). */
+function inMayEdit() { return typeof meCan !== "function" || meCan("indicators.edit"); }
+function inMayCampaign() { return typeof meCan !== "function" || meCan("campaigns.create"); }
+
 function inRoute() { return (location.hash || "").slice(1); }
 /* The actor label the server stores for the shared admin token. «اللوحة» means nothing to a reader. */
 function inBy(b) { return !b || b === "اللوحة" ? "المسؤول" : b; }
@@ -286,10 +290,12 @@ function inRow(r) {
   h += "<span>" + inStatusPill(r.status) + "</span>";
   h += '<span class="in-a2">' +
     '<button class="btn v" id="invb' + r.id + '" data-in="view" data-i="' + r.id + '">عرض العملاء</button>' +
-    '<a class="btn btn-ghost" href="#indicator/' + r.id + '">' + (r.status === "draft" ? "أكمل المسودة" : "تعديل") + "</a>" +
-    '<a class="btn u" href="#indicator/' + r.id + '/data" title="ارفع بيانات أحدث لهذا المؤشر">تحديث البيانات</a>' +
-    (r.status === "draft" ? "<span></span>" : '<button class="btn ' + (r.status === "active" ? "off" : "btn-ghost") + '" data-in="toggle" data-i="' + r.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ">" +
-      (r.status === "active" ? "تعطيل" : "تفعيل") + "</button>") +
+    (inMayEdit()
+      ? '<a class="btn btn-ghost" href="#indicator/' + r.id + '">' + (r.status === "draft" ? "أكمل المسودة" : "تعديل") + "</a>" +
+        '<a class="btn u" href="#indicator/' + r.id + '/data" title="ارفع بيانات أحدث لهذا المؤشر">تحديث البيانات</a>' +
+        (r.status === "draft" ? "<span></span>" : '<button class="btn ' + (r.status === "active" ? "off" : "btn-ghost") + '" data-in="toggle" data-i="' + r.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ">" +
+          (r.status === "active" ? "تعطيل" : "تفعيل") + "</button>")
+      : "") +
     "</span></div>";
   return h;
 }
@@ -311,8 +317,10 @@ function vIndicators() {
     return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا مؤشرات استخدام بعد</b>' +
       'المؤشر قائمة عملاء يجمعهم وصف قابل للقياس — «استخدام مرتفع للإجازات المرضية»، «مرتبطون تقنيًا»، «غير مشتركين». ' +
       'ارفعه من ملف Excel أو اختر عملاءه يدويًا، ويقرؤه مسار ليقترح حملات مبنية عليه ويذكر سبب كل اقتراح.' +
-      '<div class="in-row" style="margin-top:var(--s3)"><a class="btn btn-teal" href="#indicator/new" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">' + inIco("plus") + "إضافة مؤشر</a>" +
-      '<a class="btn btn-ghost" href="/assets/indicator-template.xlsx" style="text-decoration:none;display:inline-flex;align-items:center">تحميل نموذج Excel</a></div></div></section></div>' + inDrawer();
+      (inMayEdit()
+        ? '<div class="in-row" style="margin-top:var(--s3)"><a class="btn btn-teal" href="#indicator/new" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">' + inIco("plus") + "إضافة مؤشر</a>" +
+          '<a class="btn btn-ghost" href="/assets/indicator-template.xlsx" style="text-decoration:none;display:inline-flex;align-items:center">تحميل نموذج Excel</a></div>'
+        : "") + "</div></section></div>" + inDrawer();
   }
   h += inKpis();
   h += inTeaser();
@@ -338,7 +346,9 @@ function vIndicators() {
 function inPaintCrumb() {
   var act = document.getElementById("crumbact");
   if (!act || inRoute().split("/")[0] !== "indicators") return;
-  act.innerHTML = '<a href="#indicator/new" class="btn btn-teal" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-sm);font-size:var(--t-sm);">' + inIco("plus") + "إضافة مؤشر</a>";
+  act.innerHTML = inMayEdit()
+    ? '<a href="#indicator/new" class="btn btn-teal" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--r-sm);font-size:var(--t-sm);">' + inIco("plus") + "إضافة مؤشر</a>"
+    : "";
 }
 
 /* ---------------- the customers drawer ---------------- */
@@ -408,8 +418,8 @@ function inDrawer() {
       b += "</div>";
     }
   }
-  var foot = it ? '<a class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="#indicator/' + it.id + '">تعديل</a>' +
-    (it.product && it.members.length ? '<button class="btn btn-teal" data-in="drcamp">إنشاء حملة لهؤلاء</button>' : "") : "";
+  var foot = it ? (inMayEdit() ? '<a class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="#indicator/' + it.id + '">تعديل</a>' : "") +
+    (it.product && it.members.length && inMayCampaign() ? '<button class="btn btn-teal" data-in="drcamp">إنشاء حملة لهؤلاء</button>' : "") : "";
   return '<div class="in-drw"><div class="ox-scrim' + cls + '" data-in="drclose"></div>' +
     '<div class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="indrt">' +
     '<div class="ox-dh">' + head + '<button class="ox-x" aria-label="إغلاق" data-in="drclose">' + inIco("x") + "</button></div>" +
@@ -621,6 +631,15 @@ function inFormProducts() {
   return list;
 }
 function vIndicatorForm(rest) {
+  /* The route is open to indicators.view (DOOR_PERMISSIONS.indicator), which is how «عرض العملاء»
+     works — but this screen is the EDITOR. A bookmark or a browser-back must not hand a role without
+     indicators.edit a live upload-and-save form; the server refuses it, and so does the screen. */
+  if (!inMayEdit()) {
+    return '<div class="in"><div class="in-form"><button class="in-back" data-in="cancel">→ العودة إلى مؤشرات الاستخدام</button>' +
+      '<section class="cf-sec"><div class="cf-state" role="alert">' + inIco("warn") +
+      "لا تملك صلاحية تحرير المؤشرات — يمكنك عرضها وقوائم عملائها فقط." +
+      '<a class="btn btn-ghost" href="#indicators" style="text-decoration:none">كل المؤشرات</a></div></section></div></div>';
+  }
   if (inToday === "" || inRows === null) inLoad(false);
   inEnsureForm(String(rest || "new"));
   var h = '<div class="in"><div class="in-form">';
@@ -912,10 +931,13 @@ function sgCard(s) {
   if (excl) h += '<div class="ex-l">' + excl + "</div>";
   if (s.stale) h += '<div class="warn">' + inIco("warn") + " البيانات من " + inDate(s.dataUpdatedAt) + " — أقدم من " + inNDay(INDICATOR_STALE_DAYS) + ".</div>";
   if (s.count > 50) h += '<div class="ex-l">الإطلاق الواحد 50 عميلًا كحدٍّ أقصى — تختار في المعالج من تبدأ بهم.</div>';
-  h += '<div class="acts">' + (s.eligible
+  /* Acting on a suggestion creates a campaign or dismisses one, both writes: a role that may only
+     read sees the reasoning and no buttons. */
+  h += '<div class="acts">' + (!inMayCampaign() ? ""
+    : s.eligible
       ? '<button class="btn sg-go" data-sg="use" data-k="' + esc(s.key) + '">إنشاء حملة</button>'
       : '<a class="btn btn-ghost" href="#product/' + encodeURIComponent(s.product) + '/knowledge">' + esc(s.blockedWhy || "لا يبيعه المساعد") + " — افتح المنتج</a>") +
-    '<button class="btn btn-ghost" data-sg="dismiss" data-k="' + esc(s.key) + '"' + (sgBusyKey === s.key ? " disabled" : "") + ">تجاهل</button></div>";
+    (inMayCampaign() ? '<button class="btn btn-ghost" data-sg="dismiss" data-k="' + esc(s.key) + '"' + (sgBusyKey === s.key ? " disabled" : "") + ">تجاهل</button>" : "") + "</div>";
   return h + "</article>";
 }
 function sgPanel(where) {
@@ -932,7 +954,8 @@ function sgPanel(where) {
   if (!sgData && !sgFailed) return h + '<div class="sg-state" aria-busy="true">جارٍ قراءة المؤشرات…</div></section>';
   if (!sgData) return h + '<div class="sg-state" role="alert">تعذّر تحميل الفرص المقترحة.<button class="btn btn-ghost" data-sg="retry">أعد المحاولة</button></div></section>';
   if (!sgData.activeIndicators) {
-    return h + '<div class="sg-state">لا مؤشرات استخدام نشطة بعد، فلا شيء يُبنى عليه. <a class="btn sg-go" href="#indicator/new" style="text-decoration:none;display:inline-flex;align-items:center;height:34px">إضافة مؤشر</a></div></section>';
+    return h + '<div class="sg-state">لا مؤشرات استخدام نشطة بعد، فلا شيء يُبنى عليه.' +
+      (inMayEdit() ? ' <a class="btn sg-go" href="#indicator/new" style="text-decoration:none;display:inline-flex;align-items:center;height:34px">إضافة مؤشر</a>' : "") + "</div></section>";
   }
   if (!open) {
     var top = list[0];

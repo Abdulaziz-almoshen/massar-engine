@@ -814,6 +814,10 @@ let selLost = ""; let selNeedsPick = false;
 // how WATI and AiSensy let you build a list you are not allowed to send to.
 let audMode = "file"; let segDef = null; let segPreview = null; let segBusy = false; let segWindow = 5;
 let entities = []; const entSel = new Set(); let entQ = ""; const entFilters = {}; let entImportSummary = "";
+/** BR-CAM-002: the audience narrowed by the account's OWN columns (القطاع · المدينة · الأهمية), kept
+ *  apart from entFilters, which holds the imported spreadsheet's columns. The rule is audienceMatches
+ *  in account-domain; this object only remembers the choice. */
+const audFilters = {};
 let manualRows = [{ name: "", phone: "", size: "", city: "" }];
 let manualOpen = false; let manualStat = ""; let oppTab = "scheduled"; let oppQ = "";
 /** The tag vocabulary, from the server. The ONLY source the tag controls offer, so a name that
@@ -1713,7 +1717,17 @@ function vHome(d) {
 // one group per attribute key (by coverage, max 6), values ordered by count (max 12).
 function segGroups() {
   const keyCount = new Map();
-  entities.forEach((e) => Object.keys(e.attrs || {}).forEach((k) => keyCount.set(k, (keyCount.get(k) || 0) + 1)));
+  // The three account columns are now filtered above these chips (BR-CAM-002). An import that carried
+  // «المدينة» or «القطاع» as a spreadsheet column would otherwise draw the same filter twice, once
+  // from the account record and once from the file it arrived in, and the two can disagree.
+  // Every header the account columns are read from, not just the three labels: a file whose column
+  // is «الشريحة» carries the same fact as «القطاع», and drawing both invites two answers to one
+  // question (the account column is also truncated, so they can differ).
+  const owned = AUDIENCE_ATTR_KEYS;
+  entities.forEach((e) => Object.keys(e.attrs || {}).forEach((k) => {
+    if (owned.indexOf(k) >= 0) return;
+    keyCount.set(k, (keyCount.get(k) || 0) + 1);
+  }));
   return [...keyCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([key]) => {
     const valCount = new Map();
     entities.forEach((e) => { const v = (e.attrs || {})[key]; if (v) valCount.set(v, (valCount.get(v) || 0) + 1); });
@@ -1913,12 +1927,36 @@ function entMatchesProduct(e) {
   if (prodFilter.interest && !entInterested(e, prodFilter.interest)) return false;
   return true;
 }
-function entMatches() {
+/** Everything the audience step filters on EXCEPT the account column named — the base a facet counts
+ *  against, so «القطاع» keeps showing what each sector would yield once a city is already chosen. */
+function entMatchesBut(e, exceptKey) {
   const q = entQ.trim();
-  return entities.filter((e) =>
-    Object.keys(entFilters).every((k) => !entFilters[k] || ((e.attrs || {})[k] || "") === entFilters[k]) &&
-    entMatchesProduct(e) &&
-    (!q || e.name.includes(q) || e.phone.includes(q)));
+  if (!entMatchesProduct(e)) return false;
+  if (!Object.keys(entFilters).every((k) => !entFilters[k] || ((e.attrs || {})[k] || "") === entFilters[k])) return false;
+  const f = {};
+  Object.keys(audFilters).forEach((k) => { if (k !== exceptKey) f[k] = audFilters[k]; });
+  if (!audienceMatches(e, f)) return false;
+  return !q || e.name.includes(q) || e.phone.includes(q);
+}
+function entMatches() { return entities.filter((e) => entMatchesBut(e, null)); }
+/** The chips for one account column, counted against every OTHER filter (faceted counts). */
+function audGroupFor(key) {
+  const rows = entities.filter((e) => entMatchesBut(e, key));
+  return audienceGroups(rows).find((g) => g.key === key) || { key, label: key, values: [], missing: 0 };
+}
+/** What the chips SAID at the last paint. A click resolves against this, never against a fresh
+ *  count: the search box writes entQ immediately and re-renders 250 ms later, so a chip clicked
+ *  inside that window would otherwise resolve its index against a list the operator never saw and
+ *  filter by the wrong city — or, if the value had dropped out of the top twelve, by nothing. */
+let audShown = [];
+function audFilterOn() { return AUDIENCE_FIELDS.some((f) => audFilters[f.key]); }
+/** The chosen columns in words — for «مسح» summaries and for the message writer's audience line. */
+function audFilterText() {
+  return AUDIENCE_FIELDS.filter((f) => audFilters[f.key]).map((f) =>
+    f.label + ": " + (audFilters[f.key] === AUDIENCE_NONE ? "بدون" : audLabel(f.key, audFilters[f.key]))).join("، ");
+}
+function audLabel(key, value) {
+  return key === "importance" ? (ACCOUNT_IMPORTANCE_LABELS[value] || value) : value;
 }
 window.setProdFilter = (which, v) => { prodFilter[which] = v; entSel.clear(); render(false); };
 /** The whole point of the feature in one control: the campaign's own service, excluded from its own
@@ -1963,6 +2001,51 @@ function chipBtn(label, on, fn) {
     (on ? 'color:#1A47BE;background:#DCE8FC;border:1px solid #5B8DEF;' : 'color:#33373E;background:#fff;border:1px solid #ECEEF2;') +
     '" onclick="' + fn + '">' + esc(label) + "</button>";
 }
+/**
+ * BR-CAM-002 — «حسب بيانات الحساب». The account's own columns as audience filters, above the chips
+ * the imported file produced. Every count is faceted (audGroupFor), so the number on each chip is
+ * what choosing it would actually leave, not a count of the whole book.
+ *
+ * A column nobody has filled is not drawn: three empty rows would say the feature is broken when the
+ * truth is that the accounts have no sector yet. «بدون» appears only where such accounts exist, and
+ * it is a real choice — that is how you find the rows to fix.
+ */
+function vAudienceColumns() {
+  audShown = AUDIENCE_FIELDS.map((f) => audGroupFor(f.key));
+  const rows = AUDIENCE_FIELDS.map((f, fi) => {
+    const g = audShown[fi];
+    if (!g.values.length && !g.missing) return "";
+    const cur = audFilters[f.key] || "";
+    return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
+      '<span style="font-size:12px;font-weight:600;color:#656B76;min-width:52px;">' + esc(f.label) + ":</span>" +
+      chipBtn("الكل", !cur, "audSet(" + fi + ",-1)") +
+      g.values.map(([v, n], vi) => chipBtn(audLabel(f.key, v) + " (" + fmtN(n) + ")", cur === v, "audSet(" + fi + "," + vi + ")")).join("") +
+      (g.missing ? chipBtn("بدون (" + fmtN(g.missing) + ")", cur === AUDIENCE_NONE, "audSet(" + fi + ",-2)") : "") +
+      "</div>";
+  }).join("");
+  if (!rows) return "";
+  return '<div style="border:1px solid #ECEEF2;border-radius:12px;padding:14px 16px 6px;margin-bottom:12px;">' +
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">' +
+    '<span style="font-size:12px;font-weight:600;color:#14161A;">حسب بيانات الحساب</span>' +
+    '<span style="font-size:12px;color:#656B76;">من سجل العميل في «الحسابات» — لا من أعمدة الملف المستورد.</span>' +
+    '<span style="flex:1"></span>' +
+    (audFilterOn() ? '<button class="btn" style="font-size:12px;color:#656B76;background:#fff;border:1px solid #D8DCE3;" onclick="audClear()">مسح</button>' : "") +
+    "</div>" + rows + "</div>";
+}
+// Indexes only in onclick (Arabic values stay out of attribute strings); the click re-derives the
+// same group, and a facet never re-orders under its own choice.
+window.audSet = (fi, vi) => {
+  const f = AUDIENCE_FIELDS[fi]; if (!f) return;
+  const g = audShown[fi]; if (!g) return;
+  // Selection is NOT cleared, exactly as the imported-column chips behave: a filter changes what you
+  // are looking at, and silently dropping contacts a person already ticked is how an audience shrinks
+  // without anyone being told.
+  // A chip that is no longer in the painted list is not a filter anyone chose: do nothing.
+  if (vi >= 0 && !g.values[vi]) return;
+  audFilters[f.key] = vi === -1 ? "" : vi === -2 ? AUDIENCE_NONE : g.values[vi][0];
+  render(false);
+};
+window.audClear = () => { AUDIENCE_FIELDS.forEach((f) => { audFilters[f.key] = ""; }); render(false); };
 // Indexes only in onclick (Arabic keys/values stay out of attribute strings);
 // both sides re-derive the same ordering from segGroups().
 window.entSetAttr = (ki, vi) => {
@@ -1982,7 +2065,8 @@ window.composeMsg = async () => {
   const reg = wizProducts(); const prod = reg[selProd] ? reg[selProd].name : "";
   if (!prod) return;
   const groups = segGroups();
-  const audience = Object.keys(entFilters).filter((k) => entFilters[k]).map((k) => k + ": " + entFilters[k]).join("، ");
+  const audience = [audFilterText(), Object.keys(entFilters).filter((k) => entFilters[k]).map((k) => k + ": " + entFilters[k]).join("، ")]
+    .filter(Boolean).join("، ");
   if (btn) { btn.disabled = true; btn.textContent = "جارٍ الكتابة…"; }
   try {
     const r = await fetch("/admin/compose", { method: "POST", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
@@ -2436,6 +2520,12 @@ function vAimkt() {
     h += '<div style="border:1.5px dashed #D8DCE3;border-radius:12px;padding:26px;text-align:center;color:#656B76;font-size:14px;line-height:2;">لا مستهدفين بعد — ارفع ملف Excel أو CSV في شاشة <a href="#customers" style="color:#2563EB;font-weight:600;">جهات الاستهداف</a>، وستظهر شرائح أعمدته هنا تلقائيًا.</div>';
   } else {
     h += vAffinityBand(selName, m.length);
+    h += vAudienceColumns();
+    /* Two kinds of filter now sit here, and the reader has to be able to tell them apart: the block
+       above is the account record, these chips are whatever columns the uploaded file carried. */
+    if (groups.length) {
+      h += '<div style="font-size:12px;color:#656B76;margin:0 0 8px;">حسب أعمدة الملف المستورد</div>';
+    }
     h += groups.map((g, ki) =>
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">' +
       '<span style="font-size:12px;font-weight:600;color:#656B76;min-width:52px;">' + esc(g.key) + ":</span>" +
@@ -2507,7 +2597,10 @@ function vAimkt() {
     "</div></div></div>";
 
   const selEligible = !!reg[selProd] && reg[selProd].eligible !== false;
-  const can = selN > 0 && campMsg.trim() && selEligible && (typeof wizObjective === "undefined" || !!wizObjective);
+  // DEC-14: the launch itself is the system administrator's (it sends WhatsApp to real customers).
+  // A product manager builds the campaign and stops at this line, and the line says so.
+  const mayLaunch = typeof meCan !== "function" || meCan("campaigns.launch");
+  const can = mayLaunch && selN > 0 && campMsg.trim() && selEligible && (typeof wizObjective === "undefined" || !!wizObjective);
   h += '<div class="step" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
     '<label style="font-size:12px;font-weight:600;color:#14161A;flex:none;">اسم الحملة</label>' +
     '<input value="' + esc(campName) + '" oninput="campNameSet(this)" placeholder="حملة ' + esc(selName) + ' — تُسمّى تلقائيًا إن تُركت فارغة" style="font-family:inherit;flex:1;min-width:220px;font-size:14px;font-weight:600;color:#14161A;border:1.5px solid #ECEEF2;border-radius:11px;padding:11px 14px;">' +
@@ -2537,8 +2630,10 @@ function vAimkt() {
       ? '<span style="font-size:12px;color:#7A5600;max-width:240px;">لا منتج محدد — القائمة أعلاه تقول لماذا.</span>'
       : '<span style="font-size:12px;color:#7A5600;max-width:240px;">' + esc(reg[selProd].why || "لا يبيعه المساعد") + ' — <a href="#product/' + encodeURIComponent(selName) + '/knowledge" style="color:#1A47BE;font-weight:600;">افتح المنتج</a></span>') +
     (typeof wizObjective !== "undefined" && !wizObjective && selN > 0 ? '<button type="button" onclick="wizGoObjective()" style="font-family:inherit;font-size:12px;font-weight:600;color:#7A5600;background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px;min-height:32px;">اختر هدف الحملة ↑</button>' : "") +
-    '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
-      ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button></div>';
+    (mayLaunch
+      ? '<button class="btn ' + (can ? "btn-teal" : "btn-dis") + '"' + (can ? "" : ' disabled aria-disabled="true"') +
+        ' style="font-size:14px;padding:14px 30px;" onclick="openLaunch()">إطلاق الحملة ←</button>'
+      : '<span style="font-size:12px;color:#7A5600;max-width:280px;">الإطلاق من صلاحية مدير النظام — احفظ الحملة وأبلغه بها.</span>') + "</div>";
 
   h += '<div id="lmodal" style="display:none;position:fixed;inset:0;background:rgba(15,37,64,.5);z-index:var(--z-overlay);align-items:flex-start;justify-content:center;padding:60px 24px;">' +
     '<div style="width:100%;max-width:460px;background:#fff;border-radius:16px;border-top:4px solid #5B8DEF;box-shadow:0 24px 60px rgba(15,37,64,.3);padding:24px;">' +

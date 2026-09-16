@@ -160,21 +160,27 @@ function tgtFacetBar() {
   /* BR-CUS-003: filter the book by usage indicator (indicators-crm owns the membership read). */
   if (typeof indTargetsSelect === "function") h += indTargetsSelect();
   h += '<span style="flex:1"></span><span class="hair"></span>';
-  h += '<button class="btn btn-ghost" onclick="tgtOpenTags()">الوسوم' +
-    (tagList().length ? " (" + fmtN(tagList().length) + ")" : "") + "</button>";
-  h += '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>';
-  h += '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
+  if (tgtMayEdit()) {
+    h += '<button class="btn btn-ghost" onclick="tgtOpenTags()">الوسوم' +
+      (tagList().length ? " (" + fmtN(tagList().length) + ")" : "") + "</button>";
+    h += '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>';
+    h += '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
+  }
   h += "</div>";
   return h;
 }
 
 function tgtHeader(allOn) {
+  /* Selecting rows here exists only to drive the bulk bar (tag, untag, open deals). With the bar
+     hidden, a checkbox is a control that highlights rows and can never do anything. */
+  var box = tgtMayEdit()
+    ? '<input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="tgtTogglePage()">'
+    : "";
   return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
-      (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></div>' +
+    '<div class="selcell" style="opacity:1;">' + box + "</div>" +
     "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>المرحلة</div><div></div></div>" +
-    '<div class="thead-narrow"><span class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' +
-      (allOn ? " checked" : "") + ' onclick="tgtTogglePage()"></span><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
+    '<div class="thead-narrow"><span class="selcell" style="opacity:1;">' + box +
+      '</span><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
 }
 
 function tgtRow(e) {
@@ -190,8 +196,9 @@ function tgtRow(e) {
   /* A customer never messaged has an account record now (BRD §9, S2), so every row opens something. */
   var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'onclick="location.hash=&quot;account/' + Number(e.id) + '&quot;" style="cursor:pointer;"';
   return '<div class="trow km krow crow' + (tgtSel[e.id] ? " sel" : "") + '" ' + open + ">" +
-    '<div class="selcell" onclick="event.stopPropagation()"><input type="checkbox"' +
-      (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')"></div>' +
+    '<div class="selcell" onclick="event.stopPropagation()">' + (tgtMayEdit()
+      ? '<input type="checkbox"' + (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')">'
+      : "") + "</div>" +
     '<div class="t-nm"><span class="av">' + esc(e.name.trim().charAt(0)) + "</span>" +
       '<span class="lb">' + esc(e.name) + "</span></div>" +
     '<div class="t-seg">' + (function () {
@@ -208,11 +215,13 @@ function tgtRow(e) {
     // hold-to-confirm (DESIGN.md 8.5). The armed/تراجع pair is gone: the gesture IS the
     // confirmation, and releasing early is the undo. Keyboard still arms in two steps.
     '<div class="c-act">' +
-      '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' +
-      '<button class="rv-hold rv-hold-sm" style="margin-inline-start:6px;" data-do="entDel" data-arg="' + e.id + '"' +
-        ' data-idle="حذف" data-holding="استمر…" data-armed="اضغط مرة أخرى" aria-pressed="false"' +
-        ' title="اضغط مع الاستمرار لحذف الجهة" onclick="event.stopPropagation();">' +
-        '<span class="rv-fill"></span><span class="rv-lbl">حذف</span></button>' +
+      (tgtMayOpenOpp()
+        ? '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' : "") +
+      (tgtMayEdit()
+        ? '<button class="rv-hold rv-hold-sm" style="margin-inline-start:6px;" data-do="entDel" data-arg="' + e.id + '"' +
+          ' data-idle="حذف" data-holding="استمر…" data-armed="اضغط مرة أخرى" aria-pressed="false"' +
+          ' title="اضغط مع الاستمرار لحذف الجهة" onclick="event.stopPropagation();">' +
+          '<span class="rv-fill"></span><span class="rv-lbl">حذف</span></button>' : "") +
     "</div>" +
     "</div>";
 }
@@ -235,26 +244,31 @@ function tgtImportBox() {
     "</details>";
 }
 
+/* customers.edit — a role that may read the audience book imports nothing into it and tags nothing. */
+function tgtMayEdit() { return typeof meCan !== "function" || meCan("customers.edit"); }
+function tgtMayOpenOpp() { return typeof meCan !== "function" || meCan("opps.edit"); }
 function vTargetsCrm() {
   setTimeout(tgtPaintCrumb, 0);
   var h = '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">';
   if (!entities.length) {
     /* The importer instructions live HERE, where the screen has nothing else to say, instead of
        above a list of sixteen rows that already proved the format works. */
-    return h + '<div class="crmbar rise" style="justify-content:flex-end;">' +
-      '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>' +
-      '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button></div>' +
+    return h + (tgtMayEdit()
+      ? '<div class="crmbar rise" style="justify-content:flex-end;">' +
+        '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>' +
+        '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button></div>'
+      : "") +
       '<div id="entfstat">' + entImportSummary + "</div>" +
       '<div class="empty" style="padding:56px 20px;"><div class="ic"><span></span></div>' +
       '<div class="t">لا جهات في قائمتك بعد</div>' +
       '<div class="s" style="line-height:2;">ارفع ملفك كما هو: عمود اسم + عمود جوال. كل عمود إضافي — المدينة، الحجم، القطاع — يصبح شريحة استهداف تختار بها في «إنشاء حملة». التكرار يُحدَّث ولا يُضاعف، وأرقام 05 تتحول إلى 966 تلقائيًا.</div></div>' +
-      tgtImportBox();
+      (tgtMayEdit() ? tgtImportBox() : "");
   }
   var rows = tgtMatches();
   var shown = pageSlice("tgt", rows);
   h += tgtFacetBar();
   h += '<div id="entfstat">' + entImportSummary + "</div>";
-  h += tgtImportBox();
+  if (tgtMayEdit()) h += tgtImportBox();
   var allOn = shown.length > 0 && shown.every(function (e) { return tgtSel[e.id]; });
   h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
   shown.forEach(function (e) { h += tgtRow(e); });
@@ -263,7 +277,7 @@ function vTargetsCrm() {
   }
   h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
     '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
-  h += tgtBulkBar();
+  if (tgtMayEdit()) h += tgtBulkBar();
   h += tgtTagsPanel();
   return h;
 }
@@ -305,9 +319,13 @@ function tgtBulkBar() {
        الموظفين», and the money comes later, one card at a time. So each line opens UNPRICED at
        «تواصل أولي», the same shape the assistant's own auto-created lines take, which is why the
        board needs no new vocabulary to show them. */
-    '<button' + (tgtOppBusy ? " disabled" : "") + ' onclick="tgtBulkOpp()" ' +
-      'title="افتح فرصة بيع بالخدمة المختارة لكل جهة محدَّدة">' +
-      (tgtOppBusy ? "جارٍ…" : "افتح فرصة") + "</button>" +
+    /* opps.edit, not customers.edit: the product manager may tag this book and may not open deals
+       in it, and the per-row «فرصة +» is gated the same way. */
+    (tgtMayOpenOpp()
+      ? '<button' + (tgtOppBusy ? " disabled" : "") + ' onclick="tgtBulkOpp()" ' +
+        'title="افتح فرصة بيع بالخدمة المختارة لكل جهة محدَّدة">' +
+        (tgtOppBusy ? "جارٍ…" : "افتح فرصة") + "</button>"
+      : "") +
     '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
 }
 

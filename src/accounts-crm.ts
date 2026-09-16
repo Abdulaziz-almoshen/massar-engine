@@ -160,6 +160,7 @@ export const ACCOUNTS_CRM_JS = `
 /* ================= «العملاء» — accounts ================= */
 var acRows = null, acMembers = [], acLoading = false, acFailed = false, acPending = false;
 var acF = { q: "", tab: "all", product: "", sector: "", city: "", owner: "", importance: "", ind: "" };
+function acMayEdit() { return typeof meCan !== "function" || meCan("customers.edit"); }
 var acShown = 100;
 var acBusy = {};        /* account id -> true while an approval is being written */
 var acRec = null;       /* { id, data, failed } — the account record */
@@ -276,6 +277,7 @@ function acKpis() {
 function acDecisionCell(a) {
   if (a.approval !== "proposed") return "<span>" + acApprPill(a.approval) + "</span>";
   var busy = !!acBusy[a.id];
+  if (!acMayEdit()) return "";
   return '<span class="ac-dec"><button class="btn ok" data-ac="approve" data-i="' + a.id + '" id="acap' + a.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ' aria-label="اعتماد ' + esc(a.name) + '">اعتماد</button>' +
     '<button class="btn no" data-ac="reject" data-i="' + a.id + '" id="acrj' + a.id + '"' + (busy ? " disabled" : "") + ' aria-label="رفض ' + esc(a.name) + '">رفض</button></span>';
 }
@@ -302,7 +304,10 @@ function acPaintCrumb() {
   if (r !== "accounts" && r !== "account") return;
   /* Painted once per route: rebuilding it on every paint destroyed the button the sheet returns focus to. */
   if (document.getElementById("acnewtop")) return;
-  act.innerHTML = '<button class="btn btn-teal ac-newtop" id="acnewtop" data-ac="new" aria-label="إضافة عميل جديد">' + acIco("plus") + '<span class="lg">إضافة عميل جديد</span><span class="sm">عميل</span></button>';
+  /* A role with customers.view but not customers.edit reads the book and adds nothing to it. */
+  act.innerHTML = acMayEdit()
+    ? '<button class="btn btn-teal ac-newtop" id="acnewtop" data-ac="new" aria-label="إضافة عميل جديد">' + acIco("plus") + '<span class="lg">إضافة عميل جديد</span><span class="sm">عميل</span></button>'
+    : "";
 }
 function vAccounts() {
   if (acStale) { acStale = false; acLoad(!!acRows); } else acLoad(false);
@@ -316,8 +321,10 @@ function vAccounts() {
   if (!acRows.length) {
     return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا عملاء بعد</b>' +
       "العميل منشأة تبيع لها Lean: اسمها ومدينتها وقطاعها وأهميتها ومن يتولاها والأشخاص فيها. أضفه يدويًا، أو استورد قائمة من «جهات الاستهداف»." +
-      '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="acnewempty" data-ac="new" style="display:inline-flex;align-items:center;gap:6px">' + acIco("plus") + "إضافة عميل جديد</button>" +
-      '<a class="btn btn-ghost" href="#targets" style="text-decoration:none;display:inline-flex;align-items:center">استيراد من ملف</a></div></div></section></div>' + acModal();
+      (acMayEdit()
+        ? '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="acnewempty" data-ac="new" style="display:inline-flex;align-items:center;gap:6px">' + acIco("plus") + "إضافة عميل جديد</button>" +
+          '<a class="btn btn-ghost" href="#targets" style="text-decoration:none;display:inline-flex;align-items:center">استيراد من ملف</a></div>'
+        : "") + "</div></section></div>" + acModal();
   }
   h += acKpis();
   var counts = { all: acFiltered("all").length, approved: acFiltered("approved").length, proposed: acFiltered("proposed").length, rejected: acFiltered("rejected").length };
@@ -420,16 +427,19 @@ function vAccount(idRaw) {
     '<div class="in-row" style="gap:8px"><h1 id="acrech" tabindex="-1">' + esc(a.name) + "</h1>" + acApprPill(a.approval) + acImpPill(a.importance) + "</div>" +
     '<div class="meta">' + [a.sector ? esc(a.sector) : "", a.city ? esc(a.city) : "", '<bdi dir="ltr">+' + esc(a.phone) + "</bdi>"].filter(Boolean).join(" · ") +
     '<br>أُضيف بواسطة ' + esc(acBy(a.createdBy)) + " · " + esc(acSource(a)) + " · " + acDate(a.createdAt) + "</div></div>" +
-    '<div class="acts"><button class="btn btn-ghost" id="acedit" data-ac="edit">' + acIco("edit") + "تعديل</button>" +
+    '<div class="acts">' + (acMayEdit() ? '<button class="btn btn-ghost" id="acedit" data-ac="edit">' + acIco("edit") + "تعديل</button>" : "") +
     (talked ? '<a class="btn btn-ghost" href="#customer/' + esc(a.phone) + '">فتح المحادثة</a>' : "") +
-    (typeof opFromEntity === "function" ? '<button class="btn btn-teal" data-ac="opp">فرصة +</button>' : "") + "</div></div>";
+    (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? '<button class="btn btn-teal" data-ac="opp">فرصة +</button>' : "") + "</div></div>";
   if (a.approval === "proposed") {
     h += '<div class="ac-banner" role="status"><span class="tx">هذا عميل <b>مقترح</b> بانتظار اعتماد فريق المبيعات قبل بدء إجراءات البيع.</span>' +
-      '<button class="btn btn-teal" data-ac="approve" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">اعتماد العميل</button>" +
-      '<button class="btn btn-ghost" data-ac="reject" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">رفض</button></div>";
+      (acMayEdit()
+        ? '<button class="btn btn-teal" data-ac="approve" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">اعتماد العميل</button>" +
+          '<button class="btn btn-ghost" data-ac="reject" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">رفض</button>"
+        : "") + "</div>";
   } else if (a.approval === "rejected") {
     h += '<div class="ac-banner rej" role="status"><span class="tx">رُفض هذا العميل' + (a.approvalBy ? " بواسطة " + esc(acBy(a.approvalBy)) : "") + (a.approvalAt ? " في " + acDate(a.approvalAt) : "") +
-      '. لا يظهر في «الكل»، وسجله محفوظ.</span><button class="btn btn-ghost" data-ac="repropose" data-i="' + a.id + '">إعادة إلى مقترح</button></div>';
+      '. لا يظهر في «الكل»، وسجله محفوظ.</span>' +
+      (acMayEdit() ? '<button class="btn btn-ghost" data-ac="repropose" data-i="' + a.id + '">إعادة إلى مقترح</button>' : "") + "</div>";
   }
   /* main column */
   var main = "";
@@ -442,7 +452,8 @@ function vAccount(idRaw) {
       return '<div class="ac-li"><span class="grow"><span>' + esc(o.product) + '</span><span class="sub">' +
         [o.owner ? "المسؤول: " + esc(o.owner) : "", o.closeOn ? "إغلاق متوقع: " + acDate(o.closeOn) : "", o.nextStep ? "الخطوة التالية: " + esc(clip(o.nextStep, 60)) : ""].filter(Boolean).join(" · ") +
         '</span></span><span class="ac-stage"' + tone + ">" + esc(st.label) + '</span><span class="val">' + (o.value ? acMoney(o.value) : '<span class="sub">غير مسعّرة</span>') + "</span></div>";
-    }).join("") : '<div class="empty">لا فرص بيع لهذا العميل بعد.' + (typeof opFromEntity === "function" ? ' <button class="sg-toggle" data-ac="opp">افتح فرصة</button>' : "") + "</div>");
+    }).join("") : '<div class="empty">لا فرص بيع لهذا العميل بعد.' +
+      (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? ' <button class="sg-toggle" data-ac="opp">افتح فرصة</button>' : "") + "</div>");
   main += acCard("الحملات", d.campaigns.length ? acNCamp(d.campaigns.length) : "", "",
     d.campaigns.length ? d.campaigns.map(function (c) {
       return '<div class="ac-li"><span class="grow"><a href="#kmon/' + c.id + '">' + esc(c.name) + '</a><span class="sub">' +
@@ -473,16 +484,18 @@ function vAccount(idRaw) {
   /* side column */
   var side = "";
   var owner = a.ownerId != null ? (d.members || []).filter(function (m) { return m.id === a.ownerId; })[0] : null;
-  side += '<section class="ac-card"><div class="hd"><h2>مدير الحساب</h2><span class="sp"></span><button class="lnk" id="acedit_owner" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button></div>" +
+  side += '<section class="ac-card"><div class="hd"><h2>مدير الحساب</h2><span class="sp"></span>' +
+    (acMayEdit() ? '<button class="lnk" id="acedit_owner" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button>" : "") + "</div>" +
     (a.ownerName ? '<div class="ac-owner"><span class="ac-av" aria-hidden="true">' + acIni(a.ownerName) + '</span><span><span class="nm">' + esc(a.ownerName) + '</span><br><span class="rl">' +
       esc([owner ? (owner.role === "sales" ? "مبيعات" : owner.role === "support" ? "دعم" : owner.role === "manager" ? "مدير" : owner.role) : "لم يعد نشطًا في الفريق", owner && owner.division ? owner.division : ""].filter(Boolean).join(" · ")) + "</span></span></div>"
       : '<div class="bd"><div class="empty">لا موظف مسؤول عن هذا العميل.</div></div>') + "</section>";
-  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", '<button class="lnk" id="acedit_contacts" data-ac="edit">إدارة</button>',
+  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", acMayEdit() ? '<button class="lnk" id="acedit_contacts" data-ac="edit">إدارة</button>' : "",
     a.contacts.length ? a.contacts.map(function (c) {
       return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(c.name) + '</span><span class="grow"><span>' + esc(c.name) +
         (c.primary ? ' <span class="cf-pill ap-approved">رئيسية</span>' : "") + "</span>" + (c.role ? '<span class="sub">' + esc(c.role) + "</span>" : "") +
         '<span class="reach">' + (c.phone ? '<bdi dir="ltr">+' + esc(c.phone) + "</bdi>" : "") + (c.email ? '<a href="mailto:' + esc(c.email) + '" dir="ltr">' + esc(c.email) + "</a>" : "") + "</span></span></div>";
-    }).join("") : '<div class="empty">لا جهات اتصال مسجّلة — أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال. <button class="sg-toggle" id="acedit_addct" data-ac="edit">أضف جهة اتصال</button></div>');
+    }).join("") : '<div class="empty">لا جهات اتصال مسجّلة — أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال.' +
+      (acMayEdit() ? ' <button class="sg-toggle" id="acedit_addct" data-ac="edit">أضف جهة اتصال</button>' : "") + "</div>");
   var lines = d.opps.map(function (o) { return { product: o.product, stage: o.stage }; });
   var prods = acProducts({ productTags: a.productTags, usesProducts: a.usesProducts, oppProducts: a.oppProducts });
   side += acCard("المنتجات", prods.length ? fmtN(prods.length) : "", "",
