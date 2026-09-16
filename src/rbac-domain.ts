@@ -248,7 +248,12 @@ export const DOOR_PERMISSIONS: Readonly<Record<string, Permission>> = {
   // sub-routes that need more than their door
   triage: "conversations.view", pipeline: "conversations.view", customer: "conversations.view", indicators: "indicators.view",
   indicator: "indicators.view", aimkt: "campaigns.create", kb: "knowledge.view", sector: "knowledge.view", targets: "customers.view", partners: "partners.view",
-  perf: "dashboards.view", org: "org.manage", team: "org.manage", divisions: "org.manage", users: "org.manage", audit: "audit.view",
+  perf: "dashboards.view",
+  // «الهيكل التنظيمي» only READS the sectors, departments and team; every write on it hands off to
+  // «الأقسام» / «الفريق», which stay org.manage. Gating the reading on org.manage would hide the
+  // company's own shape from the executive who is asked about it.
+  org: "settings.view", board: "opps.view",
+  team: "org.manage", divisions: "org.manage", users: "org.manage", audit: "audit.view",
   accounts: "customers.view", account: "customers.view", tasks: "customers.view", notes: "customers.view", product: "knowledge.view",
 };
 export function canOpen(role: unknown, route: unknown): boolean {

@@ -38,6 +38,7 @@ import { INDICATOR_DOMAIN_JS } from "./indicator-domain.js";
 import { ACCOUNTS_CRM_CSS, ACCOUNTS_CRM_JS } from "./accounts-crm.js";
 import { ACCOUNT_DOMAIN_JS } from "./account-domain.js";
 import { HOME_CRM_CSS, HOME_CRM_JS } from "./home-crm.js";
+import { ORG_CRM_CSS, ORG_CRM_JS } from "./org-crm.js";
 import { HOME_DOMAIN_JS } from "./home-domain.js";
 import { OPP_WORK_CRM_CSS, OPP_WORK_CRM_JS } from "./opp-work-crm.js";
 import { OPP_WORK_DOMAIN_JS } from "./opp-work-domain.js";
@@ -726,6 +727,7 @@ ${SETTINGS_CRM_CSS}
 ${INDICATORS_CRM_CSS}
 ${ACCOUNTS_CRM_CSS}
 ${HOME_CRM_CSS}
+${ORG_CRM_CSS}
 ${SALES_CRM_CSS}
 ${OPPS_CRM_CSS}
 ${OPP_WORK_CRM_CSS}
@@ -921,7 +923,7 @@ let campMsg = "في أغلب المنشآت الصحية، إصدار {product} 
 const NAV = [
   { id: "home",      l: "الرئيسية",  i: "home" },
   { id: "opps",      l: "فرص البيع", i: "target" },
-  { id: "customers", l: "العملاء",   i: "users" },
+  { id: "accounts",  l: "العملاء",   i: "users" },
   { id: "products",  l: "المنتجات",  i: "flame" },
   { id: "kmon",      l: "الحملات",   i: "send" },
   { id: "reports",   l: "التقارير",  i: "chart" },
@@ -939,13 +941,21 @@ const NAV = [
 // under الحملات. «الهيكل التنظيمي» sits under المنتجات because dept and manager are the same
 // rollup layer as the sector.
 const SUBS = {
-  opps:      [["opps", "الفرص"], ["triage", "فرز الردود"], ["pipeline", "لوحة المتابعة"]],
+  // «لوحة المتابعة» is the DEAL board in the founder's prototype — cards you drag between stages —
+  // so that is what the tab opens (#board renders the opportunities board in kanban mode). The
+  // chronological message ledger that used to carry the name is «سجل الأحداث»: it answers a
+  // different question, and two screens with one name is how a tab stops being findable.
+  opps:      [["opps", "الفرص"], ["board", "لوحة المتابعة"], ["triage", "فرز الردود"], ["pipeline", "سجل الأحداث"]],
   // «مؤشرات الاستخدام» sits under العملاء because the prototype put it there (client A, Sep 15):
   // an indicator is a statement about customers, and its list is read beside theirs.
   // «الحسابات» is the BRD's customer list (§9: organisations, contacts, owner, approval); «المحادثات»
   // is the conversation list that used to carry the name. Tab order keeps #customers as the landing
   // route, so every existing link and the door itself still open where they did.
-  customers: [["customers", "المحادثات"], ["accounts", "الحسابات"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
+  // «الحسابات» leads, because that is what «العملاء» means to the founder: his prototype's العملاء door
+  // opens the customer LIST — organisations, owners, approval, the money on each — and the WhatsApp
+  // conversation list is one view OF those customers, not the door to them. Every #customers link
+  // still works; only which route the door lands on changed.
+  accounts:  [["accounts", "العملاء"], ["customers", "المحادثات"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
   products:  [["products", "المنتجات"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
@@ -955,9 +965,9 @@ const SUBS = {
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
 // a route ends up highlighting no door at all, or two.
 const DOOR_OF = (function () {
-  const m = { customer: "customers",     // #customer/<phone> is a detail view of العملاء
-              indicator: "customers",    // #indicator/new and #indicator/<id> are the indicator form
-              account: "customers",      // #account/<id> is the account record (BRD §9 «العميل 360°»)
+  const m = { customer: "accounts",      // #customer/<phone> is a detail view of العملاء
+              indicator: "accounts",     // #indicator/new and #indicator/<id> are the indicator form
+              account: "accounts",       // #account/<id> is the account record (BRD §9 «العميل 360°»)
               product: "products",       // #product/<name> and #sector/<name> are detail views
               sector: "products" };      //   of المنتجات — the door stays lit inside a drill
   for (const d in SUBS) for (var i = 0; i < SUBS[d].length; i++) m[SUBS[d][i][0]] = d;
@@ -966,7 +976,9 @@ const DOOR_OF = (function () {
 })();
 
 // products, reports and partners are REAL screens now; org is still a placeholder.
-const PAL_SOON = { org: 1 };
+// «الهيكل التنظيمي» stopped being a placeholder: it reads the sectors, the departments and the team
+// the ledger already holds (org-crm.ts). Nothing is «قريبًا» in the rail today.
+const PAL_SOON = {};
 const TITLES = {
   home: ["الرئيسية", "نظرة عامة على نشاط مسار الفعلي"],
   kmon: ["الحملات", "متابعة أداء حملات مساعد المبيعات"],
@@ -975,9 +987,10 @@ const TITLES = {
   customers: ["المحادثات", "كل جهة تحدّث معها المساعد، وحالتها"],
   customer: ["ملف جهة الاستهداف", "بيانات الجهة، وقراءة المساعد، وسجل التفاعل"], opps: ["فرص البيع", "كل بند من أول تواصل حتى الإغلاق"], triage: ["فرز الردود", "من ردّ، ومن لم يردّ، ومتى موعد المهتمين"],
   perf: ["المستهدفات والأداء", "المحقق والمتوقع مقابل المستهدف — كل رقم محسوب من السجل عدا المستهدف"],
-  pipeline: ["لوحة المتابعة", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
+  pipeline: ["سجل الأحداث", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
+  board: ["لوحة المتابعة", "أدر فرص البيع واسحبها بين المراحل"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
-  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["الهيكل التنظيمي", "ضمن المرحلة القادمة"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["الهيكل التنظيمي", "القطاعات والإدارات والموظفون، وما يرتبط بكل منها"],
   settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
   indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
   indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
@@ -4582,7 +4595,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit" || cur === "org" || cur === "board") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4606,6 +4619,8 @@ function render(fetchNew) {
       : cur === "partners" ? vPartners()
       : cur === "users" ? vUsers()
       : cur === "audit" ? vAudit()
+      : cur === "org" ? vOrg()
+      : cur === "board" ? vOppsBoard()
       : vCustomersCrm();
   } else {
     b.innerHTML = vPlaceholder(cur);
@@ -4982,6 +4997,7 @@ ${ACCOUNTS_CRM_JS}
 ${ACCOUNT_DOMAIN_JS}
 ${HOME_DOMAIN_JS}
 ${HOME_CRM_JS}
+${ORG_CRM_JS}
 ${OPPS_DOMAIN_JS}
 ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}

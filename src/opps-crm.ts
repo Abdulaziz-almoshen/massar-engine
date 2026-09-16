@@ -1588,6 +1588,9 @@ function opResetScope() {
 }
 window.opRetry = function () { oppFailed = false; opLoad(true); opRender(); };
 window.opSetMode = function (v) { if (opMode === v) return; opMode = v; opResetScope(); opRender(); };
+/* «لوحة المتابعة» (#board) is this same board in kanban mode — one screen, one set of rules, entered
+   two ways. It is NOT a copy: a second board would drift from this one the first time a stage moved. */
+function vOppsBoard() { opMode = "kanban"; return vOppsCrm(); }
 window.opSetSort = function (v) { opSort = v; opResetScope(); opRender(); };
 window.opSetStg = function (v) { opStg = opStg === v && v !== "all" ? "all" : v; opResetScope(); opRender(); };
 window.opSetSrc = function (v) { opSrc = v; opResetScope(); opRender(); };
