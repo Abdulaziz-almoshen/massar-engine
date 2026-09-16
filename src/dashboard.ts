@@ -1061,7 +1061,8 @@ function PAL_BADGES() {
 function moveInd(strip) {
   if (!strip) return;
   const ind = strip.querySelector(".ind");
-  const on = strip.querySelector(".sub.on, .rp-tab.on");
+  // the drawer's tabs mark their active one with aria-selected, like a real tablist
+  const on = strip.querySelector('.sub.on, .rp-tab.on, [aria-selected="true"]');
   if (!ind || !on) { if (ind) ind.style.width = "0px"; return; }
   const first = !ind.dataset.placed;
   if (first) { ind.classList.add("noanim"); ind.dataset.placed = "1"; }

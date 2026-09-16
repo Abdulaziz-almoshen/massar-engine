@@ -306,6 +306,63 @@ export const OPPS_CRM_CSS = `
     .ox-c-chk input[type="checkbox"] { width:44px; height:44px; }
   }
 
+  /* ===================== «بطاقات» — one card per ACCOUNT =====================
+     The founder's prototype opens فرص البيع as cards: the customer first, its product lines under it,
+     and the deal's health said once at the top. A line-per-row table answers «which line?»; a person
+     working a book asks «where does this CUSTOMER stand?» — and in a table that answer is four rows
+     apart. Ported from beUI's card / animated-badge / bouncy-accordion idioms into plain CSS: a 2px
+     lift on hover (fine pointers only), scale(0.98) on press, and the remaining lines unfolding in
+     place rather than navigating away. */
+  .ox-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(336px,1fr)); gap:var(--s3); padding:var(--s3); }
+  .ox-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
+    padding:var(--s4); display:flex; flex-direction:column; gap:var(--s3); min-width:0;
+    transition:box-shadow var(--base) var(--ease), transform var(--base) var(--ease), border-color var(--base) var(--ease); }
+  @media (hover:hover) and (pointer:fine) {
+    .ox-card:hover { box-shadow:var(--sh-3); transform:translateY(-2px); border-color:var(--accent-mark); }
+  }
+  .ox-card .top { display:flex; align-items:flex-start; gap:var(--s3); min-width:0; }
+  .ox-card .av { width:34px; height:34px; flex:none; border-radius:var(--r-md); background:var(--accent-tint);
+    color:var(--accent-deep); font-weight:600; font-size:var(--t-sm); display:flex; align-items:center; justify-content:center; }
+  .ox-card .who { flex:1; min-width:0; }
+  .ox-card .who b { display:block; font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
+  .ox-card .who span { display:block; font-size:var(--t-xs); color:var(--muted); margin-block-start:2px; }
+  .ox-card .tot { text-align:end; flex:none; }
+  .ox-card .tot b { display:block; font-size:var(--t-md); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .ox-card .tot span { display:block; font-size:var(--t-xs); color:var(--muted); }
+  .ox-cb { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+  .ox-cb b { font-size:var(--t-xs); font-weight:500; border-radius:var(--r-pill); padding:2px 9px;
+    background:var(--tn-soft,var(--surface-2)); color:var(--tn-text,var(--ink-2)); display:inline-flex; align-items:center; gap:5px; }
+  .ox-cb b i { width:6px; height:6px; border-radius:var(--r-pill); background:currentColor; display:block; }
+  .ox-cb .split { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ox-cl { display:flex; flex-direction:column; border-block-start:1px solid var(--line-soft); }
+  .ox-cli { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:var(--s2);
+    padding:9px 6px; margin-inline:-6px; border-radius:var(--r-sm); font-family:inherit; font-size:var(--t-sm);
+    text-align:start; background:none; border:0; cursor:pointer; color:inherit; border-block-start:1px solid var(--line-soft);
+    transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
+  .ox-cli:first-child { border-block-start:0; }
+  @media (hover:hover) and (pointer:fine) { .ox-cli:hover { background:var(--surface); } }
+  .ox-cli:active { transform:scale(0.98); }
+  .ox-cli .pn { font-weight:500; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-cli .st { font-size:var(--t-xs); border-radius:var(--r-pill); padding:2px 9px; white-space:nowrap;
+    background:var(--tn-soft); color:var(--tn-text); }
+  .ox-cli .vl { font-size:var(--t-xs); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ox-cli .vl.unp { color:var(--muted); font-weight:400; }
+  .ox-cmore { font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--accent-deep); background:none;
+    border:0; cursor:pointer; padding:8px 6px; margin-inline:-6px; border-radius:var(--r-sm); text-align:start;
+    border-block-start:1px solid var(--line-soft); transition:background var(--fast) var(--ease); }
+  @media (hover:hover) and (pointer:fine) { .ox-cmore:hover { background:var(--accent-bar-hover); } }
+  .ox-cmore:active { transform:scale(0.98); }
+  /* the unfold: height cannot transition to auto, so the revealed rows fade and rise as a group.
+     Reduced motion keeps the fade — something has to say that content appeared. */
+  .ox-cl .mor { animation:oxUnfold 220ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+  @keyframes oxUnfold { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+  @keyframes oxFadeIn { from { opacity:0; } to { opacity:1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .ox-card { transition:none; }
+    .ox-cl .mor { animation:oxFadeIn 160ms linear both; }
+  }
+  @media (pointer: coarse) { .ox-cli, .ox-cmore { min-height:44px; } }
+
   /* ---- kanban ---- */
   .ox-kb { display:flex; gap:var(--s3); padding:var(--s3); overflow-x:auto; align-items:flex-start; }
   /* width AND min-width: a flex item's automatic minimum is its content, so one long hospital name
@@ -339,17 +396,50 @@ export const OPPS_CRM_CSS = `
     border:none; border-radius:var(--r-md); min-height:36px; cursor:pointer; }
 
   /* ---- the drawer: detail and create are one component ---- */
-  .ox-scrim { position:fixed; inset:0; background:rgba(16,24,40,.28); z-index:var(--z-overlay);
-    opacity:0; transition:opacity var(--base) var(--ease); }
-  .ox-scrim.in { opacity:1; }
-  .ox-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(520px,100vw); background:var(--paper);
-    border-inline-end:1px solid var(--line); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10));
+  /* ---- the record drawer (beUI Drawer idioms: blurred backdrop, spring-ish slide, scroll lock,
+         esc-to-close). The curve is Ionic's iOS drawer easing, 260ms: a panel this size at the
+         default ease reads as sliding TO somewhere; this one arrives. Opacity leads at 140ms so the
+         surface is legible before it stops moving. ---- */
+  html.ox-lock, html.ox-lock body { overflow:hidden; }
+  .ox-scrim { position:fixed; inset:0; background:rgba(16,24,40,.34); z-index:var(--z-overlay);
+    opacity:0; transition:opacity 220ms var(--ease), backdrop-filter 220ms var(--ease); }
+  .ox-scrim.in { opacity:1; backdrop-filter:blur(3px); }
+  .ox-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(560px,100vw); background:var(--paper);
+    border-inline-end:1px solid var(--line); box-shadow:-24px 0 60px rgba(16,24,40,.16);
+    border-start-end-radius:var(--r-lg); border-end-end-radius:var(--r-lg);
     z-index:var(--z-modal); display:flex; flex-direction:column;
     transform:translateX(100%); opacity:0;
-    transition:transform var(--base) var(--ease), opacity var(--fast) var(--ease); }
-  [dir="ltr"] .ox-dr { transform:translateX(-100%); }
+    transition:transform 260ms cubic-bezier(0.32, 0.72, 0, 1), opacity 140ms linear; }
+  [dir="ltr"] .ox-dr { transform:translateX(-100%); box-shadow:24px 0 60px rgba(16,24,40,.16);
+    border-start-end-radius:0; border-end-end-radius:0; border-start-start-radius:var(--r-lg); border-end-start-radius:var(--r-lg); }
   .ox-dr.in, [dir="ltr"] .ox-dr.in { transform:none; opacity:1; }
-  @media (prefers-reduced-motion: reduce) { .ox-dr, .ox-scrim { transition:none; } }
+  @media (prefers-reduced-motion: reduce) { .ox-dr, .ox-scrim { transition:opacity 120ms linear; } }
+  /* the hero: who, what, where it stands and what it is worth — before any scrolling */
+  .ox-hero { display:flex; align-items:flex-start; gap:var(--s3); }
+  .ox-hero .av { width:38px; height:38px; flex:none; border-radius:var(--r-md); background:var(--accent-tint);
+    color:var(--accent-deep); font-weight:600; font-size:var(--t-md); display:flex; align-items:center; justify-content:center; }
+  .ox-hero .tt { flex:1; min-width:0; }
+  .ox-hval { display:flex; align-items:baseline; gap:var(--s3); flex-wrap:wrap; padding:var(--s3) var(--s4) 0; }
+  .ox-hval b { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2; }
+  .ox-hval b.none { font-size:var(--t-md); color:var(--muted); font-weight:500; }
+  .ox-hval .sub { font-size:var(--t-xs); color:var(--muted); }
+  .ox-hval .stg { font-size:var(--t-xs); font-weight:500; border-radius:var(--r-pill); padding:3px 10px;
+    background:var(--tn-soft); color:var(--tn-text); margin-inline-start:auto; }
+  /* the drawer's own tabs (beUI Tabs: one gliding indicator, no cross-fade of the panel) */
+  .ox-dtabs { flex:none; position:relative; display:flex; gap:2px; padding:var(--s3) var(--s4) 0;
+    border-block-end:1px solid var(--line-soft); overflow-x:auto; scrollbar-width:none; }
+  .ox-dtabs::-webkit-scrollbar { display:none; }
+  .ox-dtab { position:relative; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--muted);
+    background:none; border:0; cursor:pointer; padding:8px 12px 12px; white-space:nowrap; border-radius:var(--r-sm) var(--r-sm) 0 0;
+    transition:color var(--fast) var(--ease), background var(--fast) var(--ease); }
+  .ox-dtab .n { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; margin-inline-start:5px; }
+  .ox-dtab[aria-selected="true"] { color:var(--accent-deep); font-weight:600; }
+  .ox-dtab[aria-selected="true"] .n { color:var(--accent-deep); }
+  @media (hover:hover) and (pointer:fine) { .ox-dtab:not([aria-selected="true"]):hover { color:var(--ink); background:var(--surface); } }
+  .ox-dtabs .ind { position:absolute; inset-block-end:0; height:2px; background:var(--accent); border-radius:var(--r-pill);
+    transition:transform 240ms cubic-bezier(0.77, 0, 0.175, 1), width 240ms cubic-bezier(0.77, 0, 0.175, 1); }
+  @media (prefers-reduced-motion: reduce) { .ox-dtabs .ind { transition:none; } }
+  @media (pointer: coarse) { .ox-dtab { min-height:44px; } }
   .ox-dh { flex:none; display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4);
     min-height:72px; border-bottom:1px solid var(--line-soft); }
   .ox-dh .tt { flex:1; min-width:0; }
@@ -520,7 +610,7 @@ export const OPPS_CRM_JS = `
    screens sharing one search box is how a filter typed on one silently narrows the other. */
 var oppRows = null, oppLoading = false, oppBusy = false, oppFailed = false;
 var opView = "board";        /* retained for dataSignature; triage is now its own route (#triage) */
-var opMode = "list";         /* list | kanban */
+var opMode = "cards";        /* cards | list | kanban — cards is the landing view (the founder's prototype) */
 var opSort = "value";        /* value | recent | stage | account */
 var opSel = {};              /* selected LINE ids, keyed by id */
 var opQ = "", opStat = "all", opSrc = "all", opStg = "all";
@@ -662,6 +752,7 @@ var OPP_ICO = {
   other: '<circle cx="12" cy="12" r="8"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1"/>',
   board: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>',
+  cards: '<rect x="3" y="4" width="8" height="7" rx="1.5"/><rect x="13" y="4" width="8" height="7" rx="1.5"/><rect x="3" y="13" width="8" height="7" rx="1.5"/><rect x="13" y="13" width="8" height="7" rx="1.5"/>',
   chevS: '<path d="M15 6l-6 6 6 6"/>',
   chevD: '<path d="M6 9l6 6 6-6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -903,6 +994,7 @@ function opToolbar() {
      sight. */
   h += '<span class="ox-seg" role="group" aria-label="طريقة العرض">' +
     '<button aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
+    '<button aria-pressed="' + (opMode === "cards") + '" aria-label="عرض البطاقات" title="بطاقات — بطاقة لكل عميل" onclick="opSetMode(&quot;cards&quot;)">' + opIco("cards") + "</button>" +
     '<button aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
   h += !opMayEdit() ? ""
@@ -981,6 +1073,83 @@ function opSkeleton(n) {
   for (var i = 0; i < n; i++) h += '<div class="ox-skel"><i style="width:16px"></i><i style="width:70%"></i><i style="width:55%"></i><i style="width:60%"></i><i style="width:70%"></i><i style="width:45%"></i></div>';
   return h + "</div>";
 }
+/* One card per ACCOUNT. Everything on it is counted from that account's own lines — nothing is
+   summed across accounts, and the total obeys the ONE money rule (a lost line is worth nothing). */
+var opCardOpen = {};   /* accountKey -> true while its extra lines are unfolded */
+window.opCardMore = function (k) { opCardOpen[k] = !opCardOpen[k]; opRender(); };
+var OP_CARD_LINES = 3;
+
+function opAccountGroups(rows) {
+  var by = {}, order = [];
+  rows.forEach(function (l) {
+    var k = opKey(l);
+    if (!by[k]) { by[k] = { key: k, name: l.account_name, phone: l.phone, owner: l.owner || "", lines: [] }; order.push(by[k]); }
+    if (!by[k].owner && l.owner) by[k].owner = l.owner;
+    by[k].lines.push(l);
+  });
+  order.forEach(function (g) {
+    g.open = g.lines.filter(opIsOpen);
+    g.won = g.lines.filter(opIsWon);
+    g.lost = g.lines.filter(opIsLost);
+    g.value = opSumLive(g.lines);
+    g.stalled = g.open.some(opStalled);
+    g.priced = g.open.some(opPriced) || g.won.some(opPriced);
+  });
+  /* Live money first: the card grid is read top-left to bottom-right, and the accounts worth the most
+     open money are the ones a sales lead is looking for. Accounts with no open line sink. */
+  order.sort(function (a, b) {
+    if (!a.open.length !== !b.open.length) return a.open.length ? -1 : 1;
+    if (b.value !== a.value) return b.value - a.value;
+    return String(a.name).localeCompare(String(b.name), "ar");
+  });
+  return order;
+}
+
+function opCardsView() {
+  /* «بانتظار الدعم» is read from the escalations table, the same source الرئيسية uses — so the two
+     screens cannot disagree about which deals are blocked. */
+  if (typeof hmEscLoad === "function") hmEscLoad(false);
+  var esc2 = typeof hmOpenEscIds === "function" ? hmOpenEscIds() : {};
+  var groups = opAccountGroups(opLines());
+  var page = pageSlice("opps", groups);
+  if (!page.length) {
+    return '<div class="ox-t"><div class="ox-state">' + (oppRows && oppRows.length
+      ? "لا بند يطابق التصفية." + '<button class="btn btn-ghost" onclick="opClearFilters()">مسح التصفية</button>'
+      : "لا فرص مسجّلة بعد." + '<span class="s">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة.</span>') + "</div></div>";
+  }
+  var h = '<div class="ox-cards">';
+  page.forEach(function (g) {
+    var openEsc = g.open.some(function (l) { return !!esc2[l.id]; });
+    var shown = opCardOpen[g.key] ? g.lines : g.lines.slice(0, OP_CARD_LINES);
+    var rest = g.lines.length - shown.length;
+    h += '<article class="ox-card">' +
+      '<div class="top"><span class="av" aria-hidden="true">' + esc(String(g.name || "؟").trim().charAt(0)) + "</span>" +
+      '<span class="who"><b>' + esc(g.name) + "</b><span>" + opNProd(g.lines.length) +
+        (g.owner ? " · " + esc(g.owner) : " · بلا مسؤول") + "</span></span>" +
+      '<span class="tot">' + (g.priced ? "<b>" + opMoneyShort(g.value) + "</b>" : '<b class="ox-none">' + OPP_UNPRICED + "</b>") +
+      "<span>قيمة قائمة</span></span></div>";
+    /* the health of THIS account, said once */
+    h += '<div class="ox-cb">' +
+      (g.open.length ? '<b style="--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"><i></i>قائمة</b>' : "") +
+      (g.stalled ? '<b style="--tn-soft:#FBF2DC;--tn-text:#7A5600"><i></i>متوقّف</b>' : "") +
+      (openEsc ? '<b style="--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"><i></i>دعم</b>' : "") +
+      '<span class="split">' + ["قائمة " + fmtN(g.open.length), g.won.length ? "ربح " + fmtN(g.won.length) : "", g.lost.length ? "خسارة " + fmtN(g.lost.length) : ""]
+        .filter(Boolean).join(" · ") + "</span></div>";
+    h += '<div class="ox-cl">' + shown.map(function (l, i) {
+      var st = opStage(l.stage);
+      return '<button type="button" class="ox-cli' + (opCardOpen[g.key] && i >= OP_CARD_LINES ? " mor" : "") + '" id="oxc_' + l.id + '"' +
+        ' onclick="opOpenLine(' + l.id + ',this.id)" aria-label="' + esc(l.product) + " — " + esc(st.label) + '">' +
+        '<span class="pn">' + esc(l.product) + "</span>" +
+        '<span class="st" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>" +
+        '<span class="vl' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoneyShort(opValue(l)) : OPP_UNPRICED) + "</span></button>";
+    }).join("") +
+      (rest > 0 ? '<button type="button" class="ox-cmore" onclick="opCardMore(&quot;' + esc(g.key) + '&quot;)">و' + opNLine(rest) + " أخرى ↓</button>"
+        : g.lines.length > OP_CARD_LINES ? '<button type="button" class="ox-cmore" onclick="opCardMore(&quot;' + esc(g.key) + '&quot;)">طيّ ↑</button>' : "") +
+      "</div></article>";
+  });
+  return h + "</div>";
+}
+
 function opListView() {
   var rows = opSorted();
   var page = pageSlice("opps", rows);
@@ -1214,7 +1383,22 @@ function opEscResolve(id, oppId) {
     .catch(function () { opToast("تعذّر الإغلاق", true); });
 }
 
-function opDrawerShell(labelId, head, body, foot) {
+/* The record's tabs. A deal's drawer used to be one column eight sections long: the stage ladder,
+   its results, the money, the follow-up, the activities, the quotes, the escalations and the account's
+   other lines. Scrolling past six of them to record a call is the cost of a screen that never decided
+   what it is FOR. Four panels now, and the tab carries its own count so nobody opens an empty one. */
+var opTab = "deal";
+window.opSetTab = function (t) { if (opTab === t) return; opTab = t; opDrScroll = 0; opRender(); };
+function opTabStrip(counts) {
+  var tabs = [["deal", "الفرصة", null], ["acts", "الأنشطة", counts.acts], ["quotes", "عروض الأسعار", counts.quotes], ["esc", "التصعيد والدعم", counts.esc]];
+  return '<div class="ox-dtabs" role="tablist" aria-label="أقسام الفرصة">' + tabs.map(function (t) {
+    return '<button type="button" class="ox-dtab" role="tab" id="oxdt_' + t[0] + '" aria-selected="' + (opTab === t[0]) + '"' +
+      ' onclick="opSetTab(&quot;' + t[0] + '&quot;)">' + t[1] +
+      (t[2] ? '<span class="n">' + fmtN(t[2]) + "</span>" : "") + "</button>";
+  }).join("") + '<i class="ind" aria-hidden="true"></i></div>';
+}
+
+function opDrawerShell(labelId, head, body, foot, tabs) {
   var cls = opDrShown ? " in" : "";
   return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
     /* Plain divs, not aside/header/footer: the shell styles those ELEMENTS (the rail is an aside that
@@ -1222,6 +1406,7 @@ function opDrawerShell(labelId, head, body, foot) {
        wide inside a 390px drawer. */
     '<div class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
     '<div class="ox-dh">' + head + '<button class="ox-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></div>" +
+    (tabs || "") +
     '<div class="ox-db" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
     '<div class="ox-df">' + foot + "</div></div>";
 }
@@ -1300,9 +1485,17 @@ function opDetailDrawer(l) {
   var st = opStage(l.stage);
   var open = opOpenStages();
   var idx = -1; open.forEach(function (s, i) { if (s.key === l.stage) idx = i; });
-  var head = '<div class="tt"><h2 id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
+  var head = '<div class="ox-hero"><span class="av" aria-hidden="true">' + esc(String(l.account_name || "؟").trim().charAt(0)) + "</span>" +
+    '<div class="tt"><h2 id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
     '<div class="st"><span>' + esc(l.product) + "</span>" +
-    (l.created_by === "المساعد" ? '<span class="ox-auto">تلقائي</span>' : "") + "</div></div>";
+    (l.created_by === "المساعد" ? '<span class="ox-auto">تلقائي</span>' : "") + "</div></div></div>";
+  /* The three facts a reader opens this drawer for, before any scrolling: what it is worth, where it
+     stands, and whether it is late. */
+  head += '<div class="ox-hval">' +
+    (opPriced(l) ? "<b>" + opMoney(opValue(l)) + "</b>" : '<b class="none">' + OPP_UNPRICED + "</b>") +
+    '<span class="sub">' + (opIsOpen(l) ? opAgo(l) : opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
+    (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متأخرة</span>" : "") +
+    '<span class="stg" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span></div>";
   var b = "";
   /* المرحلة */
   var ssk = l.id + ":stage";
@@ -1326,11 +1519,13 @@ function opDetailDrawer(l) {
   /* القيمة */
   var disc = Number(l.discount || 0);
   b += '<section class="ox-sec" aria-labelledby="oxsec_v"><div class="ox-sech" id="oxsec_v">القيمة</div>';
+  /* The figure itself now leads the drawer (ox-hval), so this section carries only HOW it is
+     reached — printing the same number twice on one screen is how a reader starts checking whether
+     the two agree. */
   b += opPriced(l)
-    ? '<div class="ox-vfig">' + opMoney(opValue(l)) + "</div>" +
-      '<div class="ox-form"><bdi>' + fmtN(Number(l.sale_price)) + " ر.س سنويًا × " + opNYear(Number(l.years || 1)) + " × " + fmtN(Number(l.qty || 1)) +
-      (disc ? " × (1 − " + fmtN(disc) + "٪)" : "") + "</bdi></div>"
-    : '<div class="ox-vfig unp">' + OPP_UNPRICED + '</div><div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
+    ? '<div class="ox-form"><bdi>' + fmtN(Number(l.sale_price)) + " ر.س سنويًا × " + opNYear(Number(l.years || 1)) + " × " + fmtN(Number(l.qty || 1)) +
+      (disc ? " × (1 − " + fmtN(disc) + "٪)" : "") + " = " + opMoney(opValue(l)) + "</bdi></div>"
+    : '<div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
   b += '<div class="ox-g2">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
     opField(l, "qty", "الكمية", "number") + opField(l, "discount", "الخصم ٪", "number") + "</div>";
   if (disc > 50) b += '<div class="ox-hint">' + opIco("warn") + "خصم مرتفع: " + fmtN(disc) + "٪ من السعر السنوي. تأكّد أنه مقصود.</div>";
@@ -1353,11 +1548,9 @@ function opDetailDrawer(l) {
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
     "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
-  /* «نتائج المراحل» sits above the activities: what each rung came to is the story of the deal, and
-     the activities are the work inside it. */
+  /* «نتائج المراحل» closes the deal panel: what each rung came to is the story of the line, and the
+     work done inside it lives in its own tab. */
   if (typeof owJourneySection === "function") b += owJourneySection(l);
-  if (typeof owActivitiesSection === "function") b += owActivitiesSection(l) + owQuotesSection(l);
-  b += opEscSection(l);
   /* بنود أخرى لهذه الجهة */
   var key = opKey(l);
   var rel = (oppRows || []).filter(function (o) { return o.id !== l.id && opKey(o) === key; });
@@ -1369,6 +1562,24 @@ function opDetailDrawer(l) {
           '<span class="v">' + (opPriced(o) ? opMoney(opValue(o)) : '<span class="ox-none">' + OPP_UNPRICED + "</span>") + "</span></button>";
       }).join("") + "</div></section>";
   }
+  /* The tabs. The deal panel is everything built above; the other three are their own sections, each
+     already responsible for its own loading and failure states. */
+  var w0 = (typeof owWork !== "undefined" && owWork[l.id] && owWork[l.id].data) || null;
+  var escRows = (typeof opEscRows !== "undefined" && opEscRows[l.id]) || [];
+  var counts = {
+    acts: w0 ? (w0.activities || []).length : 0,
+    quotes: w0 ? (w0.quotes || []).length : 0,
+    esc: escRows.filter(function (r) { return !r.resolvedAt; }).length
+  };
+  if (opTab === "acts") b = typeof owActivitiesSection === "function" ? owActivitiesSection(l) : "";
+  else if (opTab === "quotes") b = typeof owQuotesSection === "function" ? owQuotesSection(l) : "";
+  else if (opTab === "esc") b = opEscSection(l);
+  else {
+    /* The deal panel keeps the counts honest even when its own tab is open: both reads are cheap and
+       already de-duplicated by their loaders. */
+    if (typeof owLoad === "function") owLoad(l.id, false);
+    opEscLoad(l.id, false);
+  }
   var foot = (opDelErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opDelErr) + "</span>" : "") +
     (l.phone ? '<a class="btn btn-ghost" href="#customer/' + esc(l.phone) + '" style="text-decoration:none;">ملف العميل ←</a>' : "") +
     '<span class="sp"></span>' +
@@ -1376,7 +1587,7 @@ function opDetailDrawer(l) {
       ? '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
         ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>'
       : "");
-  return opDrawerShell("oxdrt", head, b, foot);
+  return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts));
 }
 
 function opCreateDrawer() {
@@ -1475,6 +1686,11 @@ function opAfterRender() {
   var tb = document.querySelector(".ox-tb");
   if (tb && !opSelIds().length) opTbH = Math.round(tb.getBoundingClientRect().height);
   var dr = document.querySelector(".ox-dr");
+  /* The page behind a modal drawer must not scroll under it (beUI Drawer: body scroll lock). The
+     class goes on <html> and is removed the moment the drawer leaves the DOM, including the paint
+     after a close — a lock that outlives its dialog is a frozen page. */
+  try { document.documentElement.classList.toggle("ox-lock", !!dr); } catch (e) {}
+  if (dr) { var strip = dr.querySelector(".ox-dtabs"); if (strip && typeof moveInd === "function") moveInd(strip); }
   if (!dr) { opStepPrev = null; opStepFocus = ""; return; }
   opPlaceStepPill();
   if (opStepFocus) {
@@ -1567,7 +1783,7 @@ function vOppsCrm() {
   } else {
     if (oppFailed) h += '<div class="ox-state" role="alert" style="padding:var(--s2);">' + opIco("warn") + "تعذّر تحديث الفرص — المعروض آخر نسخة محمّلة." + '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
     h += opWaRow();
-    h += opMode === "kanban" ? opKanbanView() : opListView();
+    h += opMode === "kanban" ? opKanbanView() : opMode === "cards" ? opCardsView() : opListView();
   }
   h += "</section></div>";
   if (opSheet) h += opCreateDrawer();
@@ -1590,7 +1806,7 @@ function opResetScope() {
   if (n) opToast("أُلغي تحديد " + opNLine(n) + " عند تغيير التصفية", false);
 }
 window.opRetry = function () { oppFailed = false; opLoad(true); opRender(); };
-window.opSetMode = function (v) { if (opMode === v) return; opMode = v; opResetScope(); opRender(); };
+window.opSetMode = function (v) { if (opMode === v) return; opMode = v; opCardOpen = {}; opResetScope(); opRender(); };
 /* «لوحة المتابعة» (#board) is this same board in kanban mode — one screen, one set of rules, entered
    two ways. It is NOT a copy: a second board would drift from this one the first time a stage moved. */
 function vOppsBoard() { opMode = "kanban"; return vOppsCrm(); }
@@ -1630,7 +1846,7 @@ window.opOpenLine = function (id, opener) {
   opSheet = null; opErr = ""; opDelErr = "";
   if (opOpen !== id) { opDrScroll = 0; }
   if (!opOpen) opDrShown = false;
-  opOpen = id; opOpener = opener || "";
+  opOpen = id; opOpener = opener || ""; opTab = "deal";
   try { history.replaceState(null, "", "#opps/" + fmtId(id)); } catch (e) {}
   opRender();
 };
@@ -1642,7 +1858,7 @@ window.opRowClick = function (e, id) {
 window.opCardKey = function (e, id, opener) {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.opOpenLine(id, opener); }
 };
-window.opSwitchLine = function (id) { opDelErr = ""; opDrScroll = 0; opOpen = id; try { history.replaceState(null, "", "#opps/" + fmtId(id)); } catch (e) {} opRender(); };
+window.opSwitchLine = function (id) { opDelErr = ""; opDrScroll = 0; opOpen = id; opTab = "deal"; try { history.replaceState(null, "", "#opps/" + fmtId(id)); } catch (e) {} opRender(); };
 window.opCloseDrawer = function () {
   var wasSheet = !!opSheet;
   var pend = Object.keys(opFState).filter(function (k) { return opFState[k].s === "pending"; }).length;

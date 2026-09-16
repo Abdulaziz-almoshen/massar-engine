@@ -236,6 +236,36 @@ export const PRODUCTS_CRM_CSS = `
 .px-menu button:hover { background:var(--accent-wash); }
 .px-menu button[aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
 .px-menu .why { font-size:var(--t-xs); color:var(--muted); padding:0 12px 8px; line-height:1.5; }
+/* ===== the product record's hero: what this product is asked to sell, and where it stands =====
+   The record opened on three inline editors and a wall of sections; the questions a product manager
+   actually arrives with — «هل نحن على المستهدف؟» and «هل يستطيع المساعد بيعه؟» — were four scrolls
+   apart. The hero answers both in one band, and the switcher moves between products without a trip
+   back to the list (the founder's prototype puts one at the top of every product screen). */
+.px-hero { display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:var(--s3); margin-block:var(--s3); }
+.px-hi { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4);
+  display:flex; flex-direction:column; gap:4px; min-width:0; }
+.px-hi .l { font-size:var(--t-xs); color:var(--muted); }
+.px-hi .n { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2; }
+.px-hi .n.none { color:var(--muted); font-size:var(--t-md); }
+.px-hi .s { font-size:var(--t-xs); color:var(--muted); }
+.px-hi.lead .n { color:var(--accent-deep); }
+.px-hi .meter { height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; margin-block-start:6px; }
+.px-hi .meter i { display:block; height:100%; border-radius:var(--r-pill); background:var(--accent);
+  transition:width 320ms cubic-bezier(0.23, 1, 0.32, 1); }
+.px-hi.ok .meter i { background:var(--s-ok-text, #12633F); }
+.px-hi.warn .meter i { background:var(--s-attn-mark, #B37F00); }
+/* the switcher: a scrollable rail of every live product, current one held */
+.px-sw { display:flex; gap:6px; overflow-x:auto; padding-block:var(--s2); scrollbar-width:none; }
+.px-sw::-webkit-scrollbar { display:none; }
+.px-swb { flex:none; font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--r-pill); padding:7px 14px;
+  cursor:pointer; text-decoration:none; white-space:nowrap;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease), border-color var(--fast) var(--ease), transform 160ms var(--ease); }
+@media (hover:hover) and (pointer:fine) { .px-swb:hover { background:var(--surface); } }
+.px-swb:active { transform:scale(0.97); }
+.px-swb[aria-current="page"] { background:var(--accent-tint); color:var(--accent-deep); border-color:var(--accent-mark); font-weight:600; }
+@media (prefers-reduced-motion: reduce) { .px-hi .meter i, .px-swb { transition:none; } }
+@media (pointer: coarse) { .px-swb { min-height:44px; display:inline-flex; align-items:center; } }
 .px-rec { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); align-items:start; }
 /* Below the two-column breakpoint the readiness and related links come straight after the header:
    they answer «can the assistant sell this?» before any figure does (spec §record, phone). */
@@ -1097,6 +1127,53 @@ function pxRenameModal() {
   h += '<div class="acts"><button class="btn btn-teal" data-px="renamesave"' + (m.busy || !im ? " disabled" : "") + ">" + (m.busy ? "جارٍ الحفظ…" : "حفظ الاسم") + '</button><button class="btn btn-ghost" data-px="modalclose">إلغاء</button></div>';
   return h + "</div></div>";
 }
+
+/* Every live product, current one held. Archived ones are left out: this rail is for moving between
+   the products someone is actually working. */
+function pxSwitcher(p) {
+  var live = (pcCat || []).filter(function (x) { return !x.archived; });
+  if (live.length < 2) return "";
+  return '<div class="px-sw" role="group" aria-label="التنقل بين المنتجات">' + live.map(function (x) {
+    var on = x.product === p.product;
+    return '<a class="px-swb" href="#product/' + pxEnc(x.product) + '"' + (on ? ' aria-current="page"' : "") + ">" + esc(x.product) + "</a>";
+  }).join("") + "</div>";
+}
+
+/* The four figures a product manager opens this record for. Target and achieved come from
+   /admin/sales/quarters (the same read «المستهدفات» uses), the open book from the board, and the
+   readiness from the knowledge score — no figure is computed a second way here. */
+function pxHero(p, rd) {
+  var q = null;
+  var rows = (typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.byProduct) || [];
+  for (var i = 0; i < rows.length; i++) if (rows[i].product === p.product) q = rows[i];
+  var target = q ? Number(q.annualTarget) || 0 : 0;
+  var achieved = q ? Number(q.achieved) || 0 : 0;
+  var pct = typeof wholePct === "function" ? wholePct(attainmentPct(achieved, target)) : null;
+  var lines = ((typeof oppRows !== "undefined" && oppRows) ? oppRows : []).filter(function (l) { return l.product === p.product; });
+  var open = lines.filter(function (l) { return typeof opIsOpen === "function" ? opIsOpen(l) : false; });
+  var openValue = typeof opSumLive === "function" ? opSumLive(open) : 0;
+  var ks = p.knowledgeScore || null;
+  var score = ks && typeof ks.score === "number" ? ks.score : null;
+  var money = function (v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; };
+  var tile = function (cls, label, value, sub, meter) {
+    return '<div class="px-hi ' + cls + '"><span class="l">' + label + "</span>" + value +
+      (sub ? '<span class="s">' + sub + "</span>" : "") + (meter || "") + "</div>";
+  };
+  var meter = function (v) { return '<span class="meter"><i style="width:' + Math.max(0, Math.min(100, v)) + '%"></i></span>'; };
+  return '<div class="px-hero">' +
+    tile("", "المستهدف السنوي", target ? '<span class="n">' + money(target) + "</span>" : '<span class="n none">لم يُحدَّد</span>',
+      target ? esc(String((typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year) || "")) : "يُحدَّد من «المستهدفات»", "") +
+    tile("", "المحقق", '<span class="n">' + money(achieved) + "</span>", "من الصفقات الرابحة", "") +
+    tile("lead" + (pct === null ? "" : pct >= 100 ? " ok" : pct >= 70 ? "" : " warn"), "نسبة الإنجاز",
+      pct === null ? '<span class="n none">—</span>' : '<span class="n">' + fmtN(pct) + "٪</span>",
+      pct === null ? "بلا مستهدف" : "من المستهدف", pct === null ? "" : meter(pct)) +
+    tile("", "الفرص المفتوحة", '<span class="n">' + fmtN(open.length) + "</span>", open.length ? money(openValue) : "لا بنود مفتوحة", "") +
+    tile(score === null ? "" : score >= KB_READY_MIN ? " ok" : " warn", "جاهزية المساعد",
+      score === null ? '<span class="n none">—</span>' : '<span class="n">' + fmtN(score) + "٪</span>",
+      esc(rd && rd.word ? rd.word : ""), score === null ? "" : meter(score)) +
+    "</div>";
+}
+
 function vProductDrill(name, section) {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
   if (typeof cfLoad === "function") cfLoad(false);
@@ -1144,6 +1221,7 @@ function vProductDrill(name, section) {
       : '<button role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
   }
   h += "</div></div>";
+  h += pxSwitcher(p) + pxHero(p, rd);
   h += '<div class="px-rec"><div class="px-main">' + pxPerfSection(p) + pxPricingSection(p) + pxTargetsSection(p) + pxKnowledgeSection(p);
   if (!p.embedded && !p.archived) {
     h += '<section class="px-sec" id="pxsec_archive"><div class="px-sech"><h2>أرشفة المنتج</h2></div><div class="px-secb"><div class="px-note" id="pxarch_note">' +
