@@ -1959,4 +1959,7 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-dp__f{ display: flex; gap: var(--m-2); margin-block-start: var(--m-2);
   padding-block-start: var(--m-2); border-block-start: 1px solid var(--m-line); }
 @media (prefers-reduced-motion: reduce){.ds6 .m-dp__t, .ds6 .m-dp__nav{ transition: none; }}
+/* A person field a viewer may only read: the control still says what it holds, and says it is not
+   theirs to change, rather than disappearing. */.ds6 .m-cb__t:disabled{ background: var(--m-page); color: var(--m-mut); cursor: default; }
+.ds6 .m-cb__t:disabled .m-cb__c{ stroke: var(--m-line-2); }
 `;

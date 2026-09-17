@@ -26,9 +26,14 @@ function mCombo(o) {
   var val = o.value === null || o.value === undefined ? "" : String(o.value);
   var opts = o.options || [];
   return '<div class="m-cb' + (o.wide ? " m-cb--wide" : "") + '" data-cb-id="' + esc(o.id) + '"' +
-    (o.free ? ' data-cb-free="1"' : "") + ">" +
+    (o.free ? ' data-cb-free="1"' : "") +
+    /* What to say when the list itself is empty, which is not the same as a query matching nothing.
+       On this app's live data the team directory is empty, so the owner pickers opened on a blank
+       list that explained nothing. */
+    ' data-cb-empty="' + esc(o.empty || "لا خيارات مسجّلة بعد") + '">' +
     '<input type="hidden" id="' + esc(o.id) + '" value="' + esc(val) + '"' + (o.attrs || "") + ">" +
     '<button type="button" class="m-cb__t" id="' + esc(o.id) + '_t" aria-haspopup="listbox"' +
+      (o.disabled ? " disabled" : "") +
       ' aria-expanded="false" aria-controls="' + esc(o.id) + '_p"' +
       ' aria-label="' + esc(o.label || o.placeholder || "اختر") + '">' +
       '<span class="m-cb__v' + (val ? "" : " is-ph") + '">' + esc(val || o.placeholder || "اختر…") + "</span>" +
@@ -99,7 +104,11 @@ if (!window.__mCb) {
       n++;
     }
     empty.hidden = n > 0;
-    if (n === 0) empty.textContent = "لا خيار يطابق " + '"' + q + '"';
+    if (n === 0) {
+      empty.textContent = q
+        ? ("لا خيار يطابق " + '"' + q + '"')
+        : (g.getAttribute("data-cb-empty") || "لا خيارات مسجّلة بعد");
+    }
     mCbHi(g, mCbRows(g)[0] || null);
   };
   var mCbOpenIt = function (g) {

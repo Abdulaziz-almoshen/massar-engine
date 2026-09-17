@@ -941,7 +941,11 @@ function pxSheetHtml() {
     '<select class="m-select" id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
     "</select></div>" +
-    fld("pxs_owner", "المسؤول", "owner", d.owner, { max: 60 }, "بلا مسؤول", "") +
+    '<div class="m-field"><label class="m-label" for="pxs_owner">المسؤول</label>' +
+      mCombo({ id: "pxs_owner", value: d.owner, options: pxOwnerList(), placeholder: "بلا مسؤول",
+        label: "المسؤول", free: true, wide: true,
+        empty: "لا أسماء بعد — اكتب اسمًا، أو أضِف الفريق من «إعدادات النظام»",
+        attrs: ' data-pxsheet="owner"' }) + "</div>" +
     '<div class="full">' + fld("pxs_note", "ملاحظة التسعير", "pricingNote", d.pricingNote, { max: 120 }, "مثال: اشتراك سنوي يحدده المختص وفق الحجم", "") + "</div>" +
     "</div></section>";
   h += '<section><h3 class="m-label">الباقة الأولى (اختياري)</h3><div class="m-form">' +
@@ -1255,6 +1259,15 @@ function pxReadinessState(p) {
    product record answers is «does the assistant sell this, and what is missing?» — not «which
    screen am I on». render() calls it; the readiness rule is the same one the list row and the
    campaign wizard read, so three surfaces cannot disagree. */
+/* Everyone who already manages a product, plus the team directory when «إعدادات النظام» has been
+   read — a new manager should be offerable before they own anything. */
+function pxOwnerList() {
+  var out = [];
+  var add = function (o) { if (o && out.indexOf(o) < 0) out.push(o); };
+  (pcCat || []).forEach(function (x) { add(x.owner); });
+  if (typeof cfTeam !== "undefined" && cfTeam) cfTeam.forEach(function (m) { add(m.name); });
+  return out.sort(function (a, b) { return String(a).localeCompare(String(b), "ar"); });
+}
 function pxReadinessBand() {
   if (!pcCat) return "";
   var r = typeof pxParseProductRoute === "function" ? pxParseProductRoute() : null;
@@ -1436,9 +1449,14 @@ function pxMetaSection(p) {
       '</select><span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span></div>";
   }
   var ov = pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "");
+  /* A PERSON FIELD IS THE COMBOBOX (founder, 2026-09-17), the same control «المسؤول» on an
+     opportunity uses: the datalist here showed nothing on a touch device and hinted at no list at all.
+     Still a free name — a product manager can be someone no product names yet. */
   b += '<div class="m-field"><label class="m-label" for="pxf_owner">مدير المنتج</label>' +
-    '<input class="m-input" id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(ov) + '" data-pxfield="owner"' + dis + ">" +
-    '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
+    mCombo({ id: "pxf_owner", value: ov, options: pxOwnerList(), placeholder: "بلا مسؤول",
+      label: "مدير المنتج", free: true, wide: true, disabled: !may,
+      empty: "لا أسماء بعد — اكتب اسمًا، أو أضِف الفريق من «إعدادات النظام»",
+      attrs: ' aria-describedby="pxf_owner_st" data-pxfield="owner"' }) +
     '<span class="px-acts">' + pxStatusSlot(name + "|owner", "pxf_owner") + "</span></div>";
   b += "</div>";
   b += '<p class="m-meta">' + (p.createdAt ? "أُنشئ " + fmtD(p.createdAt) + " · " : "") +

@@ -1451,6 +1451,7 @@ function opField(l, key, label, type) {
   if (key === "owner") {
     return field + mCombo({ id: id, value: val, options: opOwners(), placeholder: "بلا مسؤول",
       label: label, free: true, wide: true,
+      empty: "لا أسماء بعد — اكتب اسمًا، أو أضِف الفريق من «إعدادات النظام»",
       attrs: ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;owner&quot;,this.value)"' }) + "</div>";
   }
   return field + '<input class="m-input" id="' + id + '" type="text" value="' + esc(val) + '"' + tail + "></div>";
