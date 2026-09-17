@@ -96,7 +96,26 @@ function hdsStage(k) {
 }
 
 function hdsN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
-function hdsNil(t) { return '<span class="m-td-nil">' + esc(t) + "</span>"; }
+
+/* Bind the counts this screen prints to the arrays it renders them from. A figure marked here
+   is re-derived on every paint; if the markup and the records ever disagree, the number is
+   outlined and the console says which key. Astra's finding 5 was three numbers for one fact
+   (nav said six products, home said "five of six", the truth was eight) — that is now a runtime
+   error rather than something the next reviewer has to notice. */
+function hdsBind() {
+  dsD("products",  function () { return hdsFacts().products; });
+  dsD("noTarget",  function () { return hdsFacts().noTarget; });
+  dsD("nLines",    function () { return hdsLines().length; });
+  dsD("unpriced",  function () { return hdsLines().filter(function (l) { return !l.value; }).length; });
+  dsD("priced",    function () { return hdsLines().filter(function (l) { return l.value > 0; }).length; });
+  dsD("staleN",    function () { return hdsLines().filter(function (l) { return l.days >= 30; }).length; });
+}
+/* kind: "owed" a number someone owes, "unset" a classification nobody made, "none" a
+   legitimate nothing. Drawing all three the same is how a page of dashes teaches the reader
+   to stop seeing dashes. */
+function hdsNil(t, kind) {
+  return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>";
+}
 
 /* ---------- the revenue surface ---------- */
 function hdsRevenue(f, lines) {
@@ -127,7 +146,7 @@ function hdsRevenue(f, lines) {
       ? (esc(f.onlyProduct) + (f.onlyScope ? " · " + esc(f.onlyScope) : ""))
       : ("على " + fmtN(f.withTarget) + " منتجات")) + "</dd>";
   } else {
-    h += '<dd class="m-facts__value">' + hdsNil("لا مستهدف مسجّل") + "</dd>";
+    h += '<dd class="m-facts__value">' + hdsNil("لا مستهدف مسجّل", "owed") + "</dd>";
     h += "<dd>لم يُسجَّل مستهدف على أي منتج في " + hdsYearTxt(f.year) + "</dd>";
   }
   h += "</div>";
@@ -135,15 +154,16 @@ function hdsRevenue(f, lines) {
   h += "<div><dt>قيمة البنود المفتوحة المسعّرة</dt>";
   h += '<dd class="m-facts__value">' + hdsN(pricedValue) + " ر.س</dd>";
   h += "<dd>" + (lines.length
-    ? (fmtN(priced.length) + " مسعّر من " + fmtN(lines.length) +
+    ? (dsFig("priced", priced.length) + " مسعّر من " + dsFig("nLines", lines.length) +
        (f.unpriced ? ("؛ " + fmtN(f.unpriced) + " بلا تسعير") : ""))
     : "لا بنود مفتوحة") + "</dd></div></dl>";
 
   /* The qualification. Without it the figure above reads as the company's number, and it is not
      one while most products carry no target to read it against. */
   if (f.noTarget) {
-    h += '<p class="m-revenue__qualification">' + fmtN(f.noTarget) +
-         " من " + fmtN(f.products) + " منتجات بلا مستهدف. لا يمكن تقييم تحقيق مستهدف الشركة.</p>";
+    h += '<p class="m-revenue__qualification">' + dsFig("noTarget", f.noTarget) +
+         " من " + dsFig("products", f.products) +
+         " منتجات بلا مستهدف. لا يمكن تقييم تحقيق مستهدف الشركة.</p>";
     h += '<a class="m-link" href="#perf">استكمال المستهدفات &#8592;</a>';
   } else if (f.products) {
     h += '<p class="m-revenue__qualification">كل المنتجات تحمل مستهدفًا مسجّلًا.</p>';
@@ -182,7 +202,7 @@ function hdsLedger(lines) {
       '<td class="m-td-n">' + esc(l.account) + "</td>" +
       "<td>" + esc(l.product) + "</td>" +
       '<td><span class="m-chip">' + esc(hdsStage(l.stage)) + "</span></td>" +
-      '<td class="m-td-v">' + (l.value ? hdsN(l.value) : hdsNil("لم يُسعَّر")) + "</td>" +
+      '<td class="m-td-v">' + (l.value ? hdsN(l.value) : hdsNil("لم يُسعَّر", "owed")) + "</td>" +
       '<td class="m-td-v">' + hdsN(l.days) + "</td></tr>";
   }).join("");
   h += "</tbody></table></div></div>";
@@ -256,6 +276,7 @@ function vHomeDs() {
   if (typeof opLoad === "function") opLoad(false);
   if (typeof pcPerfLoad === "function") pcPerfLoad(hdsYear(), false);
 
+  hdsBind();
   var f = hdsFacts();
   var linesReady = (typeof oppRows !== "undefined" && oppRows);
   if (!f.loaded || !linesReady) {

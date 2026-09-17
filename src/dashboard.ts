@@ -27,6 +27,7 @@ import { REVAMP_CSS, HOLD_CSS, HOLD_JS } from "./revamp.js";
 import { MASSAR_DS_CSS } from "./massar-ds-crm.js";
 import { HOME_DS_JS } from "./home-ds-crm.js";
 import { MASSAR_DS_SHELL_CSS } from "./massar-ds-shell.js";
+import { DS_VERIFY_CSS, DS_VERIFY_JS } from "./ds-verify.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
@@ -822,6 +823,7 @@ ${HOLD_CSS}
 ${MASSAR_DS_CSS}
 /* The shell is deliberately unscoped: one rail, shared by every route. */
 ${MASSAR_DS_SHELL_CSS}
+${DS_VERIFY_CSS}
 </style>
 </head>
 <body>
@@ -4854,6 +4856,9 @@ function render(fetchNew) {
     const el2 = document.getElementById(afId);
     if (el2) { el2.focus(); if (afPos != null && el2.setSelectionRange) try { el2.setSelectionRange(afPos, afPos); } catch (e) {} }
   }
+  // Every printed figure that declared a derivation is re-checked against the records on every
+  // paint. A summary can no longer disagree with the table under it without saying so out loud.
+  if (typeof dsVerify === "function") { try { dsVerify(b); } catch (e) {} }
 }
 // The count-up animation was removed. It shipped a runtime TypeError (Math.roundfmtN), then sat
 // dead for a day because the values became Arabic-Indic and its parseInt stripped 0-9 to NaN.
@@ -5201,6 +5206,7 @@ ${ACCOUNT_DOMAIN_JS}
 ${HOME_DOMAIN_JS}
 ${ACCEPTANCE_DOMAIN_JS}
 ${HOME_CRM_JS}
+${DS_VERIFY_JS}
 ${HOME_DS_JS}
 ${ORG_CRM_JS}
 ${YEAR_TARGETS_JS}

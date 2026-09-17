@@ -1282,4 +1282,38 @@ export const MASSAR_DS_CSS = `
 .m-evidence__row > * + *{ text-align: end; }
 @media (max-width: 720px){.ds6 .m-evidence__row{ grid-template-columns: minmax(0, 1fr); }.ds6 .m-evidence__row > * + *{ text-align: start; }}
 .ds6 .m-chip{ white-space: nowrap; }
+.ds6 /* ---- the six absences, .ds6 drawn ----
+   Wording alone does not separate them: at a glance a column of grey text reads as one state
+   repeated. Astra's entry gave each KIND of absence its own treatment, .ds6 so the reader sorts them
+   before reading a word. Three forms, .ds6 by what the absence means:
+
+     a MISSING NUMBER someone owes      dashed, .ds6 accent      لم يُسعَّر · بلا مستهدف
+     a MISSING CLASSIFICATION           dashed, .ds6 neutral     لم يُصنَّف · لم تُسجَّل
+     a LEGITIMATE NOTHING               plain, .ds6 quiet        لا بنود مفتوحة · لا سعر منشور
+
+   The first is work. The second is data hygiene. The third is not a problem at all, .ds6 and drawing
+   it like one is how a page full of dashes teaches the reader to ignore every dash. */
+.m-nil--owed{
+  color: var(--m-bad);
+  border: 1px dashed var(--m-bad-line);
+  border-radius: 3px;
+  padding-inline: 5px;
+  padding-block: 1px;
+  font-size: var(--m-t-micro);
+  white-space: nowrap;
+}
+.ds6 .m-nil--unset{
+  color: var(--m-mut);
+  border: 1px dashed var(--m-line-2);
+  border-radius: 3px;
+  padding-inline: 5px;
+  padding-block: 1px;
+  font-size: var(--m-t-micro);
+  white-space: nowrap;
+}
+.ds6 .m-nil--none{
+  color: var(--m-faint);
+  font-size: var(--m-t-micro);
+  white-space: nowrap;
+}
 `;
