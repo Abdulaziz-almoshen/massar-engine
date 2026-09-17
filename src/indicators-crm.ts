@@ -3,9 +3,25 @@
 // the form; the BRD said what they are FOR — explainable campaign opportunities (BR-IND-007/008,
 // BR-CAM-003, BR-MON-002/003).
 //
-// GRAMMAR. Nothing new is invented here: the table is the settings table (.cf-sec/.cf-hr/.cf-r), the
-// tiles are .crm-kpi, the drawer is the opportunities drawer (.ox-dr), segmented controls are .vtog.
-// A module that brings its own components is how a product ends up with four kinds of table.
+// PORTED to the new design system (docs/PORT-SPEC.md) — but only the three surfaces this module OWNS:
+//   · vIndicators()     #indicators           — the list, its tiles, its filter bar, its table
+//   · vIndicatorForm()  #indicator/<...>      — the create / edit / replace-data form
+//   · inDrawer()        the customers drawer  — it carries its OWN .ds6 wrapper, because it is also
+//                                               rendered from accounts-crm.ts (ported) and from
+//                                               dashboard.ts's customer view (not ported)
+// Each speaks the m-* vocabulary: real tables in .m-tablewrap, .m-card sections, .m-field/.m-label/
+// .m-input forms, .m-chip for status, .m-item and .m-tl for lists, and every digit through .m-n.
+//
+// NOT PORTED, AND DELIBERATELY SO. These render INSIDE screens that are still on the old system, and
+// new tokens under old structure is not a half-finished redesign, it is a broken page:
+//   · sgPanel / sgCard / sgWizardTop / sgExcl / sgTargetedWord — campaigns-crm.ts (#kmon) and the
+//     wizard in dashboard.ts
+//   · indCustomerBlock — dashboard.ts's customer view
+//   · indWizardSelect (dashboard.ts wizard) · indTargetsSelect (targets-crm.ts)
+//   · wizObjectiveStep / wizReviewSummary / wizRepeatBlock / rwBlock — dashboard.ts's wizard
+//   · inPaintCrumb — it writes into #crumbact, which is dashboard.ts's breadcrumb bar, above #body
+// Their markup and their CSS rules (.sg*, .wz-obj, .rw, .wz-review, .sg-applied, .cf-pill.warn/
+// .draft/.sys, .in-mem, .in-link, .in-ev) are kept verbatim below.
 //
 // RULES come from indicator-domain (serialised into the page as INDICATOR_DOMAIN_JS): the control the
 // form disables and the write the server refuses give the same reason in the same words.
@@ -18,112 +34,174 @@
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const INDICATORS_CRM_CSS = `
-.in { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:inw; }
-.in .crm-kpis { margin-block-end:0; }
-.in .crm-kpi.crm-click { text-decoration:none; color:inherit; display:block; }
-.in-bar { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); }
-.in-q { flex:1; min-width:180px; max-width:340px; height:36px; font-family:inherit; font-size:var(--t-sm); color:var(--ink);
-  background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-pill); padding-inline:14px; }
-.in-q:focus { outline:none; box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
-.in-bar select { font-family:inherit; height:36px; font-size:var(--t-sm); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:10px; }
-.in-bar select.on { box-shadow:inset 0 0 0 1px var(--accent-mark); background:var(--accent-tint); color:var(--accent-deep); }
-.in-bar .sp { flex:1; }
-/* Every track is fixed or fr: each row is its own grid, so an «auto» track sizes per row and the
-   header drifts off its cells. Actions are a 2×2 block, as in the client's prototype, so the name
-   keeps the width it needs at 1280 (design review: names were cut to 8 characters). */
-.in-t .cf-hr, .in-t .cf-r { grid-template-columns:minmax(190px,1.8fr) minmax(0,1fr) 108px 68px 132px 84px 196px; }
-.in-t .cf-r { align-items:center; }
-.in-nm { min-width:0; display:flex; flex-direction:column; gap:3px; }
-.in-desc { font-size:var(--t-xs); color:var(--muted); line-height:1.55; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+/* ============================================================================
+   THE PORTED SCREENS. Only what the m-* vocabulary genuinely lacks: overlay
+   geometry for the drawer, the file drop zone, the preview table's scroll box
+   and column widths, the sticky action bar, the candidate picker, and the two
+   or three block/reset rules a vocabulary of text scales cannot supply.
+   Everything the module used to declare for tables, pills, tiles, fields and
+   buttons is gone: .m-table, .m-chip, .m-card, .m-field and .m-btn carry it.
+   ============================================================================ */
+.ds6 .in-page { display:flex; flex-direction:column; gap:var(--m-4); min-inline-size:0; }
+
+/* A tile is a card that may also be a link; the vocabulary gives it its type scale. */
+.ds6 .in-kpi { display:grid; align-content:start; gap:2px; text-decoration:none; color:inherit; min-inline-size:0; }
+.ds6 a.in-kpi { transition:background var(--m-out) var(--m-ease); }
+@media (hover: hover) and (pointer: fine) { .ds6 a.in-kpi:hover { background:var(--m-page); } }
+.ds6 .in-kpi--lead { background:var(--m-ac-dim); border-color:var(--m-ac-line); }
+
+/* The suggestions teaser. A leading accent rule, because the sentence is «مسار proposes», and the
+   card has to read as coming from somewhere rather than as one more section of this screen. */
+.ds6 .in-teaser { display:flex; align-items:center; gap:var(--m-4); flex-wrap:wrap;
+  border-inline-start:3px solid var(--m-ac); }
+.ds6 .in-teaser__b { flex:1 1 260px; min-inline-size:0; }
+
+/* The toolbar's filters. Each control keeps its own width rather than stretching to the row. */
+.ds6 .in-filters { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; min-inline-size:0; }
+.ds6 .in-filters .m-input, .ds6 .in-filters .m-select { inline-size:auto; min-inline-size:150px; }
+.ds6 .in-filters .m-input[type="search"] { flex:1 1 200px; max-inline-size:340px; }
+/* A filter that is DOING something says so, or a narrowed list looks like an empty one. */
+.ds6 .in-filters .in-on { box-shadow:0 0 0 1px var(--m-ac), 0 1px 2px rgba(0,0,0,.05); color:var(--m-ac-deep); }
+
+.ds6 .in-tbl .m-table { min-inline-size:980px; }
+.ds6 .in-clip { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  min-inline-size:0; max-inline-size:26ch; }
+/* .m-meta is a text scale, not a block: a table cell's sub-line needs the line break. */
+.ds6 .m-table .in-sub, .ds6 .m-item .in-sub { display:block; font-weight:400; }
+/* Two lines of description and no more — a paragraph in a cell pushes every other row off screen. */
+.ds6 .in-desc { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+/* A disabled indicator keeps its row and loses its emphasis; it is not an error, it is switched off. */
+.ds6 .in-row--off .m-td-n, .ds6 .in-row--off { color:var(--m-mut); }
+/* A row's actions wrap rather than widen the table. The buttons are compact at a fine pointer and
+   take the full 44px target back on a coarse one (the coarse block at the end of this file). */
+.ds6 .in-acts2 { display:flex; align-items:center; gap:var(--m-1); flex-wrap:wrap; }
+.ds6 .in-btn-sm { min-block-size:36px; padding-inline:var(--m-3); padding-block:4px;
+  font-size:var(--m-t-cap); white-space:nowrap; }
+.ds6 .in-btn-off { color:var(--m-bad); border-color:var(--m-bad-line); }
+/* A name that opens a record is a link inside a table cell, not a button with a border. */
+.ds6 button.in-linkbtn { font:inherit; background:none; border:0; padding:0; cursor:pointer;
+  text-align:start; min-block-size:0; }
+
+/* ---- the form ---- */
+.ds6 .in-form { max-inline-size:880px; display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .in-secb { display:flex; flex-direction:column; gap:var(--m-4); min-inline-size:0; }
+.ds6 .in-row { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .in-grp { display:grid; gap:var(--m-1); justify-items:start; }
+/* A segmented control whose options are three long Arabic phrases has to be allowed to wrap. */
+.ds6 .in-seg { flex-wrap:wrap; }
+/* The vocabulary draws the held segment on [aria-pressed]. These groups are RADIO groups, where
+   aria-checked is the correct attribute and aria-pressed would be invalid ARIA on role=radio — so
+   the held state is drawn from aria-checked here rather than the markup being bent to the CSS. */
+.ds6 .m-seg button[aria-checked="true"] { background:var(--m-paper); color:var(--m-ink); box-shadow:var(--m-low); }
+/* Three dates in a row; one per row once the row stops fitting them. */
+.ds6 .in-g3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--m-4); }
+@media (max-width:760px) { .ds6 .in-g3 { grid-template-columns:minmax(0,1fr); } }
+
+/* The drop zone. A dashed edge is the one place in this system where a border is the affordance. */
+.ds6 .in-drop { position:relative; display:flex; flex-direction:column; align-items:center; gap:var(--m-2);
+  text-align:center; padding:var(--m-5); border-radius:var(--m-r-card); border:1.5px dashed var(--m-line-2);
+  background:var(--m-page); cursor:pointer;
+  transition:background var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease); }
+.ds6 .in-drop.over, .ds6 .in-drop:focus-within { border-color:var(--m-ac); background:var(--m-ac-dim); }
+.ds6 .in-drop .ico { inline-size:40px; block-size:40px; border-radius:var(--m-r-ctl); background:var(--m-ac-dim);
+  color:var(--m-ac-deep); display:flex; align-items:center; justify-content:center; }
+.ds6 .in-drop .ico svg { inline-size:20px; block-size:20px; }
+.ds6 .in-drop .m-meta { max-inline-size:52ch; }
+.ds6 .in-drop .in-pickbtn { pointer-events:none; }
+.ds6 .in-file { position:absolute; inline-size:1px; block-size:1px; opacity:0; overflow:hidden; }
+
+/* The preview: its own scroll box, because it is a table inside a form section rather than the
+   page's own table, and it is capped so the action bar stays reachable. */
+.ds6 .in-totals { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .in-pv { max-block-size:380px; overflow:auto; border:1px solid var(--m-line); border-radius:var(--m-r-ctl); }
+.ds6 .in-pv .m-table { min-inline-size:900px; }
+.ds6 .in-pv .m-select { min-inline-size:200px; inline-size:100%; min-block-size:36px; font-size:var(--m-t-cap); }
+.ds6 .in-pager { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+
+/* The manual picker: a bounded, scrollable list of candidates, each one a control. */
+.ds6 .in-cands { border:1px solid var(--m-line); border-radius:var(--m-r-ctl); max-block-size:260px; overflow:auto; }
+.ds6 .in-cand { display:flex; align-items:center; gap:var(--m-2); inline-size:100%; min-block-size:44px;
+  padding-inline:var(--m-3); padding-block:6px; font:inherit; font-size:var(--m-t-body); color:var(--m-ink);
+  background:transparent; border:0; border-block-end:1px solid var(--m-line); cursor:pointer; text-align:start;
+  transition:background var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+.ds6 .in-cand:last-child { border-block-end:0; }
+.ds6 .in-cand:active { transform:scale(.97); }
+@media (hover: hover) and (pointer: fine) { .ds6 .in-cand:hover { background:var(--m-page); } }
+.ds6 .in-cand[aria-pressed="true"] { background:var(--m-ac-dim); }
+.ds6 .in-box { inline-size:16px; block-size:16px; flex:0 0 auto; border-radius:4px;
+  box-shadow:inset 0 0 0 1.5px var(--m-line-2); display:inline-flex; align-items:center; justify-content:center; }
+.ds6 .in-cand[aria-pressed="true"] .in-box { background:var(--m-ac); box-shadow:none; color:#FFFFFF; }
+.ds6 .in-box svg { inline-size:12px; block-size:12px; }
+.ds6 .in-picked { display:flex; flex-direction:column; gap:6px; }
+.ds6 .in-pick { display:grid; grid-template-columns:minmax(0,1fr) 180px auto; gap:var(--m-2); align-items:center;
+  padding-inline:var(--m-3); padding-block:6px; background:var(--m-ac-dim); border-radius:var(--m-r-ctl); }
+.ds6 .in-pick .m-input { min-block-size:36px; font-size:var(--m-t-cap); }
+@media (max-width:760px) {
+  .ds6 .in-pick { grid-template-columns:minmax(0,1fr) auto; }
+  .ds6 .in-pick .m-input { grid-column:1 / -1; grid-row:2; }
+}
+
+/* The scroll container (#body) has 48px of bottom padding, and a sticky bar stops at the padding
+   edge — the form showed through the gap under it. The negative inset reaches the real edge. */
+.ds6 .in-acts { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; position:sticky;
+  inset-block-end:calc(-1 * var(--m-7)); margin-block-end:calc(-1 * var(--m-7)); z-index:var(--z-sticky, 100);
+  background:var(--m-paper); border:1px solid var(--m-line); border-block-end:0;
+  border-start-start-radius:var(--m-r-card); border-start-end-radius:var(--m-r-card);
+  padding-inline:var(--m-3); padding-block:var(--m-2) calc(var(--m-2) + var(--m-7)); }
+@media (max-width:560px) {
+  .ds6 .in-acts { inset-block-end:calc(-1 * var(--m-6)); margin-block-end:calc(-1 * var(--m-6));
+    padding-block-end:calc(var(--m-2) + var(--m-6)); }
+}
+
+/* ---- the customers drawer: the overlay geometry a .m-dlg panel needs without a <dialog> ----
+   It slides from the inline start, which in RTL is the right edge; translateX is not direction
+   aware, so the LTR case gets its own sign. */
+.ds6 .in-scrim { position:fixed; inset:0; z-index:var(--z-modal, 310); background:rgba(11,13,18,.44);
+  opacity:0; transition:opacity var(--m-out) var(--m-ease); }
+.ds6 .in-scrim.in { opacity:1; }
+.ds6 .in-dr { position:fixed; inset-block:0; inset-inline-start:0; inline-size:min(560px, 100vw);
+  z-index:var(--z-modal, 310); background:var(--m-paper); border-inline-end:1px solid var(--m-line);
+  box-shadow:var(--m-lift); display:flex; flex-direction:column;
+  transform:translateX(100%); opacity:0;
+  transition:transform var(--m-out) var(--m-ease), opacity var(--m-out) var(--m-ease); }
+[dir="ltr"] .ds6 .in-dr { transform:translateX(-100%); }
+.ds6 .in-dr.in, [dir="ltr"] .ds6 .in-dr.in { transform:none; opacity:1; transition-duration:var(--m-in); }
+.ds6 .in-dr .m-dlg__b { flex:1 1 auto; max-block-size:none; display:flex; flex-direction:column; gap:var(--m-3); }
+.ds6 .in-dr .m-dlg__h { align-items:flex-start; }
+
+@media (pointer:coarse) {
+  .ds6 .in-btn-sm, .ds6 .in-pv .m-select, .ds6 .in-pick .m-input, .ds6 button.in-linkbtn { min-block-size:44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds6 .in-dr, .ds6 .in-scrim, .ds6 .in-cand, .ds6 .in-drop { transition:none; }
+  .ds6 .in-cand:active { transform:none; }
+}
+
+/* ============================================================================
+   NOT PORTED, AND DELIBERATELY SO. Everything below draws a surface that
+   renders OUTSIDE a .ds6 subtree — «فرص حملات مقترحة» on #kmon and in the
+   wizard, the indicator block on the customer record, the wizard's objective
+   step, its repeat warning and its review summary. Their rules are kept
+   verbatim, on the old tokens, until those screens are ported in turn.
+   .in-mem, .in-link and .in-ev are here for the same reason: the customer
+   record and the dismissals list still draw with them.
+   ============================================================================ */
+.cf-pill.warn { background:var(--s-attn-soft); color:var(--s-attn-text); }
+.cf-pill.draft { background:var(--s-attn-soft); color:var(--s-attn-text); }
+.cf-pill.sys { background:var(--accent-tint); color:var(--accent-deep); }
 .in-link { font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--ink); background:none; border:none; padding:0; cursor:pointer;
   text-align:start; line-height:var(--lh-body); border-radius:var(--r-sm); }
 a.in-link { text-decoration:none; }
 .in-link:hover { color:var(--accent-deep); text-decoration:underline; text-underline-offset:3px; }
-.in-num { font-family:inherit; font-size:var(--t-sm); font-weight:600; color:var(--accent-deep); background:none; border:none; padding:0; cursor:pointer;
-  font-variant-numeric:tabular-nums; text-align:start; border-radius:var(--r-sm); }
-.in-num:hover { text-decoration:underline; text-underline-offset:3px; }
-.in-lbl { display:none; font-size:var(--t-xs); color:var(--muted); font-weight:400; }
-.in-clip { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.in-a2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-.in-a2 .btn { height:30px; padding-inline:6px; font-size:var(--t-xs); justify-content:center; text-decoration:none; display:inline-flex; align-items:center; white-space:nowrap; }
-.in-a2 .v { background:var(--accent-tint); color:var(--accent-deep); }
-.in-a2 .u { background:var(--s-issued-soft); color:var(--s-issued-text); }
-.in-a2 .off { background:var(--paper); color:var(--s-fail-text); box-shadow:inset 0 0 0 1px var(--s-fail-soft); }
-.cf-pill.warn { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.draft { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.sys { background:var(--accent-tint); color:var(--accent-deep); }
-.in .btn:active, .sg .btn:active, .in-link:active, .in-num:active { transform:scale(.97); }
-.in .btn, .sg .btn { transition:transform 140ms var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease); }
-.in select:focus-visible, .in-link:focus-visible, .in-num:focus-visible, .in-back:focus-visible, .sg a:focus-visible, .sg-f .lnk:focus-visible, .sg-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.in-form { max-width:880px; display:flex; flex-direction:column; gap:var(--s3); }
-.in-sec-b { padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
-.in-fl textarea { font-family:inherit; width:100%; font-size:var(--t-sm); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding:10px; line-height:var(--lh-body); resize:vertical; }
-.in-fl textarea:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); outline:none; }
-.in-fl textarea[aria-invalid="true"], .in .cf-fl select[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.in .cf-fl .req { color:var(--s-fail-text); }
-.in .cf-fl .ferr { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:4px; }
-.in-grp { display:flex; flex-direction:column; gap:4px; }
-.in-grp .gl { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-.in-back { align-self:flex-start; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--accent-deep); background:none; border:none; padding:4px 0; cursor:pointer; }
-.in-drop { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; padding:var(--s4); border-radius:var(--r-lg);
-  border:1.5px dashed var(--s-off-mark); background:var(--surface); cursor:pointer; transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
-.in-drop.over, .in-drop:focus-within { border-color:var(--accent); background:var(--accent-wash); }
-.in-drop .ico { width:40px; height:40px; border-radius:var(--r-md); background:var(--accent-tint); color:var(--accent-deep); display:flex; align-items:center; justify-content:center; }
-.in-drop .ico svg { width:20px; height:20px; }
-.in-drop .t { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.in-drop .s { font-size:var(--t-xs); color:var(--muted); line-height:1.6; max-width:52ch; }
-.in-drop .pick { pointer-events:none; }
-.in-file { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }
-.in-row { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.in-totals { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-xs); }
-.in-pv { border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:auto; max-height:380px; }
-.in-pv .cf-hr, .in-pv .cf-r { grid-template-columns:48px minmax(140px,1.3fr) minmax(0,1fr) 80px 92px 104px minmax(220px,1.6fr); min-width:820px; }
-.in-pv .cf-hr { position:sticky; top:0; z-index:var(--z-base); }
-.in-pv select { font-family:inherit; width:100%; min-width:200px; height:34px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-attn-mark); border-radius:var(--r-sm); padding-inline:8px; }
-.in-pv .who { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.in-pager { display:flex; align-items:center; gap:var(--s2); font-size:var(--t-xs); color:var(--muted); }
-.in-cands { border:1px solid var(--line-soft); border-radius:var(--r-md); max-height:260px; overflow:auto; }
-.in-cand { display:flex; align-items:center; gap:var(--s2); width:100%; min-height:44px; padding:6px var(--s3); font-family:inherit; font-size:var(--t-sm);
-  color:var(--ink); background:none; border:none; border-bottom:1px solid var(--line-soft); cursor:pointer; text-align:start; }
-.in-cand:hover { background:var(--accent-wash); }
-.in-cand[aria-pressed="true"] { background:var(--accent-tint); }
-.in-box { width:16px; height:16px; flex:none; border-radius:var(--r-sm); box-shadow:inset 0 0 0 1.5px var(--s-off-mark); display:inline-flex; align-items:center; justify-content:center; }
-.in-cand[aria-pressed="true"] .in-box { background:var(--accent); box-shadow:none; color:#FFFFFF; }
-.in-box svg { width:12px; height:12px; }
-.in-picked { display:flex; flex-direction:column; gap:6px; }
-.in-pick { display:grid; grid-template-columns:minmax(0,1fr) 170px auto; gap:var(--s2); align-items:center; padding:6px var(--s3);
-  background:var(--accent-wash); border-radius:var(--r-md); }
-.in-pick .inp { height:34px; padding:0 10px; border-radius:var(--r-sm); font-size:var(--t-xs); }
-.in-how { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s3) var(--s4); font-size:var(--t-sm); color:var(--ink-2, #33373E); line-height:var(--lh-loose); }
-.in-how b { color:var(--ink); font-weight:600; }
-/* The scroll container (#body) has bottom padding, and a sticky bar stops at the padding edge — the
-   form showed through a 48px gap under it. The negative inset reaches the real edge. */
-.in-acts { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; position:sticky; bottom:calc(-1 * var(--s6)); margin-bottom:calc(-1 * var(--s6));
-  z-index:var(--z-sticky); background:var(--paper); border:1px solid var(--line); border-bottom:none; border-radius:var(--r-lg) var(--r-lg) 0 0;
-  padding:var(--s2) var(--s3) calc(var(--s2) + var(--s6)); }
+.in-link:active { transform:scale(.97); }
 .in-ev { display:flex; gap:var(--s2); align-items:baseline; flex-wrap:wrap; font-size:var(--t-xs); color:var(--muted); padding:8px 0; border-bottom:1px solid var(--line-soft); }
 .in-ev b { color:var(--ink); font-weight:500; }
 .in-mem { display:flex; align-items:baseline; gap:var(--s2); flex-wrap:wrap; padding:10px 0; border-bottom:1px solid var(--line-soft); font-size:var(--t-sm); }
 .in-mem .v { font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600; font-size:var(--t-xs); background:var(--surface); border-radius:var(--r-pill); padding:1px 8px; }
 .in-mem .m { flex-basis:100%; font-size:var(--t-xs); color:var(--muted); }
-.in-drw .ox-db { display:flex; flex-direction:column; gap:var(--s2); }
-@container inw (max-width: 900px) {
-  .in-t .cf-hr { display:none; }
-  .in-t .cf-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
-  .in-t .cf-r > * { min-width:0; }
-  .in-t .in-a2 { grid-column:1 / -1; grid-template-columns:repeat(4, auto); justify-content:start; }
-  .in-lbl { display:inline; }
-  .in-pick { grid-template-columns:minmax(0,1fr) auto; }
-  .in-pick .inp { grid-column:1 / -1; grid-row:2; }
-}
-@media (max-width: 560px) { .in-acts { bottom:calc(-1 * var(--s5)); margin-bottom:calc(-1 * var(--s5)); padding-bottom:calc(var(--s2) + var(--s5)); } }
-@media (pointer:coarse) {
-  .in-bar select, .in-q, .in .cf-acts .btn, .in-pv select, .in-a2 .btn, .in-link, .in-num, .in-back, .sg-f .lnk,
-  .in .cf-fl .inp, .in .cf-fl select { min-height:44px; }
-}
+.sg .btn:active { transform:scale(.97); }
+.sg .btn { transition:transform 140ms var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease); }
+.in-link:focus-visible, .sg a:focus-visible, .sg-f .lnk:focus-visible, .sg-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 
 /* ---- «فرص حملات مقترحة» ---- */
 .sg { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
@@ -177,8 +255,8 @@ a.in-link { text-decoration:none; }
 .wz-review .r { display:grid; grid-template-columns:96px minmax(0,1fr); gap:var(--s2); align-items:baseline; }
 .wz-review .r .k { font-size:var(--t-xs); color:var(--muted); }
 .wz-review .msg { font-size:var(--t-xs); color:var(--ink-2, #33373E); background:var(--surface); border-radius:var(--r-md); padding:8px 10px; line-height:1.7; white-space:pre-wrap; max-height:120px; overflow:auto; }
-@media (pointer:coarse) { .sg-c .acts .btn, .wz-obj button, .sg-toggle { min-height:44px; } }
-@media (prefers-reduced-motion: reduce) { .in .btn, .sg .btn, .wz-obj button { transition:none; } .in .btn:active, .sg .btn:active, .wz-obj button:active, .in-link:active, .in-num:active { transform:none; } }
+@media (pointer:coarse) { .sg-c .acts .btn, .wz-obj button, .sg-toggle, .sg-f .lnk, .in-link { min-height:44px; } }
+@media (prefers-reduced-motion: reduce) { .sg .btn, .wz-obj button { transition:none; } .sg .btn:active, .wz-obj button:active, .in-link:active { transform:none; } }
 `;
 
 export const INDICATORS_CRM_JS = `
@@ -191,6 +269,8 @@ var inF = null;         /* the create/edit form */
 var inFKey = "";        /* the route tail the form state belongs to: "new", "<id>" or "<id>/data" */
 var inRowBusy = 0;
 
+/* PLAIN counted nouns, for the places that are NOT parsed as HTML — aria-labels, toasts, and the
+   surfaces of this module that are still on the old system. */
 function inPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function inNCust(n) { return inPl(n, "عميل واحد", "عميلان", "عملاء", "عميلًا"); }
 function inNInd(n) { return inPl(n, "مؤشر واحد", "مؤشران", "مؤشرات", "مؤشرًا"); }
@@ -198,6 +278,13 @@ function inNDay(n) { return inPl(n, "يوم واحد", "يومان", "أيام",
 function inNRow(n) { return inPl(n, "صف واحد", "صفّان", "صفوف", "صفًّا"); }
 function inNCamp(n) { return inPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
 function inNOpp(n) { return inPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
+/* The SAME four-way forms as MARKUP, with the numeral inside .m-n (PORT-SPEC §3 and §5). mPl comes
+   from the shared vocabulary helpers; one definition of the rule, two output shapes. */
+function inMCust(n) { return mPl(n, "عميل واحد", "عميلان", "عملاء", "عميلًا"); }
+function inMInd(n) { return mPl(n, "مؤشر واحد", "مؤشران", "مؤشرات", "مؤشرًا"); }
+function inMDay(n) { return mPl(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
+function inMRow(n) { return mPl(n, "صف واحد", "صفّان", "صفوف", "صفًّا"); }
+function inMOpp(n) { return mPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
 function inIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function inToast(m, bad, act, fn) { if (typeof opToast === "function") opToast(m, bad, act, fn); else alertBar(m, bad); }
 /* indicators.edit — exec and sales read the indicators and create none (§22). */
@@ -207,19 +294,29 @@ function inMayCampaign() { return typeof meCan !== "function" || meCan("campaign
 function inRoute() { return (location.hash || "").slice(1); }
 /* The actor label the server stores for the shared admin token. «اللوحة» means nothing to a reader. */
 function inBy(b) { return !b || b === "اللوحة" ? "المسؤول" : b; }
-/* Gregorian, western digits: «ar-SA» alone defaults to the Hijri calendar. */
+/* Gregorian, western digits: «ar-SA» alone defaults to the Hijri calendar. Returns "" when there is
+   no date — the CALL SITE decides which absence that is, because a missing measurement date is not
+   the same fact as an optional period nobody filled in (PORT-SPEC §4). */
 function inDate(iso) {
-  if (!iso) return "—";
+  if (!iso) return "";
   var d = new Date(String(iso) + "T00:00:00");
-  if (isNaN(d.getTime())) return esc(String(iso));
+  if (isNaN(d.getTime())) return String(iso);
   return d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", year: "numeric" });
+}
+/* A date as a CELL: the digits isolated, or the named absence. */
+function inDateC(iso, nilText, kind) {
+  var s = inDate(iso);
+  return s ? '<span class="m-n">' + esc(s) + "</span>" : mNil(nilText || "لم تُسجَّل", kind || "unset");
 }
 function inStamp(ms) {
   return new Date(Number(ms)).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 }
+function inStampC(ms) { return '<span class="m-n">' + esc(inStamp(ms)) + "</span>"; }
+/* Colour means status, never decoration: active is a good state, a draft is unfinished work, and
+   an inactive indicator is neither — it is simply switched off, so it takes the idle tone. */
 function inStatusPill(st) {
-  var cls = st === "active" ? "on" : st === "draft" ? "draft" : "off";
-  return '<span class="cf-pill ' + cls + '">' + esc(INDICATOR_STATUS_LABELS[st] || st) + "</span>";
+  var tone = st === "active" ? " m-chip--ok" : st === "draft" ? " m-chip--warn" : "";
+  return '<span class="m-chip' + tone + '">' + esc(INDICATOR_STATUS_LABELS[st] || st) + "</span>";
 }
 function inById(id) { return (inRows || []).filter(function (r) { return String(r.id) === String(id); })[0] || null; }
 
@@ -249,21 +346,48 @@ function inFiltered() {
     return true;
   });
 }
+/* PORT-SPEC §6. Every count this screen prints in more than one place is derived ONCE, from the SAME
+   array the markup renders, and re-run on every paint by dsVerify. The list total is printed in the
+   «المؤشرات النشطة» tile AND in the filter bar; the member count is printed on the row AND in the
+   drawer's sub-head. A figure that drifts is outlined and named in the console. */
+function inBind() {
+  dsD("inNAll", function () { return (inRows || []).length; });
+  dsD("inNShown", function () { return inFiltered().length; });
+  dsD("inNActive", function () { return (inRows || []).filter(function (r) { return r.status === "active"; }).length; });
+  dsD("inNProd", function () {
+    var p = {}; (inRows || []).forEach(function (r) { if (r.product) p[r.product] = 1; });
+    return Object.keys(p).length;
+  });
+}
+/* The row and the drawer print one fact — «how many customers are in this indicator» — from two
+   reads. Binding both to the registry means a stale count cannot sit quietly beside a fresh one.
+   When the list was never loaded (the drawer opened from the customer record) the derivation
+   returns null and dsVerify skips it rather than crying wolf. */
+function inBindMem(id) {
+  dsD("inMem_" + id, function () { var r = inById(id); return r ? r.memberCount : null; });
+}
 function inKpis() {
   var all = inRows || [];
   var active = all.filter(function (r) { return r.status === "active"; }).length;
   var prods = {}; all.forEach(function (r) { if (r.product) prods[r.product] = 1; });
   var last = all.filter(function (r) { return r.status !== "draft"; }).reduce(function (a, r) { return r.dataUpdatedAt > a ? r.dataUpdatedAt : a; }, "");
   var fr = last ? indicatorFreshness(last, inToday) : { days: null, stale: false };
-  var tile = function (k, v, s, lead, href) {
-    var open = href ? '<a class="crm-kpi crm-click' + (lead ? " crm-lead" : "") + '" href="' + href + '">' : '<div class="crm-kpi' + (lead ? " crm-lead" : "") + '">';
-    return open + '<div class="crm-k">' + k + '</div><div class="crm-v">' + v + "</div>" + (s ? '<div class="crm-s">' + s + "</div>" : "") + (href ? "</a>" : "</div>");
+  var tile = function (k, v, s, href, lead) {
+    var body = '<span class="m-stat__k">' + k + '</span><span class="m-stat__v">' + v + "</span>" +
+      (s ? '<span class="m-stat__s">' + s + "</span>" : "");
+    return href
+      ? '<a class="m-card in-kpi" href="' + href + '">' + body + "</a>"
+      : '<div class="m-card in-kpi' + (lead ? " in-kpi--lead" : "") + '">' + body + "</div>";
   };
-  return '<div class="crm-kpis crm-hasLead">' +
-    tile("المؤشرات النشطة", fmtN(active), "من أصل " + inNInd(all.length), true) +
-    tile("العملاء المشمولون", fmtN(inCov.customers), fmtN(inCov.activeCustomers) + " منهم في مؤشر نشط · اعرضهم", false, "#targets/indicators") +
-    tile("المنتجات المرتبطة", fmtN(Object.keys(prods).length), "") +
-    tile("آخر تحديث للبيانات", last ? inDate(last) : "—", fr.days == null ? "" : fr.days === 0 ? "اليوم" : "قبل " + inNDay(fr.days)) +
+  return '<div class="m-kpis">' +
+    tile("المؤشرات النشطة", dsFig("inNActive", active),
+      "من أصل " + opPlFig("inNAll", all.length, "مؤشر واحد", "مؤشران", "مؤشرات", "مؤشرًا"), "", true) +
+    tile("العملاء المشمولون", mN(inCov.customers),
+      mN(inCov.activeCustomers) + " منهم في مؤشر نشط · اعرضهم", "#targets/indicators") +
+    tile("المنتجات المرتبطة", dsFig("inNProd", Object.keys(prods).length), "") +
+    /* No measurement date on record is a date nobody entered, not a legitimate nothing. */
+    tile("آخر تحديث للبيانات", last ? inDateC(last) : mNil("لم تُسجَّل", "unset"),
+      fr.days == null ? "" : fr.days === 0 ? "اليوم" : "قبل " + inMDay(fr.days)) +
     "</div>";
 }
 function inTeaser() {
@@ -271,32 +395,39 @@ function inTeaser() {
   if (!sgData) return "";
   var n = (sgData.suggestions || []).length;
   if (!n) return "";
-  return '<div class="sg-applied" style="margin-bottom:0"><span class="mk">' + inIco("check") + '</span><div style="flex:1;min-width:220px">' +
-    '<div class="tt">اقترح مسار ' + inNOpp(n) + " لحملات من هذه المؤشرات</div>" +
-    '<div class="s">لكل فرصة سببها، والمؤشرات التي بُنيت عليها، وعدد العملاء بعد استبعاد من طلب الإيقاف ومن أُرسلت إليه حملة خلال ' + inNDay(sgData.suppressionDays) + ".</div></div>" +
-    '<a class="btn sg-go" href="#kmon" style="text-decoration:none;height:36px;display:inline-flex;align-items:center">راجع الفرص</a></div>';
+  return '<div class="m-card in-teaser" role="status"><div class="in-teaser__b">' +
+    '<p class="m-label">اقترح مسار ' + inMOpp(n) + " لحملات من هذه المؤشرات</p>" +
+    '<p class="m-meta">لكل فرصة سببها، والمؤشرات التي بُنيت عليها، وعدد العملاء بعد استبعاد من طلب الإيقاف ومن أُرسلت إليه حملة خلال ' +
+      inMDay(sgData.suppressionDays) + ".</p></div>" +
+    '<a class="m-btn" href="#kmon">راجع الفرص</a></div>';
 }
 function inRow(r) {
   var fr = indicatorFreshness(r.dataUpdatedAt, inToday);
   var busy = inRowBusy === r.id;
   var archived = r.product && inProducts.indexOf(r.product) < 0;
-  var h = '<div class="cf-r' + (r.status === "active" ? "" : " off") + '" data-inrow="' + r.id + '">';
-  h += '<span class="in-nm"><button class="in-link" id="inv' + r.id + '" data-in="view" data-i="' + r.id + '" title="عرض العملاء">' + esc(r.name) + "</button>" +
-    (r.description ? '<span class="in-desc">' + esc(r.description) + "</span>" : "") + "</span>";
-  h += '<span class="in-clip" title="' + esc(r.product || "") + '">' + (r.product ? esc(r.product) + (archived ? ' <span class="cf-pill off">مؤرشف</span>' : "") : '<span class="cf-sub">بلا منتج</span>') + "</span>";
-  h += '<span class="cf-sub in-clip" title="' + esc(INDICATOR_SIGNAL_LABELS[r.signal] || "") + '">' + esc(INDICATOR_SIGNAL_SHORT[r.signal] || r.signal) + "</span>";
-  h += '<span><button class="in-num" id="invn' + r.id + '" data-in="view" data-i="' + r.id + '" aria-label="عرض ' + esc(inNCust(r.memberCount)) + '">' + fmtN(r.memberCount) + '</button><span class="in-lbl"> ' + (r.memberCount === 1 ? "عميل" : r.memberCount === 2 ? "عميلان" : r.memberCount >= 3 && r.memberCount <= 10 ? "عملاء" : "عميلًا") + "</span></span>";
-  h += '<span><span class="in-lbl">آخر تحديث </span>' + inDate(r.dataUpdatedAt) + (fr.stale ? ' <span class="cf-pill warn" title="البيانات أقدم من ' + inNDay(INDICATOR_STALE_DAYS) + '">قديمة</span>' : "") + "</span>";
-  h += "<span>" + inStatusPill(r.status) + "</span>";
-  h += '<span class="in-a2">' +
-    '<button class="btn v" id="invb' + r.id + '" data-in="view" data-i="' + r.id + '">عرض العملاء</button>' +
+  inBindMem(r.id);
+  var h = '<tr' + (r.status === "active" ? "" : ' class="in-row--off"') + ' data-inrow="' + r.id + '">';
+  h += '<td class="m-td-n"><button class="m-link in-linkbtn in-clip" id="inv' + r.id + '" data-in="view" data-i="' + r.id + '" title="عرض العملاء">' + esc(r.name) + "</button>" +
+    (r.description ? '<span class="m-meta in-sub in-desc">' + esc(r.description) + "</span>" : "") + "</td>";
+  /* An indicator with no product is a link nobody made — the form requires one, so this is a draft
+     that stopped short, not a legitimate nothing. */
+  h += '<td><span class="in-clip" title="' + esc(r.product || "") + '">' +
+    (r.product ? esc(r.product) + (archived ? ' <span class="m-chip">مؤرشف</span>' : "") : mNil("بلا منتج", "unset")) + "</span></td>";
+  h += '<td><span class="in-clip" title="' + esc(INDICATOR_SIGNAL_LABELS[r.signal] || "") + '">' + esc(INDICATOR_SIGNAL_SHORT[r.signal] || r.signal) + "</span></td>";
+  h += '<td class="m-td-v"><button class="m-link in-linkbtn" id="invn' + r.id + '" data-in="view" data-i="' + r.id + '" aria-label="عرض ' + esc(inNCust(r.memberCount)) + '">' +
+    opPlFig("inMem_" + r.id, r.memberCount, "عميل واحد", "عميلان", "عملاء", "عميلًا") + "</button></td>";
+  h += "<td>" + inDateC(r.dataUpdatedAt) +
+    (fr.stale ? ' <span class="m-chip m-chip--warn" title="البيانات أقدم من ' + esc(inNDay(INDICATOR_STALE_DAYS)) + '">قديمة</span>' : "") + "</td>";
+  h += "<td>" + inStatusPill(r.status) + "</td>";
+  h += '<td><span class="in-acts2">' +
+    '<button class="m-btn in-btn-sm" id="invb' + r.id + '" data-in="view" data-i="' + r.id + '">عرض العملاء</button>' +
     (inMayEdit()
-      ? '<a class="btn btn-ghost" href="#indicator/' + r.id + '">' + (r.status === "draft" ? "أكمل المسودة" : "تعديل") + "</a>" +
-        '<a class="btn u" href="#indicator/' + r.id + '/data" title="ارفع بيانات أحدث لهذا المؤشر">تحديث البيانات</a>' +
-        (r.status === "draft" ? "<span></span>" : '<button class="btn ' + (r.status === "active" ? "off" : "btn-ghost") + '" data-in="toggle" data-i="' + r.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ">" +
+      ? '<a class="m-btn in-btn-sm" href="#indicator/' + r.id + '">' + (r.status === "draft" ? "أكمل المسودة" : "تعديل") + "</a>" +
+        '<a class="m-btn in-btn-sm" href="#indicator/' + r.id + '/data" title="ارفع بيانات أحدث لهذا المؤشر">تحديث البيانات</a>' +
+        (r.status === "draft" ? "" : '<button class="m-btn in-btn-sm' + (r.status === "active" ? " in-btn-off" : "") + '" data-in="toggle" data-i="' + r.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ">" +
           (r.status === "active" ? "تعطيل" : "تفعيل") + "</button>")
       : "") +
-    "</span></div>";
+    "</span></td></tr>";
   return h;
 }
 function vIndicators() {
@@ -305,44 +436,65 @@ function vIndicators() {
      is now, not the status it had before someone disabled it from this list (eng review). */
   inF = null; inFKey = "";
   setTimeout(inPaintCrumb, 0);
-  var h = '<div class="in">';
+  inBind();
+  var open = '<div class="ds6"><div class="in-page">', shut = "</div></div>";
   if (inRows === null && !inFailed) {
-    return h + '<section class="cf-sec"><div class="cf-state" aria-busy="true">جارٍ تحميل المؤشرات…</div></section></div>';
+    return open + '<div class="m-card" aria-busy="true">' + moSkeleton(5, ["w40", "w80", "w60"]) + "</div>" + shut + inDrawer();
   }
   if (inRows === null) {
-    return h + '<section class="cf-sec"><div class="cf-state" role="alert">تعذّر تحميل المؤشرات.<button class="btn btn-ghost" data-in="retry">أعد المحاولة</button></div></section></div>';
+    /* A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY LIST: it says which, and offers the retry. */
+    return open + '<div class="m-alert" role="alert"><span class="m-alert__t">تعذّر تحميل المؤشرات</span>' +
+      '<span class="m-alert__d">لم يُعرض شيء لأن الطلب فشل، لا لأن القائمة فارغة.</span>' +
+      '<button class="m-btn" data-in="retry">أعد المحاولة</button></div>' + shut + inDrawer();
   }
-  if (inFailed) h += '<section class="cf-sec"><div class="cf-state" role="alert">' + inIco("warn") + 'تعذّر التحديث — المعروض آخر نسخة محمّلة.<button class="btn btn-ghost" data-in="retry">أعد المحاولة</button></div></section>';
+  var h = open;
+  if (inFailed) {
+    h += '<div class="m-alert" role="alert"><span class="m-alert__d">' + inIco("warn") +
+      "تعذّر التحديث — المعروض آخر نسخة محمّلة.</span>" +
+      '<button class="m-btn" data-in="retry">أعد المحاولة</button></div>';
+  }
   if (!inRows.length) {
-    return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا مؤشرات استخدام بعد</b>' +
-      'المؤشر قائمة عملاء يجمعهم وصف قابل للقياس — «استخدام مرتفع للإجازات المرضية»، «مرتبطون تقنيًا»، «غير مشتركين». ' +
-      'ارفعه من ملف Excel أو اختر عملاءه يدويًا، ويقرؤه مسار ليقترح حملات مبنية عليه ويذكر سبب كل اقتراح.' +
+    h += '<div class="m-card m-empty"><p class="m-empty__t">لا مؤشرات استخدام بعد</p>' +
+      '<p class="m-empty__d">المؤشر قائمة عملاء يجمعهم وصف قابل للقياس — «استخدام مرتفع للإجازات المرضية»، «مرتبطون تقنيًا»، «غير مشتركين». ' +
+      'ارفعه من ملف Excel أو اختر عملاءه يدويًا، ويقرؤه مسار ليقترح حملات مبنية عليه ويذكر سبب كل اقتراح.</p>' +
       (inMayEdit()
-        ? '<div class="in-row" style="margin-top:var(--s3)"><a class="btn btn-teal" href="#indicator/new" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px">' + inIco("plus") + "إضافة مؤشر</a>" +
-          '<a class="btn btn-ghost" href="/assets/indicator-template.xlsx" style="text-decoration:none;display:inline-flex;align-items:center">تحميل نموذج Excel</a></div>'
-        : "") + "</div></section></div>" + inDrawer();
+        ? '<div class="m-empty__a in-row"><a class="m-btn m-btn--primary" href="#indicator/new">' + inIco("plus") + "إضافة مؤشر</a>" +
+          '<a class="m-btn" href="/assets/indicator-template.xlsx">تحميل نموذج Excel</a></div>'
+        : "") + "</div>";
+    return h + shut + inDrawer();
   }
   h += inKpis();
   h += inTeaser();
   var rows = inFiltered();
   var prodOpts = {}; inRows.forEach(function (r) { if (r.product) prodOpts[r.product] = 1; });
-  h += '<section class="cf-sec in-t"><div class="in-bar">' +
-    '<input class="in-q" id="inq" value="' + esc(inQ) + '" placeholder="بحث باسم المؤشر أو وصفه…" aria-label="بحث في المؤشرات" data-inset="q">' +
-    '<select aria-label="المنتج" data-inset="prod"' + (inFProd ? ' class="on"' : "") + '><option value="">كل المنتجات</option>' +
+  h += '<section class="m-card m-card--pad0 in-tbl" aria-label="مؤشرات الاستخدام"><div class="m-tools">' +
+    '<div class="in-filters">' +
+    '<input class="m-input" id="inq" type="search" value="' + esc(inQ) + '" placeholder="بحث باسم المؤشر أو وصفه…" aria-label="بحث في المؤشرات" data-inset="q">' +
+    '<select class="m-select' + (inFProd ? " in-on" : "") + '" aria-label="المنتج" data-inset="prod"><option value="">كل المنتجات</option>' +
       Object.keys(prodOpts).sort().map(function (p) { return '<option value="' + esc(p) + '"' + (inFProd === p ? " selected" : "") + ">" + esc(clip(p, 28)) + "</option>"; }).join("") + "</select>" +
-    '<select aria-label="الحالة" data-inset="stat"' + (inFStat ? ' class="on"' : "") + '><option value="">كل الحالات</option>' +
+    '<select class="m-select' + (inFStat ? " in-on" : "") + '" aria-label="الحالة" data-inset="stat"><option value="">كل الحالات</option>' +
       INDICATOR_STATUSES.map(function (s) { return '<option value="' + s + '"' + (inFStat === s ? " selected" : "") + ">" + INDICATOR_STATUS_LABELS[s] + "</option>"; }).join("") + "</select>" +
-    '<select aria-label="دلالة المؤشر" data-inset="sig"' + (inFSig ? ' class="on"' : "") + '><option value="">كل الدلالات</option>' +
+    '<select class="m-select' + (inFSig ? " in-on" : "") + '" aria-label="دلالة المؤشر" data-inset="sig"><option value="">كل الدلالات</option>' +
       INDICATOR_SIGNALS.map(function (s) { return '<option value="' + s + '"' + (inFSig === s ? " selected" : "") + ">" + esc(INDICATOR_SIGNAL_LABELS[s]) + "</option>"; }).join("") + "</select>" +
-    '<span class="sp"></span><span class="cntpill">' + fmtN(rows.length) + " من " + fmtN(inRows.length) + "</span></div>";
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>اسم المؤشر</span><span>المنتج المرتبط</span><span>الدلالة</span><span>العملاء</span><span>آخر تحديث</span><span>الحالة</span><span>الإجراءات</span></div>';
+    "</div>" +
+    '<span class="m-cap">' + dsFig("inNShown", rows.length) + " من " + dsFig("inNAll", inRows.length) + "</span></div>";
+  h += '<div class="m-tablewrap"><table class="m-table"><thead><tr>' +
+    "<th>اسم المؤشر</th><th>المنتج المرتبط</th><th>الدلالة</th><th>العملاء</th>" +
+    "<th>آخر تحديث</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody>";
   if (!rows.length) {
-    h += '<div class="cf-state">لا مؤشرات مطابقة.<button class="btn btn-ghost" data-in="clearf">مسح التصفية</button></div>';
+    h += '<tr class="m-table__empty"><td colspan="7"><div class="m-empty">' +
+      '<p class="m-empty__t">لا مؤشرات مطابقة</p>' +
+      '<p class="m-empty__d">لا مؤشر يطابق التصفية الحالية.</p>' +
+      '<div class="m-empty__a"><button class="m-btn" data-in="clearf">مسح التصفية</button></div></div></td></tr>';
   }
   rows.forEach(function (r) { h += inRow(r); });
-  h += '</div><div class="cf-note">المؤشر المعطَّل يبقى بسجله وعملائه ولا يدخل في الفرص المقترحة الجديدة. «تحديث البيانات» يستبدل قائمة العملاء بملف أحدث ويُسجَّل في سجل التغييرات.</div></section>';
-  return h + "</div>" + inDrawer();
+  h += "</tbody></table></div>";
+  h += '<p class="m-meta" style="padding-inline:var(--m-4);padding-block:var(--m-3)">المؤشر المعطَّل يبقى بسجله وعملائه ولا يدخل في الفرص المقترحة الجديدة. «تحديث البيانات» يستبدل قائمة العملاء بملف أحدث ويُسجَّل في سجل التغييرات.</p>';
+  h += "</section>";
+  return h + shut + inDrawer();
 }
+/* NOT PORTED: this writes into #crumbact, which is dashboard.ts's breadcrumb bar — above #body and
+   outside every .ds6 subtree. It keeps the old vocabulary until that bar is ported. */
 function inPaintCrumb() {
   var act = document.getElementById("crumbact");
   if (!act || inRoute().split("/")[0] !== "indicators") return;
@@ -364,11 +516,12 @@ function inOpenDrawer(id, from) {
 function inCloseDrawer() {
   if (!inDr) return;
   var from = inDr.from;
-  document.querySelectorAll(".in-drw .ox-dr, .in-drw .ox-scrim").forEach(function (el) { el.classList.remove("in"); });
+  document.querySelectorAll(".in-drw .in-dr, .in-drw .in-scrim").forEach(function (el) { el.classList.remove("in"); });
+  /* --m-out, the exit duration the panel is actually animating over. */
   setTimeout(function () {
     inDr = null; render(false);
     var t = from && document.getElementById(from); if (t) t.focus();
-  }, 200);
+  }, 120);
 }
 function inDrawer() {
   if (!inDr) return "";
@@ -378,52 +531,72 @@ function inDrawer() {
   var it = inDr.data, row = inById(inDr.id);
   var cls = inDr.shown ? " in" : "";
   var title = it ? it.name : row ? row.name : "المؤشر";
-  var head = '<div class="tt"><h2 id="indrt" tabindex="-1">' + esc(title) + "</h2>" +
-    '<div class="st">' + (it ? inNCust(it.members.length) + " · " + (it.product ? esc(it.product) : "بلا منتج") + " · " + inStatusPill(it.status) : "") + "</div></div>";
+  if (it) inBindMem(it.id);
+  var sub = it
+    ? opPlFig("inMem_" + it.id, it.members.length, "عميل واحد", "عميلان", "عملاء", "عميلًا") + " · " +
+      (it.product ? esc(it.product) : mNil("بلا منتج", "unset")) + " · " + inStatusPill(it.status)
+    : "";
   var b = "";
-  if (!it && !inDr.failed) b = '<div class="cf-state" aria-busy="true">جارٍ تحميل العملاء…</div>';
-  else if (!it) b = '<div class="cf-state" role="alert">تعذّر تحميل المؤشر.<button class="btn btn-ghost" data-in="drretry">أعد المحاولة</button></div>';
-  else {
+  if (!it && !inDr.failed) b = '<div aria-busy="true">' + moSkeleton(4, ["w80", "w60", "w40"]) + "</div>";
+  else if (!it) {
+    b = '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل المؤشر.</span>' +
+      '<button class="m-btn" data-in="drretry">أعد المحاولة</button></div>';
+  } else {
     var fr = indicatorFreshness(it.dataUpdatedAt, inToday);
-    b += '<div class="cf-sub" style="line-height:1.8">' + esc(INDICATOR_SIGNAL_LABELS[it.signal] || "") + " · " + esc(CUSTOMER_TYPE_LABELS[it.customerType] || "") + " · بيانات " + inDate(it.dataUpdatedAt) +
-      (fr.stale ? ' <span class="cf-pill warn">أقدم من ' + inNDay(INDICATOR_STALE_DAYS) + "</span>" : "") +
-      (it.periodFrom || it.periodTo ? " · الفترة " + inDate(it.periodFrom) + " ← " + inDate(it.periodTo) : "") +
-      (it.source === "file" && it.sourceFilename ? " · من ملف <bdi>" + esc(it.sourceFilename) + "</bdi>" : it.source === "manual" ? " · اختيار يدوي" : "") + "</div>";
-    if (it.description) b += '<p style="margin:0;font-size:var(--t-sm);color:var(--ink);line-height:1.7">' + esc(it.description) + "</p>";
-    b += '<input class="in-q" id="indrq" data-inset="drq" value="' + esc(inDr.q) + '" placeholder="ابحث في عملاء المؤشر…" aria-label="بحث في عملاء المؤشر" style="max-width:none;width:100%;flex:none;height:38px">';
+    b += '<p class="m-meta">' + esc(INDICATOR_SIGNAL_LABELS[it.signal] || "") + " · " + esc(CUSTOMER_TYPE_LABELS[it.customerType] || "") +
+      " · بيانات " + inDateC(it.dataUpdatedAt) +
+      (fr.stale ? ' <span class="m-chip m-chip--warn">أقدم من ' + esc(inNDay(INDICATOR_STALE_DAYS)) + "</span>" : "") +
+      /* A period nobody entered is optional metadata, not data anyone owes. */
+      (it.periodFrom || it.periodTo ? " · الفترة " + inDateC(it.periodFrom, "بلا بداية", "none") + " ← " + inDateC(it.periodTo, "بلا نهاية", "none") : "") +
+      (it.source === "file" && it.sourceFilename ? " · من ملف " + esc(it.sourceFilename) : it.source === "manual" ? " · اختيار يدوي" : "") + "</p>";
+    if (it.description) b += '<p class="m-body">' + esc(it.description) + "</p>";
+    b += '<input class="m-input" id="indrq" data-inset="drq" value="' + esc(inDr.q) + '" placeholder="ابحث في عملاء المؤشر…" aria-label="بحث في عملاء المؤشر">';
     var q = inDr.q.trim();
     var list = it.members.filter(function (m) { return !q || m.name.indexOf(q) >= 0 || m.phone.indexOf(q) >= 0; });
     var shown = list.slice(0, 200);
     b += "<div>";
-    if (!list.length) b += '<div class="cf-state">' + (q ? "لا عميل يطابق «" + esc(q) + "»." : "لا عملاء في هذا المؤشر.") + "</div>";
+    if (!list.length) {
+      b += '<div class="m-empty"><p class="m-empty__t">' + (q ? "لا عميل يطابق «" + esc(q) + "»" : "لا عملاء في هذا المؤشر") + "</p></div>";
+    }
     shown.forEach(function (m) {
       /* A customer never messaged has no conversation record yet, and #customer/<phone> said so with a
          dead end. Those open their row in the customer book instead (UX review). */
       var talked = typeof contactByPhone === "function" && contactByPhone(m.phone);
-      b += '<div class="in-mem">' + (talked
-          ? '<a class="in-link" href="#customer/' + esc(m.phone) + '">' + esc(m.name) + "</a>"
-          : '<a class="in-link" href="#account/' + Number(m.entityId) + '" title="لم تُراسل بعد — افتح سجل العميل">' + esc(m.name) + "</a>") +
-        (m.value ? '<span class="v">' + esc(m.value) + "</span>" : "") +
-        '<span class="m">' + [m.city ? esc(m.city) : "", m.period ? esc(m.period) : "", m.matchedBy ? IN_MATCHED_BY[m.matchedBy] || "" : "", talked ? "" : "لم تُراسل بعد", '<bdi dir="ltr">+' + esc(m.phone) + "</bdi>"].filter(Boolean).join(" · ") + "</span></div>";
+      var meta = [m.city ? esc(m.city) : "", m.period ? esc(m.period) : "", m.matchedBy ? IN_MATCHED_BY[m.matchedBy] || "" : "",
+        talked ? "" : "لم تُراسل بعد", '<span class="m-n">+' + esc(m.phone) + "</span>"].filter(Boolean).join(" · ");
+      b += '<div class="m-item"><span class="m-item__b">' +
+        (talked
+          ? '<a class="m-item__n" href="#customer/' + esc(m.phone) + '">' + esc(m.name) + "</a>"
+          : '<a class="m-item__n" href="#account/' + Number(m.entityId) + '" title="لم تُراسل بعد — افتح سجل العميل">' + esc(m.name) + "</a>") +
+        '<span class="m-item__s">' + meta + "</span></span>" +
+        (m.value ? '<span class="m-item__v m-n">' + esc(m.value) + "</span>" : "") + "</div>";
     });
-    if (list.length > shown.length) b += '<div class="cf-sub" style="padding:var(--s2) 0">يُعرض ' + fmtN(shown.length) + " من " + fmtN(list.length) + " — ضيّق البحث.</div>";
+    if (list.length > shown.length) {
+      b += '<p class="m-meta">يُعرض ' + mN(shown.length) + " من " + mN(list.length) + " — ضيّق البحث.</p>";
+    }
     b += "</div>";
     if (it.events && it.events.length) {
-      b += '<div style="margin-top:var(--s2)"><div style="font-size:var(--t-sm);font-weight:600;color:var(--ink);margin-bottom:2px">سجل التغييرات</div>';
+      b += '<div><p class="m-label">سجل التغييرات</p><div class="m-tl">';
       it.events.forEach(function (e) {
-        var extra = e.action === "data_replaced" && e.detail ? " (" + fmtN(e.detail.before) + " ← " + fmtN(e.detail.after) + ")" :
-          e.action === "created" && e.detail ? " (" + inNCust(e.detail.members) + ")" : "";
-        b += '<div class="in-ev"><b>' + esc(IN_EVENT[e.action] || e.action) + extra + "</b><span>" + esc(inBy(e.by)) + '</span><span style="margin-inline-start:auto">' + inStamp(e.at) + "</span></div>";
+        var extra = e.action === "data_replaced" && e.detail ? " (" + mN(e.detail.before) + " ← " + mN(e.detail.after) + ")" :
+          e.action === "created" && e.detail ? " (" + inMCust(e.detail.members) + ")" : "";
+        b += '<div class="m-tl__i"><span class="m-tl__d"></span><span><span class="m-tl__n">' +
+          esc(IN_EVENT[e.action] || e.action) + extra + '</span><span class="m-tl__s">' + esc(inBy(e.by)) + "</span></span>" +
+          '<span class="m-tl__t">' + inStampC(e.at) + "</span></div>";
       });
-      b += "</div>";
+      b += "</div></div>";
     }
   }
-  var foot = it ? (inMayEdit() ? '<a class="btn btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center" href="#indicator/' + it.id + '">تعديل</a>' : "") +
-    (it.product && it.members.length && inMayCampaign() ? '<button class="btn btn-teal" data-in="drcamp">إنشاء حملة لهؤلاء</button>' : "") : "";
-  return '<div class="in-drw"><div class="ox-scrim' + cls + '" data-in="drclose"></div>' +
-    '<div class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="indrt">' +
-    '<div class="ox-dh">' + head + '<button class="ox-x" aria-label="إغلاق" data-in="drclose">' + inIco("x") + "</button></div>" +
-    '<div class="ox-db">' + b + "</div>" + (foot ? '<div class="ox-df">' + foot + "</div>" : "") + "</div></div>";
+  var foot = it ? (inMayEdit() ? '<a class="m-btn" href="#indicator/' + it.id + '">تعديل</a>' : "") +
+    (it.product && it.members.length && inMayCampaign() ? '<button class="m-btn m-btn--primary" data-in="drcamp">إنشاء حملة لهؤلاء</button>' : "") : "";
+  /* Its OWN .ds6: this drawer is also rendered from accounts-crm.ts and from the customer record in
+     dashboard.ts, so it cannot rely on a host wrapper that may or may not be there. */
+  return '<div class="ds6"><div class="in-drw"><div class="in-scrim' + cls + '" data-in="drclose"></div>' +
+    '<div class="in-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="indrt">' +
+    '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="indrt" tabindex="-1">' + esc(title) + "</h2>" +
+    (sub ? '<p class="m-meta">' + sub + "</p>" : "") + "</div>" +
+    '<button class="m-x" aria-label="إغلاق" data-in="drclose">' + inIco("x") + "</button></div>" +
+    '<div class="m-dlg__b">' + b + "</div>" + (foot ? '<div class="m-dlg__f">' + foot + "</div>" : "") + "</div></div></div>";
 }
 /* Runs after every paint. The drawer slides in once (painted without «in», class added next frame);
    the load finishing repaints it, which drops focus from its heading, so focus is put back once. The
@@ -436,7 +609,7 @@ function inAfterPaint() {
   if (inDr && !inDr.shown && document.querySelector(".in-drw")) {
     requestAnimationFrame(function () {
       if (!inDr) return;
-      document.querySelectorAll(".in-drw .ox-dr, .in-drw .ox-scrim").forEach(function (el) { el.classList.add("in"); });
+      document.querySelectorAll(".in-drw .in-dr, .in-drw .in-scrim").forEach(function (el) { el.classList.add("in"); });
       inDr.shown = true;
       var hd = document.getElementById("indrt"); if (hd) hd.focus();
     });
@@ -491,7 +664,7 @@ function inEnsureForm(rest) {
   }).then(function () { render(false); });
 }
 function inFld(f) { return inF && inF.field === f ? ' aria-invalid="true" aria-describedby="err_' + f + '"' : ""; }
-function inFerr(f) { return inF && inF.field === f && inF.err ? '<span class="ferr" id="err_' + f + '" role="alert">' + inIco("warn") + esc(inF.err) + "</span>" : ""; }
+function inFerr(f) { return inF && inF.field === f && inF.err ? '<span class="m-err" id="err_' + f + '" role="alert">' + inIco("warn") + esc(inF.err) + "</span>" : ""; }
 function inIncluded() {
   if (!inF) return [];
   var out = [], seen = {};
@@ -518,106 +691,139 @@ function inHowText(sig, product) {
     other: "لا يدخل في القواعد الآلية. يظهر شريحةً جاهزة لحملة على " + p + " دون أن يدّعي مسار دلالة لم تُحدَّد.",
   };
   return (m[sig] || "اختر دلالة المؤشر أعلاه ليظهر هنا كيف يستخدمه مسار.") +
-    " لا يدخل في أي توصية إلا وهو <b>نشط</b>، ويُستبعد تلقائيًا من طلب الإيقاف، ومن لديه فرصة مفتوحة للمنتج، ومن أُرسلت إليه حملة عنه خلال " + inNDay(inSupp) + ".";
+    " لا يدخل في أي توصية إلا وهو <b>نشط</b>، ويُستبعد تلقائيًا من طلب الإيقاف، ومن لديه فرصة مفتوحة للمنتج، ومن أُرسلت إليه حملة عنه خلال " + inMDay(inSupp) + ".";
 }
 function inSel(id, label, k, value, opts, req, hint) {
-  return '<div class="cf-fl"><label for="' + id + '">' + label + (req ? ' <span class="req" aria-hidden="true">*</span>' : "") + '</label><select id="' + id + '" data-infld="' + k + '"' + (req ? ' aria-required="true"' : "") + inFld(k) + ">" +
+  return '<div class="m-field"><label class="m-label' + (req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+    '<select class="m-select" id="' + id + '" data-infld="' + k + '"' + (req ? ' aria-required="true"' : "") + inFld(k) + ">" +
     opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
-    "</select>" + (hint ? '<span class="hint">' + hint + "</span>" : "") + inFerr(k) + "</div>";
+    "</select>" + (hint ? '<span class="m-hint">' + hint + "</span>" : "") + inFerr(k) + "</div>";
 }
 function inInp(id, label, k, value, extra, req, hint) {
   extra = extra || {};
-  return '<div class="cf-fl"><label for="' + id + '">' + label + (req ? ' <span class="req" aria-hidden="true">*</span>' : "") + '</label><input class="inp" id="' + id + '" data-infld="' + k + '" value="' + esc(value || "") + '"' +
+  return '<div class="m-field"><label class="m-label' + (req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+    '<input class="m-input" id="' + id + '" data-infld="' + k + '" value="' + esc(value || "") + '"' +
     (extra.type ? ' type="' + extra.type + '" lang="en"' : "") + (extra.max ? ' maxlength="' + extra.max + '"' : "") + (extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : "") +
-    (req ? ' aria-required="true"' : "") + inFld(k) + ">" + (hint ? '<span class="hint">' + hint + "</span>" : "") + inFerr(k) + "</div>";
+    (req ? ' aria-required="true"' : "") + inFld(k) + ">" + (hint ? '<span class="m-hint">' + hint + "</span>" : "") + inFerr(k) + "</div>";
 }
+/* A radiogroup, drawn as a segmented control. aria-checked carries the state (aria-pressed would be
+   invalid ARIA on role=radio), and the module's own rule draws the held option from it. */
 function inSeg(k, value, opts, label) {
   var lid = "seg_" + k;
-  return (label ? '<span class="gl" id="' + lid + '">' + label + "</span>" : "") +
-    '<span class="vtog" role="radiogroup"' + (label ? ' aria-labelledby="' + lid + '"' : ' aria-label="تصفية الصفوف"') + ">" + opts.map(function (o) {
-      return '<button type="button" role="radio" aria-checked="' + (value === o[0]) + '" class="' + (value === o[0] ? "on" : "") + '" data-in="seg" data-k="' + k + '" data-v="' + esc(o[0]) + '">' + esc(o[1]) + "</button>";
+  return (label ? '<span class="m-label" id="' + lid + '">' + label + "</span>" : "") +
+    '<span class="m-seg in-seg" role="radiogroup"' + (label ? ' aria-labelledby="' + lid + '"' : ' aria-label="تصفية الصفوف"') + ">" + opts.map(function (o) {
+      return '<button type="button" role="radio" aria-checked="' + (value === o[0]) + '" data-in="seg" data-k="' + k + '" data-v="' + esc(o[0]) + '">' + esc(o[1]) + "</button>";
     }).join("") + "</span>";
 }
 var IN_PV_PAGE = 100;
 function inPreviewView() {
   var pv = inF.preview;
-  if (inF.pvBusy) return '<div class="cf-state" aria-busy="true">جارٍ قراءة البيانات ومطابقتها بالعملاء…</div>';
-  if (inF.pvErr) return '<div class="cf-err" role="alert">' + inIco("warn") + esc(inF.pvErr) + "</div>";
+  if (inF.pvBusy) return '<div aria-busy="true">' + moSkeleton(3, ["w60", "w80"]) + "</div>";
+  if (inF.pvErr) return '<div class="m-alert" role="alert"><span class="m-alert__d">' + inIco("warn") + esc(inF.pvErr) + "</span></div>";
   if (!pv) return "";
   var t = pv.totals;
   var reviews = pv.rows.filter(function (r) { return r.status === "review"; });
   var resolved = reviews.filter(function (r) { return inF.resolve[r.line]; }).length;
   var inc = inIncluded().length;
+  /* PORT-SPEC §6: what will be saved is printed in the totals strip AND again under the table, from
+     the same rows and the same resolutions, so the two lines cannot disagree. */
+  dsD("inPvInc", function () { return inF ? inIncluded().length : null; });
+  dsD("inPvResolved", function () {
+    if (!inF || !inF.preview) return null;
+    return inF.preview.rows.filter(function (r) { return r.status === "review" && inF.resolve[r.line]; }).length;
+  });
   /* A review row resolved to a customer another row already matched is saved once; say so rather than
      let the count silently disagree with the number of choices made. */
   var dupPicks = t.matched + resolved - inc;
   var h = '<div class="in-totals" role="status">' +
-    '<span class="cf-pill off">' + inNRow(t.total) + (pv.filename ? " من <bdi>" + esc(pv.filename) + "</bdi>" : "") + "</span>" +
-    '<span class="cf-pill ' + (t.matched ? "on" : "off") + '">مطابق ' + fmtN(t.matched) + "</span>" +
-    (t.review ? '<span class="cf-pill warn">يحتاج مراجعة ' + fmtN(t.review) + " · روجع " + fmtN(resolved) + "</span>" : '<span class="cf-pill off">يحتاج مراجعة 0</span>') +
-    '<span class="cf-pill off">غير مطابق ' + fmtN(t.unmatched) + "</span>" +
-    (pv.duplicates ? '<span class="cf-pill warn">' + inPl(pv.duplicates, "عميل مكرر", "عميلان مكرران", "عملاء مكررون", "عميلًا مكررًا") + " — يُحفظ مرة واحدة</span>" : "") +
-    (pv.headerFound ? "" : '<span class="cf-sub">لم نجد صف عناوين — قُرئت الأعمدة بترتيب النموذج: اسم العميل، المعرف، قيمة المؤشر، الفترة، ملاحظات.</span>') + "</div>";
+    '<span class="m-chip">' + inMRow(t.total) + (pv.filename ? " من " + esc(pv.filename) : "") + "</span>" +
+    '<span class="m-chip' + (t.matched ? " m-chip--ok" : "") + '">مطابق ' + mN(t.matched) + "</span>" +
+    (t.review ? '<span class="m-chip m-chip--warn">يحتاج مراجعة ' + mN(t.review) + " · روجع " + dsFig("inPvResolved", resolved) + "</span>"
+      : '<span class="m-chip">يحتاج مراجعة ' + mN(0) + "</span>") +
+    '<span class="m-chip">غير مطابق ' + mN(t.unmatched) + "</span>" +
+    (pv.duplicates ? '<span class="m-chip m-chip--warn">' + mPl(pv.duplicates, "عميل مكرر", "عميلان مكرران", "عملاء مكررون", "عميلًا مكررًا") + " — يُحفظ مرة واحدة</span>" : "") +
+    (pv.headerFound ? "" : '<span class="m-meta">لم نجد صف عناوين — قُرئت الأعمدة بترتيب النموذج: اسم العميل، المعرف، قيمة المؤشر، الفترة، ملاحظات.</span>') + "</div>";
   h += '<div class="in-row">' + inSeg("pvFilter", inF.pvFilter, [["all", "الكل"], ["matched", "مطابق"], ["review", "يحتاج مراجعة"], ["unmatched", "غير مطابق"]], "") + "</div>";
   var rows = pv.rows.filter(function (r) { return inF.pvFilter === "all" || r.status === inF.pvFilter; });
   var pages = Math.max(1, Math.ceil(rows.length / IN_PV_PAGE));
   if (inF.pvPage >= pages) inF.pvPage = pages - 1;
   var slice = rows.slice(inF.pvPage * IN_PV_PAGE, (inF.pvPage + 1) * IN_PV_PAGE);
-  h += '<div class="in-pv ms-scroll"><div class="cf-t"><div class="cf-hr" role="row"><span>السطر</span><span>الاسم في الملف</span><span>المعرف / الجوال</span><span>القيمة</span><span>الفترة</span><span>الحالة</span><span>العميل في مسار</span></div>';
+  h += '<div class="in-pv ms-scroll"><table class="m-table m-table--sticky"><thead><tr>' +
+    "<th>السطر</th><th>الاسم في الملف</th><th>المعرف / الجوال</th><th>القيمة</th><th>الفترة</th><th>الحالة</th><th>العميل في مسار</th>" +
+    "</tr></thead><tbody>";
   slice.forEach(function (r) {
-    var st = r.status === "matched" ? '<span class="cf-pill on">مطابق</span>' : r.status === "review" ? '<span class="cf-pill warn">يحتاج مراجعة</span>' : '<span class="cf-pill off">غير مطابق</span>';
+    var st = r.status === "matched" ? '<span class="m-chip m-chip--ok">مطابق</span>'
+      : r.status === "review" ? '<span class="m-chip m-chip--warn">يحتاج مراجعة</span>'
+      : '<span class="m-chip">غير مطابق</span>';
     var who;
-    if (r.status === "matched") who = '<span class="who"><span class="in-clip">' + esc(r.candidates[0] ? r.candidates[0].name : "") + '</span><span class="cf-sub">' + (IN_MATCHED_BY[r.by] || "") + "</span></span>";
-    else if (r.status === "review") who = '<select aria-label="اختر العميل للسطر ' + fmtN(r.line) + '" data-inres="' + r.line + '"><option value="">— اختر العميل أو اتركه —</option>' +
-      r.candidates.map(function (c) { return '<option value="' + c.id + '"' + (String(inF.resolve[r.line]) === String(c.id) ? " selected" : "") + ">" + esc(clip(c.name, 34)) + " · +" + esc(c.phone) + "</option>"; }).join("") + "</select>";
-    else if (r.phone && String(r.phone).replace(/[^0-9]/g, "").length >= 9 && r.name) {
-      who = inF.adding[r.line] ? '<span class="cf-sub" aria-busy="true">جارٍ الإضافة…</span>'
-        : '<button class="btn btn-ghost" style="height:30px;font-size:var(--t-xs)" data-in="addent" data-line="' + r.line + '">إضافة كعميل جديد</button>';
+    if (r.status === "matched") {
+      who = '<span class="in-clip">' + esc(r.candidates[0] ? r.candidates[0].name : "") + '</span>' +
+        '<span class="m-meta in-sub">' + (IN_MATCHED_BY[r.by] || "") + "</span>";
+    } else if (r.status === "review") {
+      who = '<select class="m-select" aria-label="اختر العميل للسطر ' + esc(String(r.line)) + '" data-inres="' + r.line + '"><option value="">اتركه دون ربط</option>' +
+        r.candidates.map(function (c) { return '<option value="' + c.id + '"' + (String(inF.resolve[r.line]) === String(c.id) ? " selected" : "") + ">" + esc(clip(c.name, 34)) + " · +" + esc(c.phone) + "</option>"; }).join("") + "</select>";
+    } else if (r.phone && String(r.phone).replace(/[^0-9]/g, "").length >= 9 && r.name) {
+      who = inF.adding[r.line] ? '<span class="m-meta" aria-busy="true">جارٍ الإضافة…</span>'
+        : '<button class="m-btn in-btn-sm" data-in="addent" data-line="' + r.line + '">إضافة كعميل جديد</button>';
+    } else {
+      who = mNil("غير موجود في قائمة العملاء", "none");
     }
-    else who = '<span class="cf-sub">غير موجود في قائمة العملاء</span>';
-    h += '<div class="cf-r"><span class="cf-num cf-sub">' + fmtN(r.line) + '</span><span class="in-clip" title="' + esc(r.name || "") + '">' + esc(r.name || "—") + '</span><span class="in-clip cf-sub"><bdi>' + esc(r.code || r.phone || "—") + "</bdi></span>" +
-      '<span class="in-clip">' + esc(r.value || "—") + '</span><span class="in-clip cf-sub">' + esc(r.period || "—") + "</span><span>" + st + "</span><span>" + who + "</span></div>";
+    /* Three different absences in one row: a name or an identifier the FILE did not carry is data
+       someone owes the import; a value or a period it legitimately omitted is a nothing. */
+    h += '<tr><td class="m-td-v">' + mN(r.line) + "</td>" +
+      '<td><span class="in-clip" title="' + esc(r.name || "") + '">' + (r.name ? esc(r.name) : mNil("بلا اسم في الملف", "unset")) + "</span></td>" +
+      '<td><span class="in-clip">' + (r.code || r.phone ? '<span class="m-n">' + esc(r.code || r.phone) + "</span>" : mNil("بلا معرِّف", "unset")) + "</span></td>" +
+      '<td><span class="in-clip">' + (r.value ? esc(r.value) : mNil("بلا قيمة", "none")) + "</span></td>" +
+      '<td><span class="in-clip">' + (r.period ? esc(r.period) : mNil("بلا فترة", "none")) + "</span></td>" +
+      "<td>" + st + "</td><td>" + who + "</td></tr>";
   });
-  if (!rows.length) h += '<div class="cf-state">لا صفوف في هذا التبويب.</div>';
-  h += "</div></div>";
-  if (pages > 1) {
-    h += '<div class="in-pager"><button class="btn btn-ghost" data-in="pvpage" data-v="-1"' + (inF.pvPage === 0 ? " disabled" : "") + '>السابق</button>' +
-      "<span>صفحة " + fmtN(inF.pvPage + 1) + " من " + fmtN(pages) + " · " + inNRow(rows.length) + "</span>" +
-      '<button class="btn btn-ghost" data-in="pvpage" data-v="1"' + (inF.pvPage >= pages - 1 ? " disabled" : "") + ">التالي</button></div>";
+  if (!rows.length) {
+    h += '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا صفوف في هذا التبويب</p></div></td></tr>';
   }
-  h += '<div class="in-row"><b style="font-size:var(--t-sm);font-weight:600;color:var(--ink)">' + (inc ? "سيُحفظ " + inNCust(inc) : "لن يُحفظ أي عميل بعد") + "</b>" +
-    (t.review - resolved > 0 ? '<span class="cf-pill warn">' + inPl(t.review - resolved, "صف واحد لم يُراجع", "صفّان لم يُراجعا", "صفوف لم تُراجع", "صفًّا لم يُراجع") + " — لن يُحفظ</span>" : "") +
-    (dupPicks > 0 ? '<span class="cf-pill warn">' + inPl(dupPicks, "صف مكرر", "صفّان مكرران", "صفوف مكررة", "صفًّا مكررًا") + " لعميل مطابق في سطر آخر</span>" : "") +
-    (t.unmatched ? '<span class="cf-sub">غير المطابقين لا يُحفظون — أضف من له جوال كعميل جديد من الجدول، أو من <a href="#targets" style="color:var(--accent-deep);font-weight:600">جهات الاستهداف</a>.</span>' : "") + "</div>";
+  h += "</tbody></table></div>";
+  if (pages > 1) {
+    h += '<div class="in-pager"><button class="m-btn in-btn-sm" data-in="pvpage" data-v="-1"' + (inF.pvPage === 0 ? " disabled" : "") + ">السابق</button>" +
+      '<span class="m-cap">صفحة ' + mN(inF.pvPage + 1) + " من " + mN(pages) + " · " + inMRow(rows.length) + "</span>" +
+      '<button class="m-btn in-btn-sm" data-in="pvpage" data-v="1"' + (inF.pvPage >= pages - 1 ? " disabled" : "") + ">التالي</button></div>";
+  }
+  h += '<div class="in-row"><span class="m-label">' +
+    (inc ? "سيُحفظ " + opPlFig("inPvInc", inc, "عميل واحد", "عميلان", "عملاء", "عميلًا") : "لن يُحفظ أي عميل بعد") + "</span>" +
+    (t.review - resolved > 0 ? '<span class="m-chip m-chip--warn">' + mPl(t.review - resolved, "صف واحد لم يُراجع", "صفّان لم يُراجعا", "صفوف لم تُراجع", "صفًّا لم يُراجع") + " — لن يُحفظ</span>" : "") +
+    (dupPicks > 0 ? '<span class="m-chip m-chip--warn">' + mPl(dupPicks, "صف مكرر", "صفّان مكرران", "صفوف مكررة", "صفًّا مكررًا") + " لعميل مطابق في سطر آخر</span>" : "") +
+    (t.unmatched ? '<span class="m-meta">غير المطابقين لا يُحفظون — أضف من له جوال كعميل جديد من الجدول، أو من <a class="m-link" href="#targets">جهات الاستهداف</a>.</span>' : "") + "</div>";
   return h;
 }
 function inManualView() {
   var q = inF.manualQ.trim();
   var picked = {}; inF.picked.forEach(function (p) { picked[p.entityId] = 1; });
   var cands = (entities || []).filter(function (e) { return !q || e.name.indexOf(q) >= 0 || e.phone.indexOf(q) >= 0; });
-  var h = '<input class="inp" id="inmq" data-infld="manualQ" value="' + esc(inF.manualQ) + '" placeholder="ابحث باسم العميل أو رقمه…" aria-label="ابحث عن عميل">';
-  if (!(entities || []).length) return h + '<div class="cf-state">لا عملاء في مسار بعد — أضفهم من <a href="#targets" style="color:var(--accent-deep);font-weight:600">جهات الاستهداف</a>.</div>';
+  var h = '<input class="m-input" id="inmq" data-infld="manualQ" value="' + esc(inF.manualQ) + '" placeholder="ابحث باسم العميل أو رقمه…" aria-label="ابحث عن عميل">';
+  if (!(entities || []).length) {
+    return h + '<div class="m-empty"><p class="m-empty__t">لا عملاء في مسار بعد</p>' +
+      '<p class="m-empty__d">أضفهم من <a class="m-link" href="#targets">جهات الاستهداف</a>.</p></div>';
+  }
   h += '<div class="in-cands ms-scroll">';
   cands.slice(0, 40).forEach(function (e) {
     var on = !!picked[e.id];
-    h += '<button type="button" class="in-cand" aria-pressed="' + on + '" data-in="pick" data-i="' + e.id + '"><span class="in-box">' + (on ? inIco("check") : "") + '</span><span class="in-clip" style="flex:1">' + esc(e.name) +
-      '</span><span class="cf-sub">' + esc((e.attrs && e.attrs["المدينة"]) || "") + "</span></button>";
+    h += '<button type="button" class="in-cand" aria-pressed="' + on + '" data-in="pick" data-i="' + e.id + '"><span class="in-box">' + (on ? inIco("check") : "") + "</span>" +
+      '<span class="in-clip" style="flex:1 1 auto;max-inline-size:none">' + esc(e.name) + "</span>" +
+      '<span class="m-meta">' + esc((e.attrs && e.attrs["المدينة"]) || "") + "</span></button>";
   });
-  if (!cands.length) h += '<div class="cf-state">لا عميل يطابق «' + esc(q) + "».</div>";
+  if (!cands.length) h += '<div class="m-empty"><p class="m-empty__t">لا عميل يطابق «' + esc(q) + "»</p></div>";
   h += "</div>";
-  if (cands.length > 40) h += '<div class="cf-sub">تُعرض ' + fmtN(40) + " نتيجة من " + fmtN(cands.length) + " — ضيّق البحث.</div>";
+  if (cands.length > 40) h += '<p class="m-meta">تُعرض ' + mN(40) + " نتيجة من " + mN(cands.length) + " — ضيّق البحث.</p>";
   /* A picked customer deleted from the book since the form opened is dropped here, visibly, rather than
      staying ticked and failing the save (QA). */
   var live = {}; (entities || []).forEach(function (e) { live[e.id] = 1; });
   var gone = inF.picked.filter(function (p) { return !live[p.entityId]; }).length;
-  if (gone) { inF.picked = inF.picked.filter(function (p) { return live[p.entityId]; }); h += '<div class="cf-pill warn">' + inNCust(gone) + " لم يعودوا في قائمة العملاء — أُزيلوا من الاختيار</div>"; }
+  if (gone) { inF.picked = inF.picked.filter(function (p) { return live[p.entityId]; }); h += '<span class="m-chip m-chip--warn">' + inMCust(gone) + " لم يعودوا في قائمة العملاء — أُزيلوا من الاختيار</span>"; }
   if (inF.picked.length) {
-    h += '<div style="font-size:var(--t-sm);font-weight:600;color:var(--ink)">العملاء المختارون (' + fmtN(inF.picked.length) + ')</div><div class="in-picked">';
+    h += '<p class="m-label">العملاء المختارون · ' + mN(inF.picked.length) + '</p><div class="in-picked">';
     inF.picked.forEach(function (p) {
       var e = (entities || []).filter(function (x) { return x.id === p.entityId; })[0];
       h += '<div class="in-pick"><span class="in-clip">' + esc(e ? e.name : p.name || "") + "</span>" +
-        '<input class="inp" data-inval="' + p.entityId + '" value="' + esc(p.value || "") + '" placeholder="قيمة المؤشر (اختياري)" aria-label="قيمة المؤشر لـ ' + esc(e ? e.name : "") + '">' +
-        '<button type="button" class="btn btn-ghost" style="height:32px;font-size:var(--t-xs)" data-in="pick" data-i="' + p.entityId + '">إزالة</button></div>';
+        '<input class="m-input" data-inval="' + p.entityId + '" value="' + esc(p.value || "") + '" placeholder="قيمة المؤشر (اختياري)" aria-label="قيمة المؤشر لـ ' + esc(e ? e.name : "") + '">' +
+        '<button type="button" class="m-btn in-btn-sm" data-in="pick" data-i="' + p.entityId + '">إزالة</button></div>';
     });
     h += "</div>";
   }
@@ -631,82 +837,96 @@ function inFormProducts() {
   return list;
 }
 function vIndicatorForm(rest) {
+  var open = '<div class="ds6"><div class="in-form">', shut = "</div></div>";
   /* The route is open to indicators.view (DOOR_PERMISSIONS.indicator), which is how «عرض العملاء»
      works — but this screen is the EDITOR. A bookmark or a browser-back must not hand a role without
      indicators.edit a live upload-and-save form; the server refuses it, and so does the screen. */
   if (!inMayEdit()) {
-    return '<div class="in"><div class="in-form"><button class="in-back" data-in="cancel">→ العودة إلى مؤشرات الاستخدام</button>' +
-      '<section class="cf-sec"><div class="cf-state" role="alert">' + inIco("warn") +
-      "لا تملك صلاحية تحرير المؤشرات — يمكنك عرضها وقوائم عملائها فقط." +
-      '<a class="btn btn-ghost" href="#indicators" style="text-decoration:none">كل المؤشرات</a></div></section></div></div>';
+    return open + '<button class="m-btn m-btn--quiet" data-in="cancel">' + inIco("back") + "العودة إلى مؤشرات الاستخدام</button>" +
+      '<div class="m-alert" role="alert"><span class="m-alert__t">لا صلاحية للتحرير</span>' +
+      '<span class="m-alert__d">لا تملك صلاحية تحرير المؤشرات — يمكنك عرضها وقوائم عملائها فقط.</span>' +
+      '<a class="m-btn" href="#indicators">كل المؤشرات</a></div>' + shut;
   }
   if (inToday === "" || inRows === null) inLoad(false);
   inEnsureForm(String(rest || "new"));
-  var h = '<div class="in"><div class="in-form">';
-  h += '<button class="in-back" data-in="cancel">→ العودة إلى مؤشرات الاستخدام</button>';
+  var h = open + '<button class="m-btn m-btn--quiet" data-in="cancel">' + inIco("back") + "العودة إلى مؤشرات الاستخدام</button>";
   if (inF.missing) {
-    return h + '<section class="cf-sec"><div class="cf-state" role="alert">لا مؤشر بهذا الرقم — ربما الرابط قديم.<a class="btn btn-ghost" href="#indicators" style="text-decoration:none">كل المؤشرات</a></div></section></div></div>';
+    return h + '<div class="m-card m-empty"><p class="m-empty__t">لا مؤشر بهذا الرقم</p>' +
+      '<p class="m-empty__d">ربما الرابط قديم.</p>' +
+      '<div class="m-empty__a"><a class="m-btn" href="#indicators">كل المؤشرات</a></div></div>' + shut;
   }
   if (!inF.loaded) {
-    return h + '<section class="cf-sec"><div class="cf-state" ' + (inF.failed ? 'role="alert">تعذّر تحميل المؤشر.<button class="btn btn-ghost" data-in="formretry">أعد المحاولة</button>' : 'aria-busy="true">جارٍ تحميل المؤشر…') + "</div></section></div></div>";
+    return h + (inF.failed
+      ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل المؤشر.</span>' +
+        '<button class="m-btn" data-in="formretry">أعد المحاولة</button></div>'
+      : '<div class="m-card" aria-busy="true">' + moSkeleton(4, ["w60", "w80", "w40"]) + "</div>") + shut;
   }
   var d = inF.d, isEdit = !!inF.id;
   var prods = [["", "— اختر المنتج —"]].concat(inFormProducts().map(function (p) { return [p, p + (inProducts.indexOf(p) < 0 ? " (مؤرشف)" : "")]; }));
-  if (isEdit) h += '<div style="font-size:var(--t-lg);font-weight:600;color:var(--ink)">تعديل: ' + esc(d.name) + "</div>";
+  if (isEdit) h += '<h1 class="m-h1">تعديل: ' + esc(d.name) + "</h1>";
   /* 1 */
-  h += '<section class="cf-sec"><div class="cf-h"><div><h2>1. معلومات المؤشر</h2><div class="s">اسم واضح، ومنتج مرتبط، ودلالة محددة — بها يبني مسار على المؤشر توصية يذكر سببها.</div></div></div><div class="in-sec-b">';
-  h += '<div class="cf-g">' + inInp("inf_name", "اسم المؤشر", "name", d.name, { max: INDICATOR_NAME_MAX, ph: "مثال: استخدام مرتفع للإجازات المرضية" }, true) +
+  h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">1. معلومات المؤشر</h2>' +
+    '<p class="m-meta">اسم واضح، ومنتج مرتبط، ودلالة محددة — بها يبني مسار على المؤشر توصية يذكر سببها.</p></div></div><div class="in-secb">';
+  h += '<div class="m-form">' + inInp("inf_name", "اسم المؤشر", "name", d.name, { max: INDICATOR_NAME_MAX, ph: "مثال: استخدام مرتفع للإجازات المرضية" }, true) +
     inSel("inf_product", "المنتج المرتبط", "product", d.product, prods, true) + "</div>";
-  h += '<div class="cf-fl in-fl"><label for="inf_desc">وصف المؤشر</label><textarea id="inf_desc" rows="2" maxlength="' + INDICATOR_DESC_MAX + '" data-infld="description" placeholder="اشرح بإيجاز ما يمثّله المؤشر وكيف قيس"' + inFld("description") + ">" + esc(d.description) + "</textarea>" + inFerr("description") + "</div>";
-  h += '<div class="cf-g">' + inSel("inf_signal", "على ماذا يدل هذا المؤشر؟", "signal", d.signal,
-    [["", "— اختر الدلالة —"]].concat(INDICATOR_SIGNALS.map(function (s) { return [s, INDICATOR_SIGNAL_LABELS[s]]; })), true, "على هذه الدلالة تُبنى فرص الحملات المقترحة") + "</div>";
-  h += '<div class="in-row" style="gap:var(--s4);align-items:flex-start"><div class="in-grp">' + inSeg("customerType", d.customerType, CUSTOMER_TYPES.map(function (t) { return [t, CUSTOMER_TYPE_LABELS[t]]; }), "نوع العملاء") + "</div>" +
+  h += '<div class="m-field"><label class="m-label" for="inf_desc">وصف المؤشر</label>' +
+    '<textarea class="m-input" id="inf_desc" rows="2" maxlength="' + INDICATOR_DESC_MAX + '" data-infld="description" placeholder="اشرح بإيجاز ما يمثّله المؤشر وكيف قيس"' + inFld("description") + ">" + esc(d.description) + "</textarea>" + inFerr("description") + "</div>";
+  h += inSel("inf_signal", "على ماذا يدل هذا المؤشر؟", "signal", d.signal,
+    [["", "— اختر الدلالة —"]].concat(INDICATOR_SIGNALS.map(function (s) { return [s, INDICATOR_SIGNAL_LABELS[s]]; })), true, "على هذه الدلالة تُبنى فرص الحملات المقترحة");
+  h += '<div class="in-row" style="gap:var(--m-5);align-items:flex-start"><div class="in-grp">' + inSeg("customerType", d.customerType, CUSTOMER_TYPES.map(function (t) { return [t, CUSTOMER_TYPE_LABELS[t]]; }), "نوع العملاء") + "</div>" +
     '<div class="in-grp">' + inSeg("status", d.status, [["active", "نشط"], ["inactive", "غير نشط"]], "حالة المؤشر") + "</div></div>";
   h += "</div></section>";
   /* 2 */
-  h += '<section class="cf-sec" id="inf_members" tabindex="-1"><div class="cf-h"><div><h2>2. بيانات العملاء</h2><div class="s">زوّد مسار بالعملاء المشمولين — برفع ملف يُطابَق بقائمة العملاء، أو باختيارهم يدويًا.</div></div></div><div class="in-sec-b">';
+  h += '<section class="m-card" id="inf_members" tabindex="-1"><div class="m-card__h"><div><h2 class="m-card__t">2. بيانات العملاء</h2>' +
+    '<p class="m-meta">زوّد مسار بالعملاء المشمولين — برفع ملف يُطابَق بقائمة العملاء، أو باختيارهم يدويًا.</p></div></div><div class="in-secb">';
   if (isEdit && !inF.replace) {
-    h += '<div class="in-row"><span style="font-size:var(--t-sm);color:var(--ink)">يحتوي المؤشر على <b>' + inNCust(inF.memberCount) + "</b>" +
-      (inF.source === "file" && inF.sourceFilename ? " من ملف <bdi>" + esc(inF.sourceFilename) + "</bdi>" : inF.source === "manual" ? " (اختيار يدوي)" : "") + ".</span>" +
-      '<button class="btn btn-ghost" data-in="replace">استبدال البيانات</button><button class="btn btn-ghost" id="infview" data-in="view" data-i="' + inF.id + '">عرض العملاء</button></div>';
+    h += '<div class="in-row"><span class="m-body">يحتوي المؤشر على ' + inMCust(inF.memberCount) +
+      (inF.source === "file" && inF.sourceFilename ? " من ملف " + esc(inF.sourceFilename) : inF.source === "manual" ? " (اختيار يدوي)" : "") + ".</span>" +
+      '<button class="m-btn" data-in="replace">استبدال البيانات</button><button class="m-btn" id="infview" data-in="view" data-i="' + inF.id + '">عرض العملاء</button></div>';
   } else {
-    if (isEdit && inF.memberCount) h += '<div class="cf-sub">البيانات الجديدة تستبدل قائمة العملاء الحالية (' + inNCust(inF.memberCount) + ') عند الحفظ، ويُسجَّل ذلك في سجل التغييرات. <button class="sg-toggle" data-in="keep">إبقاء الحالية</button></div>';
+    if (isEdit && inF.memberCount) h += '<p class="m-meta">البيانات الجديدة تستبدل قائمة العملاء الحالية (' + inMCust(inF.memberCount) + ') عند الحفظ، ويُسجَّل ذلك في سجل التغييرات. <button class="m-btn m-btn--quiet" data-in="keep">إبقاء الحالية</button></p>';
     h += '<div class="in-grp">' + inSeg("mode", inF.mode, [["file", "رفع ملف Excel"], ["paste", "لصق المحتوى"], ["manual", "اختيار عملاء يدويًا"]], "طريقة الإدخال") + "</div>";
     if (inF.mode === "file") {
       h += '<label class="in-drop" id="indrop"><input type="file" class="in-file" id="infile" accept=".xlsx,.xls,.csv" aria-label="ملف بيانات المؤشر">' +
         '<span class="ico">' + inIco("up") + "</span>" +
-        '<span class="t">' + (inF.fileName ? "الملف: <bdi>" + esc(inF.fileName) + "</bdi>" : "اسحب ملف Excel إلى هنا أو اضغط لاختياره") + "</span>" +
-        '<span class="s">XLSX · XLS · CSV حتى 5 ميغابايت و5000 صف — الأعمدة: اسم العميل، المعرف، الجوال، قيمة المؤشر، الفترة، ملاحظات. الجوال أدق مفتاح للمطابقة.</span>' +
-        '<span class="in-row" style="justify-content:center"><span class="btn btn-teal pick">' + (inF.fileName ? "اختر ملفًا آخر" : "اختيار ملف") + '</span>' +
-        '<a class="btn btn-ghost" href="/assets/indicator-template.xlsx" onclick="event.stopPropagation()" style="text-decoration:none;display:inline-flex;align-items:center">تحميل نموذج Excel</a></span></label>';
+        '<span class="m-label">' + (inF.fileName ? "الملف: " + esc(inF.fileName) : "اسحب ملف Excel إلى هنا أو اضغط لاختياره") + "</span>" +
+        '<span class="m-meta">XLSX · XLS · CSV حتى ' + mN(5) + ' ميغابايت و' + mN(5000) + ' صف — الأعمدة: اسم العميل، المعرف، الجوال، قيمة المؤشر، الفترة، ملاحظات. الجوال أدق مفتاح للمطابقة.</span>' +
+        '<span class="in-row" style="justify-content:center"><span class="m-btn m-btn--primary in-pickbtn">' + (inF.fileName ? "اختر ملفًا آخر" : "اختيار ملف") + "</span>" +
+        '<a class="m-btn" href="/assets/indicator-template.xlsx" onclick="event.stopPropagation()">تحميل نموذج Excel</a></span></label>';
     } else if (inF.mode === "paste") {
-      h += '<div class="cf-fl in-fl"><label for="inpaste">الصق محتوى الملف — سطر لكل عميل</label><textarea id="inpaste" rows="6" dir="auto" data-infld="paste" placeholder="اسم العميل,المعرف,قيمة المؤشر,الفترة,ملاحظات">' + esc(inF.paste) + "</textarea></div>" +
-        '<div class="in-row"><button class="btn btn-teal" data-in="parse"' + (inF.pvBusy ? " disabled" : "") + '>تحليل ومطابقة</button><button class="btn btn-ghost" data-in="sample">تعبئة نموذج تجريبي</button></div>';
+      h += '<div class="m-field"><label class="m-label" for="inpaste">الصق محتوى الملف — سطر لكل عميل</label>' +
+        '<textarea class="m-input" id="inpaste" rows="6" dir="auto" data-infld="paste" placeholder="اسم العميل,المعرف,قيمة المؤشر,الفترة,ملاحظات">' + esc(inF.paste) + "</textarea></div>" +
+        '<div class="in-row"><button class="m-btn m-btn--primary" data-in="parse"' + (inF.pvBusy ? " disabled" : "") + ">تحليل ومطابقة</button>" +
+        '<button class="m-btn" data-in="sample">تعبئة نموذج تجريبي</button></div>';
     }
     h += inF.mode === "manual" ? inManualView() : inPreviewView();
   }
-  if (inF.field === "members" && inF.err) h += '<div class="cf-err" id="err_members" role="alert">' + inIco("warn") + esc(inF.err) + "</div>";
+  if (inF.field === "members" && inF.err) h += '<div class="m-alert" id="err_members" role="alert"><span class="m-alert__d">' + inIco("warn") + esc(inF.err) + "</span></div>";
   h += "</div></section>";
   /* 3 */
-  h += '<section class="cf-sec"><div class="cf-h"><div><h2>3. فترة البيانات</h2><div class="s">متى قيست البيانات. البيانات الأقدم من ' + inNDay(INDICATOR_STALE_DAYS) + " تُستخدم، وتقول كل توصية مبنية عليها ذلك.</div></div></div>" +
-    '<div class="in-sec-b"><div class="cf-g">' + inInp("inf_from", "من تاريخ", "periodFrom", d.periodFrom, { type: "date" }) + inInp("inf_to", "إلى تاريخ", "periodTo", d.periodTo, { type: "date" }) +
+  h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">3. فترة البيانات</h2>' +
+    '<p class="m-meta">متى قيست البيانات. البيانات الأقدم من ' + inMDay(INDICATOR_STALE_DAYS) + " تُستخدم، وتقول كل توصية مبنية عليها ذلك.</p></div></div>" +
+    '<div class="in-secb"><div class="in-g3">' + inInp("inf_from", "من تاريخ", "periodFrom", d.periodFrom, { type: "date" }) + inInp("inf_to", "إلى تاريخ", "periodTo", d.periodTo, { type: "date" }) +
     inInp("inf_upd", "تاريخ تحديث البيانات", "dataUpdatedAt", d.dataUpdatedAt, { type: "date" }, true) + "</div></div></section>";
   /* 4 */
-  h += '<div class="in-how"><b>4. كيف يستخدم مسار هذا المؤشر؟</b><br>' + inHowText(d.signal, d.product) + "</div>";
+  h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">4. كيف يستخدم مسار هذا المؤشر؟</h2></div></div>' +
+    '<p class="m-body">' + inHowText(d.signal, d.product) + "</p></section>";
   if (isEdit && inF.events.length) {
-    h += '<section class="cf-sec"><div class="cf-h"><div><h2>سجل التغييرات</h2></div></div><div class="in-sec-b" style="gap:0">';
+    h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">سجل التغييرات</h2></div></div><div class="m-tl">';
     inF.events.slice(0, 10).forEach(function (e) {
-      h += '<div class="in-ev"><b>' + esc(IN_EVENT[e.action] || e.action) + '</b><span>' + esc(inBy(e.by)) + '</span><span style="margin-inline-start:auto">' + inStamp(e.at) + "</span></div>";
+      h += '<div class="m-tl__i"><span class="m-tl__d"></span><span><span class="m-tl__n">' + esc(IN_EVENT[e.action] || e.action) + "</span>" +
+        '<span class="m-tl__s">' + esc(inBy(e.by)) + "</span></span>" +
+        '<span class="m-tl__t">' + inStampC(e.at) + "</span></div>";
     });
     h += "</div></section>";
   }
   var busy = inF.busy || inF.pvBusy;
   h += '<div class="in-acts">' +
-    '<button class="btn btn-teal" data-in="save"' + (busy ? ' disabled aria-busy="true"' : "") + ">" + (inF.busy ? "جارٍ الحفظ…" : inF.pvBusy ? "انتظر قراءة الملف…" : "حفظ المؤشر") + "</button>" +
-    (isEdit && !inF.wasDraft ? "" : '<button class="btn btn-ghost" data-in="draft"' + (busy ? " disabled" : "") + ">حفظ كمسودة</button>") +
-    '<button class="btn btn-ghost" data-in="cancel">إلغاء</button>' +
-    (inF.err ? '<span class="cf-err" id="inferr" role="status">' + inIco("warn") + esc(inF.err) + "</span>" : "") + "</div>";
-  return h + "</div></div>" + inDrawer();
+    '<button class="m-btn m-btn--primary" data-in="save"' + (busy ? ' disabled aria-busy="true"' : "") + ">" + (inF.busy ? "جارٍ الحفظ…" : inF.pvBusy ? "انتظر قراءة الملف…" : "حفظ المؤشر") + "</button>" +
+    (isEdit && !inF.wasDraft ? "" : '<button class="m-btn" data-in="draft"' + (busy ? " disabled" : "") + ">حفظ كمسودة</button>") +
+    '<button class="m-btn m-btn--quiet" data-in="cancel">إلغاء</button>' +
+    (inF.err ? '<span class="m-err" id="inferr" role="status">' + inIco("warn") + esc(inF.err) + "</span>" : "") + "</div>";
+  return h + shut + inDrawer();
 }
 /* One counter for every preview request, so a slow answer to an earlier file can never land on top of
    a later one, and nothing can be saved while the current file is still being read (GPT review). */
@@ -716,6 +936,8 @@ function inPreviewStart() {
   if (inF.field === "members") { inF.err = ""; inF.field = ""; }
   return inF.pvSeq;
 }
+/* An HTTP status inside a message is prose, not a figure: pvErr is written through esc() into the
+   DOM, so .m-n markup there would print as literal angle brackets. Same for toasts and aria-labels. */
 function inPreviewDone(f, seq, r) {
   if (f.pvSeq !== seq) return;
   f.pvBusy = false;
@@ -833,6 +1055,7 @@ function inIndOptions(sel, withAny) {
       return '<option value="' + i.id + '"' + (String(sel) === String(i.id) ? " selected" : "") + ">" + esc(clip(i.name, 26)) + " (" + fmtN(i.memberIds.length) + ")" + (i.status === "inactive" ? " · معطَّل" : "") + "</option>";
     }).join("");
 }
+/* NOT PORTED: renders inside dashboard.ts's wizard toolbar, which is still on the old system. */
 function indWizardSelect() {
   inMemLoad();
   if (!(inMembership || []).some(function (i) { return i.status !== "draft"; })) return "";
@@ -841,7 +1064,8 @@ function indWizardSelect() {
 }
 window.indSetWizF = function (v) { wizIndF = v; entSel.clear(); render(false); };
 /* BR-CUS-003: the customer book filters by indicator too. «#targets/indicators» arrives from the
-   «العملاء المشمولون» tile and means «in any indicator». */
+   «العملاء المشمولون» tile and means «in any indicator».
+   NOT PORTED: renders inside targets-crm.ts, which is still on the old system. */
 var tgtIndF = "";
 function indTargetsFilter(e) {
   if (inRoute() === "targets/indicators" && !tgtIndF) tgtIndF = "any";
@@ -860,7 +1084,9 @@ window.indSetTgtF = function (v) {
   render(false);
 };
 
-/* ---------------- the customer record ---------------- */
+/* ---------------- the customer record ----------------
+   NOT PORTED: this block renders inside dashboard.ts's customer view, above the conversation, and
+   that screen is still on the old system. */
 var inCust = { phone: "", rows: null, failed: false, busy: false };
 function indCustomerBlock(phone) {
   if (!phone) return "";
@@ -878,12 +1104,14 @@ function indCustomerBlock(phone) {
   inCust.rows.forEach(function (r) {
     h += '<div class="in-mem"><button class="in-link" id="incv' + r.id + '" data-in="view" data-i="' + r.id + '">' + esc(r.name) + "</button>" +
       (r.value ? '<span class="v">' + esc(r.value) + "</span>" : "") +
-      '<span class="m">' + [r.product ? esc(r.product) : "", INDICATOR_STATUS_LABELS[r.status] || "", "بيانات " + inDate(r.dataUpdatedAt)].filter(Boolean).join(" · ") + "</span></div>";
+      '<span class="m">' + [r.product ? esc(r.product) : "", INDICATOR_STATUS_LABELS[r.status] || "", "بيانات " + (inDate(r.dataUpdatedAt) || "لم تُسجَّل")].filter(Boolean).join(" · ") + "</span></div>";
   });
   return h + "</div>";
 }
 
-/* ================= «فرص حملات مقترحة» ================= */
+/* ================= «فرص حملات مقترحة» =================
+   NOT PORTED: sgPanel renders on #kmon (campaigns-crm.ts) and inside the wizard (dashboard.ts), and
+   sgWizardTop renders above the wizard's first step. Both hosts are still on the old system. */
 var sgData = null, sgLoading = false, sgFailed = false, sgPending = false, sgAll = false, sgShowDismissed = false, sgBusyKey = "";
 /* The monitoring page is for monitoring: the panel opens collapsed there (UX review — it pushed the first
    campaign 1.8 screens down on a phone), and remembers the choice per browser. */
@@ -929,7 +1157,7 @@ function sgCard(s) {
   h += '<div class="sg-src"><span>بناءً على:</span>' + uniq(inc).map(function (i) { return '<span class="sg-chip" title="' + esc(i.name) + '">' + esc(i.name) + "</span>"; }).join("") + "</div>";
   if (exc.length) h += '<div class="sg-src"><span>مع استبعاد:</span>' + uniq(exc).map(function (i) { return '<span class="sg-chip ex" title="' + esc(i.name) + '">' + esc(i.name) + "</span>"; }).join("") + "</div>";
   if (excl) h += '<div class="ex-l">' + excl + "</div>";
-  if (s.stale) h += '<div class="warn">' + inIco("warn") + " البيانات من " + inDate(s.dataUpdatedAt) + " — أقدم من " + inNDay(INDICATOR_STALE_DAYS) + ".</div>";
+  if (s.stale) h += '<div class="warn">' + inIco("warn") + " البيانات من " + (inDate(s.dataUpdatedAt) || "تاريخ غير مسجّل") + " — أقدم من " + inNDay(INDICATOR_STALE_DAYS) + ".</div>";
   if (s.count > 50) h += '<div class="ex-l">الإطلاق الواحد 50 عميلًا كحدٍّ أقصى — تختار في المعالج من تبدأ بهم.</div>';
   /* Acting on a suggestion creates a campaign or dismisses one, both writes: a role that may only
      read sees the reasoning and no buttons. */
@@ -1030,7 +1258,8 @@ function wizOriginOut(targets) {
 }
 function wizAfterLaunch() { wizOrigin = null; wizObjective = ""; sgData = null; rw.sig = ""; rw.data = null; }
 
-/* ---------------- objective (step 2), repeat warning, review summary ---------------- */
+/* ---------------- objective (step 2), repeat warning, review summary ----------------
+   NOT PORTED: all three render inside dashboard.ts's wizard steps. */
 var rw = { sig: "", data: null, busy: false, timer: 0, failed: false };
 function rwBlock(product, phones) {
   if (!product || !phones.length) return "";
@@ -1079,8 +1308,8 @@ function wizReviewSummary(n, product) {
   var r = function (k, v) { return '<div class="r"><span class="k">' + k + "</span><span>" + v + "</span></div>"; };
   return '<div class="wz-review">' +
     r("الجمهور", inNCust(n)) +
-    r("المنتج", esc(product || "—")) +
-    r("الهدف", esc(CAMPAIGN_OBJECTIVE_LABELS[wizObjective] || "—")) +
+    r("المنتج", esc(product || "لم يُحدَّد")) +
+    r("الهدف", esc(CAMPAIGN_OBJECTIVE_LABELS[wizObjective] || "لم يُحدَّد")) +
     r("القناة", "واتساب") +
     r("التوقيت", "فور التأكيد — دفعة واحدة") +
     r("الاسم", esc(campName.trim() || "يُسمّى تلقائيًا")) +

@@ -1,88 +1,89 @@
-// targets-crm.ts — جهات الاستهداف, the imported book, on the Frappe list chrome.
+// targets-crm.ts — جهات الاستهداف, the imported book.
 //
-// WHAT THIS REPLACES, and why each piece went:
+// WHAT THIS SCREEN IS, and why each piece is here:
 //
 // 1. «قائمة الصباح» sat on TOP of this screen — the third rendering of the same ranked list that
-//    #home shows as «ما يستحق المتابعة الآن» and #customers shows as its تجميع-by-outcome view.
+//    #home shows as its own work column and #customers shows as its تجميع-by-outcome view.
 //    Three surfaces, three visual languages, one question. It is deleted here; #home owns it.
-// 2. The list had NO header row, no sort, no facets and no count — while #customers and #kmon
-//    beside it in the same sidebar had all four. It was the last un-migrated table in the product.
-// 3. Every row carried an always-visible red «×» that deleted an imported target on ONE click with
-//    no confirmation. Sixteen red buttons down the left edge of a screen you scroll. The action is
-//    hover-revealed and neutral now, and asks once, inline, before it fires.
-// 4. The importer was a full card ABOVE the list, so the subject of the page (your book) opened
-//    below the fold under a block of instructions. It is two buttons on the control bar plus a
-//    collapsed «إضافة جهة يدويًا»; the instructions moved into the empty state, where they are
-//    read exactly when they are needed.
+// 2. The list has a header row, sort, facets and a count, like #customers and #kmon beside it.
+// 3. Deleting an imported target is a HOLD, not a click: DESIGN.md §8.5. The gesture is the
+//    confirmation and releasing early is the undo.
+// 4. The importer is two buttons on the control bar plus a collapsed «إضافة جهة يدويًا»; the
+//    instructions live in the empty state, where they are read exactly when they are needed.
+//
+// PORTED to the new design system (docs/PORT-SPEC.md). The screen body is wrapped in .ds6 and the
+// book is a real .m-table inside .m-tablewrap, so the eight-track .crow grid, its phone fallback
+// and the private avatar/chip/phone cells are all gone. Every count goes through .m-n or dsFig,
+// every empty cell states WHICH KIND of absence it is, and the counted nouns come from opPl.
+//
+// SMOKE LANDMARK: #targets asserts «الشرائح», which is the table's second column header. Do not
+// rename it without smoke.py.
+//
+// TWO ISLANDS OF THE OLD SYSTEM REMAIN, and they are dashboard.ts's, not this file's: the manual
+// entry rows come from manualRowsHtml() and the import status lines are written into #entstat and
+// #entfstat as .chip markup. Both live in dashboard.ts, which ADR-0001 forbids range-editing, so
+// they keep their old classes until that file is ported.
 //
 // Client JS in the dashboard.ts <script> scope (see campaigns-crm.ts for the seam). It borrows
-// entities, segGroups, attrChips, contactByPhone, cusOutcome, esc,
-// fmtN, fmtD, ic, LIST_CAP — and defines no statistic of its own.
+// entities, segGroups, attrChips, contactByPhone, esc, fmtN, ic, LIST_CAP — and defines no
+// statistic of its own.
+//
+// NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const TARGETS_CRM_CSS = `
-  /* SIX cells, six tracks. Nothing here is display:contents, so cell count and track count are
-     the same number in both directions — the arity bug class that wrapped three earlier tables. */
-  .tgtflat .crow { grid-template-columns: 40px 1.9fr 2.2fr 1.1fr 1fr 128px; padding-inline:20px 12px; }
-  .tgtflat .crow .t-nm { display:flex; align-items:center; gap:10px; min-width:0; }
-  .tgtflat .crow .t-nm .av { width:28px; height:28px; flex:none; border-radius:7px; background:#E5E8EE;
-    color:#33373E; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; }
-  /* Two lines, then clamp — an entity name is the only thing identifying its row, and
-     «مجمع النور الطبي (مثال — امسح هذا الصف)» was being cut mid-parenthesis. DESIGN.md 6.5. */
-  .tgtflat .crow .t-nm .lb { font-size:14px; font-weight:450; color:#14161A; overflow:hidden;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-    white-space:normal; line-height:1.4; }
-  .tgtflat .crow .t-seg { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; min-width:0; }
-  .tgtflat .crow .t-ph { font-size:12px; color:#656B76; direction:ltr; text-align:start; font-variant-numeric:tabular-nums; }
-  .tgtflat .crow .t-st { display:flex; align-items:center; gap:7px; font-size:12px; color:#33373E; min-width:0; }
-  .tgtflat .crow .t-st .d { width:6px; height:6px; border-radius:999px; flex:none; }
-  .tgtflat .crow .t-st .lb { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tgtflat .crow .c-act { display:flex; justify-content:flex-end; }
-  .tgtdel { font-family:inherit; font-size:12px; color:#656B76; background:transparent; border:1px solid #ECEEF2;
-    border-radius:6px; height:26px; padding:0 8px; cursor:pointer; white-space:nowrap; }
-  .tgtdel:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
-  .tgtdel.arm { color:#8E2A27; border-color:#8E2A27; background:#FBE7E6; opacity:1 !important; }
-  .tgtopp { font-family:inherit; font-size:12px; color:#2563EB; background:#fff; border:1px solid #ECEEF2;
-    border-radius:6px; height:26px; padding:0 9px; cursor:pointer; white-space:nowrap; }
-  .tgtopp:hover { border-color:#5B8DEF; background:#EAF1FE; }
-  /* The shared .crow rule hides the ENTIRE action cell until hover, which is right for a delete and
-     wrong for the one thing this screen is asked for: «I onboarded leads, I called one, now what».
-     An affordance you must already know about to discover is not an answer to that question. So the
-     cell is always visible and the DELETE alone keeps the hover reveal — opacity cannot be undone
-     by a child, so the rule has to move down to the button rather than be overridden on it. */
-  .tgtflat .crow .c-act { opacity:1; }
-  .tgtflat .crow .tgtdel { opacity:0; transition:opacity .14s ease-in; }
-  .tgtflat .crow:hover .tgtdel, .tgtflat .crow:focus-within .tgtdel,
-  .tgtflat .crow.sel .tgtdel { opacity:1; }
-  /* Both halves of the armed pair stay put: a confirm that fades when the pointer drifts is a
-     confirm you cannot answer. */
-  .tgtflat .crow .tgtdel.arm, .tgtflat .crow .tgtdel.armx { opacity:1; }
-  @media (pointer:coarse) { .tgtflat .crow .tgtdel { opacity:1; } }
-  /* إدارة الوسوم */
-  .tagsheet { position:fixed; inset:0; z-index:var(--z-toast); background:rgba(23,23,23,.32);
-    display:flex; align-items:flex-start; justify-content:center; padding:70px 20px; overflow-y:auto; }
-  .tagsheet .sheet { background:#fff; border:1px solid #ECEEF2; border-radius:14px; width:100%;
-    max-width:520px; padding:20px; box-shadow:0 18px 48px rgba(16,24,40,.22); }
-  .tagsheet .sh { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-  .tagsheet .sh .t { font-size:16px; font-weight:600; color:#14161A; }
-  .tagsheet .hint { font-size:12px; color:#656B76; line-height:1.8; margin-top:6px; }
-  .tagsheet .mk { display:flex; gap:8px; margin:14px 0 4px; }
-  .tagsheet .mk input { flex:1; min-width:0; height:34px; }
-  .tagsheet .tlist { margin-top:6px; max-height:52vh; overflow-y:auto; }
-  .tagsheet .trow2 { display:flex; align-items:center; gap:8px; padding:10px 2px; border-top:1px solid #ECEEF2; }
-  .tagsheet .trow2 .nm { flex:1; min-width:0; font-size:14px; color:#14161A;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .tagsheet .trow2 .ct { font-size:12px; color:#656B76; white-space:nowrap; font-variant-numeric:tabular-nums; }
-  .tagsheet .trow2 .btn { height:28px; padding:0 9px; font-size:12px; }
-  .tagsheet .trow2 .dngr:hover { color:#8E2A27; border-color:#FBE7E6; background:#FBE7E6; }
-  @media (max-width: 939px) {
-    .tgtflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:5px; column-gap:10px; padding:12px 16px; }
-    .tgtflat .crow .selcell { grid-row:1 / 5; grid-column:1; align-self:center; }
-    .tgtflat .crow .t-nm { grid-row:1; grid-column:2; }
-    .tgtflat .crow .c-act { grid-row:1; grid-column:3; }
-    .tgtflat .crow .t-st { grid-row:2; grid-column:2 / 4; }
-    .tgtflat .crow .t-seg { grid-row:3; grid-column:2 / 4; flex-wrap:wrap; }
-    .tgtflat .crow .t-ph { grid-row:4; grid-column:2 / 4; }
-  }
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). Deleted here because the vocabulary carries
+   them: the row grid and its narrow-screen fallback, the header strip, the avatar, the segment
+   chips, the phone cell, the stage dot, the buttons and their hover and focus treatments. What
+   survives is the table's own column width, the two cells whose content the vocabulary has no
+   opinion about, and the tag sheet — a panel, not a modal, and the vocabulary's .m-dlg is a
+   dialog element this screen does not open as one. */
+.ds6 .tgt-tbl .m-table{min-inline-size:880px}
+.ds6 .tgt-nm{display:flex;align-items:center;gap:var(--m-2);min-inline-size:0}
+/* Two lines, then clamp — an entity name is the only thing identifying its row, and
+   «مجمع النور الطبي (مثال — امسح هذا الصف)» was being cut mid-parenthesis. */
+.ds6 .tgt-nm .lb{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  white-space:normal;line-height:1.4}
+.ds6 .tgt-seg{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-inline-size:0}
+.ds6 .tgt-ltr{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.ds6 .tgt-st{display:flex;align-items:center;gap:7px;min-inline-size:0}
+.ds6 .tgt-st .d{inline-size:6px;block-size:6px;border-radius:50%;flex:none}
+.ds6 .tgt-act{display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+/* The hold-to-delete gesture is revamp.ts's .rv-hold and keeps its own drawing. In a table cell it
+   is always visible: an affordance you must hover to discover is not an answer to «now what». */
+.ds6 .tgt-act .rv-hold{opacity:1}
+
+/* The manual-entry disclosure. Its ROWS come from dashboard.ts (manualRowsHtml) and still wear
+   .inp, so only the container is stated here. */
+.ds6 .tgt-import{background:var(--m-paper);border:1px solid var(--m-line);border-radius:var(--m-r-card);
+  padding-inline:var(--m-4);padding-block:var(--m-3)}
+.ds6 .tgt-import > summary{font-size:var(--m-t-body);font-weight:600;color:var(--m-ink-2);cursor:pointer}
+.ds6 .tgt-import .row{display:flex;align-items:center;gap:var(--m-3);margin-block-start:var(--m-3);flex-wrap:wrap}
+.ds6 .tgt-import textarea{inline-size:100%;font:inherit;font-size:var(--m-t-body);line-height:2;
+  padding:var(--m-2) var(--m-3);border:1px solid var(--m-line-2);border-radius:var(--m-r-ctl);
+  background:var(--m-paper);color:var(--m-ink);resize:vertical;box-sizing:border-box}
+.ds6 .tgt-import textarea:focus{outline:none;box-shadow:var(--m-focus)}
+
+/* إدارة الوسوم — a panel over the list, not a dialog element. */
+.tgt-sheet{position:fixed;inset:0;z-index:var(--z-toast);background:rgba(11,13,18,.32);
+  display:flex;align-items:flex-start;justify-content:center;padding:70px 20px;overflow-y:auto}
+.ds6 .tgt-sheet__p{background:var(--m-paper);border:1px solid var(--m-line);border-radius:var(--m-r-band);
+  inline-size:100%;max-inline-size:520px;padding:var(--m-5);box-shadow:var(--m-lift);
+  display:flex;flex-direction:column;gap:var(--m-3)}
+.ds6 .tgt-sheet__mk{display:flex;gap:var(--m-2)}
+.ds6 .tgt-sheet__mk .m-input{flex:1;min-inline-size:0}
+.ds6 .tgt-sheet__l{max-block-size:52vh;overflow-y:auto}
+.ds6 .tgt-trow{display:flex;align-items:center;gap:var(--m-2);padding-block:var(--m-2);
+  border-block-start:1px solid var(--m-line);flex-wrap:wrap}
+.ds6 .tgt-trow:first-child{border-block-start:0}
+.ds6 .tgt-trow .nm{flex:1;min-inline-size:120px;font-size:var(--m-t-body);color:var(--m-ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds6 .tgt-trow .m-input{flex:1;min-inline-size:140px}
+.ds6 .tgt-trow .m-btn{min-block-size:36px;padding-inline:var(--m-3);font-size:var(--m-t-cap)}
+.ds6 .tgt-trow .danger{color:var(--m-bad);border-color:var(--m-bad-line)}
+@media (max-width:640px){
+  .ds6 .tgt-tbl .m-table{min-inline-size:640px}
+  .tgt-sheet{padding:24px 12px}
+}
 `;
 
 export const TARGETS_CRM_JS = `
@@ -125,62 +126,64 @@ function tgtMatches() {
       (!q || e.name.includes(q) || e.phone.includes(q));
   });
 }
+/* The match count is printed on the control bar AND in the table's foot, so it is bound to the
+   filter it is counted from rather than passed twice (PORT-SPEC §6). */
+function tgtBind() {
+  dsD("tgtShown", function () { return tgtMatches().length; });
+  dsD("tgtAll", function () { return entities.length; });
+}
 
 /* Facets come from segGroups() — whatever columns the imported file actually carried. No facet is
    declared here, so a book without a «المدينة» column simply has no المدينة filter rather than an
    empty dropdown promising one. */
 function tgtFacetBar() {
   var groups = segGroups();
-  var h = '<div class="crmbar rise">';
-  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:190px;max-width:300px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
-    '<input id="tq" class="inp" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" placeholder="ابحث بالاسم أو الرقم…" ' +
-    'style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
-  if (tgtTagProd) h += '<button class="px-toggle" aria-pressed="true" onclick="tgtClearTagProd()" title="إزالة تصفية المنتج">موسومة بـ: ' + esc(tgtTagProd) + ' ×</button>';
+  var h = '<div class="m-tools"><div class="m-head__a">';
+  h += '<input class="m-input" id="tq" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" ' +
+    'placeholder="ابحث بالاسم أو الرقم…" aria-label="بحث في جهات الاستهداف">';
+  if (tgtTagProd) h += '<button type="button" class="m-btn" aria-pressed="true" onclick="tgtClearTagProd()" title="إزالة تصفية المنتج">موسومة بـ: ' + esc(tgtTagProd) + " &#215;</button>";
   groups.forEach(function (g, ki) {
-    var on = Boolean(tgtFilters[g.key]);
-    h += '<select class="crmsel' + (on ? " on" : "") + '" onchange="tgtSetAttr(' + ki + ', Number(this.value))"' +
-      (on ? ' style="border-color:#5B8DEF;color:#2563EB;background:#DCE8FC;"' : "") + '>' +
+    h += '<select class="m-select" aria-label="' + esc(g.key) + '" onchange="tgtSetAttr(' + ki + ', Number(this.value))">' +
       '<option value="-1">' + esc(g.key) + ": الكل</option>" +
       g.values.map(function (v, vi) {
-        return '<option value="' + vi + '"' + (tgtFilters[g.key] === v[0] ? " selected" : "") + '>' +
+        return '<option value="' + vi + '"' + (tgtFilters[g.key] === v[0] ? " selected" : "") + ">" +
           esc(v[0]) + " (" + fmtN(v[1]) + ")</option>";
       }).join("") + "</select>";
   });
   var withProd = affinityProducts().filter(function (p) { return p.uses > 0 || p.name === tgtProd; });
   if (withProd.length) {
-    h += '<select class="crmsel' + (tgtProd ? " on" : "") + '" onchange="tgtSetProd(this.value)"' +
-      (tgtProd ? ' style="border-color:#5B8DEF;color:#2563EB;background:#DCE8FC;"' : "") + '>' +
+    h += '<select class="m-select" aria-label="الخدمة المستخدمة" onchange="tgtSetProd(this.value)">' +
       '<option value="">الخدمة المستخدمة: الكل</option>' +
       withProd.map(function (p) {
-        return '<option value="' + esc(p.name) + '"' + (tgtProd === p.name ? " selected" : "") + '>' +
+        return '<option value="' + esc(p.name) + '"' + (tgtProd === p.name ? " selected" : "") + ">" +
           esc(clip(p.name, 26)) + " (" + fmtN(p.uses) + ")</option>";
       }).join("") + "</select>";
   }
   /* BR-CUS-003: filter the book by usage indicator (indicators-crm owns the membership read). */
   if (typeof indTargetsSelect === "function") h += indTargetsSelect();
-  h += '<span style="flex:1"></span><span class="hair"></span>';
   if (tgtMayEdit()) {
-    h += '<button class="btn btn-ghost" onclick="tgtOpenTags()">الوسوم' +
+    h += '<button type="button" class="m-btn" onclick="tgtOpenTags()">الوسوم' +
       (tagList().length ? " (" + fmtN(tagList().length) + ")" : "") + "</button>";
-    h += '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>';
-    h += '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
+    h += '<a href="/assets/audience-template.xlsx" download class="m-btn">القالب الجاهز</a>';
+    h += '<button type="button" class="m-btn m-btn--primary" onclick="entFilePick()">رفع ملف Excel/CSV</button>';
   }
-  h += "</div>";
+  h += "</div></div>";
   return h;
 }
+/* The unit noun is four-way and agrees with its own count (PORT-SPEC §5): dsPageBar prints the
+   number itself, so this returns the noun alone. */
+function tgtNoun(n) { return n === 1 ? "جهة" : n === 2 ? "جهتان" : (n >= 3 && n <= 10) ? "جهات" : "جهة"; }
 
 function tgtHeader(allOn) {
   /* Selecting rows here exists only to drive the bulk bar (tag, untag, open deals). With the bar
      hidden, a checkbox is a control that highlights rows and can never do anything. */
   var box = tgtMayEdit()
-    ? '<input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="tgtTogglePage()">'
+    ? '<input type="checkbox" class="m-cb" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="tgtTogglePage()">'
     : "";
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-    '<div class="selcell" style="opacity:1;">' + box + "</div>" +
-    "<div>الجهة</div><div>الشرائح</div><div>الجوال</div><div>المرحلة</div><div></div></div>" +
-    '<div class="thead-narrow"><span class="selcell" style="opacity:1;">' + box +
-      '</span><span>الجهة</span><span style="flex:1"></span><span>الحالة</span></div>';
+  /* SMOKE: «الشرائح» is the landmark smoke.py asserts for #targets. */
+  return "<thead><tr>" +
+    '<th class="m-sel">' + box + "</th>" +
+    "<th>الجهة</th><th>الشرائح</th><th>الجوال</th><th>المرحلة</th><th>إجراءات</th></tr></thead>";
 }
 
 function tgtRow(e) {
@@ -188,59 +191,59 @@ function tgtRow(e) {
      the pipeline stage of its conversation, or «مستهدَف» when it has never been messaged — which is
      the ladder's own first rung, so this screen invents no word of its own. Nothing is ever
      inferred from the imported attributes. */
-  // The same ladder the clients list and the record use. «لم تُراسل بعد» was this screen's private
-  // third word for what the ladder already calls «مستهدَف».
   var st = stageOfEntity(e);
   var c = contactByPhone(e.phone);
-  var armed = tgtArm === e.id;
   /* A customer never messaged has an account record now (BRD §9, S2), so every row opens something. */
-  var open = c ? 'onclick="location.hash=&quot;customer/' + esc(e.phone) + '&quot;" style="cursor:pointer;"' : 'onclick="location.hash=&quot;account/' + Number(e.id) + '&quot;" style="cursor:pointer;"';
-  return '<div class="trow km krow crow' + (tgtSel[e.id] ? " sel" : "") + '" ' + open + ">" +
-    '<div class="selcell" onclick="event.stopPropagation()">' + (tgtMayEdit()
-      ? '<input type="checkbox"' + (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')">'
-      : "") + "</div>" +
-    '<div class="t-nm"><span class="av">' + esc(e.name.trim().charAt(0)) + "</span>" +
-      '<span class="lb">' + esc(e.name) + "</span></div>" +
-    '<div class="t-seg">' + (function () {
-      var pc = prodChips(e);
-      var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
-      return pc + attrChips(e, budget) || '<span style="color:#656B76;font-size:12px;">—</span>';
-    })() + "</div>" +
-    '<div class="t-ph">+' + esc(e.phone) + "</div>" +
-    '<div class="t-st"><span class="d" style="background:' + st.dot + ';"></span><span class="lb">' + st.label + "</span></div>" +
-    /* Two row actions, and the constructive one comes first. «فتح فرصة» is the answer to «I onboarded
+  var href = c ? ("#customer/" + esc(e.phone)) : ("#account/" + Number(e.id));
+  var seg = (function () {
+    var pc = prodChips(e);
+    var budget = pc ? (pc.split("<span class=").length - 1 > 1 ? 1 : 2) : 3;
+    return pc + attrChips(e, budget);
+  })();
+  return "<tr" + (tgtSel[e.id] ? ' aria-selected="true"' : "") + ">" +
+    '<td class="m-sel" onclick="event.stopPropagation()">' + (tgtMayEdit()
+      ? '<input type="checkbox" class="m-cb"' + (tgtSel[e.id] ? " checked" : "") + ' aria-label="تحديد ' + esc(e.name) + '" onclick="tgtToggle(' + e.id + ')">'
+      : "") + "</td>" +
+    '<td class="m-td-n"><span class="tgt-nm"><span class="m-av m-av--sq">' + esc(e.name.trim().charAt(0)) + "</span>" +
+      '<a class="m-link lb" href="' + href + '">' + esc(e.name) + "</a></span></td>" +
+    /* A row with no segment columns is not a failure: the imported file simply had none, which is
+       a legitimate nothing rather than data somebody owes. */
+    '<td><span class="tgt-seg">' + (seg || mNil("لا شرائح مستوردة", "none")) + "</span></td>" +
+    '<td><bdi class="tgt-ltr">+' + esc(e.phone) + "</bdi></td>" +
+    '<td><span class="tgt-st"><span class="d" style="background:' + st.dot + '"></span>' + st.label + "</span></td>" +
+    /* Two row actions, and the constructive one comes first. «فرصة +» is the answer to «I onboarded
        leads, I called one, now what» — the act belongs on the lead, not on a form three screens
-       away that makes you retype its name. It is hover-revealed and neutral like the delete beside
-       it; nothing here writes on one click — it opens a prefilled form the operator still submits. */
-    // hold-to-confirm (DESIGN.md 8.5). The armed/تراجع pair is gone: the gesture IS the
-    // confirmation, and releasing early is the undo. Keyboard still arms in two steps.
-    '<div class="c-act">' +
+       away that makes you retype its name. Nothing here writes on one click: it opens a prefilled
+       form the operator still submits.
+       The delete is hold-to-confirm (DESIGN.md §8.5): the gesture IS the confirmation and
+       releasing early is the undo. Keyboard still arms in two steps. */
+    '<td><span class="tgt-act">' +
       (tgtMayOpenOpp()
-        ? '<button class="tgtopp" title="سجّل فرصة بيع لهذه الجهة" onclick="event.stopPropagation();opFromEntity(' + e.id + ')">فرصة +</button>' : "") +
+        ? '<button type="button" class="m-btn" title="سجّل فرصة بيع لهذه الجهة" onclick="opFromEntity(' + e.id + ')">فرصة +</button>' : "") +
       (tgtMayEdit()
-        ? '<button class="rv-hold rv-hold-sm" style="margin-inline-start:6px;" data-do="entDel" data-arg="' + e.id + '"' +
+        ? '<button class="rv-hold rv-hold-sm" data-do="entDel" data-arg="' + e.id + '"' +
           ' data-idle="حذف" data-holding="استمر…" data-armed="اضغط مرة أخرى" aria-pressed="false"' +
-          ' title="اضغط مع الاستمرار لحذف الجهة" onclick="event.stopPropagation();">' +
+          ' title="اضغط مع الاستمرار لحذف الجهة">' +
           '<span class="rv-fill"></span><span class="rv-lbl">حذف</span></button>' : "") +
-    "</div>" +
-    "</div>";
+    "</span></td></tr>";
 }
 
+/* The manual-entry disclosure. Its ROWS are dashboard.ts's manualRowsHtml() and still wear .inp —
+   that file is under ADR-0001 and is not range-edited from here. */
 function tgtImportBox() {
-  return '<details id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open" ' +
-    'style="background:#fff;border:1px solid #ECEEF2;border-radius:13px;padding:12px 16px;margin-bottom:14px;">' +
-    '<summary style="font-size:12px;color:#33373E;cursor:pointer;font-weight:500;">إضافة جهة يدويًا أو لصق قائمة</summary>' +
-    '<div style="font-size:12px;color:#656B76;margin:10px 0 12px;line-height:1.9;">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام 05 تتحول إلى 966</div>' +
+  return '<details class="tgt-import" id="manualbox"' + (manualOpen ? " open" : "") + ' ontoggle="manualOpen=this.open">' +
+    "<summary>إضافة جهة يدويًا أو لصق قائمة</summary>" +
+    '<p class="m-meta">الاسم والجوال مطلوبان · كل عمود إضافي (المدينة، الحجم…) يصبح شريحة استهداف · أرقام 05 تتحول إلى 966</p>' +
     '<div id="manualrows">' + manualRowsHtml() + "</div>" +
-    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">' +
-    '<button class="btn btn-dark" onclick="entManualSave()">حفظ الجهات ←</button>' +
-    '<button class="btn btn-ghost" onclick="entAddRow()">+ صف آخر</button>' +
+    '<div class="row">' +
+    '<button type="button" class="m-btn m-btn--primary" onclick="entManualSave()">حفظ الجهات &#8592;</button>' +
+    '<button type="button" class="m-btn" onclick="entAddRow()">+ صف آخر</button>' +
     '<span id="entstat">' + manualStat + '</span><span style="flex:1"></span>' +
-    '<button class="btn btn-ghost" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
-    '<div id="pastebox" style="display:none;margin-top:12px;">' +
-    '<div style="font-size:12px;color:#656B76;margin-bottom:8px;line-height:1.9;">سطر لكل جهة: <b style="color:#14161A;font-weight:500;">الاسم، الجوال، الحجم، المدينة</b></div>' +
-    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض" class="inp" style="width:100%;font-size:12px;line-height:2;resize:vertical;"></textarea>' +
-    '<button class="btn btn-ghost" style="margin-top:10px;" onclick="entImport()">استيراد الملصق ←</button></div>' +
+    '<button type="button" class="m-btn" onclick="entTogglePaste()">أو الصق قائمة جاهزة</button></div>' +
+    '<div id="pastebox" style="display:none" class="row">' +
+    '<p class="m-meta">سطر لكل جهة: <b>الاسم، الجوال، الحجم، المدينة</b></p>' +
+    '<textarea id="entpaste" rows="4" placeholder="مجمع النور الطبي، 966512345678، كبيرة، الرياض"></textarea>' +
+    '<button type="button" class="m-btn" onclick="entImport()">استيراد الملصق &#8592;</button></div>' +
     "</details>";
 }
 
@@ -249,20 +252,20 @@ function tgtMayEdit() { return typeof meCan !== "function" || meCan("customers.e
 function tgtMayOpenOpp() { return typeof meCan !== "function" || meCan("opps.edit"); }
 function vTargetsCrm() {
   setTimeout(tgtPaintCrumb, 0);
-  var h = '<input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">';
+  tgtBind();
+  var h = '<div class="ds6"><input id="entfile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="entFileUpload(this)">';
   if (!entities.length) {
     /* The importer instructions live HERE, where the screen has nothing else to say, instead of
        above a list of sixteen rows that already proved the format works. */
     return h + (tgtMayEdit()
-      ? '<div class="crmbar rise" style="justify-content:flex-end;">' +
-        '<a href="/assets/audience-template.xlsx" download class="btn btn-ghost" style="text-decoration:none;">القالب الجاهز</a>' +
-        '<button class="btn btn-dark" onclick="entFilePick()">رفع ملف Excel/CSV</button></div>'
+      ? '<div class="m-tools"><span></span><div class="m-head__a">' +
+        '<a href="/assets/audience-template.xlsx" download class="m-btn">القالب الجاهز</a>' +
+        '<button type="button" class="m-btn m-btn--primary" onclick="entFilePick()">رفع ملف Excel/CSV</button></div></div>'
       : "") +
       '<div id="entfstat">' + entImportSummary + "</div>" +
-      '<div class="empty" style="padding:56px 20px;"><div class="ic"><span></span></div>' +
-      '<div class="t">لا جهات في قائمتك بعد</div>' +
-      '<div class="s" style="line-height:2;">ارفع ملفك كما هو: عمود اسم + عمود جوال. كل عمود إضافي — المدينة، الحجم، القطاع — يصبح شريحة استهداف تختار بها في «إنشاء حملة». التكرار يُحدَّث ولا يُضاعف، وأرقام 05 تتحول إلى 966 تلقائيًا.</div></div>' +
-      (tgtMayEdit() ? tgtImportBox() : "");
+      '<section class="m-card m-empty"><p class="m-empty__t">لا جهات في قائمتك بعد</p>' +
+      '<p class="m-empty__d">ارفع ملفك كما هو: عمود اسم + عمود جوال. كل عمود إضافي — المدينة، الحجم، القطاع — يصبح شريحة استهداف تختار بها في «إنشاء حملة». التكرار يُحدَّث ولا يُضاعف، وأرقام 05 تتحول إلى 966 تلقائيًا.</p></section>' +
+      (tgtMayEdit() ? tgtImportBox() : "") + "</div>";
   }
   var rows = tgtMatches();
   var shown = pageSlice("tgt", rows);
@@ -270,16 +273,20 @@ function vTargetsCrm() {
   h += '<div id="entfstat">' + entImportSummary + "</div>";
   if (tgtMayEdit()) h += tgtImportBox();
   var allOn = shown.length > 0 && shown.every(function (e) { return tgtSel[e.id]; });
-  h += '<div class="tblwrap crmflat tgtflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' + tgtHeader(allOn);
+  h += '<section class="m-card m-card--pad0 tgt-tbl"><div class="m-tablewrap">' +
+    '<table class="m-table m-table--sticky">' + tgtHeader(allOn) + "<tbody>";
   shown.forEach(function (e) { h += tgtRow(e); });
   if (!shown.length) {
-    h += '<div style="padding:44px;text-align:center;color:#656B76;font-size:14px;">لا جهة تطابق هذا الفرز.</div>';
+    h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty">' +
+      '<p class="m-empty__t">لا جهة تطابق هذا الفرز</p>' +
+      '<p class="m-empty__d">امسح البحث أو غيّر إحدى الشرائح أعلاه.</p></div></td></tr>';
   }
-  h += '</div></div><div class="tfoot">' + pageBar("tgt", rows.length, "جهة") +
-    '<span>' + ic("users", 14) + " من أصل " + fmtN(entities.length) + " في قائمتك</span></div></div>";
+  h += '</tbody></table></div><div class="m-foot">' +
+    dsPageBar("tgt", rows.length, tgtNoun(rows.length), "tgtShown") +
+    '<span class="m-cap">' + ic("users", 14) + " من أصل " + dsFig("tgtAll", entities.length) + " في قائمتك</span></div></section>";
   if (tgtMayEdit()) h += tgtBulkBar();
   h += tgtTagsPanel();
-  return h;
+  return h + "</div>";
 }
 
 /* «وسم كمرشّح» — the whole point of this screen for someone building a target list by hand. It
@@ -294,21 +301,20 @@ function tgtBulkBar() {
     /* No vocabulary yet. Offering an empty dropdown and a live «وسم» button is a control that can
        only fail; the bar says what is missing and where to fix it. */
     return '<div class="bulkbar"><div>' +
-      '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-      '<span style="font-size:12px;">لا وسوم بعد.</span>' +
+      '<span class="cnt">' + mN(ids.length) + " محدَّدة</span>" +
+      "<span>لا وسوم بعد.</span>" +
       '<button class="pri" onclick="tgtOpenTags()">أنشئ أول وسم</button>' +
-      '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
+      '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">&#215;</button></div></div>';
   }
   return '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + fmtN(ids.length) + " محدَّدة</span>" +
-    '<select id="tgtagsel" class="crmsel" style="height:32px;background:#fff;border-color:#fff;color:#14161A;border-radius:999px;">' +
+    '<span class="cnt">' + mN(ids.length) + " محدَّدة</span>" +
+    '<select id="tgtagsel" aria-label="الوسم">' +
     tags.map(function (t) { return '<option value="' + esc(t.name) + '">' + esc(clip(t.name, 30)) + "</option>"; }).join("") +
     "</select>" +
     '<button class="pri"' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(true)">' +
       (tgtTagBusy ? "جارٍ…" : "وسم") + "</button>" +
     '<button' + (tgtTagBusy ? " disabled" : "") + ' onclick="tgtTag(false)">إزالة الوسم</button>' +
     '<button onclick="tgtOpenTags()">إدارة الوسوم</button>' +
-    '<span style="width:1px;height:20px;background:rgba(255,255,255,.28);flex:none;"></span>' +
     /* The bulk half of «فرصة +», and it reads the SAME service select the tagging uses. A second
        dropdown sat beside the first looking identical, and no reader could tell which act it
        governed — but the deeper point is that it was never a second question: «مرشّح لـ فحص
@@ -318,15 +324,15 @@ function tgtBulkBar() {
        deals do not — what you know after working a list is «these eleven are live on فحص
        الموظفين», and the money comes later, one card at a time. So each line opens UNPRICED at
        «تواصل أولي», the same shape the assistant's own auto-created lines take, which is why the
-       board needs no new vocabulary to show them. */
-    /* opps.edit, not customers.edit: the product manager may tag this book and may not open deals
+       board needs no new vocabulary to show them.
+       opps.edit, not customers.edit: the product manager may tag this book and may not open deals
        in it, and the per-row «فرصة +» is gated the same way. */
     (tgtMayOpenOpp()
       ? '<button' + (tgtOppBusy ? " disabled" : "") + ' onclick="tgtBulkOpp()" ' +
         'title="افتح فرصة بيع بالخدمة المختارة لكل جهة محدَّدة">' +
         (tgtOppBusy ? "جارٍ…" : "افتح فرصة") + "</button>"
       : "") +
-    '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">×</button></div></div>';
+    '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">&#215;</button></div></div>';
 }
 
 /* إدارة الوسوم — create, rename, delete, with the count each one carries.
@@ -336,40 +342,44 @@ function tgtBulkBar() {
 function tgtTagsPanel() {
   if (!tgtTagsOpen) return "";
   var tags = tagList();
-  return '<div class="tagsheet" onclick="if(event.target===this) tgtCloseTags()"><div class="sheet">' +
-    '<div class="sh"><span class="t">إدارة الوسوم</span>' +
-    '<button class="btn btn-ghost" onclick="tgtCloseTags()">إغلاق</button></div>' +
-    '<div class="hint">الوسم تسمّيه كما تشاء — خدمة، خط منتجات قسم آخر، أو فعالية. يُنشأ مرة، ثم يُختار.</div>' +
-    '<div class="mk"><input id="tgnew" class="inp" maxlength="60" placeholder="اسم الوسم الجديد…" ' +
+  return '<div class="tgt-sheet" onclick="if(event.target===this) tgtCloseTags()"><div class="tgt-sheet__p" role="dialog" aria-modal="true" aria-labelledby="tgtagt">' +
+    '<div class="m-between"><h2 class="m-h2" id="tgtagt">إدارة الوسوم</h2>' +
+    '<button type="button" class="m-x" onclick="tgtCloseTags()" aria-label="إغلاق">&#215;</button></div>' +
+    '<p class="m-meta">الوسم تسمّيه كما تشاء — خدمة، خط منتجات قسم آخر، أو فعالية. يُنشأ مرة، ثم يُختار.</p>' +
+    '<div class="tgt-sheet__mk"><input id="tgnew" class="m-input" maxlength="60" placeholder="اسم الوسم الجديد…" aria-label="اسم الوسم الجديد" ' +
       'onkeydown="if(event.key===&quot;Enter&quot;) tgtCreateTag()">' +
-      '<button class="btn btn-dark" onclick="tgtCreateTag()">أضف</button></div>' +
+      '<button type="button" class="m-btn m-btn--primary" onclick="tgtCreateTag()">أضف</button></div>' +
     (tags.length
-      ? '<div class="tlist">' + tags.map(function (t) {
-          /* esc(), not a hand-rolled quote swap. JSON.stringify escapes " and \\ but leaves &
-             alone, so a tag literally named &quot;…&quot; came back through the HTML parser as a
-             real quote and broke out of the JS string. esc() escapes & first, which closes it. */
+      ? '<div class="tgt-sheet__l">' + tags.map(function (t) {
+          /* esc(), not a hand-rolled quote swap. JSON.stringify escapes the quote and the backslash
+             but leaves & alone, so a tag literally named with an &quot; entity came back through
+             the HTML parser as a real quote and broke out of the JS string. esc() escapes & first,
+             which closes it. */
           var q = esc(JSON.stringify(t.name));
           /* Renaming happens IN the row and deleting arms before it fires — the same two-step this
              screen already uses on a row, and no browser dialog anywhere. */
           if (tgtTagEdit === t.name) {
-            return '<div class="trow2"><input id="tgedit" class="inp" maxlength="60" value="' + esc(t.name) + '" ' +
+            return '<div class="tgt-trow"><input id="tgedit" class="m-input" maxlength="60" value="' + esc(t.name) + '" aria-label="الاسم الجديد" ' +
               'onkeydown="if(event.key===&quot;Enter&quot;) tgtRenameSave(' + q + '); if(event.key===&quot;Escape&quot;) tgtRenameCancel()">' +
-              '<button class="btn btn-dark" onclick="tgtRenameSave(' + q + ')">حفظ</button>' +
-              '<button class="btn btn-ghost" onclick="tgtRenameCancel()">إلغاء</button></div>';
+              '<button type="button" class="m-btn m-btn--primary" onclick="tgtRenameSave(' + q + ')">حفظ</button>' +
+              '<button type="button" class="m-btn" onclick="tgtRenameCancel()">إلغاء</button></div>';
           }
           if (tgtTagArm === t.name) {
-            return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +
-              '<span class="ct" style="color:#8E2A27;">' +
-                (t.count ? "سيُزال عن " + fmtN(t.count) + " جهة" : "بلا جهات") + "</span>" +
-              '<button class="btn btn-ghost dngr" style="border-color:#8E2A27;color:#8E2A27;" onclick="tgtDeleteTag(' + q + ')">تأكيد الحذف</button>' +
-              '<button class="btn btn-ghost" onclick="tgtArmTag(&quot;&quot;)">تراجع</button></div>';
+            return '<div class="tgt-trow"><span class="nm">' + esc(t.name) + "</span>" +
+              '<span class="m-cap">' + (t.count
+                ? "سيُزال عن " + mPl(t.count, "جهة واحدة", "جهتين", "جهات", "جهة")
+                : mNil("بلا جهات", "none")) + "</span>" +
+              '<button type="button" class="m-btn danger" onclick="tgtDeleteTag(' + q + ')">تأكيد الحذف</button>' +
+              '<button type="button" class="m-btn" onclick="tgtArmTag(&quot;&quot;)">تراجع</button></div>';
           }
-          return '<div class="trow2"><span class="nm">' + esc(t.name) + "</span>" +
-            '<span class="ct">' + (t.count ? fmtN(t.count) + " جهة" : "بلا جهات") + "</span>" +
-            '<button class="btn btn-ghost" onclick="tgtEditTag(' + q + ')">إعادة تسمية</button>' +
-            '<button class="btn btn-ghost dngr" onclick="tgtArmTag(' + q + ')">حذف</button></div>';
+          return '<div class="tgt-trow"><span class="nm">' + esc(t.name) + "</span>" +
+            '<span class="m-cap">' + (t.count
+              ? mPl(t.count, "جهة واحدة", "جهتان", "جهات", "جهة")
+              : mNil("بلا جهات", "none")) + "</span>" +
+            '<button type="button" class="m-btn" onclick="tgtEditTag(' + q + ')">إعادة تسمية</button>' +
+            '<button type="button" class="m-btn danger" onclick="tgtArmTag(' + q + ')">حذف</button></div>';
         }).join("") + "</div>"
-      : '<div class="hint" style="padding:18px 0;">لا وسوم بعد.</div>') +
+      : '<p class="m-meta">لا وسوم بعد.</p>') +
     "</div></div>";
 }
 
@@ -379,8 +389,6 @@ function tgtPaintCrumb() {
   if (act) act.innerHTML = "";
 }
 
-/* Deleting an imported target is irreversible and the row is one of sixteen on a scrolling page.
-   Arming is a separate click on a separate button, and only one row can be armed at a time. */
 window.tgtArmDel = function (id) { tgtArm = id; render(false); };
 window.tgtSetProd = function (v) { tgtProd = v; render(false); };
 window.tgtToggle = function (id) { if (tgtSel[id]) delete tgtSel[id]; else tgtSel[id] = true; render(false); };

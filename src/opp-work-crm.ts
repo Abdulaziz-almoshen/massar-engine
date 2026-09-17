@@ -3,107 +3,118 @@
 // (meetings, calls, presentations, emails, notes with a dated next step — BR-OPP-003) and «عروض الأسعار»
 // (BR-OPP-004). Rules come from opp-work-domain (OPP_WORK_DOMAIN_JS).
 //
-// GRAMMAR. Sections are the drawer's own .ox-sec/.ox-sech, fields .ox-fld/.inp, lists follow the
-// escalation list's rhythm. The dialog is centred (it is a modal, so it scales from the centre), 200ms in
-// and 140ms out with a strong ease-out, reduced motion keeps only the fade.
+// PORTED to the new design system (docs/PORT-SPEC.md), 2026-09-17. Everything this module renders is
+// rendered INSIDE «فرص البيع» — the four sections nest in the record drawer and the lost-reason
+// dialog is appended by vOppsCrm — so opps-crm.ts owns the single .ds6 wrapper and every selector
+// below is scoped to it. Fields are m-field/m-label/m-input (a textarea is textarea.m-input),
+// buttons m-btn (+--primary), statuses m-chip, the journey the vocabulary's own m-tl timeline, and
+// every digit rides inside .m-n. What stays local is what the vocabulary genuinely lacks: a centred
+// dialog frame that is not <dialog> (it is appended to a re-rendering subtree), the two-column grid
+// of loss reasons, the chip radiogroup of activity kinds, and the work-row rhythm.
+//
+// GRAMMAR. Sections are the drawer's own .ox-sec/.ox-sech. The dialog is centred (it is a modal, so
+// it scales from the centre), 200ms in and 140ms out, reduced motion keeps only the fade.
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const OPP_WORK_CRM_CSS = `
-/* «نتائج المراحل» — the deal's own journey down the ladder */
-.ow-jsub { font-size:var(--t-xs); color:var(--muted); margin-block-start:2px; }
-.ow-jpct { display:flex; align-items:center; gap:var(--s3); margin-block:var(--s2) var(--s3); }
-.ow-jpct .l { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
-.ow-jpct .bar { flex:1; height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
-.ow-jpct .bar i { display:block; height:100%; background:var(--accent); border-radius:var(--r-pill);
-  transition:width 320ms cubic-bezier(0.23, 1, 0.32, 1); }
-.ow-jpct .v { font-size:var(--t-xs); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
-.ow-j { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
-.ow-js { position:relative; display:grid; grid-template-columns:16px minmax(0,1fr); gap:var(--s3);
-  padding-block:8px; padding-inline-start:2px; }
-.ow-js .dot { width:9px; height:9px; border-radius:var(--r-pill); background:var(--tn, var(--accent)); margin-block-start:5px; justify-self:center; }
-.ow-js.future .dot, .ow-js.skipped .dot { background:transparent; box-shadow:inset 0 0 0 1.5px var(--s-off-mark, #D8DCE3); }
-/* the thread between the rungs, so the column reads as one journey rather than four rows */
-.ow-js::before { content:""; position:absolute; inset-block-start:16px; inset-block-end:-8px;
-  inset-inline-start:9px; width:1px; background:var(--line-soft); }
-.ow-js:last-child::before { display:none; }
-.ow-js .hd { display:flex; align-items:baseline; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); }
-.ow-js .hd b { color:var(--ink); font-weight:600; }
-.ow-js .res { font-size:var(--t-xs); font-weight:500; color:var(--tn-text, var(--ink-2)); background:var(--tn-soft, var(--surface-2));
-  border-radius:var(--r-pill); padding:2px 9px; }
-.ow-js.future .res, .ow-js.skipped .res { color:var(--muted); background:var(--surface-2); }
-.ow-js .at { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; margin-inline-start:auto; }
-.ow-js .why { display:block; font-size:var(--t-xs); color:var(--muted); line-height:1.8; margin-block-start:3px; }
-.ow-js.current .hd b { color:var(--accent-deep); }
-@media (prefers-reduced-motion: reduce) { .ow-jpct .bar i { transition:none; } }
+/* «نتائج المراحل» — the deal's own journey down the ladder, on the vocabulary's timeline. The one
+   addition is the TONE: a rung wears its own stage colour, which is data (stage-tone-domain.ts). */
+.ds6 .ow-jsub { font-size:var(--m-t-cap); color:var(--m-mut); margin-block-start:2px; }
+.ds6 .ow-jpct { display:flex; align-items:center; gap:var(--m-3); margin-block:var(--m-2) var(--m-3); }
+.ds6 .ow-jpct .l { font-size:var(--m-t-cap); color:var(--m-mut); white-space:nowrap; }
+.ds6 .ow-jpct .m-meter { flex:1; margin-block:0; }
+.ds6 .ow-jpct .v { font-size:var(--m-t-cap); font-weight:700; color:var(--m-ink); }
+/* A closed deal reports its OUTCOME where an open one reports its progress. */
+.ds6 .ow-jout { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; margin-block:var(--m-2) var(--m-3); }
+.ds6 .ow-j { list-style:none; margin:0; padding:0; }
+.ds6 .ow-j .m-tl__d { background:var(--tn, var(--m-ac)); }
+.ds6 .ow-js.future .m-tl__d, .ds6 .ow-js.skipped .m-tl__d { background:var(--m-paper); box-shadow:0 0 0 1.5px var(--m-line-2); }
+.ds6 .ow-js .hd { display:flex; align-items:baseline; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .ow-js .hd b { color:var(--m-ink); font-weight:700; }
+.ds6 .ow-js.current .hd b { color:var(--m-ac-deep); }
+.ds6 .ow-js .m-chip.res { background:var(--tn-soft, var(--m-sunk)); color:var(--tn-text, var(--m-ink-2)); }
+.ds6 .ow-js.future .m-chip.res, .ds6 .ow-js.skipped .m-chip.res { background:var(--m-sunk); color:var(--m-mut); }
+.ds6 .ow-js .why { display:block; font-size:var(--m-t-cap); color:var(--m-mut); line-height:1.8; margin-block-start:3px; }
 
-.ow-scrim { position:fixed; inset:0; background:rgba(16,24,40,.42); z-index:var(--z-toast); opacity:0; transition:opacity 140ms var(--ease); }
-.ow-scrim.in { opacity:1; transition-duration:200ms; }
-.ow-lossm { position:fixed; inset:0; z-index:var(--z-toast); display:flex; align-items:flex-start; justify-content:center; padding:10vh var(--s3) var(--s3); pointer-events:none; }
-.ow-box { pointer-events:auto; width:100%; max-width:520px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
-  box-shadow:0 24px 60px rgba(16,24,40,.22); display:flex; flex-direction:column; max-height:80vh; opacity:0; transform:scale(.96);
-  transition:opacity 140ms cubic-bezier(.23,1,.32,1), transform 140ms cubic-bezier(.23,1,.32,1); }
-.ow-box.in { opacity:1; transform:none; transition-duration:200ms; }
-.ow-box .mh { padding:var(--s4) var(--s4) var(--s2); }
-.ow-box .mh h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); }
-.ow-box .mh .s { font-size:var(--t-xs); color:var(--muted); margin-top:4px; line-height:1.6; }
-.ow-box .mb { padding:var(--s2) var(--s4); overflow:auto; display:flex; flex-direction:column; gap:var(--s3); }
-.ow-box .mf { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; padding:var(--s3) var(--s4); border-top:1px solid var(--line-soft); }
-.ow-box .mf .btn { height:38px; font-size:var(--t-sm); }
-.ow-reasons { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
-.ow-reason { font-family:inherit; display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:start; min-height:52px; padding:8px 10px;
-  border:none; border-radius:var(--r-md); background:var(--paper); box-shadow:inset 0 0 0 1px var(--s-off-mark); cursor:pointer;
-  transition:transform 140ms var(--ease), background var(--fast) var(--ease), box-shadow var(--fast) var(--ease); }
-.ow-reason .l { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.ow-reason .h { font-size:var(--t-xs); color:var(--muted); line-height:1.5; }
-.ow-reason[aria-checked="true"] { background:var(--s-fail-soft); box-shadow:inset 0 0 0 2px var(--s-fail); }
-.ow-reason[aria-checked="true"] .l { color:var(--s-fail-text); }
-.ow-reason:active, .ow-sec .btn:active, .ow-box .btn:active, .ow-kind button:active { transform:scale(.97); }
-.ow-reason:focus-visible, .ow-kind button:focus-visible, .ow-lnk:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.ow-ta { font-family:inherit; width:100%; font-size:var(--t-sm); color:var(--ink); background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark);
-  border-radius:var(--r-sm); padding:8px 10px; line-height:var(--lh-body); resize:vertical; min-height:60px; }
-.ow-ta:focus { outline:none; box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
-.ow-ta[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.ow-err { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; flex-basis:100%; }
-.ow-lost { display:flex; flex-direction:column; gap:4px; margin-top:var(--s2); padding:var(--s2) var(--s3); border-radius:var(--r-md); background:var(--s-fail-soft); font-size:var(--t-sm); color:var(--s-fail-text); }
-.ow-lost .r { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.ow-lost b { font-weight:600; }
-.ow-lost .n { color:var(--ink); font-size:var(--t-xs); line-height:1.6; overflow-wrap:anywhere; }
-.ow-lnk { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:none; border:none; padding:0 4px; cursor:pointer; min-height:28px; border-radius:var(--r-sm); }
-.ow-sec .ow-top { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.ow-sec .ow-top .sp { flex:1; }
-.ow-sec .ow-top .btn { height:32px; font-size:var(--t-xs); padding-inline:10px; gap:4px; }
-.ow-form { display:flex; flex-direction:column; gap:var(--s2); margin-top:var(--s2); padding:var(--s3); border-radius:var(--r-md); background:var(--surface); }
-.ow-form .ow-btns { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-.ow-form .ow-btns .btn { height:36px; font-size:var(--t-sm); }
-.ow-kind { display:flex; flex-wrap:wrap; gap:6px; }
-.ow-kind button { font-family:inherit; min-height:32px; font-size:var(--t-xs); font-weight:500; color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-pill); padding:0 12px; cursor:pointer; transition:transform 140ms var(--ease); }
-.ow-kind button[aria-checked="true"] { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); font-weight:600; }
-.ow-list { display:flex; flex-direction:column; margin-top:var(--s2); }
-.ow-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px var(--s2); padding:var(--s2) 0; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
-.ow-row .k { font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); }
-.ow-row .d { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; text-align:end; }
-.ow-row .tx { grid-column:1 / -1; line-height:1.6; overflow-wrap:anywhere; }
-.ow-row .nx { grid-column:1 / -1; font-size:var(--t-xs); color:var(--ink-2, #33373E); display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.ow-row .nx b { font-weight:600; color:var(--ink); }
-.ow-row .m { grid-column:1 / -1; font-size:var(--t-xs); color:var(--muted); display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; }
-.ow-row .acts { grid-column:1 / -1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.ow-row .acts .btn { height:30px; font-size:var(--t-xs); padding-inline:10px; }
-.ow-amt { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.cf-pill.q-draft { background:var(--surface-2); color:var(--muted); }
-.cf-pill.q-sent { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.q-accepted { background:var(--s-issued-soft); color:var(--s-issued-text); }
-.cf-pill.q-rejected { background:var(--s-fail-soft); color:var(--s-fail-text); }
-.ow-total { font-size:var(--t-sm); color:var(--ink); }
-.ow-total b { font-variant-numeric:tabular-nums; }
-.ow-chk { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); color:var(--ink); }
-@media (max-width: 560px) { .ow-reasons { grid-template-columns:minmax(0,1fr); } .ow-lossm { padding:0; align-items:stretch; } .ow-box { max-width:none; max-height:none; border-radius:0; } }
-@media (pointer:coarse) { .ow-kind button, .ow-lnk, .ow-sec .ow-top .btn, .ow-row .acts .btn { min-height:44px; } }
+/* The lost-reason dialog. The vocabulary's m-dlg is a real <dialog> with a ::backdrop; this one is
+   markup inside a subtree that re-renders on every keystroke, so the FRAME is local and everything
+   inside it is m-dlg__h / __b / __f. */
+.ds6 .ow-scrim { position:fixed; inset:0; background:rgba(11,13,18,.44); z-index:var(--z-toast);
+  opacity:0; transition:opacity var(--m-out) var(--m-ease); }
+.ds6 .ow-scrim.in { opacity:1; transition-duration:var(--m-in); }
+.ds6 .ow-lossm { position:fixed; inset:0; z-index:var(--z-toast); display:flex; align-items:flex-start;
+  justify-content:center; padding:10vh var(--m-3) var(--m-3); pointer-events:none; }
+.ds6 .ow-box { pointer-events:auto; inline-size:100%; max-inline-size:520px; background:var(--m-paper);
+  border:1px solid var(--m-line); border-radius:var(--m-r-card); box-shadow:var(--m-lift);
+  display:flex; flex-direction:column; max-block-size:80vh; opacity:0; transform:scale(.97);
+  transition:opacity var(--m-out) var(--m-ease), transform var(--m-out) var(--m-ease); }
+.ds6 .ow-box.in { opacity:1; transform:none; transition-duration:var(--m-in); }
+.ds6 .ow-box .m-dlg__h { flex-direction:column; align-items:flex-start; gap:var(--m-1); }
+.ds6 .ow-box .m-dlg__b { display:flex; flex-direction:column; gap:var(--m-3); }
+.ds6 .ow-box .m-dlg__f { justify-content:flex-start; align-items:center; flex-wrap:wrap; }
+/* Five reasons read as a list, not a paragraph: two columns, each carrying its own hint. */
+.ds6 .ow-reasons { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
+.ds6 .ow-reason { font:inherit; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+  text-align:start; min-block-size:52px; padding:8px 10px; border:1px solid var(--m-line-2);
+  border-radius:var(--m-r-ctl); background:var(--m-paper); cursor:pointer;
+  transition:transform var(--m-press) var(--m-ease), background var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease); }
+.ds6 .ow-reason .l { font-size:var(--m-t-body); font-weight:700; color:var(--m-ink); }
+.ds6 .ow-reason .h { font-size:var(--m-t-cap); color:var(--m-mut); line-height:1.5; }
+.ds6 .ow-reason[aria-checked="true"] { background:var(--m-bad-dim); border-color:var(--m-bad); }
+.ds6 .ow-reason[aria-checked="true"] .l { color:var(--m-bad); }
+.ds6 .ow-reason:active, .ds6 .ow-kind button:active { transform:scale(.97); }
+.ds6 .ow-err { font-size:var(--m-t-cap); color:var(--m-bad); display:flex; align-items:center; gap:6px; flex-basis:100%; }
+/* The lost line, said once at the top of a closed deal's record. */
+.ds6 .ow-lost { display:flex; flex-direction:column; gap:4px; margin-block-start:var(--m-2);
+  padding:var(--m-2) var(--m-3); border-radius:var(--m-r-ctl); background:var(--m-bad-dim);
+  font-size:var(--m-t-body); color:var(--m-bad); }
+.ds6 .ow-lost .r { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .ow-lost .r .sp { flex:1 1 auto; }
+.ds6 .ow-lost b { font-weight:700; }
+.ds6 .ow-lost .n { color:var(--m-ink); font-size:var(--m-t-cap); line-height:1.6; overflow-wrap:anywhere; }
+/* A section's own header row: title, then its one action at the end. */
+.ds6 .ow-sec .ow-top { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .ow-sec .ow-top .sp { flex:1 1 auto; }
+.ds6 .ow-form { display:flex; flex-direction:column; gap:var(--m-3); margin-block-start:var(--m-2);
+  padding:var(--m-3); border-radius:var(--m-r-ctl); background:var(--m-page); }
+.ds6 .ow-form .ow-btns { display:flex; gap:var(--m-2); align-items:center; flex-wrap:wrap; }
+/* Seven activity kinds, one chosen: too many for the vocabulary's segmented control, and they wrap. */
+.ds6 .ow-kind { display:flex; flex-wrap:wrap; gap:6px; }
+.ds6 .ow-kind button { font:inherit; min-block-size:40px; font-size:var(--m-t-cap); font-weight:600;
+  color:var(--m-ink-2); background:var(--m-paper); border:1px solid var(--m-line-2);
+  border-radius:var(--m-r-chip); padding-inline:var(--m-3); cursor:pointer;
+  transition:transform var(--m-press) var(--m-ease), background var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease); }
+.ds6 .ow-kind button[aria-checked="true"] { background:var(--m-ac-dim); color:var(--m-ac-deep); border-color:var(--m-ac); }
+/* One recorded item per row: what it was, when, what it said, and what it produced. m-item is a
+   single-line row; these carry four stacked parts, which is why the grid is local. */
+.ds6 .ow-list { display:flex; flex-direction:column; margin-block-start:var(--m-2); }
+.ds6 .ow-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--m-1) var(--m-2);
+  padding-block:var(--m-2); border-block-start:1px solid var(--m-line);
+  font-size:var(--m-t-body); color:var(--m-ink); }
+.ds6 .ow-row .k { font-size:var(--m-t-cap); font-weight:700; color:var(--m-ac-deep); }
+.ds6 .ow-row .d { font-size:var(--m-t-cap); color:var(--m-mut); white-space:nowrap; text-align:end; }
+.ds6 .ow-row .tx { grid-column:1 / -1; line-height:1.7; overflow-wrap:anywhere; }
+.ds6 .ow-row .nx { grid-column:1 / -1; font-size:var(--m-t-cap); color:var(--m-ink-2);
+  display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.ds6 .ow-row .nx b { font-weight:700; color:var(--m-ink); }
+.ds6 .ow-row .m { grid-column:1 / -1; font-size:var(--m-t-cap); color:var(--m-mut);
+  display:flex; gap:var(--m-2); flex-wrap:wrap; align-items:center; }
+.ds6 .ow-row .m .sp { flex:1 1 auto; }
+.ds6 .ow-row .acts { grid-column:1 / -1; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.ds6 .ow-amt { font-weight:700; white-space:nowrap; }
+.ds6 .ow-total { font-size:var(--m-t-body); color:var(--m-ink); }
+.ds6 .ow-total b { font-weight:700; }
+.ds6 .ow-chk { display:inline-flex; align-items:center; gap:6px; font-size:var(--m-t-cap); color:var(--m-ink); }
+@media (max-width: 560px) {
+  .ds6 .ow-reasons { grid-template-columns:minmax(0,1fr); }
+  .ds6 .ow-lossm { padding:0; align-items:stretch; }
+  .ds6 .ow-box { max-inline-size:none; max-block-size:none; border-radius:0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .ow-box { transform:none; transition:opacity 140ms linear; }
-  .ow-reason, .ow-kind button { transition:none; }
-  .ow-reason:active, .ow-sec .btn:active, .ow-box .btn:active, .ow-kind button:active { transform:none; }
+  .ds6 .ow-box { transform:none; transition:opacity var(--m-out) linear; }
+  .ds6 .ow-reason, .ds6 .ow-kind button { transition:none; }
+  .ds6 .ow-reason:active, .ds6 .ow-kind button:active { transform:none; }
 }
 `;
 
@@ -162,10 +173,11 @@ function owLossModal() {
   var L = owLoss, cls = L.shown ? " in" : "";
   var n = L.ids.length;
   /* After «إغلاق» the count is the object: «بندين», not «بندان» (review). */
-  var title = L.mode === "edit" ? "تعديل سبب الخسارة" : n === 2 ? "إغلاق بندين خسارة" : n > 1 ? "إغلاق " + opNLine(n) + " خسارة" : "إغلاق البند خسارة";
+  var title = L.mode === "edit" ? "تعديل سبب الخسارة" : n === 2 ? "إغلاق بندين خسارة" : n > 1 ? "إغلاق " + opNLineN(n) + " خسارة" : "إغلاق البند خسارة";
   var h = '<div class="ow-scrim' + cls + '" data-ow="losscancel"></div><div class="ow-lossm"><div class="ow-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="owlt">' +
-    '<div class="mh"><h2 id="owlt">' + title + "</h2>" + (n === 1 && L.name ? '<div class="s">' + esc(L.name) + "</div>" : "") +
-    '<div class="s">السبب يُسجَّل على البند وفي «الخسائر حسب السبب» — لا يُغلق بند خسارة بلا سبب.</div></div><div class="mb">';
+    '<div class="m-dlg__h"><h2 class="m-dlg__t" id="owlt">' + title + "</h2>" +
+    (n === 1 && L.name ? '<div class="m-meta">' + esc(L.name) + "</div>" : "") +
+    '<div class="m-meta">السبب يُسجَّل على البند وفي «الخسائر حسب السبب» — لا يُغلق بند خسارة بلا سبب.</div></div><div class="m-dlg__b">';
   h += '<div class="ow-reasons" role="radiogroup" aria-label="سبب الخسارة"' + (L.field === "lost_reason" ? ' aria-describedby="owlerr"' : "") + ">";
   LOSS_REASONS.forEach(function (r, i) {
     var on = L.reason === r.key;
@@ -175,12 +187,13 @@ function owLossModal() {
   });
   h += "</div>";
   var needNote = L.reason === LOSS_OTHER_KEY;
-  h += '<div class="ox-fld"><label for="owlnote">' + (needNote ? 'اكتب السبب <span class="req" aria-hidden="true">*</span>' : "ملاحظة (اختيارية)") + "</label>" +
-    '<textarea class="ow-ta" id="owlnote" maxlength="' + LOSS_NOTE_MAX + '" data-owf="lossnote" placeholder="مثال: اختاروا منصة حكومية مجانية"' +
+  h += '<div class="m-field"><label class="m-label' + (needNote ? " m-req" : "") + '" for="owlnote">' +
+    (needNote ? "اكتب السبب" : "ملاحظة (اختيارية)") + "</label>" +
+    '<textarea class="m-input" id="owlnote" rows="3" maxlength="' + LOSS_NOTE_MAX + '" data-owf="lossnote" placeholder="مثال: اختاروا منصة حكومية مجانية"' +
     (L.field === "lost_note" ? ' aria-invalid="true" aria-describedby="owlerr"' : "") + ">" + esc(L.note) + "</textarea></div></div>";
-  h += '<div class="mf"><button class="btn btn-teal" id="owlsave" data-ow="losssave"' + (L.busy ? ' disabled aria-busy="true"' : "") + ">" +
+  h += '<div class="m-dlg__f"><button class="m-btn m-btn--primary" id="owlsave" data-ow="losssave"' + (L.busy ? ' disabled aria-busy="true"' : "") + ">" +
     (L.busy ? "جارٍ الحفظ…" : L.mode === "edit" ? "حفظ السبب" : "سجّل الخسارة") + "</button>" +
-    '<button class="btn btn-ghost" data-ow="losscancel">إلغاء</button>' +
+    '<button class="m-btn" data-ow="losscancel">إلغاء</button>' +
     (L.err ? '<span class="ow-err" id="owlerr" role="alert">' + opIco("warn") + esc(L.err) + "</span>" : "") + "</div></div></div>";
   return h;
 }
@@ -221,8 +234,12 @@ function owLossSave() {
 /* ---------------- the lost line ---------------- */
 function owLostBlock(l) {
   if (!opIsLost(l)) return "";
-  return '<div class="ow-lost"><div class="r">' + (l.lost_reason ? "السبب: <b>" + esc(owReasonLabel(l.lost_reason)) + "</b>" : "<b>لم يُسجَّل سبب</b> — أُغلق قبل أن يصبح السبب إلزاميًا") +
-    '<span style="flex:1"></span><button class="ow-lnk" id="owlossedit_' + l.id + '" data-ow="lossedit" data-i="' + l.id + '">' + (l.lost_reason ? "تعديل السبب" : "سجّل السبب") + "</button></div>" +
+  /* A reason nobody recorded on a deal that WAS lost is data someone owes, not a legitimate nothing
+     (PORT-SPEC §4) — and the sentence beside it says why it can be missing at all. */
+  return '<div class="ow-lost"><div class="r">' + (l.lost_reason
+      ? "السبب: <b>" + esc(owReasonLabel(l.lost_reason)) + "</b>"
+      : opNil("لم يُسجَّل سبب", "owed") + " — أُغلق قبل أن يصبح السبب إلزاميًا") +
+    '<span class="sp"></span><button class="m-btn m-btn--quiet" id="owlossedit_' + l.id + '" data-ow="lossedit" data-i="' + l.id + '">' + (l.lost_reason ? "تعديل السبب" : "سجّل السبب") + "</button></div>" +
     (l.lost_note ? '<div class="n">' + esc(l.lost_note) + "</div>" : "") + "</div>";
 }
 
@@ -259,17 +276,32 @@ function owJourneySection(l) {
   if (!w.data && w.loading) return b + '<div class="ox-hint2" aria-busy="true">جارٍ قراءة سجل المراحل…</div></section>';
   if (!w.data && w.failed) {
     return b + '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر قراءة سجل المراحل.' +
-      '<button class="btn btn-ghost" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div></section>';
+      '<button class="m-btn" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div></section>';
   }
   var evs = (w.data && w.data.stageEvents) || [];
   var steps = stageJourney(ladder, evs, l.stage);
-  var pct = journeyPct(ladder, l.stage);
-  if (pct !== null) {
-    b += '<div class="ow-jpct"><span class="l">نسبة الإنجاز في الدورة</span>' +
-      '<span class="bar"><i style="width:' + pct + '%"></i></span>' +
-      '<span class="v">' + fmtN(pct) + "٪</span></div>";
+  /* THE FRACTION IS MEASURED ON THE OPEN RUNGS ONLY, and a CLOSED deal gets no fraction at all.
+     Measured over the whole eight-rung ladder — «won» and «lost» included — a LOST deal sat on the
+     last rung and printed «نسبة الإنجاز في الدورة: 100٪» behind a full accent bar, while a WON deal
+     printed 88٪. The arithmetic was right and the sentence it made was false: losing is not
+     finishing. A deal that has closed has no progress left to report, so it reports its outcome. */
+  var openKeys = (typeof opOpenStages === "function" ? opOpenStages() : []).map(function (s) { return s.key; });
+  var closed = typeof opIsOpen === "function" && !opIsOpen(l);
+  if (closed) {
+    b += '<div class="ow-jout"><span class="m-chip ' + (opIsWon(l) ? "m-chip--ok" : "m-chip--bad") + '">' +
+      (opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
+      '<span class="m-meta">الصفقة مغلقة — لا نسبة إنجاز تُقاس على دورة انتهت</span></div>';
+  } else {
+    var pct = journeyPct(openKeys, l.stage);
+    b += '<div class="ow-jpct"><span class="l">نسبة الإنجاز في الدورة المفتوحة</span>';
+    /* A rung that is not on the open ladder at all — a paused or deleted stage a line still sits on —
+       is a position nobody can place, which is the «unset» absence, never a made-up number. */
+    b += pct === null
+      ? '<span class="v">' + opNil("مرحلة خارج الدورة المفتوحة", "unset") + "</span>"
+      : '<span class="m-meter" style="--m-pct:' + pct + '%"><i></i></span><span class="v">' + mPct(pct) + "</span>";
+    b += "</div>";
   }
-  b += '<ol class="ow-j">' + steps.map(function (st) {
+  b += '<ol class="ow-j m-tl">' + steps.map(function (st) {
     var stage = typeof opStage === "function" ? opStage(st.key) : { label: st.key };
     var o = st.outcomeKey ? owOutcomeOf(st.outcomeKey) : null;
     var said = st.state === "current" ? "الحالية"
@@ -278,15 +310,17 @@ function owJourneySection(l) {
       : o ? o.label : (st.leftAt ? "انتقلت دون تسجيل نتيجة" : "لم تُسجَّل");
     var why = st.reason || (o ? o.reason : "");
     var act = o ? o.nextAction : "";
-    return '<li class="ow-js ' + st.state + '"' + (typeof opToneVars === "function" ? ' style="' + opToneVars(st.key) + '"' : "") + ">" +
-      '<span class="dot" aria-hidden="true"></span>' +
-      '<span class="bd"><span class="hd"><b>' + esc(stage.label) + "</b>" +
-      '<span class="res">' + esc(said) + "</span>" +
-      (st.leftAt || st.reachedAt ? '<span class="at">' + esc(owStamp(st.leftAt || st.reachedAt)) + "</span>" : "") + "</span>" +
+    return '<li class="ow-js m-tl__i ' + st.state + '"' + (typeof opToneVars === "function" ? ' style="' + opToneVars(st.key) + '"' : "") + ">" +
+      '<span class="m-tl__d" aria-hidden="true"></span>' +
+      '<span class="m-tl__n"><span class="hd"><b>' + esc(stage.label) + "</b>" +
+      '<span class="m-chip res">' + esc(said) + "</span></span>" +
       (st.state === "done" && (why || act)
         ? '<span class="why">' + (why ? "السبب: " + esc(why) : "") + (why && act ? " · " : "") + (act ? "الإجراء: " + esc(act) : "") + "</span>"
         : st.state === "current" && typeof opAgo === "function" ? '<span class="why">' + esc(opAgo(l)) + "</span>" : "") +
-      "</span></li>";
+      "</span>" +
+      '<span class="m-tl__t">' + (st.leftAt || st.reachedAt
+        ? esc(owStamp(st.leftAt || st.reachedAt))
+        : opNil("بلا تاريخ", "unset")) + "</span></li>";
   }).join("") + "</ol>";
   if (!evs.length) {
     b += '<div class="ox-hint2">لا انتقالات مسجّلة لهذا البند بعد — يُسجَّل الانتقال تلقائيًا عند تغيير المرحلة.</div>';
@@ -300,9 +334,11 @@ function owActivitiesSection(l) {
   var w = owWork[l.id] || {};
   var rows = w.data ? w.data.activities : [];
   var depts = (w.data && w.data.departments) || [];
+  /* The count is printed HERE and on the drawer's tab, so both sites carry the owActs derivation
+     (PORT-SPEC §6) and cannot drift apart. */
   var b = '<section class="ox-sec ow-sec" aria-labelledby="oxsec_act"><div class="ow-top"><div class="ox-sech" id="oxsec_act">الأنشطة' +
-    (rows.length ? '<span class="ox-cnt" style="color:var(--muted)">' + fmtN(rows.length) + "</span>" : "") + '</div><span class="sp"></span>' +
-    (!owAct || owAct.oppId !== l.id ? '<button class="btn btn-ghost" id="owactnew_' + l.id + '" data-ow="actnew" data-i="' + l.id + '">' + opIco("plus") + (owActDrafts[l.id] ? "متابعة مسودة النشاط" : "تسجيل نشاط") + "</button>" : "") + "</div>";
+    (rows.length ? ' <span class="m-chip m-chip--plain">' + dsFig("owActs", rows.length) + "</span>" : "") + '</div><span class="sp"></span>' +
+    (!owAct || owAct.oppId !== l.id ? '<button class="m-btn" id="owactnew_' + l.id + '" data-ow="actnew" data-i="' + l.id + '">' + opIco("plus") + (owActDrafts[l.id] ? "متابعة مسودة النشاط" : "تسجيل نشاط") + "</button>" : "") + "</div>";
   if (owAct && owAct.oppId === l.id) {
     var A = owAct;
     var inv = function (f) { return A.field === f ? ' aria-invalid="true" aria-describedby="owaerr"' : ""; };
@@ -311,29 +347,34 @@ function owActivitiesSection(l) {
         var on = A.kind === k;
         return '<button type="button" role="radio" id="owk_' + k + '" aria-checked="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-ow="kind" data-k="' + k + '">' + esc(ACTIVITY_KIND_LABELS[k]) + "</button>";
       }).join("") + "</div>" +
-      '<div class="ox-g2"><div class="ox-fld"><label for="owa_on">التاريخ <span class="req" aria-hidden="true">*</span></label><input class="inp" type="date" id="owa_on" max="' + owToday() + '" value="' + esc(A.occurredOn) + '" data-owf="occurredOn"' + inv("occurredOn") + "></div>" +
-      '<div class="ox-fld"><label for="owa_owner">المسؤول</label><input class="inp" id="owa_owner" list="oxowners2" maxlength="' + ACTIVITY_OWNER_MAX + '" value="' + esc(A.owner) + '" data-owf="owner"' + inv("owner") + "></div></div>" +
-      '<div class="ox-fld"><label for="owa_sum">ما الذي دار؟ <span class="req" aria-hidden="true">*</span></label><textarea class="ow-ta" id="owa_sum" maxlength="' + ACTIVITY_SUMMARY_MAX + '" data-owf="summary" placeholder="مثال: استعراض متطلبات التكامل مع إدارة تقنية المعلومات"' + inv("summary") + ">" + esc(A.summary) + "</textarea></div>" +
-      '<div class="ox-g2"><div class="ox-fld"><label for="owa_next">الخطوة التالية</label><input class="inp" id="owa_next" maxlength="' + ACTIVITY_NEXT_MAX + '" value="' + esc(A.nextStep) + '" data-owf="nextStep" placeholder="مثال: إرسال العرض الفني"' + inv("nextStep") + "></div>" +
-      '<div class="ox-fld"><label for="owa_nexton">موعدها</label><input class="inp" type="date" id="owa_nexton" value="' + esc(A.nextOn) + '" data-owf="nextOn"' + inv("nextOn") + "></div></div>" +
-      '<div class="ox-fld"><label for="owa_dept">الإدارة المعنية</label><select class="inp" id="owa_dept" data-owf="dept"' + inv("dept") + '><option value="">— المبيعات —</option>' +
+      '<div class="m-form"><div class="m-field"><label class="m-label m-req" for="owa_on">التاريخ</label><input class="m-input" type="date" id="owa_on" max="' + owToday() + '" value="' + esc(A.occurredOn) + '" data-owf="occurredOn"' + inv("occurredOn") + "></div>" +
+      '<div class="m-field"><label class="m-label" for="owa_owner">المسؤول</label><input class="m-input" id="owa_owner" list="oxowners2" maxlength="' + ACTIVITY_OWNER_MAX + '" value="' + esc(A.owner) + '" data-owf="owner"' + inv("owner") + "></div></div>" +
+      '<div class="m-field"><label class="m-label m-req" for="owa_sum">ما الذي دار؟</label><textarea class="m-input" id="owa_sum" rows="3" maxlength="' + ACTIVITY_SUMMARY_MAX + '" data-owf="summary" placeholder="مثال: استعراض متطلبات التكامل مع إدارة تقنية المعلومات"' + inv("summary") + ">" + esc(A.summary) + "</textarea></div>" +
+      '<div class="m-form"><div class="m-field"><label class="m-label" for="owa_next">الخطوة التالية</label><input class="m-input" id="owa_next" maxlength="' + ACTIVITY_NEXT_MAX + '" value="' + esc(A.nextStep) + '" data-owf="nextStep" placeholder="مثال: إرسال العرض الفني"' + inv("nextStep") + "></div>" +
+      '<div class="m-field"><label class="m-label" for="owa_nexton">موعدها</label><input class="m-input" type="date" id="owa_nexton" value="' + esc(A.nextOn) + '" data-owf="nextOn"' + inv("nextOn") + "></div></div>" +
+      '<div class="m-field"><label class="m-label" for="owa_dept">الإدارة المعنية</label><select class="m-select" id="owa_dept" data-owf="dept"' + inv("dept") + '><option value="">المبيعات</option>' +
         depts.map(function (d) { return '<option value="' + esc(d) + '"' + (A.dept === d ? " selected" : "") + ">" + esc(d) + "</option>"; }).join("") + "</select></div>" +
-      '<div class="ow-btns"><button class="btn btn-teal" id="owasave" data-ow="actsave"' + (A.busy ? ' disabled aria-busy="true"' : "") + ">" + (A.busy ? "جارٍ الحفظ…" : "حفظ النشاط") + "</button>" +
-      '<button class="btn btn-ghost" data-ow="actcancel">إلغاء</button>' +
+      '<div class="ow-btns"><button class="m-btn m-btn--primary" id="owasave" data-ow="actsave"' + (A.busy ? ' disabled aria-busy="true"' : "") + ">" + (A.busy ? "جارٍ الحفظ…" : "حفظ النشاط") + "</button>" +
+      '<button class="m-btn" data-ow="actcancel">إلغاء</button>' +
       (A.err ? '<span class="ow-err" id="owaerr" role="alert">' + opIco("warn") + esc(A.err) + "</span>" : "") +
-      '<span class="ox-hint2" style="flex-basis:100%">الخطوة التالية تصبح «الخطوة التالية» على البند.</span></div></div>';
+      '<span class="m-hint" style="flex-basis:100%">الخطوة التالية تصبح «الخطوة التالية» على البند.</span></div></div>';
   }
-  if (w.failed && !w.data) b += '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر تحميل الأنشطة.<button class="btn btn-ghost" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
+  if (w.failed && !w.data) b += '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر تحميل الأنشطة.<button class="m-btn" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
   else if (!w.data) b += '<div class="ox-hint2" aria-busy="true">جارٍ التحميل…</div>';
-  else if (!rows.length && !(owAct && owAct.oppId === l.id)) b += '<div class="ox-hint2">لا أنشطة مسجّلة — سجّل الاجتماعات والمكالمات هنا ليعرف من يتابع البند ما جرى.</div>';
+  else if (!rows.length && !(owAct && owAct.oppId === l.id)) {
+    b += '<div class="m-empty"><p class="m-empty__t">لا أنشطة مسجّلة</p>' +
+      '<p class="m-empty__d">سجّل الاجتماعات والمكالمات هنا ليعرف من يتابع البند ما جرى.</p></div>';
+  }
   if (rows.length) {
     b += '<div class="ow-list">' + rows.map(function (a) {
       var armed = owDelArm === a.id;
+      /* An activity nobody attributed to a person is a classification nobody made, not an em-dash. */
       return '<div class="ow-row"><span class="k">' + esc(ACTIVITY_KIND_LABELS[a.kind] || a.kind) + '</span><span class="d">' + owDay(a.occurredOn) + "</span>" +
         '<span class="tx">' + esc(a.summary) + "</span>" +
         (a.nextStep ? '<span class="nx">الخطوة التالية: <b>' + esc(a.nextStep) + "</b>" + (a.nextOn ? " · " + owDay(a.nextOn) : "") + "</span>" : "") +
-        '<span class="m">' + [a.owner ? "المسؤول: " + esc(a.owner) : "", a.dept ? esc(a.dept) : "", "سجّله " + esc(owBy(a.createdBy))].filter(Boolean).join(" · ") +
-        '<span style="flex:1"></span><button class="ow-lnk" id="owdel_' + a.id + '" data-ow="actdel" data-i="' + a.id + '" data-o="' + l.id + '"' + (armed ? ' style="color:var(--s-fail-text)"' : "") + ">" + (armed ? "تأكيد الحذف" : "حذف") + "</button></span></div>";
+        '<span class="m">' + ["المسؤول: " + (a.owner ? esc(a.owner) : opNil("بلا مسؤول", "unset")),
+          a.dept ? esc(a.dept) : "", "سجّله " + esc(owBy(a.createdBy))].filter(Boolean).join(" · ") +
+        '<span class="sp"></span><button class="m-btn m-btn--quiet" id="owdel_' + a.id + '" data-ow="actdel" data-i="' + a.id + '" data-o="' + l.id + '"' + (armed ? ' style="color:var(--m-bad)"' : "") + ">" + (armed ? "تأكيد الحذف" : "حذف") + "</button></span></div>";
     }).join("") + "</div>";
   }
   return b + "</section>";
@@ -372,6 +413,12 @@ function owActSave() {
 }
 
 /* ---------------- «عروض الأسعار» ---------------- */
+/* A quote's status is a STATE, which is the one thing colour is allowed to carry (PORT-SPEC §2), so
+   it wears the vocabulary's own chip tones rather than the four private .cf-pill.q-* rules. A draft
+   is not yet a claim on anything, so it stays neutral. */
+function owQuoteTone(st) {
+  return st === "accepted" ? "m-chip--ok" : st === "rejected" ? "m-chip--bad" : st === "sent" ? "m-chip--warn" : "";
+}
 function owQuoteTotal(q) {
   return calculateLineValue({ stage: "quote", salePrice: Number(q.salePrice) || 0, years: Number(q.years) || 1, quantity: Number(q.qty) || 1, discountPercent: Number(q.discount) || 0, stageEnteredAt: 0 });
 }
@@ -379,40 +426,49 @@ function owQuotesSection(l) {
   owLoad(l.id, false);
   var w = owWork[l.id] || {};
   var rows = w.data ? w.data.quotes : [];
+  /* Printed here AND on the drawer's tab — one bound derivation for both (PORT-SPEC §6). */
   var b = '<section class="ox-sec ow-sec" aria-labelledby="oxsec_q"><div class="ow-top"><div class="ox-sech" id="oxsec_q">عروض الأسعار' +
-    (rows.length ? '<span class="ox-cnt" style="color:var(--muted)">' + fmtN(rows.length) + "</span>" : "") + '</div><span class="sp"></span>' +
-    (!owQuote || owQuote.oppId !== l.id ? '<button class="btn btn-ghost" id="owqnew_' + l.id + '" data-ow="qnew" data-i="' + l.id + '">' + opIco("plus") + "عرض سعر جديد</button>" : "") + "</div>";
+    (rows.length ? ' <span class="m-chip m-chip--plain">' + dsFig("owQuotes", rows.length) + "</span>" : "") + '</div><span class="sp"></span>' +
+    (!owQuote || owQuote.oppId !== l.id ? '<button class="m-btn" id="owqnew_' + l.id + '" data-ow="qnew" data-i="' + l.id + '">' + opIco("plus") + "عرض سعر جديد</button>" : "") + "</div>";
   if (owQuote && owQuote.oppId === l.id) {
     var Q = owQuote;
     var inv = function (f) { return Q.field === f ? ' aria-invalid="true" aria-describedby="owqerr"' : ""; };
-    var num = function (k, id, label) {
-      return '<div class="ox-fld"><label for="' + id + '">' + label + '</label><input class="inp num" type="number" inputmode="decimal" id="' + id + '" value="' + esc(Q[k]) + '" data-owq="' + k + '"' + inv(k) + "></div>";
+    var num = function (k, id, label, req) {
+      return '<div class="m-field"><label class="m-label' + (req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+        '<input class="m-input num" type="number" inputmode="decimal" id="' + id + '" value="' + esc(Q[k]) + '" data-owq="' + k + '"' + inv(k) + "></div>";
     };
-    b += '<div class="ow-form" role="group" aria-label="عرض سعر جديد"><div class="ox-g2">' + num("salePrice", "owq_price", "السعر السنوي (ر.س) *") + num("years", "owq_years", "السنوات") +
+    b += '<div class="ow-form" role="group" aria-label="عرض سعر جديد"><div class="m-form">' +
+      num("salePrice", "owq_price", "السعر السنوي (ر.س)", true) + num("years", "owq_years", "السنوات") +
       num("qty", "owq_qty", "الكمية") + num("discount", "owq_disc", "الخصم ٪") + "</div>" +
-      '<div class="ox-g2"><div class="ox-fld"><label for="owq_valid">صالح حتى</label><input class="inp" type="date" id="owq_valid" min="' + owToday() + '" value="' + esc(Q.validUntil) + '" data-owq="validUntil"' + inv("validUntil") + "></div>" +
-      '<div class="ox-fld"><label for="owq_note">ملاحظة</label><input class="inp" id="owq_note" maxlength="' + QUOTE_NOTE_MAX + '" value="' + esc(Q.note) + '" data-owq="note" placeholder="مثال: يشمل التدريب والتفعيل"' + inv("note") + "></div></div>" +
+      '<div class="m-form"><div class="m-field"><label class="m-label" for="owq_valid">صالح حتى</label><input class="m-input" type="date" id="owq_valid" min="' + owToday() + '" value="' + esc(Q.validUntil) + '" data-owq="validUntil"' + inv("validUntil") + "></div>" +
+      '<div class="m-field"><label class="m-label" for="owq_note">ملاحظة</label><input class="m-input" id="owq_note" maxlength="' + QUOTE_NOTE_MAX + '" value="' + esc(Q.note) + '" data-owq="note" placeholder="مثال: يشمل التدريب والتفعيل"' + inv("note") + "></div></div>" +
       '<div class="ow-total" id="owq_total" aria-live="polite">إجمالي العرض: <b>' + opMoney(owQuoteTotal(Q)) + "</b></div>" +
-      '<div class="ow-btns"><button class="btn btn-teal" id="owqsave" data-ow="qsave"' + (Q.busy ? ' disabled aria-busy="true"' : "") + ">" + (Q.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
-      '<button class="btn btn-ghost" data-ow="qcancel">إلغاء</button>' +
+      '<div class="ow-btns"><button class="m-btn m-btn--primary" id="owqsave" data-ow="qsave"' + (Q.busy ? ' disabled aria-busy="true"' : "") + ">" + (Q.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
+      '<button class="m-btn" data-ow="qcancel">إلغاء</button>' +
       (Q.err ? '<span class="ow-err" id="owqerr" role="alert">' + opIco("warn") + esc(Q.err) + "</span>" : "") + "</div></div>";
   }
-  if (w.failed && !w.data) b += '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر تحميل عروض الأسعار.<button class="btn btn-ghost" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
-  else if (w.data && !rows.length && !(owQuote && owQuote.oppId === l.id)) b += '<div class="ox-hint2">لا عروض أسعار — كل سعر يُعرض على العميل يُحفظ هنا ويبقى بعد قبوله أو رفضه.</div>';
+  if (w.failed && !w.data) b += '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر تحميل عروض الأسعار.<button class="m-btn" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
+  else if (w.data && !rows.length && !(owQuote && owQuote.oppId === l.id)) {
+    b += '<div class="m-empty"><p class="m-empty__t">لا عروض أسعار</p>' +
+      '<p class="m-empty__d">كل سعر يُعرض على العميل يُحفظ هنا ويبقى بعد قبوله أو رفضه.</p></div>';
+  }
   if (rows.length) {
     b += '<div class="ow-list">' + rows.map(function (q) {
       var busy = owQBusy === q.id;
       var acts = "";
-      if (q.status === "draft") acts = '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="sent"' + (busy ? " disabled" : "") + ">أُرسل للعميل</button>" +
-        '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">ألغِ المسودة</button>";
-      else if (q.status === "sent") acts = '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="accepted"' + (busy ? " disabled" : "") + ">قبله العميل</button>" +
-        '<button class="btn btn-ghost" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">رفضه العميل</button>" +
+      if (q.status === "draft") acts = '<button class="m-btn" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="sent"' + (busy ? " disabled" : "") + ">أُرسل للعميل</button>" +
+        '<button class="m-btn" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">ألغِ المسودة</button>";
+      else if (q.status === "sent") acts = '<button class="m-btn" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="accepted"' + (busy ? " disabled" : "") + ">قبله العميل</button>" +
+        '<button class="m-btn" data-ow="qmove" data-i="' + q.id + '" data-o="' + l.id + '" data-to="rejected"' + (busy ? " disabled" : "") + ">رفضه العميل</button>" +
         /* The choice lives in state: a repaint used to re-check a box the user had cleared (review). A closed
            line keeps the value it closed at, so the choice is not offered there. */
-        (opIsOpen(l) ? '<label class="ow-chk"><input type="checkbox" id="owqapply_' + q.id + '" data-owapply="' + q.id + '"' + (owQApply[q.id] === false ? "" : " checked") + "> عند القبول: اجعله سعر البند</label>" : "");
-      return '<div class="ow-row"><span><span class="ow-amt">' + opMoney(q.amount) + '</span> <span class="cf-pill q-' + esc(q.status) + '">' + esc(QUOTE_STATUS_LABELS[q.status] || q.status) + "</span></span>" +
+        (opIsOpen(l) ? '<label class="ow-chk"><input class="m-cb" type="checkbox" id="owqapply_' + q.id + '" data-owapply="' + q.id + '"' + (owQApply[q.id] === false ? "" : " checked") + "> عند القبول: اجعله سعر البند</label>" : "");
+      /* The percent sign rides INSIDE its own .m-n or bidi lands it left of its digits; .m-n also
+         isolates, which is what the <bdi> around the formula used to do (PORT-SPEC §3). */
+      return '<div class="ow-row"><span><span class="ow-amt">' + opMoney(q.amount) + '</span> <span class="m-chip ' + owQuoteTone(q.status) + '">' + esc(QUOTE_STATUS_LABELS[q.status] || q.status) + "</span></span>" +
         '<span class="d">' + fmtD(q.createdAt) + "</span>" +
-        '<span class="m"><bdi>' + fmtN(q.salePrice) + " ر.س سنويًا × " + opNYear(q.years) + " × " + fmtN(q.qty) + (q.discount ? " × (1 − " + fmtN(q.discount) + "٪)" : "") + "</bdi>" +
+        '<span class="m">' + opNU(q.salePrice, "ر.س") + " سنويًا × " + opNYearN(q.years) + " × " + opN(q.qty) +
+        (q.discount ? " × (1 − " + mPct(q.discount) + ")" : "") +
         (q.validUntil ? " · صالح حتى " + owDay(q.validUntil) : "") + "</span>" +
         (q.note ? '<span class="tx">' + esc(q.note) + "</span>" : "") +
         '<span class="m">أعدّه ' + esc(owBy(q.createdBy)) + (q.statusAt && q.status !== "draft" ? " · " + esc(QUOTE_STATUS_LABELS[q.status]) + " بتسجيل " + esc(owBy(q.statusBy)) + " في " + fmtD(q.statusAt) : "") + "</span>" +

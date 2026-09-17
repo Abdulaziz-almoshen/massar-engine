@@ -198,8 +198,26 @@ export const PRODUCTS_CRM_CSS = `
 /* The toolbar's filters. Each control keeps its own width rather than stretching to the row. */
 .ds6 .px-filters { display: flex; align-items: center; gap: var(--m-2); flex-wrap: wrap; min-inline-size: 0; }
 .ds6 .px-filters .m-input, .ds6 .px-filters .m-select { inline-size: auto; min-inline-size: 148px; }
+/* A filter that is NARROWING the list has to look different from one that is not, or the reader
+   cannot tell an empty table from a filtered one. The vocabulary has no word for it; this is it. */
+.ds6 .px-filters .m-select.px-on { box-shadow: 0 0 0 1px var(--m-ac), 0 1px 2px rgba(0,0,0,.05); color: var(--m-ac-deep); }
+.ds6 .px-sp { flex: 1 1 auto; }
+/* A gap someone owes work on, inside the segmented control. Colour means STATUS here, never
+   decoration, and it is the only toggle in the row that carries one. */
+.ds6 .m-seg .px-owed { color: var(--m-warn); }
+.ds6 .m-seg .px-owed[aria-pressed="true"] { background: var(--m-warn-dim); color: var(--m-warn); }
+/* A .m-btn used as a toggle. .m-seg already draws aria-pressed; a standalone button did not. */
+.ds6 .m-btn[aria-pressed="true"] { background: var(--m-ac-dim); border-color: var(--m-ac-line); color: var(--m-ac-deep); }
+/* The name cell is the row's link. It keeps the cell's weight rather than taking .m-link, whose
+   44px minimum would push the sub-line out of a table row. */
+.ds6 .m-table td.m-td-n a { color: inherit; text-decoration: none; }
+@media (hover: hover) and (pointer: fine) {
+  .ds6 .m-table td.m-td-n a:hover { color: var(--m-ac-deep); text-decoration: underline; text-underline-offset: 3px; }
+}
 /* A card's body: the sections inside a record pane are stacked, never crammed. */
 .ds6 .px-secb { display: flex; flex-direction: column; gap: var(--m-4); min-inline-size: 0; }
+/* A flush card's own body padding, for the one list that lives inside .m-card--pad0. */
+.ds6 .px-um { padding: var(--m-4); gap: 0; }
 .ds6 .m-dlg__b > * + * { margin-block-start: var(--m-4); }
 /* A related-population row is a control, not a link: same row, a button's reset. */
 .ds6 button.m-item { font: inherit; inline-size: 100%; background: transparent; border: 0;
@@ -209,6 +227,21 @@ export const PRODUCTS_CRM_CSS = `
 @media (hover: hover) and (pointer: fine) { .ds6 button.m-item:hover { background: var(--m-page); } }
 /* A quarter row carries money, not a two-digit count: the value column is given the room. */
 .ds6 .px-qrow { grid-template-columns: minmax(0, 1fr) 120px minmax(0, auto); }
+/* A share row that is also a filter. The vocabulary draws the row; this gives it a button's reset. */
+.ds6 button.m-seg-row { font: inherit; inline-size: 100%; background: transparent; border: 0;
+  cursor: pointer; text-align: start; color: inherit; border-radius: var(--m-r-ctl);
+  padding-inline: var(--m-1); padding-block: var(--m-1);
+  transition: background var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+.ds6 button.m-seg-row:active { transform: scale(.97); }
+.ds6 button.m-seg-row[aria-pressed="true"] { background: var(--m-ac-dim); }
+@media (hover: hover) and (pointer: fine) { .ds6 button.m-seg-row:hover { background: var(--m-page); } }
+/* FIVE tiles, not four. .m-kpis is a fixed four-column grid, which would leave the fifth alone on
+   a row of its own — so the record's deck fits as many as the width allows instead. */
+.ds6 .px-kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+/* The record header: title, the chips that name its classification, and its actions. */
+.ds6 .px-rh { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--m-4); flex-wrap: wrap; margin-block-end: var(--m-4); }
+.ds6 .px-rh__t { min-inline-size: 0; display: grid; gap: var(--m-2); }
 /* The tab that needs completing. A dot, because the count beside it is already the figure. */
 .ds6 .px-tab-dot { inline-size: 6px; block-size: 6px; border-radius: 50%; background: var(--m-warn); flex: 0 0 auto; }
 
@@ -316,7 +349,6 @@ var pxMenuOpen = false;
 /* The record's open tab. Keyed by product so moving along the switcher rail keeps the section you
    were reading; "" means «take it from the route, else نظرة عامة». */
 var pxTab = {};
-var pxTabPrev = "";           /* the tab the indicator sat on before this repaint — it glides from there */
 var pxSheet = null;           /* create draft */
 var pxSheetErr = "", pxSheetBusy = false, pxDrShown = false;
 var pxModal = null;           /* { kind:"rename", product, to, impact, err, busy } */
@@ -352,7 +384,17 @@ function pxGet(url) {
   return attempt(0);
 }
 function pxEnc(name) { return encodeURIComponent(name); }
-function pxMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v) || 0)) + " ر.س</bdi>"; }
+/* Money in the vocabulary's shape (PORT-SPEC 3): the digits inside .m-n, the currency word outside
+   it. mMoney is the ONE definition, declared in exec-reports-crm.ts and hoisted across the whole
+   concatenated page script — a second formatter here is how one figure gets printed two ways. */
+function pxMoney(v) { return mMoney(v); }
+/* A YEAR IS NOT A QUANTITY. fmtN groups thousands and printed «2,026» on the live page the first
+   time this shipped, so a year is stringified and only then isolated. */
+function pxYear(y) { return '<span class="m-n">' + String(Number(y) || 0) + "</span>"; }
+/* Arabic counts are four-way, never «n + noun». Two families, and the difference matters:
+   pxN* returns PLAIN TEXT for an aria-label, a toast and the readiness band (which is NOT ported
+   and passes these through esc()); pxN*N returns MARKUP with the numeral inside .m-n. Passing a
+   markup helper to esc() prints the span as literal angle brackets. */
 function pxPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function pxNProd(n) { return pxPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function pxNLine(n) { return pxPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
@@ -362,6 +404,14 @@ function pxNQtr(n) { return pxPl(n, "ربع واحد", "ربعان", "أرباع
 function pxNPkg(n) { return pxPl(n, "باقة واحدة", "باقتان", "باقات", "باقة"); }
 function pxNCamp(n) { return pxPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
 function pxNEnt(n) { return pxPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
+function pxNProdN(n) { return mPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
+function pxNLineN(n) { return mPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
+function pxNRowN(n) { return mPl(n, "سطر واحد", "سطران", "أسطر", "سطرًا"); }
+function pxNReadN(n) { return mPl(n, "قراءة واحدة", "قراءتان", "قراءات", "قراءة"); }
+function pxNQtrN(n) { return mPl(n, "ربع واحد", "ربعان", "أرباع", "ربعًا"); }
+function pxNPkgN(n) { return mPl(n, "باقة واحدة", "باقتان", "باقات", "باقة"); }
+function pxNCampN(n) { return mPl(n, "حملة واحدة", "حملتان", "حملات", "حملة"); }
+function pxNEntN(n) { return mPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
 function pxIco(n, cls) { return typeof opIco === "function" ? opIco(n, cls) : ""; }
 /* The product record is open to everyone with knowledge.view (DOOR_PERMISSIONS.product); writing the
    knowledge is knowledge.edit, the same permission the section editor is gated on. */
@@ -486,17 +536,47 @@ function pxRows() {
 }
 function pxFiltered() { return pxQ.trim() || pxSector !== "all" || pxDivF !== "all" || pxReadyF !== "all" || pxShort || pxOnly; }
 
-var PX_RAMP = ["var(--accent-deep)", "var(--accent-press)", "var(--accent)", "var(--accent-mark)", "var(--blue-light)", "var(--s-review-text)"];
+/* The four-way counted noun with its NUMERAL bound to a derivation (PORT-SPEC 6). One and two carry
+   no numeral in Arabic, so there is nothing to bind there and the plain words are returned — which
+   is also why the binding is per-site rather than global. */
+function pxPlFig(key, n, one, two, few, many) {
+  n = Number(n) || 0;
+  if (n === 1) return one;
+  if (n === 2) return two;
+  return dsFig(key, n) + " " + (n >= 3 && n <= 10 ? few : many);
+}
+function pxNProdFig(key, n) { return pxPlFig(key, n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
+
+/* THE PRODUCT COUNT IS PRINTED IN FOUR PLACES on this screen — the summary chips, the archived
+   toggle, the catalogue footer and the record's switcher rail — and every design review this
+   project has had found the same defect by reading: the rail said six, the page said five of six,
+   the truth was eight. Each count is now derived from the SAME array the markup renders from, and
+   dsVerify re-runs every derivation on every paint and outlines a figure that disagrees.
+   (The door badge in the rail is dashboard.ts's, outside .ds6 and outside this module; it carries
+   no product count today, so there is nothing there to bind.) */
+function pxBind() {
+  dsD("pxAll", function () { return pxBaseRows().length; });
+  dsD("pxShown", function () { return pxRows().length; });
+  dsD("pxArch", function () { return (pcCat || []).filter(function (p) { return p.archived; }).length; });
+  dsD("pxLive", function () { return (pcCat || []).filter(function (p) { return !p.archived; }).length; });
+  dsD("pxNotSelling", function () { return pxBaseRows().filter(function (p) { return !p.eligible; }).length; });
+  dsD("pxNoPrice", function () { return pxBaseRows().filter(function (p) { return pxPrice(p).kind === "none"; }).length; });
+  dsD("pxAssumed", function () { return pxBaseRows().filter(function (p) { return !!p.sectorAssumed; }).length; });
+}
+
 function pxSummary() {
   var perf = pcPerf[pcPerfYear];
   var rows = pxBaseRows();
   var notSelling = rows.filter(function (p) { return !p.eligible; }).length;
   var noPrice = rows.filter(function (p) { return pxPrice(p).kind === "none"; }).length;
   var assumed = rows.filter(function (p) { return !!p.sectorAssumed; }).length;
-  var h = '<section class="ox-sum" aria-label="ملخص المنتجات"><div>';
-  h += '<div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + "</div>";
+  var h = '<section class="m-card" aria-label="ملخص المنتجات">';
+  h += '<p class="m-stat__k">المحقق ' + pxYear(pcPerfYear) + "</p>";
   if (!perf) {
-    h += '<div class="ox-fig none">' + (pcPerfFailed[pcPerfYear] ? "تعذّر تحميل الأداء" : "—") + "</div>";
+    /* A failed read and an empty catalogue look identical to the reader, so the card says which:
+       a read that did not happen is a classification nobody made, not a legitimate nothing. */
+    h += '<p class="m-stat__v">' + (pcPerfFailed[pcPerfYear]
+      ? mNil("تعذّر تحميل الأداء", "unset") : mNil("لم يُقرأ الأداء بعد", "unset")) + "</p>";
   } else {
     /* ach was accumulated for EVERY product while tgt only for the targeted ones, so the
        printed «٪» was a percentage of a denominator that did not cover its own numerator.
@@ -511,53 +591,54 @@ function pxSummary() {
       if (a > 0) won.push({ n: p.product, v: a });
     });
     var cov = anyT ? targetCoveragePct(ach, tgt) : null;
-    h += '<div class="ox-fig">' + pxMoney(ach) + '<span class="ox-figsub">' +
-      (anyT
-        ? ("من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + fmtN(cov) + "٪") +
-           (offN ? " · " + fmtN(offN) + " بلا مستهدف، محققها " + pxMoney(offA) + " خارج النسبة" : ""))
-        : "بلا مستهدف سنوي") + "</span></div>";
-    if (won.length || (anyT && tgt > 0)) {
+    h += '<p class="m-stat__v">' + pxMoney(ach) + "</p>";
+    h += '<p class="m-stat__s">' + (anyT
+      ? ("من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + mPct(cov)) +
+         (offN ? " · " + pxNProdN(offN) + " بلا مستهدف، محققها " + pxMoney(offA) + " خارج النسبة" : ""))
+      : mNil("بلا مستهدف سنوي", "owed")) + "</p>";
+    if (won.length) {
+      /* Each product's achieved against the LARGEST achieved, not against a target: most products
+         carry no target, and a bar drawn against a denominator that does not exist for the row is
+         the same defect as the percentage above it. The bar is a share of the biggest, and it says
+         so by carrying the money beside it. */
       won.sort(function (a, b) { return b.v - a.v; });
-      var denom = Math.max(ach, tgt, 1);
-      h += '<div class="ox-bar" aria-hidden="true">' + won.map(function (w, i) {
-        return '<i style="flex:' + w.v + ' 1 0;background:' + PX_RAMP[i % PX_RAMP.length] + '" title="' + esc(w.n) + '"></i>';
-      }).join("") + (tgt > ach ? '<i style="flex:' + (tgt - ach) + ' 1 0;background-color:var(--surface-2);background-image:repeating-linear-gradient(115deg,var(--s-off-mark) 0 1px,transparent 1px 4px)" title="المتبقي حتى المستهدف"></i>' : "") + "</div>";
-      if (won.length) {
-        h += '<div class="ox-leg" role="group" aria-label="المنتجات المحققة — اضغط للتصفية">' + won.map(function (w, i) {
-          var on = pxOnly === w.n;
-          return '<button class="ox-lg' + (on ? " on" : "") + '" aria-pressed="' + on + '" data-px="only" data-nm="' + esc(w.n) + '">' +
-            '<i class="px-lg-b" style="background:' + PX_RAMP[i % PX_RAMP.length] + '"></i><span>' + esc(w.n) + "</span><b>" + pxMoney(w.v) + "</b></button>";
-        }).join("") + "</div>";
-      }
-      void denom;
+      var mx = won[0].v || 1;
+      h += '<div class="m-segs" role="group" aria-label="المنتجات المحققة — اضغط للتصفية">' + won.map(function (w) {
+        var on = pxOnly === w.n;
+        return '<button type="button" class="m-seg-row px-qrow" aria-pressed="' + on + '" data-px="only" data-nm="' + esc(w.n) + '">' +
+          '<span class="m-seg-row__t">' + esc(w.n) + "</span>" +
+          '<span class="m-seg-row__b"><i style="--m-pct:' + Math.max(2, Math.round((w.v / mx) * 100)) + '%"></i></span>' +
+          '<span class="m-seg-row__v">' + pxMoney(w.v) + "</span></button>";
+      }).join("") + "</div>";
     } else {
-      h += '<div class="px-note">لا مبيعات مربوحة بعد في ' + arYear(pcPerfYear) + ".</div>";
+      h += '<p class="m-meta">لا مبيعات مربوحة بعد في ' + pxYear(pcPerfYear) + ".</p>";
     }
   }
-  h += "</div>";
-  var met = function (key, n, label, warn) {
+  /* The three gaps, as independent toggles rather than one exclusive control — so the row is a
+     segmented control that is allowed to wrap (.px-wrapseg). The tone is a STATUS, which is the
+     only thing colour is allowed to mean here. */
+  var met = function (key, dkey, n, label, warn) {
     var on = pxShort === key;
-    return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + (n ? "" : " zero") + '" aria-pressed="' + on + '" data-px="short" data-nm="' + key + '">' +
-      '<span class="n">' + (warn && n ? pxIco("warn") : "") + fmtN(n) + "</span>" +
-      '<span class="l">' + (on ? pxIco("check") : "") + label + "</span></button>";
+    /* The figure sits inside the button as a bound span, not as a nested chip: a chip inside a
+       segmented control is a control inside a control, and the count is not a status. */
+    return '<button type="button" aria-pressed="' + on + '" data-px="short" data-nm="' + key + '"' +
+      (warn && n ? ' class="px-owed"' : "") + ">" + label + " " + dsFig(dkey, n) + "</button>";
   };
-  h += '<div class="ox-mets" role="group" aria-label="ما يلزم إكماله">' +
-    met("notSelling", notSelling, "لا يبيعها المساعد", true) +
-    met("noPrice", noPrice, "بلا سعر منشور", false) +
-    met("assumed", assumed, "قطاع مُستنتَج", false) + "</div>";
+  h += '<div class="m-seg px-wrapseg" role="group" aria-label="ما يلزم إكماله">' +
+    met("notSelling", "pxNotSelling", notSelling, "لا يبيعها المساعد", true) +
+    met("noPrice", "pxNoPrice", noPrice, "بلا سعر منشور", false) +
+    met("assumed", "pxAssumed", assumed, "قطاع مُستنتَج", false) + "</div>";
   return h + "</section>";
 }
 function pxSelect(id, label, value, opts, on) {
-  return '<span class="ox-f' + (on ? " on" : "") + '"><select id="' + id + '" aria-label="' + label + '" data-pxchange="' + id + '">' +
+  return '<select class="m-select' + (on ? " px-on" : "") + '" id="' + id + '" aria-label="' + label + '" data-pxchange="' + id + '">' +
     opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
-    '</select><span class="ox-chev">' + pxIco("chevD") + "</span></span>";
+    "</select>";
 }
 function pxToolbar() {
   var nArch = (pcCat || []).filter(function (p) { return p.archived; }).length;
-  var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات المنتجات">';
-  h += '<span class="ox-srch"><span class="ox-si">' + pxIco("search") + "</span>" +
-    '<input id="pxq" class="inp" type="search" value="' + esc(pxQ) + '" data-pxinput="q" aria-label="ابحث باسم المنتج" placeholder="ابحث باسم المنتج"></span>';
-  h += '<span class="ox-filt">';
+  var h = '<div class="px-filters" role="toolbar" aria-label="أدوات المنتجات">';
+  h += '<input id="pxq" class="m-input" type="search" value="' + esc(pxQ) + '" data-pxinput="q" aria-label="ابحث باسم المنتج" placeholder="ابحث باسم المنتج">';
   h += pxSelect("pxf_sector", "القطاع", pxSector, [["all", "كل القطاعات"], ["__none", "بلا قطاع"]].concat(pcSectorList.map(function (s) { return [String(s.id), s.name]; })), pxSector !== "all");
   // «القسم» is the company unit that owns the product; «القطاع» above is the market it sells into.
   // Two different questions, two selects, and the labels are deliberately not interchangeable.
@@ -568,105 +649,136 @@ function pxToolbar() {
   }
   h += pxSelect("pxf_ready", "الجاهزية", pxReadyF, [["all", "كل الحالات"], ["notSelling", "لا يبيعها المساعد"], ["gaps", "يبيعها وتنقصها أشياء"], ["ready", "جاهزة للمساعد"]], pxReadyF !== "all");
   h += pxSelect("pxf_sort", "ترتيب", pxSort, [["name", "حسب الاسم"], ["achieved", "الأعلى تحقيقًا"], ["open", "الأعلى مفتوحًا"], ["readiness", "غير الجاهزة أولًا"]], false);
-  h += '<button class="px-toggle" aria-pressed="' + pxArchived + '" data-px="archived">' + (pxArchived ? pxIco("check") : "") + "المؤرشفة" + (nArch ? " (" + fmtN(nArch) + ")" : "") + "</button>";
-  if (pxFiltered()) h += '<button class="ox-clear" data-px="clear" aria-label="مسح التصفية" title="مسح التصفية">' + pxIco("x") + "مسح</button>";
-  h += "</span>";
+  h += '<button type="button" class="m-btn" aria-pressed="' + pxArchived + '" data-px="archived">المؤرشفة' +
+    (nArch ? ' <span class="m-chip m-chip--plain">' + dsFig("pxArch", nArch) + "</span>" : "") + "</button>";
+  if (pxFiltered()) h += '<button type="button" class="m-btn m-btn--quiet" data-px="clear">مسح التصفية</button>';
+  h += '<span class="px-sp" aria-hidden="true"></span>';
   h += pxSheet
-    ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + pxIco("plus") + "إضافة منتج</button>"
-    : '<button class="btn btn-teal ox-add" id="pxadd" data-px="create">' + pxIco("plus") + "إضافة منتج</button>";
-  h += '<span class="ox-brk" aria-hidden="true"></span>';
+    ? '<button type="button" class="m-btn" aria-disabled="true" tabindex="-1">إضافة منتج</button>'
+    : '<button type="button" class="m-btn m-btn--primary" id="pxadd" data-px="create">إضافة منتج</button>';
   return h + "</div>";
 }
 function pxSkillLink(label) {
-  if (!pcSkill) return '<span class="fn" data-pxskill="missing">المهارة غير مرفوعة بعد</span>';
-  // a download arrow, not a chevron: a chevron beside a link read as a dropdown
-  return '<a href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="list"><svg class="ox-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>' + label + "</a>";
+  if (!pcSkill) return '<span class="m-td-nil m-nil--none" data-pxskill="missing">المهارة غير مرفوعة بعد</span>';
+  return '<a class="m-link" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="list">' + label + " &#8595;</a>";
 }
 function pxActionRows() {
   var h = "";
   var missing = (pcCat || []).filter(function (p) { return !p.archived && !p.asset; }).length;
   if (missing) {
-    h += '<div class="px-actrow">' + pxIco("plus") + "<span><b>" + pxNProd(missing) + "</b> بلا ملف تعريفي — مهارة إعداد العرض تُنتجه بمساعد ذكاء اصطناعي</span>" +
-      '<span class="sp"></span>' + (pcSkill ? '<span class="fn"><bdi>' + esc(pcSkill.filename) + "</bdi></span>" : "") + pxSkillLink("تحميل المهارة") + "</div>";
+    h += '<div class="m-alert"><span class="m-alert__d"><b>' + pxNProdN(missing) +
+      "</b> بلا ملف تعريفي — مهارة إعداد العرض تُنتجه بمساعد ذكاء اصطناعي" +
+      (pcSkill ? ' · <bdi>' + esc(pcSkill.filename) + "</bdi>" : "") + "</span>" +
+      pxSkillLink("تحميل المهارة") + "</div>";
   }
   if (pcUnmatched.length) {
-    h += '<div class="px-actrow" style="padding:0;"><button class="px-actrow px-um-h" style="border:none;" aria-expanded="' + pcUnmatchedOpen + '" data-px="unmatched">' +
-      pxIco("warn") + "<span>ملفات تحتاج ربطًا بمنتج · <b>" + fmtN(pcUnmatched.length) + '</b></span><span class="sp"></span><span>' + (pcUnmatchedOpen ? "إخفاء" : "عرض") + "</span>" + pxIco("chevD") + "</button></div>";
+    h += '<section class="m-card m-card--pad0"><div class="m-tools">' +
+      '<button type="button" class="m-btn m-btn--quiet" aria-expanded="' + pcUnmatchedOpen + '" data-px="unmatched">' +
+      "ملفات تحتاج ربطًا بمنتج " + mN(pcUnmatched.length) + "</button>" +
+      '<span class="m-meta">' + (pcUnmatchedOpen ? "إخفاء" : "عرض") + "</span></div>";
     if (pcUnmatchedOpen) {
       var tags = (pcCat || []).filter(function (p) { return !p.archived; });
-      h += pcUnmatched.map(function (u, i) {
-        return '<div class="px-um-r"><span class="nm" title="' + esc(u.name) + '">' + esc(u.name) + "</span>" +
-          '<span class="k">' + (u.kind === "kb" ? "ملف معرفة" : "ملف تعريفي") + "</span>" +
-          '<span class="fn"><bdi>' + esc(u.filename || "—") + "</bdi></span>" +
-          '<span class="acts"><select id="pxum_' + i + '" aria-label="ربط «' + esc(u.name) + '» بمنتج"><option value="">ربط بمنتج…</option>' +
+      h += '<div class="px-secb px-um">' + pcUnmatched.map(function (u, i) {
+        return '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(u.name) + "</span>" +
+          '<span class="m-item__s">' + (u.kind === "kb" ? "ملف معرفة" : "ملف تعريفي") + " · " +
+          (u.filename ? "<bdi>" + esc(u.filename) + "</bdi>" : mNil("بلا اسم ملف", "unset")) + "</span></span>" +
+          '<span class="px-acts"><select class="m-select" id="pxum_' + i + '" aria-label="ربط «' + esc(u.name) + '» بمنتج"><option value="">ربط بمنتج…</option>' +
           tags.map(function (t) { return '<option value="' + esc(t.product) + '">' + esc(t.product) + "</option>"; }).join("") + "</select>" +
-          '<button class="btn btn-ghost" data-px="reconcile" data-i="' + i + '">ربط</button>' +
-          '<button class="btn btn-ghost" data-px="umcreate" data-i="' + i + '">إنشاء منتج بهذا الاسم</button></span></div>';
-      }).join("");
+          '<button type="button" class="m-btn" data-px="reconcile" data-i="' + i + '">ربط</button>' +
+          '<button type="button" class="m-btn" data-px="umcreate" data-i="' + i + '">إنشاء منتج بهذا الاسم</button></span></div>';
+      }).join("") + "</div>";
     }
+    h += "</section>";
   }
   return h;
 }
+/* ONE ROW OF THE CATALOGUE. Every absence here is one of the three KINDS (PORT-SPEC 4), because a
+   target nobody entered, a price nobody published and an opportunity nobody opened are three
+   different facts, and a column of identical dashes teaches the reader to see none of them. */
 function pxListRow(p) {
   var perf = (pcPerf[pcPerfYear] || {})[p.product];
   var rd = pxReadiness(p), ps = pxPrice(p);
   var nm = esc(p.product);
-  var h = '<div class="ox-r" role="row" data-pxrow="' + nm + '">';
-  h += '<div class="px-c-nm" role="cell"><span class="px-nm" title="' + nm + '">' + nm + "</span>" +
-    '<span class="px-sub">' + (p.sector ? esc(p.sector) : "بلا قطاع") + (p.sectorAssumed ? '<span class="px-read">مُستنتَج</span>' : "") +
+  var h = '<tr data-pxrow="' + nm + '">';
+  h += '<td class="m-td-n"><a href="#product/' + pxEnc(p.product) + '" data-px="open" data-nm="' + nm + '">' + nm + "</a>" +
+    '<span class="m-meta">' + (p.sector ? esc(p.sector) : "بلا قطاع") + (p.sectorAssumed ? " (مُستنتَج)" : "") +
     (p.division ? " · " + esc(p.division) : "") +
-    (p.owner ? " · " + esc(p.owner) : "") + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</span></div>";
-  h += '<div class="px-ready px-c-rd" role="cell" title="' + esc(rd.word) + '">' + pxCellsHtml(rd) + '<span class="px-rw ' + pxWordCls(rd) + '">' + esc(rd.word) + "</span></div>";
-  h += '<div class="px-price px-c-pr" role="cell">' + (ps.kind === "package"
-      ? "<b>" + pxMoney(ps.lowest.listPrice) + " / سنة</b><span>" + (ps.count > 1 ? "يبدأ من · " + pxNPkg(ps.count) : esc(ps.lowest.name)) + "</span>"
-      : ps.kind === "note" ? '<span style="color:var(--ink-2);font-size:var(--t-sm);white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + esc(p.pricingNote) + "</span>"
-      : '<span class="none" style="font-size:var(--t-sm);">لا سعر منشور</span>') + "</div>";
+    (p.owner ? " · " + esc(p.owner) : "") + (p.archived ? " · مؤرشف" : "") + "</span></td>";
+  h += '<td title="' + esc(rd.word) + '">' + pxCellsHtml(rd) +
+    '<span class="m-chip' + (pxWordCls(rd) === "ok" ? " m-chip--ok" : pxWordCls(rd) === "no" ? " m-chip--warn" : "") + '">' + esc(rd.word) + "</span></td>";
+  h += "<td>" + (ps.kind === "package"
+      ? "<b>" + pxMoney(ps.lowest.listPrice) + " / سنة</b>" +
+        '<span class="m-meta">' + (ps.count > 1 ? "يبدأ من · " + pxNPkgN(ps.count) : esc(ps.lowest.name)) + "</span>"
+      : ps.kind === "note" ? '<span class="m-meta">' + esc(p.pricingNote) + "</span>"
+      /* A product priced by a committee case by case has NO published price, and that is a
+         legitimate nothing — not a number anyone owes. */
+      : mNil("لا سعر منشور", "none")) + "</td>";
   var tgt = perf ? perf.annualTarget : null;
-  h += '<div class="px-num px-c-tg" role="cell">' + (!perf ? '<span class="none">—</span>' : tgt === null || tgt === undefined ? '<span class="none">بلا مستهدف</span>' : "<b>" + pxMoney(tgt) + "</b>" + (perf.targetQuarters < 4 ? "<span>" + pxNQtr(perf.targetQuarters) + " من أربعة</span>" : "")) + "</div>";
+  h += '<td class="m-td-v">' + (!perf ? mNil("لم يُقرأ الأداء", "unset")
+    /* null is NOT a target of zero: a product nobody set a target for is a number someone owes. */
+    : tgt === null || tgt === undefined ? mNil("بلا مستهدف", "owed")
+    : pxMoney(tgt) + (perf.targetQuarters < 4 ? '<span class="m-meta">' + pxNQtrN(perf.targetQuarters) + " من أربعة</span>" : "")) + "</td>";
   var cov = perf ? targetCoveragePct(perf.achieved, tgt) : null;
-  h += '<div class="px-num px-c-ach" role="cell">' + (!perf ? '<span class="none">—</span>' :
-    "<b>" + pxMoney(perf.achieved) + "</b><span>" + (cov === null ? "—" : fmtN(cov) + "٪ من المستهدف") +
-    '<span class="px-tgsub">' + (tgt ? " · من " + pxMoney(tgt) : "") + "</span></span>") + "</div>";
-  h += '<div class="px-num px-c-op" role="cell">' + (!perf ? '<span class="none">—</span>' :
-    (perf.openLines ? "<b>" + (perf.openValue ? pxMoney(perf.openValue) : "لم تُسعَّر") + "</b><span>" + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLine(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span>" : '<span class="none">لا بنود مفتوحة</span>')) + "</div>";
-  h += '<div class="px-c-go" role="cell"><button class="ox-go" data-px="open" data-nm="' + nm + '" aria-label="فتح سجل ' + nm + '">' + pxIco("chevS") + "</button></div>";
-  return h + "</div>";
+  h += '<td class="m-td-v">' + (!perf ? mNil("لم يُقرأ الأداء", "unset")
+    : pxMoney(perf.achieved) +
+      '<span class="m-meta">' + (cov === null ? mNil("بلا نسبة — لا مستهدف", "owed") : mPct(cov) + " من المستهدف") + "</span>") + "</td>";
+  h += '<td class="m-td-v">' + (!perf ? mNil("لم يُقرأ الأداء", "unset")
+    : (perf.openLines
+        ? (perf.openValue ? pxMoney(perf.openValue) : mNil("لم تُسعَّر", "owed")) +
+          '<span class="m-meta">' + pxNLineN(perf.openLines) +
+          (perf.unpricedOpenLines ? " · " + pxNLineN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span>"
+        : mNil("لا بنود مفتوحة", "none"))) + "</td>";
+  return h + "</tr>";
 }
 function vProductsCrm() {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
   if (typeof cfLoad === "function") cfLoad(false);   /* the division filter needs «إعدادات النظام» */
   if (typeof opLoad === "function") opLoad(false);
-  var h = '<div class="px">';
+  pxBind();
   if (pcCat === null && !pcFailed) {
-    h += '<section class="ox-sum" aria-busy="true"><div><div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + '</div><div class="ox-fig none">—</div></div></section>';
-    h += '<section class="ox-led"><div class="ox-state" aria-busy="true">' + moSkeleton(5, ["w80", "w60", "w40"]) + "</div></section>";
-    return h + "</div>" + pxSheetHtml();
+    return '<div class="ds6"><section class="m-card" aria-busy="true">' +
+      '<p class="m-stat__k">المحقق ' + pxYear(pcPerfYear) + "</p>" + moSkeleton(5, ["w80", "w60", "w40"]) +
+      "</section></div>" + pxSheetHtml();
   }
+  var h = '<div class="ds6">';
   if (pcCat) h += pxSummary();
-  h += '<section class="ox-led" aria-label="الكتالوج">' + pxToolbar();
   if (pcFailed && !pcCat) {
-    h += '<div class="ox-state" role="alert">تعذّر تحميل المنتجات.<span class="s">لم يُعرض شيء لأن الطلب فشل، لا لأن الكتالوج فارغ.</span>' +
-      '<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div></section></div>';
-    return h;
+    return h + '<div class="m-card m-empty" role="alert"><p class="m-empty__t">تعذّر تحميل المنتجات.</p>' +
+      '<p class="m-empty__d">لم يُعرض شيء لأن الطلب فشل، لا لأن الكتالوج فارغ.</p>' +
+      '<p class="m-empty__a"><button type="button" class="m-btn" data-px="retry">أعد المحاولة</button></p></div></div>';
   }
-  if (pcFailed) h += '<div class="ox-state" role="alert" style="padding:var(--s2);">' + pxIco("warn") + "تعذّر تحديث المنتجات — المعروض آخر نسخة محمّلة." + '<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div>';
+  if (pcFailed) {
+    h += '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحديث المنتجات — المعروض آخر نسخة محمّلة.</span>' +
+      '<button type="button" class="m-btn" data-px="retry">أعد المحاولة</button></div>';
+  }
+  h += pxToolbar();
   h += pxActionRows();
   var rows = pxRows();
-  h += '<div class="ox-t px-t" role="table" aria-label="الكتالوج">';
-  h += '<div class="ox-hr" role="row"><div role="columnheader">المنتج</div><div role="columnheader">جاهزية المساعد</div><div role="columnheader">السعر المنشور</div>' +
-    '<div class="px-he px-c-tg" role="columnheader">المستهدف ' + arYear(pcPerfYear) + '</div><div class="px-he" role="columnheader">المحقق</div><div class="px-he" role="columnheader">المفتوح الآن</div><div role="columnheader"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">فتح</span></div></div>';
+  var base = pxBaseRows();
+  h += '<section class="m-card m-card--pad0" aria-label="الكتالوج"><div class="m-tablewrap">' +
+    '<table class="m-table"><thead><tr><th>المنتج</th><th>جاهزية المساعد</th><th>السعر المنشور</th>' +
+    '<th class="num">المستهدف ' + pxYear(pcPerfYear) + '</th><th class="num">المحقق</th><th class="num">المفتوح الآن</th></tr></thead><tbody>';
   if (!rows.length) {
-    h += '<div class="ox-state">' + ((pcCat || []).length
-      ? (pxArchived && !pxFiltered() ? "لا منتجات مؤرشفة." : "لا منتج يطابق التصفية.") + (pxFiltered() ? '<button class="btn btn-ghost" data-px="clear">مسح التصفية</button>' : "")
-      : 'لم تُضف منتجات بعد.<span class="s">أضف منتجًا ثم ارفع ملف معرفته ليبيعه المساعد.</span><button class="btn btn-teal" data-px="create">إضافة منتج</button>') + "</div>";
+    h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty">' + ((pcCat || []).length
+      ? '<p class="m-empty__t">' + (pxArchived && !pxFiltered() ? "لا منتجات مؤرشفة." : "لا منتج يطابق التصفية.") + "</p>" +
+        (pxFiltered() ? '<p class="m-empty__a"><button type="button" class="m-btn" data-px="clear">مسح التصفية</button></p>' : "")
+      : '<p class="m-empty__t">لم تُضف منتجات بعد.</p>' +
+        '<p class="m-empty__d">أضف منتجًا ثم ارفع ملف معرفته ليبيعه المساعد.</p>' +
+        '<p class="m-empty__a"><button type="button" class="m-btn m-btn--primary" data-px="create">إضافة منتج</button></p>') +
+      "</div></td></tr>";
   }
   rows.forEach(function (p) { h += pxListRow(p); });
-  h += "</div>";
+  h += "</tbody></table></div>";
   if (rows.length) {
     var perf = pcPerf[pcPerfYear] || {};
     var ach = rows.reduce(function (n, p) { return n + (Number((perf[p.product] || {}).achieved) || 0); }, 0);
-    h += '<div class="ox-foot"><span class="pgrange"><b>1–' + fmtN(rows.length) + "</b> من " + pxNProd(rows.length) + "</span>" +
-      '<span class="tot">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" + (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; }) ? ' · <a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="footer">مهارة إعداد العرض ↓</a>' : "") + "</span></div>";
+    /* Both halves of «N of M» are bound: the shown count to the filtered array and the catalogue
+       count to the unfiltered one, so the footer cannot disagree with the chips above it. */
+    h += '<div class="m-tools"><p class="m-meta">المعروض ' + dsFig("pxShown", rows.length) +
+      " من " + pxNProdFig("pxAll", base.length) + "</p>" +
+      '<p class="m-meta">المحقق للمعروض <b>' + pxMoney(ach) + "</b>" +
+      (pcSkill && !(pcCat || []).some(function (p) { return !p.archived && !p.asset; })
+        ? ' · <a class="m-link" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="footer">مهارة إعداد العرض &#8595;</a>' : "") + "</p></div>";
   }
   h += "</section></div>";
   if (pxListScroll) { var y = pxListScroll; pxListScroll = 0; setTimeout(function () { window.scrollTo(0, y); }, 0); }
@@ -680,34 +792,46 @@ function pxSheetHtml() {
   var nameCheck = d.name.trim() ? normalizeProductName(d.name) : null;
   var exists = nameCheck && nameCheck.ok && (pcCat || []).some(function (p) { return p.product === nameCheck.name; });
   var nameErr = d.touched && d.name.trim() ? (nameCheck && !nameCheck.ok ? nameCheck.reason : exists ? "يوجد منتج بهذا الاسم." : "") : "";
-  var h = '<div class="ox-scrim' + cls + '" data-px="sheetclose"></div>';
+  var fld = function (id, label, key, value, extra, ph, err) {
+    return '<div class="m-field"><label class="m-label' + (extra && extra.req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+      '<input class="m-input" id="' + id + '" data-pxsheet="' + key + '" value="' + esc(value) + '"' +
+      (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") +
+      (extra && extra.num ? ' type="number" inputmode="numeric" dir="ltr" step="1" min="' + extra.min + '"' + (extra.hi ? ' max="' + extra.hi + '"' : "") : "") +
+      (extra && extra.req ? ' aria-required="true"' : "") +
+      (err ? ' aria-invalid="true" aria-describedby="' + id + '_e"' : "") +
+      (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" +
+      (err ? '<span class="m-err" id="' + id + '_e" role="alert">' + esc(err) + "</span>" : "") + "</div>";
+  };
+  var h = '<div class="ds6"><div class="px-scrim' + cls + '" data-px="sheetclose"></div>';
   h += '<div class="px-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="pxdrt">';
-  h += '<div class="ox-dh"><div class="tt"><h2 id="pxdrt" tabindex="-1">إضافة منتج</h2><div class="st">يولد المنتج غير جاهز للمساعد، وسجلّه يوضح ما يلزم</div></div>' +
-    '<button class="ox-x" data-px="sheetclose" aria-label="إغلاق">' + pxIco("x") + "</button></div>";
-  h += '<div class="ox-db">';
-  h += '<section class="ox-sec"><div class="ox-sech">المنتج</div>' +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_name">اسم المنتج <span class="req" aria-hidden="true">*</span></label></div>' +
-    '<input class="inp" id="pxs_name" maxlength="60" value="' + esc(d.name) + '" data-pxsheet="name" aria-required="true"' + (nameErr ? ' aria-invalid="true" aria-describedby="pxs_name_e"' : "") + ' placeholder="مثال: سجل التطعيمات الوطني">' +
-    (nameErr ? '<span class="px-err" id="pxs_name_e">' + pxIco("warn") + esc(nameErr) + "</span>" : "") + "</div>" +
-    '<div class="ox-g2"><div class="ox-fld"><div class="ox-lr"><label for="pxs_sector">القطاع</label></div><span class="ox-f ox-fw"><select id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
+  h += '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="pxdrt" tabindex="-1">إضافة منتج</h2>' +
+    '<p class="m-meta">يولد المنتج غير جاهز للمساعد، وسجلّه يوضح ما يلزم</p></div>' +
+    '<button type="button" class="m-x" data-px="sheetclose" aria-label="إغلاق">' + pxIco("x") + "</button></div>";
+  h += '<div class="m-dlg__b">';
+  h += '<section><h3 class="m-label">المنتج</h3><div class="m-form">' +
+    '<div class="full">' + fld("pxs_name", "اسم المنتج", "name", d.name, { max: 60, req: true }, "مثال: سجل التطعيمات الوطني", nameErr) + "</div>" +
+    '<div class="m-field"><label class="m-label" for="pxs_sector">القطاع</label>' +
+    '<select class="m-select" id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
-    '</select><span class="ox-chev">' + pxIco("chevD") + "</span></span></div>" +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_owner">المسؤول</label></div><input class="inp" id="pxs_owner" maxlength="60" value="' + esc(d.owner) + '" data-pxsheet="owner" placeholder="بلا مسؤول"></div></div>' +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_note">ملاحظة التسعير</label></div><input class="inp" id="pxs_note" maxlength="120" value="' + esc(d.pricingNote) + '" data-pxsheet="pricingNote" placeholder="مثال: اشتراك سنوي يحدده المختص وفق الحجم"></div></section>';
-  h += '<section class="ox-sec"><div class="ox-sech">الباقة الأولى (اختياري)</div>' +
-    '<div class="ox-g2"><div class="ox-fld"><div class="ox-lr"><label for="pxs_pn">اسم الباقة</label></div><input class="inp" id="pxs_pn" maxlength="60" value="' + esc(d.pkgName) + '" data-pxsheet="pkgName" placeholder="الباقة القياسية"></div>' +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_ps">النطاق</label></div><input class="inp" id="pxs_ps" maxlength="120" value="' + esc(d.pkgScope) + '" data-pxsheet="pkgScope" placeholder="فرع واحد"></div>' +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_pp">السعر السنوي (ر.س)</label></div><input class="inp num" id="pxs_pp" type="number" min="0" step="1" inputmode="numeric" value="' + esc(d.pkgPrice) + '" data-pxsheet="pkgPrice"></div>' +
-    '<div class="ox-fld"><div class="ox-lr"><label for="pxs_py">المدة (سنوات)</label></div><input class="inp num" id="pxs_py" type="number" min="1" max="10" step="1" inputmode="numeric" value="' + esc(d.pkgYears) + '" data-pxsheet="pkgYears"></div></div></section>';
+    "</select></div>" +
+    fld("pxs_owner", "المسؤول", "owner", d.owner, { max: 60 }, "بلا مسؤول", "") +
+    '<div class="full">' + fld("pxs_note", "ملاحظة التسعير", "pricingNote", d.pricingNote, { max: 120 }, "مثال: اشتراك سنوي يحدده المختص وفق الحجم", "") + "</div>" +
+    "</div></section>";
+  h += '<section><h3 class="m-label">الباقة الأولى (اختياري)</h3><div class="m-form">' +
+    fld("pxs_pn", "اسم الباقة", "pkgName", d.pkgName, { max: 60 }, "الباقة القياسية", "") +
+    fld("pxs_ps", "النطاق", "pkgScope", d.pkgScope, { max: 120 }, "فرع واحد", "") +
+    fld("pxs_pp", "السعر السنوي (ر.س)", "pkgPrice", d.pkgPrice, { num: true, min: 0 }, "", "") +
+    fld("pxs_py", "المدة (سنوات)", "pkgYears", d.pkgYears, { num: true, min: 1, hi: 10 }, "", "") +
+    "</div></section>";
   h += "</div>";
-  h += '<div class="ox-df">' + (pxSheetErr ? '<span class="ox-derr" role="alert">' + pxIco("warn") + esc(pxSheetErr) + "</span>" : "") +
-    '<button class="btn btn-teal" id="pxs_submit" style="min-width:132px;justify-content:center;" data-px="sheetsubmit"' + (pxSheetBusy ? ' disabled aria-busy="true"' : "") + ">" + (pxSheetBusy ? "جارٍ الإنشاء…" : "إنشاء المنتج") + "</button>" +
-    '<button class="btn btn-ghost" data-px="sheetclose">إلغاء</button></div></div>';
+  h += '<div class="m-dlg__f">' + (pxSheetErr ? '<span class="m-err" role="alert">' + esc(pxSheetErr) + "</span>" : "") +
+    '<button type="button" class="m-btn m-btn--primary" id="pxs_submit" data-px="sheetsubmit"' + (pxSheetBusy ? ' disabled aria-busy="true"' : "") + ">" + (pxSheetBusy ? "جارٍ الإنشاء…" : "إنشاء المنتج") + "</button>" +
+    '<button type="button" class="m-btn" data-px="sheetclose">إلغاء</button></div></div></div>';
   setTimeout(function () {
     if (!pxDrShown) {
       pxDrShown = true;
       requestAnimationFrame(function () {
-        var s = document.querySelector(".ox-scrim"), dr = document.querySelector(".px-dr");
+        var s = document.querySelector(".px-scrim"), dr = document.querySelector(".px-dr");
         if (s) s.classList.add("in"); if (dr) dr.classList.add("in");
         var n = document.getElementById("pxs_name"); if (n) n.focus();
       });
@@ -752,46 +876,66 @@ function pxSheetSubmit() {
 function pxStatusSlot(key, forId) {
   var st = pxFState[key];
   var ida = forId ? ' id="' + forId + '_st"' : "";
-  if (!st) return '<span class="ox-fs"' + ida + ' aria-live="polite"></span>';
-  if (st.s === "pending") return '<span class="ox-fs pend"' + ida + ' aria-live="polite">جارٍ الحفظ…</span>';
-  if (st.s === "saved") return '<span class="ox-fs ok"' + ida + ' aria-live="polite">' + pxIco("check") + "حُفظ</span>";
-  if (st.s === "invalid") return '<span class="ox-fs bad"' + ida + ' aria-live="assertive">' + pxIco("warn") + esc(st.m) + "</span>";
-  return '<span class="ox-fs bad"' + ida + ' aria-live="assertive">' + pxIco("warn") + "تعذّر الحفظ" +
-    '<button data-px="fretry" data-k="' + esc(key) + '">أعد المحاولة</button><button data-px="fdiscard" data-k="' + esc(key) + '">تجاهل</button></span>';
+  if (!st) return '<span class="m-meta"' + ida + ' aria-live="polite"></span>';
+  if (st.s === "pending") return '<span class="m-meta"' + ida + ' aria-live="polite">جارٍ الحفظ…</span>';
+  if (st.s === "saved") return '<span class="m-chip m-chip--ok"' + ida + ' aria-live="polite">حُفظ</span>';
+  if (st.s === "invalid") return '<span class="m-err"' + ida + ' aria-live="assertive">' + esc(st.m) + "</span>";
+  return '<span class="px-acts"' + ida + ' aria-live="assertive"><span class="m-err">تعذّر الحفظ</span>' +
+    '<button type="button" class="m-btn m-btn--quiet" data-px="fretry" data-k="' + esc(key) + '">أعد المحاولة</button>' +
+    '<button type="button" class="m-btn m-btn--quiet" data-px="fdiscard" data-k="' + esc(key) + '">تجاهل</button></span>';
 }
 function pxEmbedded(name) { return (typeof PRODUCTS_FULL !== "undefined" ? PRODUCTS_FULL : []).filter(function (x) { return x.n === name; })[0] || null; }
 function pxSection(key, title, src, body, extra) {
-  return '<section class="px-sec" id="pxsec_' + key + '" aria-labelledby="pxsech_' + key + '"><div class="px-sech"><h2 id="pxsech_' + key + '">' + title + "</h2>" +
-    (src ? '<span class="src">' + src + "</span>" : "") + '<span class="sp"></span>' + (extra || "") + '</div><div class="px-secb">' + body + "</div></section>";
+  return '<section class="m-card" id="pxsec_' + key + '" aria-labelledby="pxsech_' + key + '">' +
+    '<div class="m-card__h"><div><h2 class="m-card__t" id="pxsech_' + key + '">' + title + "</h2>" +
+    (src ? '<p class="m-meta">' + src + "</p>" : "") + "</div>" + (extra || "") + "</div>" +
+    '<div class="px-secb">' + body + "</div></section>";
+}
+/* A quarter row: the bar is the quarter's achieved against ITS OWN target, and a quarter with no
+   target gets the hatched track (.px-nott) rather than a zero-width fill. A zero bar is a claim
+   that nothing was achieved against something; no target means the question was never asked. */
+function pxQuarterRow(q) {
+  var has = q.target !== null && q.target !== undefined && Number(q.target) > 0;
+  var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
+  return '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">الربع ' + mN(q.quarter) + "</span>" +
+    '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + pct + '%"></i></span>' +
+    '<span class="m-seg-row__v">' + (has ? pxMoney(q.achieved) : mNil("بلا مستهدف", "owed")) + "</span></div>";
 }
 function pxPerfSection(p) {
   var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
   if (!perf) {
     return pxSection("performance", "الأداء", "من سجل الفرص", pcPerfFailed[pcPerfYear]
-      ? '<div class="ox-state" role="alert">تعذّر تحميل الأداء.<button class="btn btn-ghost" data-px="perfretry">أعد المحاولة</button></div>'
+      ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل الأداء.</span>' +
+        '<button type="button" class="m-btn" data-px="perfretry">أعد المحاولة</button></div>'
       : moSkeleton(3, ["w60", "w80", "w40"]));
   }
   var cov = targetCoveragePct(perf.achieved, perf.annualTarget);
-  var b = '<div><div class="ox-lbl">المحقق ' + arYear(pcPerfYear) + '</div><div class="px-fig">' + pxMoney(perf.achieved) +
-    '<span class="ox-figsub">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "بلا مستهدف سنوي" :
-      "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + fmtN(cov) + "٪") + (perf.targetQuarters < 4 ? " · مُدخل في " + pxNQtr(perf.targetQuarters) + " من أربعة" : "")) + "</span></div></div>";
-  b += '<div class="px-qbar">' + (perf.quarters || []).map(function (q) {
-    var has = q.target !== null && q.target !== undefined && Number(q.target) > 0;
-    var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
-    return '<div class="px-qc"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + pct + '%"></i>' : "") + "</div>" +
-      '<div class="l"><span>الربع ' + fmtN(q.quarter) + "</span><span>" + (has ? pxMoney(q.achieved) : "—") + "</span></div></div>";
-  }).join("") + "</div>";
-  b += '<div class="px-stats"><div class="px-stat"><span class="l">المفتوح الآن</span><span class="v">' + (perf.openValue ? pxMoney(perf.openValue) : "—") + '</span><span class="l">' + pxNLine(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLine(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</span></div>" +
-    '<div class="px-stat"><span class="l">مربوحة ' + arYear(pcPerfYear) + '</span><span class="v">' + (perf.wonLines ? pxNLine(perf.wonLines) : "لا بنود") + '</span></div>' +
-    '<div class="px-stat"><span class="l">خاسرة ' + arYear(pcPerfYear) + '</span><span class="v">' + (perf.lostLines ? pxNLine(perf.lostLines) : "لا بنود") + "</span></div></div>";
+  /* annualTarget is number|null and null means NO TARGET RECORDED, not a target of zero. The
+     sub-line says which, and no percentage is drawn over a denominator that does not exist. */
+  var b = '<div><p class="m-stat__k">المحقق ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' + pxMoney(perf.achieved) + "</p>" +
+    '<p class="m-stat__s">' + (perf.annualTarget === null || perf.annualTarget === undefined
+      ? mNil("بلا مستهدف سنوي", "owed")
+      : "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + mPct(cov)) +
+        (perf.targetQuarters < 4 ? " · مُدخل في " + pxNQtrN(perf.targetQuarters) + " من أربعة" : "")) + "</p></div>";
+  b += '<div class="m-segs">' + (perf.quarters || []).map(pxQuarterRow).join("") + "</div>";
+  b += '<div class="m-stats"><div><p class="m-stat__k">المفتوح الآن</p>' +
+    '<p class="m-stat__v">' + (perf.openValue ? pxMoney(perf.openValue) : mNil("لم تُسعَّر", "owed")) + "</p>" +
+    '<p class="m-stat__s">' + pxNLineN(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLineN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</p></div>" +
+    '<div><p class="m-stat__k">مربوحة ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' +
+      (perf.wonLines ? pxNLineN(perf.wonLines) : mNil("لا بنود", "none")) + "</p></div>" +
+    '<div><p class="m-stat__k">خاسرة ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' +
+      (perf.lostLines ? pxNLineN(perf.lostLines) : mNil("لا بنود", "none")) + "</p></div></div>";
   var open = pxOpenLines(name).slice().sort(function (a, b2) { return opValue(b2) - opValue(a); }).slice(0, 3);
   if (open.length) {
-    b += '<div class="ox-lbl">أعلى الفرص المفتوحة</div><div class="px-list">' + open.map(function (o) {
-      return '<a class="px-li" href="#opps/' + fmtId(o.id) + '"><span class="a">' + esc(o.account_name) + '</span><span class="s">' + opDot(o.stage) + esc(opStage(o.stage).label) +
-        '</span><span class="v">' + (opPriced(o) ? pxMoney(opValue(o)) : '<span style="color:var(--muted);font-weight:450">لم تُسعَّر</span>') + "</span></a>";
-    }).join("") + '</div><button class="px-more" style="background:none;border:none;cursor:pointer;font-family:inherit;padding:0" data-px="goopps" data-nm="' + esc(name) + '">كل فرص المنتج ←</button>';
+    b += '<div><p class="m-stat__k">أعلى الفرص المفتوحة</p>' + open.map(function (o) {
+      return '<a class="m-item" href="#opps/' + fmtId(o.id) + '"><span class="m-item__b">' +
+        '<span class="m-item__n">' + esc(o.account_name) + "</span>" +
+        '<span class="m-item__s">' + esc(opStage(o.stage).label) + "</span></span>" +
+        '<span class="m-item__v">' + (opPriced(o) ? pxMoney(opValue(o)) : mNil("لم تُسعَّر", "owed")) + "</span></a>";
+    }).join("") + "</div>" +
+      '<div class="px-acts"><button type="button" class="m-btn m-btn--quiet" data-px="goopps" data-nm="' + esc(name) + '">كل فرص المنتج &#8592;</button></div>';
   }
-  b += '<div class="px-note">القيمة الإجمالية للعقد — أساس المستهدف لم يُقَرّ بعد.</div>';
+  b += '<p class="m-meta">القيمة الإجمالية للعقد — أساس المستهدف لم يُقَرّ بعد.</p>';
   return pxSection("performance", "الأداء", "من سجل الفرص", b);
 }
 function pxPricingSection(p) {
@@ -799,35 +943,49 @@ function pxPricingSection(p) {
   var ed = pxPkgEdit && pxPkgEdit.product === name ? pxPkgEdit : null;
   var editor = function () {
     var d = ed.d;
-    return '<div class="px-pke"><div class="g">' +
-      '<div class="px-fl"><label for="pxpk_n">اسم الباقة *</label><input class="inp" id="pxpk_n" maxlength="60" value="' + esc(d.name) + '" data-pxpkg="name"></div>' +
-      '<div class="px-fl"><label for="pxpk_s">النطاق</label><input class="inp" id="pxpk_s" maxlength="120" value="' + esc(d.scope) + '" data-pxpkg="scope"></div>' +
-      '<div class="px-fl"><label for="pxpk_y">المدة (سنوات)</label><input class="inp num" id="pxpk_y" type="number" min="1" max="10" step="1" value="' + esc(d.years) + '" data-pxpkg="years"></div>' +
-      '<div class="px-fl"><label for="pxpk_p">السعر السنوي (ر.س)</label><input class="inp num" id="pxpk_p" type="number" min="0" step="1" value="' + esc(d.listPrice) + '" data-pxpkg="listPrice"></div></div>' +
-      (ed.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ed.err) + "</span>" : "") +
-      '<div class="acts"><button class="btn btn-ghost" data-px="pkgsave"' + (ed.busy ? " disabled" : "") + ">" + (ed.busy ? "جارٍ الحفظ…" : "حفظ الباقة") + '</button><button class="btn btn-ghost" data-px="pkgcancel">إلغاء</button>' +
-      '<span class="px-note">تعديل السعر لا يغيّر قيم الفرص المسجّلة.</span></div></div>';
+    return '<div class="px-secb"><div class="m-form">' +
+      '<div class="m-field"><label class="m-label m-req" for="pxpk_n">اسم الباقة</label><input class="m-input" id="pxpk_n" maxlength="60" value="' + esc(d.name) + '" data-pxpkg="name"></div>' +
+      '<div class="m-field"><label class="m-label" for="pxpk_s">النطاق</label><input class="m-input" id="pxpk_s" maxlength="120" value="' + esc(d.scope) + '" data-pxpkg="scope"></div>' +
+      '<div class="m-field"><label class="m-label" for="pxpk_y">المدة (سنوات)</label><input class="m-input" id="pxpk_y" type="number" dir="ltr" min="1" max="10" step="1" value="' + esc(d.years) + '" data-pxpkg="years"></div>' +
+      '<div class="m-field"><label class="m-label" for="pxpk_p">السعر السنوي (ر.س)</label><input class="m-input" id="pxpk_p" type="number" dir="ltr" min="0" step="1" value="' + esc(d.listPrice) + '" data-pxpkg="listPrice"></div></div>' +
+      (ed.err ? '<span class="m-err" role="alert">' + esc(ed.err) + "</span>" : "") +
+      '<div class="px-acts"><button type="button" class="m-btn m-btn--primary" data-px="pkgsave"' + (ed.busy ? " disabled" : "") + ">" + (ed.busy ? "جارٍ الحفظ…" : "حفظ الباقة") + "</button>" +
+      '<button type="button" class="m-btn" data-px="pkgcancel">إلغاء</button>' +
+      '<span class="m-meta">تعديل السعر لا يغيّر قيم الفرص المسجّلة.</span></div></div>';
   };
-  b += '<div class="px-pk"><div class="px-pkh"><span>الباقة</span><span>النطاق</span><span class="end">المدة</span><span class="end">السعر السنوي</span><span></span></div>';
-  if (!(p.packages || []).length && !(ed && ed.id === 0)) b += '<div class="px-pkr"><span style="color:var(--muted)">لا باقات منشورة.</span></div>';
+  b += '<div class="m-tablewrap"><table class="m-table"><thead><tr><th>الباقة</th><th>النطاق</th>' +
+    '<th class="num">المدة</th><th class="num">السعر السنوي</th><th><span class="px-sr">إجراءات</span></th></tr></thead><tbody>';
+  if (!(p.packages || []).length && !(ed && ed.id === 0)) {
+    b += '<tr class="m-table__empty"><td colspan="5"><div class="m-empty"><p class="m-empty__t">لا باقات منشورة.</p></div></td></tr>';
+  }
   (p.packages || []).forEach(function (k) {
-    if (ed && ed.id === k.id) { b += editor(); return; }
-    b += '<div class="px-pkr"><span>' + esc(k.name) + "</span><span>" + (k.scope ? esc(k.scope) : "—") + '</span><span class="end">' + fmtN(k.years) + ' سنة</span><span class="end"><b>' + pxMoney(k.listPrice) + "</b></span>" +
-      '<span class="acts"><button class="btn btn-ghost" data-px="pkgedit" data-id="' + k.id + '">تعديل</button><button class="btn btn-ghost" data-px="pkgretire" data-id="' + k.id + '">تقاعد</button></span></div>';
+    b += '<tr><td class="m-td-n">' + esc(k.name) + "</td>" +
+      /* A scope nobody wrote is a classification nobody made, not a legitimate nothing. */
+      "<td>" + (k.scope ? esc(k.scope) : mNil("لم يُحدَّد", "unset")) + "</td>" +
+      '<td class="m-td-v">' + mN(k.years) + " سنة</td>" +
+      '<td class="m-td-v">' + pxMoney(k.listPrice) + "</td>" +
+      '<td><span class="px-acts px-acts--end"><button type="button" class="m-btn m-btn--quiet" data-px="pkgedit" data-id="' + k.id + '">تعديل</button>' +
+      '<button type="button" class="m-btn m-btn--quiet" data-px="pkgretire" data-id="' + k.id + '">تقاعد</button></span></td></tr>';
   });
-  if (ed && ed.id === 0) b += editor();
-  b += "</div>";
-  b += '<div style="display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap;">' + (ed ? "" : '<button class="ox-arow" style="width:auto;padding-inline:14px;" data-px="pkgadd">' + pxIco("plus") + "باقة</button>") +
-    (p.retiredPackageCount ? '<button class="ox-clear" data-px="retiredtoggle" aria-expanded="' + !!pxShowRetired[name] + '">' + (pxShowRetired[name] ? "إخفاء المتقاعدة" : "عرض المتقاعدة (" + fmtN(p.retiredPackageCount) + ")") + "</button>" : "") + "</div>";
+  b += "</tbody></table></div>";
+  if (ed) b += editor();
+  b += '<div class="px-acts">' + (ed ? "" : '<button type="button" class="m-btn" data-px="pkgadd">إضافة باقة</button>') +
+    (p.retiredPackageCount ? '<button type="button" class="m-btn m-btn--quiet" data-px="retiredtoggle" aria-expanded="' + !!pxShowRetired[name] + '">' +
+      (pxShowRetired[name] ? "إخفاء المتقاعدة" : "عرض المتقاعدة " + mN(p.retiredPackageCount)) + "</button>" : "") + "</div>";
   if (pxShowRetired[name]) {
     var ret = pxRetired[name];
-    b += '<div class="px-pk">' + (!ret ? '<div class="px-pkr"><span style="color:var(--muted)">جارٍ التحميل…</span></div>' : ret.filter(function (k) { return k.retiredAt || k.retired_at; }).map(function (k) {
-      return '<div class="px-pkr retired"><span>' + esc(k.name) + '</span><span>' + (k.scope ? esc(k.scope) : "—") + '</span><span class="end">' + fmtN(k.years) + ' سنة</span><span class="end">' + pxMoney(k.listPrice) + '</span><span class="acts"><span class="px-arch">متقاعدة</span><button class="btn btn-ghost" data-px="pkgrestore" data-id="' + k.id + '">إعادة التفعيل</button></span></div>';
-    }).join("")) + "</div>";
+    b += '<div class="m-tablewrap"><table class="m-table"><tbody>' + (!ret ? '<tr><td class="m-meta">جارٍ التحميل…</td></tr>' : ret.filter(function (k) { return k.retiredAt || k.retired_at; }).map(function (k) {
+      return '<tr><td class="m-td-n">' + esc(k.name) + "</td><td>" + (k.scope ? esc(k.scope) : mNil("لم يُحدَّد", "unset")) +
+        '</td><td class="m-td-v">' + mN(k.years) + ' سنة</td><td class="m-td-v">' + pxMoney(k.listPrice) +
+        '</td><td><span class="px-acts px-acts--end"><span class="m-chip">متقاعدة</span>' +
+        '<button type="button" class="m-btn m-btn--quiet" data-px="pkgrestore" data-id="' + k.id + '">إعادة التفعيل</button></span></td></tr>';
+    }).join("")) + "</tbody></table></div>";
   }
   var nk = name + "|pricingNote";
-  b += '<div class="ox-fld"><div class="ox-lr"><label for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk, "pxf_note") + '</div><input class="inp" id="pxf_note" aria-describedby="pxf_note_st" maxlength="120" value="' +
-    esc(pxFState[nk] && pxFState[nk].s !== "saved" ? pxFState[nk].v : (p.pricingNote || "")) + '" data-pxfield="pricingNote" placeholder="لا ملاحظة تسعير"><span class="px-note">تُعرض حين لا توجد باقة منشورة.</span></div>';
+  b += '<div class="m-field"><span class="px-acts"><label class="m-label" for="pxf_note">ملاحظة التسعير</label>' + pxStatusSlot(nk, "pxf_note") + "</span>" +
+    '<input class="m-input" id="pxf_note" aria-describedby="pxf_note_st" maxlength="120" value="' +
+    esc(pxFState[nk] && pxFState[nk].s !== "saved" ? pxFState[nk].v : (p.pricingNote || "")) + '" data-pxfield="pricingNote" placeholder="لا ملاحظة تسعير">' +
+    '<span class="m-hint">تُعرض حين لا توجد باقة منشورة.</span></div>';
   // The founder's rule, stated on the screen that would break it: a price is a committee decision,
   // so the section says so BEFORE the «إضافة باقة» control, not in a tooltip afterwards.
   return pxSection("pricing", "الأسعار والباقات", "لا بُدّ أن يتم الموافقة عليها مسبقًا من اللجنة قبل إضافة السعر", b);
@@ -835,29 +993,41 @@ function pxPricingSection(p) {
 function pxTargetsSection(p) {
   var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
   var yrs = [new Date().getFullYear(), new Date().getFullYear() + 1];
-  var extra = '<span class="px-yr" role="group" aria-label="السنة">' + yrs.map(function (y) {
-    return '<button aria-pressed="' + (pcPerfYear === y) + '" data-px="year" data-y="' + y + '">' + arYear(y) + "</button>";
-  }).join("") + "</span>";
-  if (!perf) return pxSection("targets", "المستهدفات", "", pcPerfFailed[pcPerfYear] ? '<div class="ox-state" role="alert">تعذّر تحميل المستهدفات.<button class="btn btn-ghost" data-px="perfretry">أعد المحاولة</button></div>' : moSkeleton(4, ["w80"]), extra);
-  var b = '<div>';
+  var extra = '<div class="m-seg" role="group" aria-label="السنة">' + yrs.map(function (y) {
+    return '<button type="button" aria-pressed="' + (pcPerfYear === y) + '" data-px="year" data-y="' + y + '">' + String(y) + "</button>";
+  }).join("") + "</div>";
+  if (!perf) return pxSection("targets", "المستهدفات", "", pcPerfFailed[pcPerfYear]
+    ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل المستهدفات.</span>' +
+      '<button type="button" class="m-btn" data-px="perfretry">أعد المحاولة</button></div>'
+    : moSkeleton(4, ["w80"]), extra);
+  var b = "";
   (perf.quarters || []).forEach(function (q) {
     var key = name + "|t|" + pcPerfYear + "|" + q.quarter, st = pxFState[key];
     var saved = q.target === null || q.target === undefined ? "" : String(q.target);
     var val = st && st.s !== "saved" ? st.v : saved;
     var has = saved !== "" && Number(saved) > 0;
     var cov = targetCoveragePct(q.achieved, q.target);
-    b += '<div class="px-q"><span class="lb">الربع ' + fmtN(q.quarter) + "</span>" +
-      '<div class="px-qf"><label class="sr" for="pxq_' + q.quarter + '" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">مستهدف الربع ' + fmtN(q.quarter) + "</label>" +
-      '<input class="inp" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" + pxStatusSlot(key, "pxq_" + q.quarter) + "</div>" +
-      '<span class="ach">المحقق ' + pxMoney(q.achieved) + "</span>" +
-      '<div class="cov"><div class="trk' + (has ? "" : " not") + '">' + (has ? '<i style="width:' + Math.min(100, cov || 0) + '%"></i>' : "") + "</div><span>" + (cov === null ? "—" : fmtN(cov) + "٪") + "</span></div>";
+    b += '<div class="m-field"><span class="px-acts">' +
+      '<label class="m-label" for="pxq_' + q.quarter + '">مستهدف الربع ' + mN(q.quarter) + "</label>" +
+      pxStatusSlot(key, "pxq_" + q.quarter) + "</span>" +
+      '<input class="m-input" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" +
+      '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">المحقق ' + pxMoney(q.achieved) + "</span>" +
+      '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + (has ? Math.min(100, cov || 0) : 0) + '%"></i></span>' +
+      /* No target is not a coverage of zero: there is no denominator for the percentage to be a
+         percentage OF, so the cell says what is missing instead of printing a number. */
+      '<span class="m-seg-row__v">' + (cov === null ? mNil("بلا مستهدف", "owed") : mPct(cov)) + "</span></div>";
     if (pxQConfirm[key]) {
-      b += '<div class="px-confirm" role="alert">إزالة مستهدف الربع ' + fmtN(q.quarter) + '؟<button class="btn btn-ghost" data-px="tclear" data-q="' + q.quarter + '">إزالة</button><button class="btn btn-ghost" data-px="tundo" data-q="' + q.quarter + '">تراجع</button></div>';
+      b += '<div class="m-alert" role="alert"><span class="m-alert__d">إزالة مستهدف الربع ' + mN(q.quarter) + "؟</span>" +
+        '<button type="button" class="m-btn" data-px="tclear" data-q="' + q.quarter + '">إزالة</button>' +
+        '<button type="button" class="m-btn" data-px="tundo" data-q="' + q.quarter + '">تراجع</button></div>';
     }
     b += "</div>";
   });
-  b += "</div>";
-  b += '<div class="px-note">' + (perf.annualTarget === null || perf.annualTarget === undefined ? "لا مستهدفات مدخلة لهذه السنة." : "مجموع المستهدفات المدخلة " + pxMoney(perf.annualTarget) + (perf.targetQuarters < 4 ? " · " + pxNQtr(4 - perf.targetQuarters) + " بلا مستهدف" : "")) + " · القيم نفسها في «المستهدفات والأداء».</div>";
+  b += '<p class="m-meta">' + (perf.annualTarget === null || perf.annualTarget === undefined
+    ? "لا مستهدفات مدخلة لهذه السنة."
+    : "مجموع المستهدفات المدخلة " + pxMoney(perf.annualTarget) +
+      (perf.targetQuarters < 4 ? " · " + pxNQtrN(4 - perf.targetQuarters) + " بلا مستهدف" : "")) +
+    " · القيم نفسها في «المستهدفات والأداء».</p>";
   return pxSection("targets", "المستهدفات", "", b, extra);
 }
 function pxKnowledgeSection(p) {
@@ -866,55 +1036,76 @@ function pxKnowledgeSection(p) {
   /* The score leads: on a tab named «معرفة المنتج» the first question is «كم نسبة الجاهزية، وأي قسم
      ناقص؟» — the two files are how you fix it, so they come after the answer, not before it. */
   if (typeof kbScoreBlock === "function") b += kbScoreBlock(p, kn);
-  if (pxKnowFailed[name]) b += '<div class="ox-state" role="alert">تعذّر تحميل نص المعرفة.<button class="btn btn-ghost" data-px="knowretry">أعد المحاولة</button></div>';
+  if (pxKnowFailed[name]) {
+    b += '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل نص المعرفة.</span>' +
+      '<button type="button" class="m-btn" data-px="knowretry">أعد المحاولة</button></div>';
+  }
   /* intro PDF */
-  b += '<div class="px-file"><span class="px-cells"><i class="' + (p.asset ? "" : "miss") + '"></i></span><div><div class="t">الملف التعريفي (PDF)</div><div class="d">يُرسله المساعد للعميل عند طلب التفاصيل' +
-    (p.asset ? ' · <bdi>' + esc(p.asset.filename) + "</bdi>" + (p.asset.size ? " · " + fmtN(Math.max(1, Math.round(p.asset.size / 1024))) + " ك.ب" : "") + (p.asset.updatedAt ? " · " + fmtD(p.asset.updatedAt) : "") : " · لا ملف مرفق") +
-    (upA && upA.s === "busy" ? ' · <span class="ox-fs pend">جارٍ الرفع…</span>' : upA && upA.s === "failed" ? ' · <span class="px-err">' + esc(upA.m) + "</span>" : "") + '</div></div><div class="acts">' +
-    (p.asset ? '<a class="btn btn-ghost" href="/assets/' + esc(p.asset.publicId) + '" target="_blank" rel="noopener" style="text-decoration:none;">معاينة</a>' : (pcSkill ? '<a class="ox-lnk" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="record">أنشئه بمهارة إعداد العرض ↓</a>' : '<span class="px-note" data-pxskill="missing">مهارة إعداد العرض غير مرفوعة بعد</span>')) +
-    '<button class="btn btn-ghost" data-px="pickasset"' + (p.archived ? " disabled" : "") + ">" + (p.asset ? "استبدال" : "رفع PDF") + "</button>" +
-    '<input id="pxasset" type="file" accept="application/pdf,.pdf" aria-label="اختر ملفًا تعريفيًا (PDF)" style="display:none" data-pxupload="asset"></div></div>';
+  b += '<div class="m-item"><span class="px-cells" aria-hidden="true"><i class="' + (p.asset ? "" : "miss") + '"></i></span>' +
+    '<span class="m-item__b"><span class="m-item__n">الملف التعريفي (PDF)</span>' +
+    '<span class="m-item__s">يُرسله المساعد للعميل عند طلب التفاصيل' +
+    (p.asset ? " · <bdi>" + esc(p.asset.filename) + "</bdi>" +
+      (p.asset.size ? " · " + mN(Math.max(1, Math.round(p.asset.size / 1024))) + " ك.ب" : "") +
+      (p.asset.updatedAt ? " · " + fmtD(p.asset.updatedAt) : "") : " · " + mNil("لا ملف مرفق", "owed")) +
+    (upA && upA.s === "busy" ? " · جارٍ الرفع…" : upA && upA.s === "failed" ? ' · <span class="m-err">' + esc(upA.m) + "</span>" : "") +
+    "</span></span>" +
+    '<span class="px-acts px-acts--end">' +
+    (p.asset ? '<a class="m-btn" href="/assets/' + esc(p.asset.publicId) + '" target="_blank" rel="noopener">معاينة</a>'
+      : (pcSkill ? '<a class="m-link" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="record">أنشئه بمهارة إعداد العرض &#8595;</a>'
+        : '<span class="m-meta" data-pxskill="missing">مهارة إعداد العرض غير مرفوعة بعد</span>')) +
+    '<button type="button" class="m-btn" data-px="pickasset"' + (p.archived ? " disabled" : "") + ">" + (p.asset ? "استبدال" : "رفع PDF") + "</button>" +
+    '<input id="pxasset" type="file" accept="application/pdf,.pdf" aria-label="اختر ملفًا تعريفيًا (PDF)" hidden data-pxupload="asset"></span></div>';
   /* knowledge */
   var kst = (p.kb && p.kb.state) || "none";
   var sub = kst === "approved" ? "اعتُمدت" + (p.kb.approvedBy ? " · " + esc(p.kb.approvedBy) : "") + (p.kb.approvedAt ? " · " + fmtD(p.kb.approvedAt) : "") + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
-    : kst === "legacy" ? '<span style="color:var(--s-attn-text);font-weight:500">بانتظار اعتماد النص الحالي — المساعد لا يستخدمه</span>' + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
+    : kst === "legacy" ? '<span class="m-chip m-chip--warn">بانتظار اعتماد النص الحالي — المساعد لا يستخدمه</span>' + (p.kb.source ? ' · <bdi>' + esc(p.kb.source) + "</bdi>" : "")
     : p.embedded ? "لا ملف — المساعد يبيع من المعرفة المدمجة فقط" : "لا ملف معرفة — المساعد لا يبيع هذا المنتج";
-  b += '<div class="px-file"><span class="px-cells"><i class="' + (kst === "approved" ? "" : kst === "legacy" || p.draft ? "pend" : "miss") + '"></i></span><div><div class="t">ملف المعرفة</div><div class="d">يقرأه المساعد ليجيب عن الأسعار والاعتراضات · ' + sub +
-    (upK && upK.s === "busy" ? ' · <span class="ox-fs pend">جارٍ استخلاص المعرفة… قد يستغرق دقيقة</span>' : upK && upK.s === "failed" ? ' · <span class="px-err">' + esc(upK.m) + "</span>" : "") + '</div></div><div class="acts">' +
+  b += '<div class="m-item"><span class="px-cells" aria-hidden="true"><i class="' + (kst === "approved" ? "" : kst === "legacy" || p.draft ? "pend" : "miss") + '"></i></span>' +
+    '<span class="m-item__b"><span class="m-item__n">ملف المعرفة</span>' +
+    '<span class="m-item__s">يقرأه المساعد ليجيب عن الأسعار والاعتراضات · ' + sub +
+    (upK && upK.s === "busy" ? " · جارٍ استخلاص المعرفة… قد يستغرق دقيقة" : upK && upK.s === "failed" ? ' · <span class="m-err">' + esc(upK.m) + "</span>" : "") +
+    "</span></span>" +
+    '<span class="px-acts px-acts--end">' +
     /* knowledge.edit — the readiness meter above is a read; uploading, approving and discarding are
        writes, and a role without the permission must not be offered them beside a hidden editor. */
     (pxMayEditKb()
-      ? '<button class="btn btn-ghost" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
-        '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" style="display:none" data-pxupload="kb">'
-      : "") + "</div></div>";
+      ? '<button type="button" class="m-btn" data-px="pickkb"' + (p.archived || (upK && upK.s === "busy") ? " disabled" : "") + ">" + (kst === "none" ? "رفع ملف المعرفة" : "استبدال") + "</button>" +
+        '<input id="pxkb" type="file" aria-label="اختر ملف معرفة" accept=".pdf,.docx,.pptx,.xlsx,.md,.txt" hidden data-pxupload="kb">'
+      : "") + "</span></div>";
   var ap = pxAppr[name] || {};
   if (kn && kn.draftMd) {
-    b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</div>" +
-      '<div class="px-note"><bdi>' + esc(kn.draftSource || "") + "</bdi>" + (kn.draftBy ? " · رُفعت · " + esc(kn.draftBy) : "") + (kn.draftAt ? " · " + fmtD(kn.draftAt) : "") +
-      (kn.changeSummary ? " · أُضيف " + pxNRowTxt(kn.changeSummary.added) + " · حُذف " + pxNRowTxt(kn.changeSummary.removed) + " مقارنة بالمعتمد" : "") + "</div>" +
+    b += '<section class="m-card"><div class="m-card__h"><div>' +
+      '<h3 class="m-card__t">مسودة بانتظار الاعتماد — المساعد لا يقرؤها بعد</h3>' +
+      '<p class="m-meta"><bdi>' + esc(kn.draftSource || "") + "</bdi>" + (kn.draftBy ? " · رُفعت · " + esc(kn.draftBy) : "") + (kn.draftAt ? " · " + fmtD(kn.draftAt) : "") +
+      (kn.changeSummary ? " · أُضيف " + pxNRowN(kn.changeSummary.added) + " · حُذف " + pxNRowN(kn.changeSummary.removed) + " مقارنة بالمعتمد" : "") + "</p></div></div>" +
       (typeof kbDraftLine === "function" ? kbDraftLine(kn) : "") +
       '<div class="px-md">' + mdRender(kn.draftMd) + "</div>" +
-      (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
+      (ap.err ? '<span class="m-err" role="alert">' + esc(ap.err) + "</span>" : "") +
       (pxMayEditKb()
-        ? '<div class="acts"><button class="btn btn-teal" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
+        ? '<div class="px-acts"><button type="button" class="m-btn m-btn--primary" data-px="approve"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد المعرفة") + "</button>" +
           '<button class="rv-hold" data-do="pxDiscard" data-arg="' + esc(name) + '" data-idle="تجاهل المسودة" data-holding="استمر بالضغط للتجاهل…" data-armed="اضغط مرة أخرى للتجاهل" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">تجاهل المسودة</span></button></div>'
-        : "") + "</div>";
+        : "") + "</section>";
   }
   if (kn && kn.state === "legacy" && kn.md) {
-    b += '<div class="px-draft"><div class="h">' + pxIco("warn") + "نص مستخدم قبل تسجيل الاعتماد — راجعه ثم اعتمده ليعود إليه المساعد</div>" +
-      '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="px-err" role="alert">' + pxIco("warn") + esc(ap.err) + "</span>" : "") +
-      (pxMayEditKb() ? '<div class="acts"><button class="btn ' + (kn.draftMd ? "btn-ghost" : "btn-teal") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div>" : "") + "</div>";
+    b += '<section class="m-card"><div class="m-card__h"><div>' +
+      '<h3 class="m-card__t">نص مستخدم قبل تسجيل الاعتماد</h3>' +
+      '<p class="m-meta">راجعه ثم اعتمده ليعود إليه المساعد.</p></div></div>' +
+      '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="m-err" role="alert">' + esc(ap.err) + "</span>" : "") +
+      (pxMayEditKb() ? '<div class="px-acts"><button type="button" class="m-btn' + (kn.draftMd ? "" : " m-btn--primary") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div>" : "") + "</section>";
   } else if (kn && kn.state === "approved" && kn.md) {
-    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'النص المعتمد <span class="src">يُحدَّث برفع ملف جديد أو من «تحرير الأقسام»، ثم اعتماده</span></summary><div class="px-md">' + mdRender(kn.md) + "</div></details>";
+    b += '<details class="m-evidence"><summary>النص المعتمد' +
+      '<span class="m-meta">يُحدَّث برفع ملف جديد أو من «تحرير الأقسام»، ثم اعتماده</span></summary>' +
+      '<div class="px-md">' + mdRender(kn.md) + "</div></details>";
   } else if (!kn && !pxKnowFailed[name] && kst !== "none") {
     b += moSkeleton(2, ["w80", "w60"]);
   }
   var emb = pxEmbedded(name);
   if (p.embedded && emb) {
-    b += '<details class="px-acc"><summary>' + pxIco("chevD") + 'المعرفة المدمجة <span class="src">معتمدة بمراجعة الشيفرة — للقراءة فقط</span></summary><div class="px-list">' +
+    b += '<details class="m-evidence"><summary>المعرفة المدمجة' +
+      '<span class="m-meta">معتمدة بمراجعة الشيفرة — للقراءة فقط</span></summary>' +
       [["العرض", emb.pitch], ["الكفاءة", (emb.eff || []).join(" · ")], ["ملائم لـ", (emb.best || []).join("، ")], ["التسعير المعتمد", emb.pricing]].map(function (x) {
-        return '<div class="px-li" style="cursor:default;grid-template-columns:120px minmax(0,1fr);"><span class="s">' + esc(x[0]) + '</span><span class="a" style="white-space:normal">' + esc(x[1]) + "</span></div>";
-      }).join("") + "</div></details>";
+        return '<div class="m-evidence__row"><p class="m-meta">' + esc(x[0]) + "</p><p>" + esc(x[1]) + "</p></div>";
+      }).join("") + "</details>";
   }
   return pxSection("knowledge", "معرفة المنتج", "ما يقرؤه المساعد قبل أن يردّ على عميل", b);
 }
@@ -957,30 +1148,41 @@ function pxSide(p, rd) {
   void rd;
   var h = "";
   var open = pxOpenLines(name), openVal = open.reduce(function (n, o) { return n + (opPriced(o) ? opValue(o) : 0); }, 0);
+  /* A related-population row is a CONTROL, not a link: it resets the destination's filters and
+     sets the exact product, so the page it opens counts what this row counted. */
   var link = function (act, label, count, extra) {
-    return '<button class="px-lk" data-px="' + act + '" data-nm="' + esc(name) + '"><span class="l">' + label + '</span><span class="v"><b>' + fmtN(count) + "</b>" + (extra || "") + pxIco("chevS") + "</span></button>";
+    return '<button type="button" class="m-item" data-px="' + act + '" data-nm="' + esc(name) + '">' +
+      '<span class="m-item__b"><span class="m-item__n">' + label + "</span>" +
+      (extra ? '<span class="m-item__s">' + extra + "</span>" : "") + "</span>" +
+      '<span class="m-item__v">' + mN(count) + "</span></button>";
   };
-  h += '<section class="px-sec" aria-labelledby="pxrel_h"><div class="px-sech"><h2 id="pxrel_h">المرتبط بهذا المنتج</h2></div><div class="px-secb" style="gap:0">' +
-    link("goopen", "الفرص المفتوحة", open.length, openVal ? " · " + pxMoney(openVal) : "") +
-    link("gocamps", "الحملات", pxCampaigns(name).length) +
-    link("gointerest", 'اهتمام رصده المساعد <span class="px-read">قراءة المساعد</span>', pxInterest(name)) +
-    link("gotargets", "الجهات المستهدفة بالوسم", pxTargeted(name)) + "</div></section>";
+  h += '<section class="m-card m-card--pad0" aria-labelledby="pxrel_h">' +
+    '<div class="m-tools"><h2 class="m-card__k" id="pxrel_h">المرتبط بهذا المنتج</h2></div>' +
+    '<div class="px-secb px-um">' +
+    link("goopen", "الفرص المفتوحة", open.length, openVal ? pxMoney(openVal) : "") +
+    link("gocamps", "الحملات", pxCampaigns(name).length, "") +
+    link("gointerest", "اهتمام رصده المساعد", pxInterest(name), "قراءة المساعد") +
+    link("gotargets", "الجهات المستهدفة بالوسم", pxTargeted(name), "") + "</div></section>";
   return h;
 }
 function pxRenameModal() {
   if (!pxModal) return "";
   var m = pxModal;
   var im = m.impact;
-  var h = '<div class="ox-scrim in" data-px="modalclose"></div><div class="px-modal" role="dialog" aria-modal="true" aria-labelledby="pxmt"><div class="box">';
-  h += '<h2 id="pxmt" tabindex="-1">إعادة تسمية «' + esc(m.product) + "»</h2>";
-  h += '<div class="px-fl"><label for="pxm_to">الاسم الجديد</label><input class="inp" id="pxm_to" maxlength="60" value="' + esc(m.to) + '" data-pxmodal="to"' + (m.err ? ' aria-invalid="true" aria-describedby="pxm_err"' : "") + "></div>";
-  h += '<div class="px-note">' + (!im ? "جارٍ حساب ما سيتغيّر…" : "سيُغيَّر الاسم في: " + [
-    im.openLines ? pxNLine(im.openLines) + " مفتوحة" : "", im.campaigns ? pxNCamp(im.campaigns) : "", im.kb ? "ملف المعرفة" : "", im.asset ? "الملف التعريفي" : "",
-    im.packages ? pxNPkg(im.packages) : "", im.targetedEntities ? pxNEnt(im.targetedEntities) + " مستهدفة" : "", im.interestReadings ? pxNRead(im.interestReadings) + " للمساعد" : ""
-  ].filter(Boolean).join(" · ") + ".") + "</div>";
-  if (m.err) h += '<span class="px-err" id="pxm_err" role="alert">' + pxIco("warn") + esc(m.err) + "</span>";
-  h += '<div class="acts"><button class="btn btn-teal" data-px="renamesave"' + (m.busy || !im ? " disabled" : "") + ">" + (m.busy ? "جارٍ الحفظ…" : "حفظ الاسم") + '</button><button class="btn btn-ghost" data-px="modalclose">إلغاء</button></div>';
-  return h + "</div></div>";
+  var h = '<div class="ds6"><div class="px-scrim in" data-px="modalclose"></div>' +
+    '<div class="px-modal" role="dialog" aria-modal="true" aria-labelledby="pxmt"><div class="box m-dlg__p">';
+  h += '<div class="m-dlg__h"><h2 class="m-dlg__t" id="pxmt" tabindex="-1">إعادة تسمية «' + esc(m.product) + "»</h2></div>";
+  h += '<div class="m-dlg__b"><div class="m-field"><label class="m-label" for="pxm_to">الاسم الجديد</label>' +
+    '<input class="m-input" id="pxm_to" maxlength="60" value="' + esc(m.to) + '" data-pxmodal="to"' + (m.err ? ' aria-invalid="true" aria-describedby="pxm_err"' : "") + "></div>";
+  h += '<p class="m-meta">' + (!im ? "جارٍ حساب ما سيتغيّر…" : "سيُغيَّر الاسم في: " + [
+    im.openLines ? pxNLineN(im.openLines) + " مفتوحة" : "", im.campaigns ? pxNCampN(im.campaigns) : "", im.kb ? "ملف المعرفة" : "", im.asset ? "الملف التعريفي" : "",
+    im.packages ? pxNPkgN(im.packages) : "", im.targetedEntities ? pxNEntN(im.targetedEntities) + " مستهدفة" : "", im.interestReadings ? pxNReadN(im.interestReadings) + " للمساعد" : ""
+  ].filter(Boolean).join(" · ") + ".") + "</p>";
+  if (m.err) h += '<span class="m-err" id="pxm_err" role="alert">' + esc(m.err) + "</span>";
+  h += "</div>";
+  h += '<div class="m-dlg__f"><button type="button" class="m-btn m-btn--primary" data-px="renamesave"' + (m.busy || !im ? " disabled" : "") + ">" + (m.busy ? "جارٍ الحفظ…" : "حفظ الاسم") + "</button>" +
+    '<button type="button" class="m-btn" data-px="modalclose">إلغاء</button></div>';
+  return h + "</div></div></div>";
 }
 
 /* Every live product, current one held. Archived ones are left out: this rail is for moving between
@@ -990,7 +1192,7 @@ function pxSwitcher(p) {
   if (live.length < 2) return "";
   return '<div class="px-sw" role="group" aria-label="التنقل بين المنتجات">' + live.map(function (x) {
     var on = x.product === p.product;
-    return '<a class="px-swb" href="#product/' + pxEnc(x.product) + '"' + (on ? ' aria-current="page"' : "") + ">" + esc(x.product) + "</a>";
+    return '<a class="m-btn" href="#product/' + pxEnc(x.product) + '"' + (on ? ' aria-current="page"' : "") + ">" + esc(x.product) + "</a>";
   }).join("") + "</div>";
 }
 
@@ -1009,22 +1211,30 @@ function pxHero(p, rd) {
   var openValue = typeof opSumLive === "function" ? opSumLive(open) : 0;
   var ks = p.knowledgeScore || null;
   var score = ks && typeof ks.score === "number" ? ks.score : null;
-  var money = function (v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; };
+  /* annualTarget is number|null. null means NO TARGET RECORDED, which is not a target of zero, so
+     the tile prints what is owed rather than «0 ر.س» — and the attainment tile beside it prints no
+     percentage at all, because there is no denominator for it to be a percentage OF. */
+  var hasTarget = !!q && q.annualTarget !== null && q.annualTarget !== undefined;
   var tile = function (cls, label, value, sub, meter) {
-    return '<div class="px-hi ' + cls + '"><span class="l">' + label + "</span>" + value +
-      (sub ? '<span class="s">' + sub + "</span>" : "") + (meter || "") + "</div>";
+    return '<div class="m-card' + (cls ? " " + cls : "") + '"><p class="m-stat__k">' + label + "</p>" +
+      '<p class="m-stat__v">' + value + "</p>" +
+      (sub ? '<p class="m-stat__s">' + sub + "</p>" : "") + (meter || "") + "</div>";
   };
-  var meter = function (v) { return '<span class="meter"><i style="width:' + Math.max(0, Math.min(100, v)) + '%"></i></span>'; };
-  return '<div class="px-hero">' +
-    tile("", "المستهدف السنوي", target ? '<span class="n">' + money(target) + "</span>" : '<span class="n none">لم يُحدَّد</span>',
-      target ? esc(String((typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year) || "")) : "يُحدَّد من «المستهدفات»", "") +
-    tile("", "المحقق", '<span class="n">' + money(achieved) + "</span>", "من الصفقات الرابحة", "") +
-    tile("lead" + (pct === null ? "" : pct >= 100 ? " ok" : pct >= 70 ? "" : " warn"), "نسبة الإنجاز",
-      pct === null ? '<span class="n none">—</span>' : '<span class="n">' + fmtN(pct) + "٪</span>",
-      pct === null ? "بلا مستهدف" : "من المستهدف", pct === null ? "" : meter(pct)) +
-    tile("", "الفرص المفتوحة", '<span class="n">' + fmtN(open.length) + "</span>", open.length ? money(openValue) : "لا بنود مفتوحة", "") +
-    tile(score === null ? "" : score >= KB_READY_MIN ? " ok" : " warn", "جاهزية المساعد",
-      score === null ? '<span class="n none">—</span>' : '<span class="n">' + fmtN(score) + "٪</span>",
+  var meter = function (v) {
+    return '<span class="m-meter" style="--m-pct:' + Math.max(0, Math.min(100, v)) + '%"><i></i></span>';
+  };
+  return '<div class="m-kpis px-kpis">' +
+    tile("", "المستهدف السنوي", hasTarget ? pxMoney(target) : mNil("بلا مستهدف مسجّل", "owed"),
+      hasTarget ? pxYear((typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year) || new Date().getFullYear())
+        : "يُحدَّد من «المستهدفات»", "") +
+    tile("", "المحقق", pxMoney(achieved), "من الصفقات الرابحة", "") +
+    tile(pct === null ? "" : pct >= 100 ? "m-stat--ac" : "", "نسبة الإنجاز",
+      pct === null ? mNil("بلا مستهدف", "owed") : mPct(pct),
+      pct === null ? "لا نسبة بلا مستهدف" : "من المستهدف", pct === null ? "" : meter(pct)) +
+    tile("", "الفرص المفتوحة", mN(open.length),
+      open.length ? pxMoney(openValue) : mNil("لا بنود مفتوحة", "none"), "") +
+    tile("", "جاهزية المساعد",
+      score === null ? mNil("لم تُقَس", "unset") : mPct(score),
       esc(rd && rd.word ? rd.word : ""), score === null ? "" : meter(score)) +
     "</div>";
 }
@@ -1043,8 +1253,8 @@ function pxTabsFor(p) {
   return [
     { k: "overview", l: "نظرة عامة", n: "", warn: false },
     /* The founder's note: «معرفة المنتج» belongs inside the record, not only in the door beside it. */
-    { k: "knowledge", l: "معرفة المنتج", n: score === null ? "" : fmtN(score) + "٪", warn: !!(ks && !ks.ready) },
-    { k: "pricing", l: "الأسعار والباقات", n: pkgs ? fmtN(pkgs) : "", warn: !pkgs && !(p.pricingNote || "") },
+    { k: "knowledge", l: "معرفة المنتج", n: score === null ? "" : mPct(score), warn: !!(ks && !ks.ready) },
+    { k: "pricing", l: "الأسعار والباقات", n: pkgs ? mN(pkgs) : "", warn: !pkgs && !(p.pricingNote || "") },
     { k: "targets", l: "المستهدفات", n: "", warn: blank > 0 },
     { k: "settings", l: "البيانات والإدارة", n: "", warn: false }
   ];
@@ -1063,42 +1273,19 @@ function pxSetTab(product, key, focusId) {
   render(false);
   if (focusId) { var el = document.getElementById(focusId); if (el) el.focus(); }
 }
+/* The rail is .m-tabs / .m-tab with aria-selected, and the vocabulary draws the selected tab with
+   its own border. The hand-rolled gliding indicator that used to live here is GONE with it: one
+   implementation beats two that slide differently, and a strip that has to be measured after paint
+   is a strip that renders wrong on the frame before the measurement. dashboard.ts still calls
+   pxPlaceTabs behind a typeof guard, so its removal is a no-op there. */
 function pxTabStrip(p) {
   var on = pxCurTab(p);
-  return '<div class="px-tabs" role="tablist" aria-label="أقسام المنتج">' + pxTabsFor(p).map(function (t) {
-    return '<button type="button" class="px-tab" role="tab" data-pxtab="' + t.k + '" id="pxtab_' + t.k + '"' +
+  return '<div class="m-tabs px-tabs" role="tablist" aria-label="أقسام المنتج">' + pxTabsFor(p).map(function (t) {
+    return '<button type="button" class="m-tab" role="tab" data-pxtab="' + t.k + '" id="pxtab_' + t.k + '"' +
       ' aria-selected="' + (t.k === on) + '" aria-controls="pxpane_' + t.k + '" tabindex="' + (t.k === on ? "0" : "-1") + '" data-px="tab" data-t="' + t.k + '">' + t.l +
-      (t.n ? '<span class="n">' + t.n + "</span>" : "") +
-      (t.warn ? '<span class="dot" aria-hidden="true"></span><span class="px-sr">يحتاج إكمالًا</span>' : "") + "</button>";
-  }).join("") + '<i class="ind" aria-hidden="true"></i></div>';
-}
-/* The indicator element is rebuilt with every repaint, so a plain measure would make it JUMP. It is
-   placed on the PREVIOUS tab first without a transition, then moved on the next frame — the glide
-   the drawer has, across a full re-render. */
-function pxPlaceTabs() {
-  var strip = document.querySelector(".px-tabs");
-  if (!strip) { pxTabPrev = ""; return; }
-  var ind = strip.querySelector(".ind"), on = strip.querySelector('[aria-selected="true"]');
-  if (!ind || !on) return;
-  var put = function (el, anim) {
-    var sb = strip.getBoundingClientRect(), ob = el.getBoundingClientRect();
-    var rtl = getComputedStyle(strip).direction === "rtl";
-    /* Logical offset: in RTL the strip's inline start is its RIGHT edge. */
-    var off = rtl ? sb.right - ob.right : ob.left - sb.left;
-    if (!anim) ind.classList.add("noanim");
-    ind.style.width = ob.width + "px";
-    ind.style.transform = "translateX(" + (rtl ? -off : off) + "px)";
-  };
-  var prev = pxTabPrev ? strip.querySelector('[data-pxtab="' + pxTabPrev + '"]') : null;
-  if (prev && prev !== on) {
-    put(prev, false);
-    requestAnimationFrame(function () {
-      void ind.offsetWidth;                /* commit the start position before the transition is armed */
-      ind.classList.remove("noanim");
-      put(on, true);
-    });
-  } else put(on, false);
-  pxTabPrev = on.getAttribute("data-pxtab");
+      (t.n ? '<span class="m-chip m-chip--plain">' + t.n + "</span>" : "") +
+      (t.warn ? '<span class="px-tab-dot" aria-hidden="true"></span><span class="px-sr">يحتاج إكمالًا</span>' : "") + "</button>";
+  }).join("") + "</div>";
 }
 
 /* «البيانات والإدارة»: the three editors the header used to wear, plus rename and archive.
@@ -1107,28 +1294,27 @@ function pxPlaceTabs() {
 function pxMetaSection(p) {
   var name = p.product, may = pxMayEditKb() && !p.archived;
   var dis = may ? "" : " disabled";
-  var b = '<div class="px-form">';
-  b += '<div class="px-fl"><label for="pxf_sector">القطاع</label>' +
-    '<select id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + dis + '><option value="">بلا قطاع</option>' +
+  var b = '<div class="m-form">';
+  b += '<div class="m-field"><label class="m-label" for="pxf_sector">القطاع</label>' +
+    '<select class="m-select" id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + dis + '><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
-    '<span class="row">' + (p.sectorAssumed ? '<span class="px-read" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
+    '<span class="px-acts">' + (p.sectorAssumed ? '<span class="m-chip m-chip--warn" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
   if (typeof cfDivs !== "undefined" && cfDivs.length) {
-    b += '<div class="px-fl"><label for="pxf_division">القسم</label>' +
-      '<select id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا قسم</option>' +
+    b += '<div class="m-field"><label class="m-label" for="pxf_division">القسم</label>' +
+      '<select class="m-select" id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا قسم</option>' +
       cfDivs.map(function (d) { return '<option value="' + d.id + '"' + (String(p.divisionId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; }).join("") +
-      '</select><span class="row">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span></div>";
+      '</select><span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span></div>";
   }
   var ov = pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "");
-  b += '<div class="px-fl"><label for="pxf_owner">مدير المنتج</label>' +
-    '<input id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(ov) + '" data-pxfield="owner"' + dis + ">" +
+  b += '<div class="m-field"><label class="m-label" for="pxf_owner">مدير المنتج</label>' +
+    '<input class="m-input" id="pxf_owner" aria-describedby="pxf_owner_st" maxlength="60" list="pxowners" placeholder="بلا مسؤول" value="' + esc(ov) + '" data-pxfield="owner"' + dis + ">" +
     '<datalist id="pxowners">' + (pcCat || []).map(function (x) { return x.owner; }).filter(function (o, i, a) { return o && a.indexOf(o) === i; }).map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>" +
-    '<span class="row">' + pxStatusSlot(name + "|owner", "pxf_owner") + "</span></div>";
+    '<span class="px-acts">' + pxStatusSlot(name + "|owner", "pxf_owner") + "</span></div>";
   b += "</div>";
-  b += '<div class="px-note">' + (p.createdAt ? "أُنشئ " + fmtD(p.createdAt) + " · " : "") +
-    (may ? "يُحفظ كل حقل فور تغييره." : "العرض فقط — تعديل بيانات المنتج يتطلب صلاحية إدارة معرفة المنتج.") + "</div>";
+  b += '<p class="m-meta">' + (p.createdAt ? "أُنشئ " + fmtD(p.createdAt) + " · " : "") +
+    (may ? "يُحفظ كل حقل فور تغييره." : "العرض فقط — تعديل بيانات المنتج يتطلب صلاحية إدارة معرفة المنتج.") + "</p>";
   if (pxMayEditKb() && !p.embedded && !p.archived) {
-    b += '<div style="display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;">' +
-      '<button class="btn btn-ghost" data-px="rename">إعادة تسمية المنتج</button></div>';
+    b += '<div class="px-acts"><button type="button" class="m-btn" data-px="rename">إعادة تسمية المنتج</button></div>';
   }
   return pxSection("settings", "بيانات المنتج", "", b);
 }
@@ -1137,16 +1323,24 @@ function vProductDrill(name, section) {
   pcLoad(false); pcPerfLoad(pcPerfYear, false);
   if (typeof cfLoad === "function") cfLoad(false);
   if (typeof opLoad === "function") opLoad(false);
-  var back = '<a class="px-back" href="#products">' + pxIco("back") + "كل المنتجات</a>";
+  pxBind();
+  var back = '<p class="m-crumb"><a href="#products">&#8592; كل المنتجات</a></p>';
   if (pcCat === null) {
-    return '<div class="px">' + back + (pcFailed ? '<div class="ox-state" role="alert">تعذّر تحميل المنتج.<button class="btn btn-ghost" data-px="retry">أعد المحاولة</button></div>' : moSkeleton(6, ["w60", "w80", "w40"])) + "</div>";
+    return '<div class="ds6">' + back + (pcFailed
+      ? '<div class="m-card m-empty" role="alert"><p class="m-empty__t">تعذّر تحميل المنتج.</p>' +
+        '<p class="m-empty__a"><button type="button" class="m-btn" data-px="retry">أعد المحاولة</button></p></div>'
+      : moSkeleton(6, ["w60", "w80", "w40"])) + "</div>";
   }
   var p = pxRow(name);
   if (!p) {
     var words = String(name || "").split(/\s+/).filter(function (w) { return w.length > 2; });
     var close = (pcCat || []).filter(function (x) { return words.some(function (w) { return x.product.indexOf(w) >= 0; }); });
-    return '<div class="px">' + back + '<div class="ox-state">لا منتج بهذا الاسم.<span class="s"><bdi>' + esc(name) + "</bdi></span>" +
-      (close.length ? '<div class="px-list" style="width:100%;max-width:420px;">' + close.map(function (x) { return '<a class="px-li" href="#product/' + pxEnc(x.product) + '"><span class="a">' + esc(x.product) + "</span></a>"; }).join("") + "</div>" : "") + "</div></div>";
+    return '<div class="ds6">' + back + '<div class="m-card m-empty"><p class="m-empty__t">لا منتج بهذا الاسم.</p>' +
+      '<p class="m-empty__d"><bdi>' + esc(name) + "</bdi></p>" +
+      (close.length ? close.map(function (x) {
+        return '<a class="m-item" href="#product/' + pxEnc(x.product) + '"><span class="m-item__b">' +
+          '<span class="m-item__n">' + esc(x.product) + "</span></span></a>";
+      }).join("") : "") + "</div></div>";
   }
   pxKnowLoad(name, false);
   var rd = pxReadiness(p);
@@ -1155,8 +1349,9 @@ function vProductDrill(name, section) {
   void section;   /* the route's section picks the TAB now (pxCurTab), it no longer scrolls the page */
   var tab = pxCurTab(p);
   var chip = function (label, value, focusId) {
-    var has = !!value, body = '<span>' + label + "</span><b>" + (has ? esc(value) : "بلا تحديد") + "</b>";
-    var cls = "px-chip" + (has ? "" : " none");
+    var has = !!value;
+    var body = label + ": " + (has ? esc(value) : "بلا تحديد");
+    var cls = "m-chip" + (has ? " m-chip--plain" : " m-chip--warn");
     return pxMayEditKb() && !p.archived
       ? '<button type="button" class="' + cls + '" data-px="tab" data-t="settings" data-f="' + focusId + '" title="' + esc(label + " — يُحرَّر في «البيانات والإدارة»") + '">' + body + "</button>"
       : '<span class="' + cls + '">' + body + "</span>";
@@ -1164,24 +1359,25 @@ function vProductDrill(name, section) {
   var sectorName = (pcSectorList || []).filter(function (s) { return String(s.id) === String(p.sectorId); }).map(function (s) { return s.name; })[0] || "";
   var divName = (typeof cfDivs !== "undefined" ? cfDivs : []).filter(function (d) { return String(d.id) === String(p.divisionId); }).map(function (d) { return d.name; })[0] || "";
 
-  var h = '<div class="px">' + back;
-  h += '<header class="px-rh"><div class="tt"><h1>' + esc(p.product) + (p.archived ? '<span class="px-arch">مؤرشف</span>' : "") + "</h1>" +
-    '<div class="meta">' + chip("القطاع", sectorName + (sectorName && p.sectorAssumed ? " (مُستنتَج)" : ""), "pxf_sector") +
+  var h = '<div class="ds6">' + back;
+  h += '<header class="px-rh"><div class="px-rh__t"><h1 class="m-h1">' + esc(p.product) + "</h1>" +
+    '<div class="px-acts px-meta">' + (p.archived ? '<span class="m-chip">مؤرشف</span>' : "") +
+    chip("القطاع", sectorName + (sectorName && p.sectorAssumed ? " (مُستنتَج)" : ""), "pxf_sector") +
     (typeof cfDivs !== "undefined" && cfDivs.length ? chip("القسم", divName, "pxf_division") : "") +
     chip("مدير المنتج", p.owner || "", "pxf_owner") +
-    (p.embedded ? '<span class="px-chip"><span>كتالوج المساعد</span><b>مضمَّن</b></span>' : "") + "</div></div>";
-  h += '<div class="end">';
+    (p.embedded ? '<span class="m-chip m-chip--ac">كتالوج المساعد: مضمَّن</span>' : "") + "</div></div>";
+  h += '<div class="px-acts px-acts--end px-rel">';
   if (p.archived) {
-    h += '<button class="btn btn-teal" data-px="restore">استعادة المنتج</button>';
+    h += '<button type="button" class="m-btn m-btn--primary" data-px="restore">استعادة المنتج</button>';
   } else {
-    h += (!rd.eligible ? '<span class="px-why" id="pxwhy">' + esc(rd.reason || rd.word) + "</span>" : "") +
-      '<button class="btn ' + (approvePrimary ? "btn-ghost" : "btn-teal") + '" data-px="launch" data-nm="' + esc(p.product) + '"' + (rd.eligible ? "" : ' disabled aria-disabled="true" aria-describedby="pxwhy"') + ">أطلق حملة بهذا المنتج</button>";
+    h += (!rd.eligible ? '<span class="m-meta" id="pxwhy">' + esc(rd.reason || rd.word) + "</span>" : "") +
+      '<button type="button" class="m-btn' + (approvePrimary ? "" : " m-btn--primary") + '" data-px="launch" data-nm="' + esc(p.product) + '"' + (rd.eligible ? "" : ' disabled aria-disabled="true" aria-describedby="pxwhy"') + ">أطلق حملة بهذا المنتج</button>";
   }
-  h += '<button class="btn btn-ghost" id="pxmenu" data-px="menu" aria-haspopup="menu" aria-expanded="' + pxMenuOpen + '" aria-label="إجراءات أخرى">⋯</button>';
+  h += '<button type="button" class="m-btn m-btn--icon" id="pxmenu" data-px="menu" aria-haspopup="menu" aria-expanded="' + pxMenuOpen + '" aria-label="إجراءات أخرى">⋯</button>';
   if (pxMenuOpen) {
     h += '<div class="px-menu" role="menu">' + (p.embedded
-      ? '<button role="menuitem" aria-disabled="true">إعادة تسمية</button><button role="menuitem" aria-disabled="true">أرشفة المنتج</button><div class="why">مضمَّن في كتالوج المساعد — إعادة التسمية والأرشفة تتطلبان تحديث الكتالوج.</div>'
-      : '<button role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
+      ? '<button type="button" role="menuitem" aria-disabled="true">إعادة تسمية</button><button type="button" role="menuitem" aria-disabled="true">أرشفة المنتج</button><p class="m-meta">مضمَّن في كتالوج المساعد — إعادة التسمية والأرشفة تتطلبان تحديث الكتالوج.</p>'
+      : '<button type="button" role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button type="button" role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button type="button" role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
   }
   h += "</div></header>";
   h += pxSwitcher(p) + pxHero(p, rd) + pxTabStrip(p);
@@ -1196,13 +1392,17 @@ function vProductDrill(name, section) {
   else {
     pane = pxMetaSection(p);
     if (pxMayEditKb() && !p.embedded && !p.archived) {
-      pane += '<section class="px-sec" id="pxsec_archive"><div class="px-sech"><h2>أرشفة المنتج</h2></div><div class="px-secb"><div class="px-note" id="pxarch_note">' +
-        (pxModal && pxModal.kind === "archiveImpact" ? "" : "الأرشفة تُخفي المنتج من القوائم ومعالج الحملات وتوقف استخدام المساعد لمعرفته وملفه، ويبقى تاريخه كما هو. يمكن استعادته.") + "</div>" +
-        '<div><button class="rv-hold" data-do="pxArchive" data-arg="' + esc(p.product) + '" data-idle="أرشفة المنتج" data-holding="استمر بالضغط للأرشفة…" data-armed="اضغط مرة أخرى للأرشفة" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">أرشفة المنتج</span></button></div></div></section>';
+      pane += '<section class="m-card" id="pxsec_archive"><div class="m-card__h"><div>' +
+        '<h2 class="m-card__t">أرشفة المنتج</h2>' +
+        '<p class="m-meta" id="pxarch_note">' +
+        (pxModal && pxModal.kind === "archiveImpact" ? "" : "الأرشفة تُخفي المنتج من القوائم ومعالج الحملات وتوقف استخدام المساعد لمعرفته وملفه، ويبقى تاريخه كما هو. يمكن استعادته.") + "</p></div></div>" +
+        '<div class="px-acts"><button class="rv-hold" data-do="pxArchive" data-arg="' + esc(p.product) + '" data-idle="أرشفة المنتج" data-holding="استمر بالضغط للأرشفة…" data-armed="اضغط مرة أخرى للأرشفة" aria-pressed="false" title="اضغط مع الاستمرار"><span class="rv-fill"></span><span class="rv-lbl">أرشفة المنتج</span></button></div></section>';
     }
   }
+  /* A DIV with role, not a bare <aside>: dashboard.ts styles the bare tag as the navigation rail,
+     and a ported column rendered dark-on-dark the first time home shipped that way. */
   h += '<div class="px-rec"><div class="px-main px-pane" id="pxpane_' + tab + '" role="tabpanel" tabindex="0" aria-labelledby="pxtab_' + tab + '">' + pane + "</div>" +
-    '<aside class="px-side" aria-label="المرتبط بهذا المنتج">' + pxSide(p, rd) + "</aside></div>";
+    '<div class="px-side" role="complementary" aria-label="المرتبط بهذا المنتج">' + pxSide(p, rd) + "</div></div>";
   h += "</div>";
   return h + pxRenameModal() + (typeof kbEditor === "function" ? kbEditor() : "");
 }
@@ -1538,10 +1738,10 @@ export const PRODUCTS_DRILL_JS = `
    pcQuarters and oppRows. No new endpoint: a drill-down that refetches what is already in memory
    adds a spinner and a failure mode for nothing. */
 
+/* The sector drill is INSIDE .ds6 (vSectorDrill wraps it), so its back link is the vocabulary own
+   breadcrumb rather than an inline-styled anchor carrying the old tokens. */
 function pcBack() {
-  return '<a href="#products" class="mo-more" style="display:inline-flex;align-items:center;gap:6px;' +
-    'font-size:var(--t-xs);font-weight:600;color:var(--muted);text-decoration:none;margin-block-end:14px;">' +
-    '<span class="mo-arrow">\u2192</span> كل المنتجات</a>';
+  return '<p class="m-crumb"><a href="#products">&#8592; كل المنتجات</a></p>';
 }
 
 function pcOppsFor(pred) {
@@ -1851,44 +2051,50 @@ function pcQuarterChart(qs) {
 function vSectorDrill(name) {
   pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);
-  if (!pcSectors) return pcBack() + moSkeleton(6, ["w60", "w80", "w40"]);
+  if (!pcSectors) return '<div class="ds6">' + pcBack() + moSkeleton(6, ["w60", "w80", "w40"]) + "</div>";
   var sec = pcSectors.sectors.filter(function (x) { return x.sector === name; })[0];
-  if (!sec) return pcBack() + '<div class="crm-empty"><b>قطاع غير موجود</b></div>';
+  if (!sec) {
+    return '<div class="ds6">' + pcBack() +
+      '<div class="m-card m-empty"><p class="m-empty__t">قطاع غير موجود</p>' +
+      '<p class="m-empty__d"><bdi>' + esc(name) + "</bdi></p></div></div>";
+  }
 
-  var h = pcBack();
+  var h = '<div class="ds6">' + pcBack();
+  h += '<h1 class="m-h1">' + esc(sec.sector) + "</h1>";
   var cov = sec.coveragePct;
-  h += '<div class="sh-tiles">' +
-    '<div class="sh-tile lead"><div><div class="k">المحقق</div>' +
+  h += '<div class="m-kpis">' +
+    '<div class="m-card"><p class="m-stat__k">المحقق</p>' +
+      '<p class="m-stat__v">' + mMoney(sec.achieved) + "</p>" +
       /* «من 0 ر.س» asserts a target of zero. An absent target is not a zero one, and the
-         التغطية tile eight lines down already says «بلا مستهدف» — the row contradicted itself. */
-      '<div class="s">' + (Number(sec.target) > 0 ? "من " + pcMoney(sec.target) : "بلا مستهدف") + '</div></div>' +
-      '<div class="v">' + fmtN(Math.round(sec.achieved)) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">المتوقع من المفتوح</div>' +
-      '<div class="s">' + fmtN(sec.openCount) + ' فرصة مفتوحة</div></div>' +
-      '<div class="v">' + fmtN(Math.round(sec.weightedOpen)) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">مربوحة</div><div class="s">في الفترة</div></div>' +
-      '<div class="v">' + fmtN(sec.wonCount) + '</div></div>' +
-    '<div class="sh-tile"><div><div class="k">التغطية</div>' +
-      '<div class="s">' + (cov === null ? "بلا مستهدف" : "محقق + متوقع") + '</div></div>' +
-      '<div class="v">' + (cov === null ? "—" : fmtN(cov) + "٪") + '</div></div>' +
-  '</div>';
+         التغطية tile below already says «بلا مستهدف» — the row contradicted itself. */
+      '<p class="m-stat__s">' + (Number(sec.target) > 0 ? "من " + mMoney(sec.target) : mNil("بلا مستهدف", "owed")) + "</p></div>" +
+    '<div class="m-card"><p class="m-stat__k">المتوقع من المفتوح</p>' +
+      '<p class="m-stat__v">' + mMoney(sec.weightedOpen) + "</p>" +
+      '<p class="m-stat__s">' + mPl(sec.openCount, "فرصة واحدة مفتوحة", "فرصتان مفتوحتان", "فرص مفتوحة", "فرصة مفتوحة") + "</p></div>" +
+    '<div class="m-card"><p class="m-stat__k">مربوحة</p>' +
+      '<p class="m-stat__v">' + mN(sec.wonCount) + "</p>" +
+      '<p class="m-stat__s">في الفترة</p></div>' +
+    '<div class="m-card"><p class="m-stat__k">التغطية</p>' +
+      '<p class="m-stat__v">' + (cov === null ? mNil("بلا مستهدف", "owed") : mPct(cov)) + "</p>" +
+      '<p class="m-stat__s">' + (cov === null ? "لا نسبة بلا مستهدف" : "محقق + متوقع") + "</p></div>" +
+  "</div>";
 
-  h += '<div class="sh-sec"><div class="sh-h">منتجات القطاع حسب الإنجاز</div>' +
-    '<div class="sh-hs">اضغط منتجًا لفتح لوحته.</div><div class="sh-cards">';
+  h += '<section class="m-card m-card--pad0"><div class="m-tools"><div>' +
+    '<h2 class="m-card__t">منتجات القطاع حسب الإنجاز</h2>' +
+    '<p class="m-meta">اضغط منتجًا لفتح لوحته.</p></div></div><div class="px-secb px-um">';
   (sec.products || []).forEach(function (nm) {
     var pq = (pcQuarters && pcQuarters.byProduct ? pcQuarters.byProduct : []).filter(function (x) { return x.product === nm; })[0];
     var c = pq ? pq.coveragePct : null;
-    var cls = c === null ? "crm-none" : (c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad"));
-    h += '<div class="sh-card go" data-go="product" data-nm="' + esc(nm) + '">' +
-      '<div><div class="nm">' + esc(nm) + '</div>' +
-      '<div class="sub">' + (pq
-        ? (pcMoney(pq.achieved) + (pq.annualTarget === null || pq.annualTarget === undefined
-            ? " · بلا مستهدف سنوي" : " من " + pcMoney(pq.annualTarget)))
-        : '<span class="crm-none">لم يُقرأ الأداء</span>') + '</div></div>' +
-      '<div class="end"><span class="crm-st ' + cls + '"><i></i>' +
-        (c === null ? "بلا مستهدف" : fmtN(c) + "٪") + '</span></div></div>';
+    h += '<a class="m-item" href="#product/' + encodeURIComponent(nm) + '"><span class="m-item__b">' +
+      '<span class="m-item__n">' + esc(nm) + "</span>" +
+      '<span class="m-item__s">' + (pq
+        /* annualTarget null is NO TARGET RECORDED, never a target of zero, so no «من 0 ر.س». */
+        ? (mMoney(pq.achieved) + (pq.annualTarget === null || pq.annualTarget === undefined
+            ? " · " + mNil("بلا مستهدف سنوي", "owed") : " من " + mMoney(pq.annualTarget)))
+        : mNil("لم يُقرأ الأداء", "unset")) + "</span></span>" +
+      '<span class="m-item__v">' + (c === null ? mNil("بلا مستهدف", "owed") : mPct(c)) + "</span></a>";
   });
-  h += '</div></div>';
+  h += "</div></section></div>";
   return h;
 }
 `;

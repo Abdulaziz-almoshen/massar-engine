@@ -116,14 +116,15 @@ function kbScoreBlock(p, kn) {
   h += '<div class="kb-secs">' + s.sections.map(function (x) { return kbSecChip(x, may); }).join("") + "</div>";
   if (s.missing.length) {
     var gaps = s.missing.slice(0, 3).map(function (m) { return "<b>" + esc(m.label) + "</b> " + (m.state === "short" ? "قصير (يُحتسب نصف وزنه)" : "غير مكتوب") + " · إكماله يرفع الدرجة " + kbPoints(m.state === "short" ? m.weight / 2 : m.weight); });
-    h += '<div class="kb-gaps m-meta">' + gaps.map(function (g) { return "<span>" + g + "</span>"; }).join("") + (s.missing.length > 3 ? "<span>و" + pluralizeArabic(s.missing.length - 3, "قسم آخر", "قسمان آخران", "أقسام أخرى", "قسمًا آخر", fmtN) + " — انظر الأقسام أعلاه.</span>" : "") + "</div>";
+    h += '<div class="kb-gaps m-meta">' + gaps.map(function (g) { return "<span>" + g + "</span>"; }).join("") + (s.missing.length > 3 ? "<span>و" + mPl(s.missing.length - 3, "قسم آخر", "قسمان آخران", "أقسام أخرى", "قسمًا آخر") + " — انظر الأقسام أعلاه.</span>" : "") + "</div>";
   }
   if (s.truncated) h += '<p class="m-status m-status--warn" role="note">عدد أحرف النص <span class="m-n">' + fmtN(s.chars) + '</span>، والمساعد يقرأ أول <span class="m-n">' + fmtN(KB_PROMPT_CHARS) + "</span> منها فقط — اختصره حتى لا يُقطع آخره.</p>";
   if (!s.ready && kn.state !== "legacy") h += '<p class="m-status m-status--warn" role="note">الدرجة أقل من حد الجاهزية (<span class="m-n">' + fmtN(KB_READY_MIN) + "٪</span>): أكمل الأقسام الناقصة — ما لم يُكتب لا يعرفه المساعد، وأسئلة العملاء عنه تُحال لموظف حين لا يجد لها مصدرًا.</p>";
   return h + "</div>";
 }
-/* Points carry the noun's agreement; a half weight prints without a decimal. */
-function kbPoints(n) { var v = Math.round(n); return pluralizeArabic(v, "نقطة واحدة", "نقطتين", "نقاط", "نقطة", fmtN); }
+/* Points carry the noun's agreement; a half weight prints without a decimal. Every one of these
+   renders as MARKUP, so the numeral goes through .m-n via mPl — PORT-SPEC 3 and 5 together. */
+function kbPoints(n) { var v = Math.round(n); return mPl(v, "نقطة واحدة", "نقطتين", "نقاط", "نقطة"); }
 function kbDraftLine(kn) {
   if (!kn || !kn.draftScore) return "";
   var before = kn.score ? kn.score.score : 0, after = kn.draftScore.score;
@@ -151,7 +152,7 @@ function kbClose(force) {
 }
 function kbLiveHtml(live) {
   return '<div class="kb-top"><span class="m-label kb-hd">درجة هذه المسودة</span>' + kbMeter(live.score) +
-    '<span class="kb-sr" role="status" id="kblivest">' + fmtN(live.score) + "٪</span></div>" +
+    '<span class="kb-sr" role="status" id="kblivest"><span class="m-n">' + fmtN(live.score) + "٪</span></span></div>" +
     (live.truncated ? '<p class="m-status m-status--warn">عدد أحرف النص <span class="m-n">' + fmtN(live.chars) + '</span> — يقرأ المساعد أول <span class="m-n">' + fmtN(KB_PROMPT_CHARS) + "</span> منها فقط.</p>" : "");
 }
 /* While typing, only the meter and the section badges change — the sheet is not rebuilt, so the textarea keeps
@@ -180,7 +181,10 @@ function kbEditor() {
     return '<span class="m-chip kb-st' + (state === "done" ? " m-chip--ok" : state === "short" ? " m-chip--warn" : "") + '">' +
       (state === "done" ? "مكتمل" : state === "short" ? "قصير" : "ناقص") + "</span>";
   };
-  var h = '<div class="kb-ed"><div class="kb-scrim' + cls + '" data-kb="close"></div><div class="kb-wrap"><div class="m-dlg__p kb-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="kbmt" aria-describedby="kbms">' +
+  /* The editor is APPENDED after the record's own .ds6 closes (vProductDrill), so it carries its
+     own wrapper — every rule this sheet needs is scoped to .ds6, and an overlay that inherits none
+     of them renders as unstyled markup over the page. */
+  var h = '<div class="ds6"><div class="kb-ed"><div class="kb-scrim' + cls + '" data-kb="close"></div><div class="kb-wrap"><div class="m-dlg__p kb-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="kbmt" aria-describedby="kbms">' +
     '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="kbmt">معرفة «' + esc(e.product) + '»</h2><p class="m-meta" id="kbms">تُحفظ مسودةً، ويقرؤها المساعد بعد «اعتماد المعرفة» فقط. اكتب ما يُسمح للمساعد بقوله حرفيًا — لا يضيف إليه شيئًا.</p></div>' +
     '<button type="button" class="m-x" data-kb="close" aria-label="إغلاق">' + (typeof pxIco === "function" ? pxIco("x") : "×") + "</button></div>";
   h += '<div class="m-dlg__b"><div class="kb-live" id="kblive">' + kbLiveHtml(live) + "</div>";
@@ -205,7 +209,7 @@ function kbEditor() {
     h += '<button type="button" class="m-btn m-btn--primary" id="kbsave" data-kb="save"' + (e.busy ? ' disabled aria-busy="true"' : "") + ">" + (e.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
       '<button type="button" class="m-btn" data-kb="close">إلغاء</button>' + (e.err && e.field.indexOf("sections.") !== 0 && e.field !== "extra" ? '<span class="m-err" role="alert">' + esc(e.err) + "</span>" : "");
   }
-  return h + "</div></div></div></div>";
+  return h + "</div></div></div></div></div>";
 }
 function kbSave() {
   var e = kbEd; if (!e || e.busy) return;

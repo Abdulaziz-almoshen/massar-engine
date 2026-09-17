@@ -9,52 +9,51 @@
 // Every figure is read from /admin/sales/quarters, which computes them from the stage ledger. This
 // file only groups and draws; the one attainment rule stays in sales-domain.
 //
+// PORTED to the new design system (docs/PORT-SPEC.md). The screen body is wrapped in its own .ds6;
+// the route paints vYearTargets() + vSalesPerf() into one screen, so each owns one wrapper. Every
+// figure goes through .m-n (or through opMoneyShort, which carries its own bdi — see the CSS note),
+// every empty cell states WHICH KIND of absence it is, and the two counts printed both in the KPI
+// strip and in the qualification under it are bound with dsD/dsFig.
+//
+// THE REPAIRS BELOW ARE LOAD-BEARING AND SURVIVE THE PORT. The ratio covers only the products that
+// HAVE a target and says how many it left out; a product-level percentage measured on part of the
+// year says «مستهدف N من أربعة أرباع» rather than wearing the year's name. Those captions are the
+// point of this screen, not clutter to be tidied away.
+//
 // No backticks in this file (gate: check-crm-literals).
 
 export const YEAR_TARGETS_CSS = `
-.yt { display:flex; flex-direction:column; gap:var(--s4); margin-block-end:var(--s5); }
-.yt-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:var(--s3); }
-.yt-kpi { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4);
-  display:flex; flex-direction:column; gap:4px; min-width:0; }
-.yt-kpi .l { font-size:var(--t-xs); color:var(--muted); }
-.yt-kpi .n { font-size:var(--t-2xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.15; }
-.yt-kpi .n.none { color:var(--muted); }
-.yt-kpi .s { font-size:var(--t-xs); color:var(--muted); }
-.yt-kpi.lead .n { color:var(--accent-deep); }
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). Deleted here because the vocabulary carries
+   them: the KPI tiles (.m-kpis/.m-stat__*), the card and its header, the table, the pill, the
+   empty state, every number and all three kinds of absence. What survives is the one thing the
+   vocabulary does not have — the quarterly split drawn as four small meters in a single cell.
 
-.yt-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
-.yt-hd { display:flex; align-items:baseline; gap:var(--s3); padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
-.yt-hd h3 { margin:0; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.yt-hd .s { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
-.yt-hd .sp { flex:1; }
-.yt-r { display:grid; grid-template-columns:minmax(0,1.3fr) 130px 130px 104px minmax(220px,1.2fr);
-  align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-top:1px solid var(--line-soft); font-size:var(--t-sm); }
-.yt-r:first-of-type { border-top:0; }
-.yt-r.hdr { font-size:var(--t-xs); font-weight:600; color:var(--muted); background:var(--surface); border-top:0; }
-.yt-r .nm { font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
-.yt-r .nm .sub { display:block; font-weight:400; font-size:var(--t-xs); color:var(--muted); margin-block-start:2px; }
-.yt-r .num { font-variant-numeric:tabular-nums; color:var(--ink-2); }
-.yt-r .num.none { color:var(--muted); }
-.yt-pct { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:600;
-  border-radius:var(--r-pill); padding:3px 10px; background:var(--tn-soft,var(--surface-2)); color:var(--tn-text,var(--ink-2)); }
-/* the quarterly split: four columns, each the quarter's achieved against its own target */
-.yt-q { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-.yt-qc { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.yt-qc .k { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
-.yt-qc .bar { height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
-.yt-qc .bar i { display:block; height:100%; background:var(--accent); border-radius:var(--r-pill);
-  transition:width 320ms cubic-bezier(0.23, 1, 0.32, 1); }
-.yt-qc.cur .k { color:var(--accent-deep); font-weight:600; }
-.yt-qc.over .bar i { background:var(--s-ok-text, #12633F); }
-.yt-qc.none .bar { background:repeating-linear-gradient(135deg,var(--surface-2),var(--surface-2) 4px,var(--paper) 4px,var(--paper) 8px); }
-.yt-qc .v { font-size:var(--t-xs); color:var(--ink-2); font-variant-numeric:tabular-nums; }
-.yt-state { padding:var(--s5) var(--s4); text-align:center; font-size:var(--t-sm); color:var(--muted); line-height:1.9; }
+   MONEY. opMoneyShort stays as the money formatter rather than being re-wrapped in .m-n: it emits
+   a bdi element, which supplies the bidi isolation .m-n exists to give, and it carries the
+   counted-noun rule for «ألف/آلاف/مليون/ملايين». exec-reports-crm.ts states tabular figures on
+   .ds6 bdi once, for every ported screen. */
+.ds6 .yt{display:flex;flex-direction:column;gap:var(--m-4)}
+.ds6 .yt-sec .m-card__h{padding-inline:var(--m-5);padding-block:var(--m-4);margin-block-end:0;
+  border-block-end:1px solid var(--m-line);align-items:baseline;flex-wrap:wrap}
+.ds6 .yt-tbl .m-table{min-inline-size:900px}
+.ds6 .yt-sub{display:block;font-weight:400;margin-block-start:2px}
 
-@media (prefers-reduced-motion: reduce) { .yt-qc .bar i { transition:none; } }
-@media (max-width: 900px) {
-  .yt-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; }
-  .yt-r.hdr { display:none; }
-  .yt-q { grid-column:1 / -1; }
+/* The quarterly split: four columns in one cell, each the quarter's achieved against its own
+   target. The bar is .m-meter, so it grows on the system's own curve. */
+.ds6 .yt-q{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.ds6 .yt-qc{display:flex;flex-direction:column;gap:4px;min-inline-size:0}
+.ds6 .yt-qc .k{font-size:var(--m-t-micro);color:var(--m-mut)}
+.ds6 .yt-qc .v{font-size:var(--m-t-micro);color:var(--m-ink-2);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.ds6 .yt-qc.cur .k{color:var(--m-ac-deep);font-weight:600}
+.ds6 .yt-qc.over .m-meter i{background:var(--m-ok)}
+/* A quarter nobody set a target for is a HATCHED track, not an empty one: an empty track and a
+   zero-progress track are different facts and they drew identically. */
+.ds6 .yt-qc.none .m-meter{background:repeating-linear-gradient(135deg,var(--m-sunk),
+  var(--m-sunk) 4px,var(--m-paper) 4px,var(--m-paper) 8px)}
+@media (max-width:900px){
+  .ds6 .yt-tbl .m-table{min-inline-size:640px}
+  .ds6 .yt-q{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 `;
 
@@ -71,17 +70,42 @@ function ytDivisionOf(product) {
   return "";
 }
 function ytMoney(v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; }
+/* The attainment pill's tone is a CLASSIFICATION of the figure beside it, which is the only reason
+   it is allowed to be a colour at all. It reads from the m-* status tokens, never from a fourth
+   palette of its own. */
 function ytTone(pct) {
-  return pct === null ? "--tn-soft:var(--surface-2);--tn-text:var(--muted)"
-    : pct >= 100 ? "--tn-soft:#E6F3EC;--tn-text:#12633F"
-    : pct >= 70 ? "--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"
-    : "--tn-soft:#FBF2DC;--tn-text:#7A5600";
+  return pct === null ? "--tn-soft:var(--m-sunk);--tn-text:var(--m-mut)"
+    : pct >= 100 ? "--tn-soft:var(--m-ok-dim);--tn-text:var(--m-ok)"
+    : pct >= 70 ? "--tn-soft:var(--m-ac-dim);--tn-text:var(--m-ac-deep)"
+    : "--tn-soft:var(--m-warn-dim);--tn-text:var(--m-warn)";
+}
+function ytPill(pct) {
+  return '<span class="m-chip m-chip--plain" style="' + ytTone(pct) +
+    ';background:var(--tn-soft);color:var(--tn-text)">' +
+    (pct === null ? mNil("بلا مستهدف", "owed") : mPct(pct)) + "</span>";
+}
+/* A YEAR IS NOT A QUANTITY: fmtN groups thousands and printed «2,026» the first time this shipped. */
+function ytYear(y) { return '<span class="m-n">' + String(y) + "</span>"; }
+
+/* The two counts this screen prints TWICE — once in the KPI strip and once in the qualification
+   under it — are bound to the rows they are counted from, so the strip and the sentence beneath it
+   cannot drift apart (PORT-SPEC §6). */
+function ytRows() {
+  var q = (typeof pcQuarters !== "undefined" && pcQuarters) || null;
+  return q ? (q.byProduct || []) : [];
+}
+function ytHasTarget(r) { return r.annualTarget !== null && r.annualTarget !== undefined; }
+function ytBind() {
+  dsD("ytProducts", function () { return ytRows().length; });
+  dsD("ytTargeted", function () { return ytRows().filter(ytHasTarget).length; });
+  dsD("ytNoTarget", function () { return ytRows().filter(function (r) { return !ytHasTarget(r); }).length; });
 }
 
 function vYearTargets() {
   if (typeof pcLoad === "function") pcLoad(false);
   var q = (typeof pcQuarters !== "undefined" && pcQuarters) || null;
   if (!q) return "";
+  ytBind();
   var rows = q.byProduct || [];
   var year = q.year;
   var cur = q.currentQuarter;
@@ -92,34 +116,43 @@ function vYearTargets() {
      percentage without ever appearing in what it was measured against. Attainment could pass
      100٪ with real targets unmet, and «المتبقّي» could read 0 at the same time.
      Targeted products decide the ratio; the rest are counted and stated, never folded in. */
-  var targeted = rows.filter(function (r) { return r.annualTarget !== null && r.annualTarget !== undefined; });
+  var targeted = rows.filter(ytHasTarget);
   var target = 0, achieved = 0;
   targeted.forEach(function (r) { target += Number(r.annualTarget) || 0; achieved += Number(r.achieved) || 0; });
   var outsideAch = 0, outside = rows.length - targeted.length;
-  rows.forEach(function (r) {
-    if (r.annualTarget === null || r.annualTarget === undefined) outsideAch += Number(r.achieved) || 0;
-  });
+  rows.forEach(function (r) { if (!ytHasTarget(r)) outsideAch += Number(r.achieved) || 0; });
   var pct = typeof wholePct === "function" ? wholePct(attainmentPct(achieved, target)) : null;
   var left = Math.max(0, target - achieved);
 
-  var h = '<div class="yt"><div class="yt-kpis">' +
-    /* A YEAR is not a quantity: fmtN would print «2,026». Same defect the campaign chain shipped once. */
-    '<div class="yt-kpi"><span class="l">إجمالي المستهدف · ' + esc(String(year)) + '</span>' +
-      (target ? '<span class="n">' + ytMoney(target) + "</span>" : '<span class="n none">—</span>') +
-      '<span class="s">' + (target
-        ? ("لكل المنتجات التي حُدِّد لها مستهدف" + (outside ? " · " + fmtN(outside) + " خارجها" : ""))
-        : "لم يُحدَّد مستهدف بعد") + "</span></div>" +
-    '<div class="yt-kpi"><span class="l">إجمالي المحقق</span><span class="n">' + ytMoney(achieved) + "</span>" +
-      '<span class="s">' + (outside
-        ? ("من المنتجات المستهدفة · " + ytMoney(outsideAch) + " خارج النسبة")
-        : "من الصفقات الرابحة") + "</span></div>" +
-    '<div class="yt-kpi"><span class="l">المتبقّي للمستهدف</span>' +
-      (target ? '<span class="n">' + ytMoney(left) + "</span>" : '<span class="n none">—</span>') +
-      '<span class="s">' + (target ? (left ? "حتى نهاية السنة" : "تحقق المستهدف") : "بلا مستهدف") + "</span></div>" +
-    '<div class="yt-kpi lead"><span class="l">نسبة الإنجاز</span>' +
-      (pct === null ? '<span class="n none">—</span>' : '<span class="n">' + fmtN(pct) + "٪</span>") +
-      '<span class="s">' + (pct === null ? "بلا مستهدف" : "من المستهدف") + "</span></div>" +
+  var tile = function (cls, k, v, s) {
+    return '<div class="m-card ' + cls + '"><span class="m-stat__k">' + k + "</span>" +
+      '<span class="m-stat__v">' + v + "</span>" +
+      '<span class="m-stat__s">' + s + "</span></div>";
+  };
+  var h = '<div class="ds6"><div class="yt">';
+  h += '<p class="m-meta">السنة المالية ' + ytYear(year) + "</p>";
+  h += '<div class="m-kpis">' +
+    tile("", "إجمالي المستهدف", target ? ytMoney(target) : mNil("لم يُحدَّد مستهدف", "owed"),
+      target ? "لكل المنتجات التي حُدِّد لها مستهدف" : "لم يُسجَّل مستهدف على أي منتج") +
+    tile("", "إجمالي المحقق", ytMoney(achieved),
+      outside ? ("من المنتجات المستهدفة وحدها · " + ytMoney(outsideAch) + " خارج النسبة") : "من الصفقات الرابحة") +
+    tile("", "المتبقّي للمستهدف", target ? ytMoney(left) : mNil("بلا مستهدف", "owed"),
+      target ? (left ? "حتى نهاية السنة" : "تحقق المستهدف") : "لا شيء يُقاس عليه") +
+    tile("m-stat--ac", "نسبة الإنجاز", pct === null ? mNil("بلا مستهدف", "owed") : mPct(pct),
+      pct === null ? "لا مستهدف مسجّل" : "من المستهدف المسجّل") +
     "</div>";
+
+  /* The qualification, stated where the figure is read and not in a footnote: a percentage over
+     partial coverage reads as the company's number, and it is not one while products carry no
+     target at all. Both counts go through dsFig — they are printed in the strip above too. */
+  if (outside) {
+    h += '<p class="m-status m-status--warn">النسبة محسوبة على ' +
+      dsFig("ytTargeted", targeted.length) + " من " + dsFig("ytProducts", rows.length) +
+      " منتجات · " + dsFig("ytNoTarget", outside) + " بلا مستهدف لهذه السنة، ومحققها خارج النسبة.</p>";
+  } else if (rows.length) {
+    h += '<p class="m-meta">كل ' + mPl(rows.length, "منتج واحد", "منتجان", "منتجات", "منتجًا") +
+      " يحمل مستهدفًا مسجّلًا لهذه السنة.</p>";
+  }
 
   /* Grouped by sector, in the catalogue's order, with anything unmapped last and named as such. */
   var groups = [], byName = {};
@@ -136,40 +169,56 @@ function vYearTargets() {
   });
 
   if (!groups.length) {
-    return h + '<div class="yt-sec"><div class="yt-state">لا منتجات في الكتالوج بعد — يظهر المستهدف السنوي هنا فور إضافة أول منتج.</div></div></div>';
+    return h + '<section class="m-card m-empty"><p class="m-empty__t">لا منتجات في الكتالوج بعد</p>' +
+      '<p class="m-empty__d">يظهر المستهدف السنوي هنا فور إضافة أول منتج.</p></section></div></div>';
   }
 
   groups.forEach(function (g) {
     var gp = typeof wholePct === "function" ? wholePct(attainmentPct(g.achieved, g.target)) : null;
-    h += '<section class="yt-sec"><div class="yt-hd"><h3>' + esc(g.sector) + "</h3>" +
-      '<span class="s">' + ytMoney(g.achieved) + " من " + (g.target ? ytMoney(g.target) : "بلا مستهدف") +
-      (gp === null ? "" : " · " + fmtN(gp) + "٪") + "</span><span class=\\"sp\\"></span>" +
-      '<span class="s">' + fmtN(g.rows.length) + (g.rows.length === 1 ? " منتج" : " منتجات") + "</span></div>";
-    h += '<div class="yt-r hdr"><span>المنتج</span><span>المستهدف السنوي</span><span>المحقق</span><span>الإنجاز</span><span>التوزيع الربعي</span></div>';
+    h += '<section class="m-card m-card--pad0 yt-sec yt-tbl"><div class="m-card__h">' +
+      '<h2 class="m-card__t">' + esc(g.sector) + "</h2>" +
+      '<span class="m-meta">' + ytMoney(g.achieved) + " من " +
+        (g.target ? ytMoney(g.target) : mNil("بلا مستهدف", "owed")) +
+        (gp === null ? "" : " · " + mPct(gp)) + " · " +
+        mPl(g.rows.length, "منتج واحد", "منتجان", "منتجات", "منتجًا") + "</span></div>";
+    h += '<div class="m-tablewrap"><table class="m-table"><thead><tr>' +
+      "<th>المنتج</th><th>المستهدف السنوي</th><th>المحقق</th><th>الإنجاز</th>" +
+      "<th>التوزيع الربعي</th></tr></thead><tbody>";
     g.rows.forEach(function (r) {
       var rp = typeof wholePct === "function" ? wholePct(attainmentPct(r.achieved, r.annualTarget)) : null;
+      var qtrs = Number(r.targetQuarters) || 0;
       var div = ytDivisionOf(r.product);
       var qs = r.quarters || [];
       var top = 0;
       qs.forEach(function (x) { top = Math.max(top, Number(x.target) || 0, Number(x.achieved) || 0); });
-      h += '<div class="yt-r"><span class="nm">' + esc(r.product) +
-        (div ? '<span class="sub">' + esc(div) + "</span>" : "") + "</span>" +
-        '<span class="num' + (r.annualTarget ? "" : " none") + '">' + (r.annualTarget ? ytMoney(r.annualTarget) : "لم يُحدَّد") + "</span>" +
-        '<span class="num">' + ytMoney(r.achieved) + "</span>" +
-        '<span><span class="yt-pct" style="' + ytTone(rp) + '">' + (rp === null ? "—" : fmtN(rp) + "٪") + "</span></span>" +
-        '<span class="yt-q">' + qs.map(function (x) {
+      h += '<tr><td class="m-td-n">' + esc(r.product) +
+        (div ? '<span class="yt-sub m-meta">' + esc(div) + "</span>" : "") + "</td>" +
+        '<td class="m-td-v">' + (ytHasTarget(r) ? ytMoney(r.annualTarget) : mNil("لم يُحدَّد", "owed")) + "</td>" +
+        '<td class="m-td-v">' + ytMoney(r.achieved) + "</td>" +
+        /* annualTarget is NOT an annual target: db.ts builds it from only the quarters that carry a
+           target row and reports how many in targetQuarters, while achieved covers the whole year.
+           A product targeted in Q1 alone that won all year printed «400٪» under the year's name.
+           The percentage is still shown — it is the only one there is — but it says what it was
+           measured on, the way the two sibling screens already do. */
+        "<td>" + ytPill(rp) +
+          (rp !== null && qtrs > 0 && qtrs < 4
+            ? '<span class="yt-sub m-meta">مستهدف ' + mN(qtrs) + " من أربعة أرباع</span>"
+            : "") + "</td>" +
+        '<td><span class="yt-q">' + qs.map(function (x) {
           var t = Number(x.target) || 0, a = Number(x.achieved) || 0;
           var w = top > 0 ? Math.min(100, Math.round((a / top) * 100)) : 0;
           var cls = (x.quarter === cur ? " cur" : "") + (t > 0 && a >= t ? " over" : "") + (t > 0 ? "" : " none");
-          var said = t > 0 ? ytMoney(a) + " من " + ytMoney(t) : a ? ytMoney(a) + " بلا مستهدف للربع" : "بلا مستهدف للربع";
-          return '<span class="yt-qc' + cls + '" title="' + esc("الربع " + fmtN(x.quarter) + ": " + said) + '">' +
-            '<span class="k">ر' + fmtN(x.quarter) + "</span>" +
-            '<span class="bar"><i style="width:' + w + '%"></i></span>' +
-            '<span class="v">' + (t > 0 || a ? ytMoney(a) : "—") + "</span></span>";
-        }).join("") + "</span></div>";
+          var said = t > 0 ? ytMoney(a) + " من " + ytMoney(t)
+            : a ? ytMoney(a) + " بلا مستهدف للربع" : "بلا مستهدف للربع";
+          return '<span class="yt-qc' + cls + '" title="' + esc("الربع " + fmtN(x.quarter)) + '">' +
+            '<span class="k">ر<span class="m-n">' + fmtN(x.quarter) + "</span></span>" +
+            '<span class="m-meter" role="img" aria-label="' + esc(said) + '">' +
+              '<i style="--m-pct:' + w + '%"></i></span>' +
+            '<span class="v">' + (t > 0 || a ? ytMoney(a) : mNil("بلا مستهدف", "owed")) + "</span></span>";
+        }).join("") + "</span></td></tr>";
     });
-    h += "</section>";
+    h += "</tbody></table></div></section>";
   });
-  return h + "</div>";
+  return h + "</div></div>";
 }
 `;

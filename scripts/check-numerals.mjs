@@ -55,17 +55,29 @@ const LATIN_PCT = /["'][^"']*%<\/(?:span|div)>/;
 // Remove every fmtN(...) span, counting parens so arbitrarily nested arguments are handled.
 // A regex cannot do this: fmtN(Math.round((a - b) / c)) is three levels deep, and the naive
 // pattern both missed real defects and flagged already-correct lines.
+// Wrappers that are ALLOWED to stand in for fmtN, because each one is defined in exactly one
+// place and its whole body is fmtN plus markup:
+//   mN(v)         -> <span class="m-n">fmtN(v)</span>
+//   dsFig(k, v)   -> the same, plus the data-d binding the verifier re-derives
+// Anything added here must be verified to delegate to fmtN. A name recognised without that is a
+// hole in the guard, which is the failure documented at aed03a3 below.
+const WRAPPERS = ["fmtN(", "mN(", "dsFig("];
+
 function blankFormatted(line) {
   let out = "", i = 0;
   while (i < line.length) {
-    const at = line.indexOf("fmtN(", i);
+    let at = -1, tok = "";
+    for (const w of WRAPPERS) {
+      const k = line.indexOf(w, i);
+      if (k !== -1 && (at === -1 || k < at)) { at = k; tok = w; }
+    }
     if (at === -1) { out += line.slice(i); break; }
     // Require a left boundary. Without it "Math.roundfmtN(" blanks to "Math.roundN" and the
     // check clears a line that throws at runtime — exactly what shipped at aed03a3, concealed
     // by this very function.
-    if (at > 0 && /[\w$.]/.test(line[at - 1])) { out += line.slice(i, at + 5); i = at + 5; continue; }
+    if (at > 0 && /[\w$.]/.test(line[at - 1])) { out += line.slice(i, at + tok.length); i = at + tok.length; continue; }
     out += line.slice(i, at) + "N";
-    let depth = 0, j = at + 4;
+    let depth = 0, j = at + tok.length - 1;
     for (; j < line.length; j++) {
       if (line[j] === "(") depth++;
       else if (line[j] === ")") { depth--; if (depth === 0) { j++; break; } }

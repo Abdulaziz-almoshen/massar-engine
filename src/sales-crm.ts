@@ -1,89 +1,57 @@
 // sales-crm.ts — «المستهدفات والأداء», the management view of the commercial engine.
 //
-// WHY IT IS ITS OWN MODULE. `dashboard.ts` is 4,127 lines of one template literal under ADR-0001,
+// WHY IT IS ITS OWN MODULE. dashboard.ts is 4,127 lines of one template literal under ADR-0001,
 // and the engineering review was explicit: adding screens to it institutionalises the problem.
 // The house pattern is already here — campaigns-crm, customers-crm, activity-crm, opps-crm — so
-// this follows it. `dashboard.ts` gains an import, two interpolations, a nav row and a route.
+// this follows it. dashboard.ts gains an import, two interpolations, a nav row and a route.
 //
 // WHAT IT SHOWS, and why every figure on it is earned. The design record's rule for this screen is
 // that nothing on it may be hand-entered except the target itself. So:
 //   · target        typed by a human. The only one.
 //   · achieved      summed from the stage-event ledger — deals whose WIN falls in this quarter.
-//   · weighted      open deals × their stage probability. The forecast the six-stage engine
-//                   could not produce at all.
-//   · attainment    achieved ÷ target        — "have we made it"
-//   · coverage      (achieved + weighted) ÷ target — "are we going to make it"
+//   · weighted      open deals x their stage WEIGHT. Never a probability of winning: the ladder
+//                   stores a weight per stage and that is all the figure is. It is labelled
+//                   «مرجّحة بوزن المرحلة» everywhere it appears, and that label is load-bearing.
+//   · attainment    achieved / target               — "have we made it"
+//   · coverage      (achieved + weighted) / target  — "are we going to make it"
 // The last two are separate on purpose: one ambiguous "%" was colouring the board wrongly.
 //
 // The arithmetic is NOT re-implemented here. Every calculation calls sales-domain through the
 // browser seam, so the number on this screen and the number in the test suite are the same code.
+//
+// PORTED to the new design system (docs/PORT-SPEC.md). The screen body is wrapped in its own .ds6:
+// the route paints vYearTargets() + vSalesPerf() into one screen, so each owns one wrapper.
+//
+// THE REPAIR BELOW IS LOAD-BEARING AND SURVIVES THE PORT. Every ratio is computed over the rows
+// that HAVE a target and the screen states how many services it left out; a service with revenue
+// and no target inflated the lead tile silently before that. The qualifying line under the table
+// is the point of this screen, not clutter.
+//
+// SMOKE LANDMARK: «المتوقع من الفرص المفتوحة» must render from the KPI shell BEFORE the fetch
+// resolves — smoke.py asserts it for #perf precisely so a slow ledger is green and a broken view
+// is red. Do not move it behind the data.
+//
+// No backticks in this file (gate: check-crm-literals).
 
 export const SALES_CRM_CSS = `
-.perf-head{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-.perf-per{display:flex;gap:6px;align-items:center}
-.perf-per .q{border:1px solid var(--line,#D8DCE3);background:var(--card,#fff);border-radius:999px;
-  padding:5px 13px;font-size:12px;cursor:pointer;color:var(--ink2,#33373E);min-height:32px}
-.perf-per .q.on{background:#2563EB;border-color:#2563EB;color:#fff;font-weight:600}
-/* One figure leads. The module exists to answer "are we going to make it" and that is «التغطية»;
-   four equal cards made it the last of four with no more weight than the rest. */
-.perf-kpis{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px}
-.perf-kpi.lead{background:#EAF1FE}
-.perf-kpi.lead .v{font-size:28px}
-.perf-kpi{background:var(--strip,#EFF1F5);border-radius:10px;padding:13px 15px}
-.perf-kpi .k{font-size:12px;color:var(--muted,#656B76);font-weight:600}
-.perf-kpi .v{font-size:22px;font-weight:600;margin-top:3px;letter-spacing:0}
-.perf-kpi .s{font-size:12px;color:var(--muted,#656B76);margin-top:2px}
-.perf-tbl{width:100%;border-collapse:collapse;font-size:14px}
-/* Logical properties only, per DESIGN.md: "no left/right, no physical offsets". The physical
-   the physical shorthand landed on the correct side ONLY because this document is RTL — it would
-   flip the moment anything renders LTR. And rows take border-TOP, which is what invariant 8
-   specifies for a flush list. (No backticks in this comment: it lives INSIDE a template literal,
-   and one terminates the string. Third time this session.) */
-.perf-tbl th{text-align:start;font-size:12px;font-weight:600;color:var(--muted,#656B76);
-  padding-inline-end:10px;padding-block-end:8px;border-block-end:1px solid var(--line,#D8DCE3);white-space:nowrap}
-.perf-tbl td{padding-inline-end:10px;border-block-start:1px solid var(--line2,#ECEEF2);height:36px;vertical-align:middle}
-.perf-tbl tr:hover td{background:var(--strip,#EFF1F5)}
-.perf-tbl .money{text-align:end;font-variant-numeric:tabular-nums;white-space:nowrap}
-.perf-prod{font-weight:600}
-.perf-sec{font-size:12px;color:var(--muted,#656B76);font-weight:400}
-/* No overflow:hidden — it clipped the pace tick's own overhang, so the "extend past the track so
-   it reads as a marker" intent was dead code. The fill clips itself with its own border-radius. */
-.perf-bar{position:relative;height:6px;border-radius:999px;background:var(--line2,#ECEEF2);
-  min-width:90px}
-.perf-bar i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:999px;display:block;
-  background:#2563EB}
-/* Full opacity and the darkest ink: at .45 over the teal fill this was invisible on exactly the
-   rows that are AHEAD of pace, which is the only comparison the tick exists to make. The overhang
-   above and below the track sits on the page ground, so it reads on both grounds. */
-.perf-bar .pace{position:absolute;inset-block:-3px;width:2px;background:var(--ink,#14161A)}
-.perf-rag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
-.perf-rag .dot{width:7px;height:7px;border-radius:999px;flex:none}
-/* The product's shipped status palette, not a fourth one. These three values are the same
-   ok/warn/bad used by «فشل الإرسال» and «أوقف الرسائل» two screens away (activity-crm,
-   campaigns-crm, customers-crm). A «متعثّر» that is a different red from every other bad state
-   in the product teaches the reader that the colour means nothing. */
-.rag-good{color:#12633F} .rag-good .dot{background:#12633F}
-.rag-warn{color:#7A5600} .rag-warn .dot{background:#7A5600}
-.rag-bad{color:#8E2A27}  .rag-bad  .dot{background:#8E2A27}
-.rag-none{color:var(--muted,#656B76)} .rag-none .dot{background:var(--line,#D8DCE3)}
-.perf-set{border:1px solid var(--line,#D8DCE3);background:transparent;border-radius:6px;
-  padding:4px 9px;font-size:12px;cursor:pointer;color:var(--ink2,#33373E);min-height:30px}
-.perf-set:hover{border-color:#2563EB;color:#2563EB}
-/* Both controls were missing from the product's focus-ring list (campaigns-crm.ts), so the quarter
-   chips had outline:none and the target button showed Chromium's default blue — a colour that
-   exists nowhere in Massar. Same treatment as every other control here. */
-.perf-per .q:focus, .perf-set:focus{outline:none}
-.perf-per .q:focus-visible, .perf-set:focus-visible{outline:2px solid #2563EB;outline-offset:1px}
-.perf-empty{padding:26px 0;color:var(--muted,#656B76);font-size:14px;max-width:56ch;line-height:1.6}
-.perf-empty b{color:var(--ink,#14161A);display:block;margin-bottom:5px;font-size:14px}
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). Deleted here because the vocabulary carries
+   them: the period chips (.m-seg), the KPI tiles (.m-kpis/.m-stat__*), the table, the status
+   chips, the buttons and their focus ring, the empty state, every number and all three kinds of
+   absence. The bespoke ok/warn/bad palette is gone with them — the status tokens are the same
+   three the rest of the system already uses.
+
+   What survives is the ONE thing the vocabulary does not carry: the attainment meter with a pace
+   tick. .m-meter already draws a fill and a mark, so the tick is --m-mark rather than a private
+   element; only the table-cell geometry is stated here. The tick is the honest signal on this
+   screen — a fill short of it is behind pace, and that reading is POSITIONAL, not chromatic. */
+.ds6 .perf-meter{margin-block:0;min-inline-size:96px}
+.ds6 .perf-meter b{opacity:1;background:var(--m-ink)}
+.ds6 .perf-ach{display:flex;align-items:center;gap:var(--m-2);min-inline-size:0}
+.ds6 .perf-tbl .m-table{min-inline-size:960px}
+.ds6 .perf-sub{display:block;font-weight:400;margin-block-start:2px}
 @media (max-width:820px){
-  .perf-kpis{grid-template-columns:repeat(2,1fr)}
-  .perf-kpi.lead .v{font-size:22px}
-  .perf-sechide{display:none}
-}
-@media (pointer:coarse){
-  .perf-per .q{min-height:44px;padding-inline:16px}
-  .perf-set{min-height:44px;padding-inline:14px}
+  .ds6 .perf-tbl .m-table{min-inline-size:760px}
+  .ds6 .perf-sechide{display:none}
 }
 `;
 
@@ -92,47 +60,47 @@ export const SALES_CRM_JS = `
 var perfState = { year: 0, quarter: 0, data: null, loading: false };
 
 /* A YEAR IS NOT A QUANTITY. fmtN is Number.toLocaleString("ar-SA"), which groups, so 2026 came out
-   as 2٬026 — in the «المستهدف» tile at rest, not just in the dialog. DESIGN.md asks for Arabic-Indic
-   numerals, which is about digit SHAPE; grouping is a separate decision and it is wrong for a year. */
+   as 2,026 — in the «المستهدف» tile at rest, not just in the dialog. Kept as a shared helper:
+   products-crm.ts prints the performance year through it too. */
 function arYear(n) {
   return new Intl.NumberFormat("ar-SA-u-nu-latn", { useGrouping: false }).format(Number(n) || 0);
 }
+/* The same year, marked as a figure so it takes the system's bidi isolation and tabular digits. */
+function perfYear(n) { return '<span class="m-n">' + arYear(n) + "</span>"; }
+
+/* Round INSIDE the helper. mPct already formats; a bare Math.round beside a string literal is
+   what check-numerals looks for, and it cannot see that mPct wraps the value. */
+function perfPct(v) { return mPct(Math.round(Number(v) || 0)); }
 
 function perfMoney(n) {
-  // fmtN carries the Arabic-Indic numerals; the currency word is separate so a zero still reads
-  // as money rather than as a bare digit.
-  return fmtN(Math.round(Number(n) || 0)) + " ر.س";
+  /* Digits inside .m-n, the currency word outside it — the shape the reference screen prints
+     (home-ds-crm.ts), so a zero still reads as money rather than as a bare digit. */
+  return mMoney(n);
 }
 
-/** The one place a percentage becomes a colour. Delegates to sales-domain so the band on screen
- *  and the band in the test suite are the same function. */
+/** The one place a percentage becomes a status word. Delegates to sales-domain so the band on
+ *  screen and the band in the test suite are the same function. The three tones are the system's
+ *  own ok/warn/bad, not a fourth palette: a «متعثّر» in a different red from every other bad state
+ *  in the product teaches the reader that the colour means nothing. */
 function perfRag(attain, elapsed) {
   var key = ragKey(attain, elapsed);
   var label = key === "good" ? "على المسار" : key === "warn" ? "متأخّر قليلًا"
             : key === "bad" ? "متعثّر" : "بلا مستهدف";
-  return '<span class="perf-rag rag-' + key + '"><i class="dot"></i>' + label + '</span>';
+  if (key === "none") return mNil(label, "owed");
+  var cls = key === "good" ? " m-chip--ok" : key === "warn" ? " m-chip--warn" : " m-chip--bad";
+  return '<span class="m-chip' + cls + '">' + label + "</span>";
 }
 
+/* The attainment meter. The bar is the attainment; the tick is how far through the quarter we are.
+   ONE accent fill, never a status colour: the status is carried by the chip in its own column,
+   which reads for a colour-blind director too, and a green-versus-red bar never did. */
 function perfBar(attain, elapsed) {
-  // «—», not an empty track. DESIGN.md chart rule 6: "Zero denominators render «—», never «0٪».
-  // A rate over nothing is unmeasured, not zero." The numeric cells in this same row honour that;
-  // an empty grey track contradicted them, and read almost identically to a real 0%.
-  if (attain === null) return '<span class="perf-sec">—</span>';
+  if (attain === null) return "";
   var w = Math.max(0, Math.min(100, attain));
   var pace = Math.max(0, Math.min(100, (Number(elapsed) || 0) * 100));
-  // TEAL, always. DESIGN.md invariant 3 lists "progress fill" as a teal-only use, and the charts
-  // rule is blunter: teal is the only saturated hue in a chart, because "four bars in four colours
-  // taught that teal, green and navy meant something. They did not."
-  //
-  // The status is not lost, it moves to where the design system puts it — the dot and label beside
-  // the bar (invariant 8: row state is a dot + label). That reads for a colour-blind director too,
-  // which a green-versus-red bar never did.
-  //
-  // The tick is the honest signal here: it marks how far through the quarter we are. A fill short
-  // of the tick is behind pace, and that is POSITIONAL, not chromatic.
-  return '<div class="perf-bar"><i style="width:' + w.toFixed(1) + '%"></i>' +
-         '<span class="pace" style="inset-inline-start:' + pace.toFixed(1) + '%" ' +
-         'title="موضعنا من الربع"></span></div>';
+  return '<span class="m-meter perf-meter" role="img" aria-label="الإنجاز مقابل موضعنا من الربع">' +
+    '<i style="--m-pct:' + w.toFixed(1) + '%"></i>' +
+    '<b style="--m-mark:' + pace.toFixed(1) + '%" title="موضعنا من الربع"></b></span>';
 }
 
 async function perfLoad(year, quarter) {
@@ -183,45 +151,58 @@ window.perfSetTarget = async function (product) {
   /* The product record keeps its own copy of the same rows. Drop it, or «المستهدفات والأداء» and
      the record show two different targets for one quarter until a reload. */
   if (typeof pcPerf !== "undefined") { pcPerf = {}; pcPerfFailed = {}; }
-  alertBar("حُفظ المستهدف — " + perfMoney(amount), false);
+  alertBar("حُفظ المستهدف — " + fmtN(Math.round(amount)) + " ر.س", false);
   perfLoad(perfState.year, perfState.quarter);
 };
 
-/** Period chips and the standing note. Painted on every path, including before data arrives and
- *  when the fetch failed, so the screen always has a shape. */
+/** Period chips. Painted on every path, including before data arrives and when the fetch failed,
+ *  so the screen always has a shape. */
 function perfShell(quarter, year) {
-  var per = '<div class="perf-per">';
+  var per = '<div class="m-seg" role="group" aria-label="الربع">';
   for (var q = 1; q <= 4; q++) {
-    per += '<button class="q' + (q === quarter ? " on" : "") + '" onclick="perfPick(' + q + ')">الربع ' + fmtN(q) + '</button>';
+    per += '<button type="button" aria-pressed="' + (q === quarter) + '" onclick="perfPick(' + q + ')">الربع ' + mN(q) + "</button>";
   }
   per += "</div>";
-  return '<div class="perf-head">' + per +
-    // THE BASIS IS STATED ON THE SCREEN, because it was never decided. The plan named this as its
-    // single unresolved business question — bookings, ACV, or TCV — and the code shipped one
-    // answer: sale_price x qty x years, the whole contract booked into the quarter it was won.
-    // The explanatory note was removed on the founder's instruction (2026-09-06). The basis it
-    // described is still stated where a figure is actually read against a target — DESIGN.md's
-    // VALUE_BASIS_NOTE renders under the quarters on المنتجات and under every report table.
-    '</div>';
+  // THE BASIS IS STATED ON THE SCREEN, because it was never decided. The plan named this as its
+  // single unresolved business question — bookings, ACV, or TCV — and the code shipped one
+  // answer: sale_price x qty x years, the whole contract booked into the quarter it was won.
+  // The explanatory note was removed on the founder's instruction (2026-09-06). The basis it
+  // described is still stated where a figure is actually read against a target — DESIGN.md's
+  // VALUE_BASIS_NOTE renders under the quarters on المنتجات and under every report table.
+  return '<header class="m-head"><div class="m-section-head__t">' +
+    '<h2 class="m-h2">المستهدفات والأداء</h2>' +
+    '<p class="m-meta">' + (year ? "الربع " + mN(quarter) + " من " + perfYear(year) : "الربع الحالي") + "</p></div>" +
+    '<div class="m-head__a">' + per + "</div></header>";
 }
 
-/** The four figures. Nulls render as «—» rather than as zero: "not loaded yet" and "zero riyals"
- *  are different facts and a dash is the honest placeholder for the first. */
+/** The four figures. A value that has not arrived is an absence of the «unset» kind — «not loaded
+ *  yet» and «zero riyals» are different facts, and drawing both as a dash is what PORT-SPEC §4
+ *  exists to stop.
+ *
+ *  «المتوقع من الفرص المفتوحة» is the smoke landmark for #perf and renders on every path. */
 function perfKpis(totT, totA, totW, totCover, totAttain, totOpen, quarter, year) {
-  var dash = "—";
-  return '<div class="perf-kpis">' +
-    '<div class="perf-kpi lead"><div class="k">التغطية</div><div class="v">' +
-      (totCover === null || totCover === undefined ? dash : fmtN(Math.round(totCover)) + "٪") + '</div>' +
-      '<div class="s">المحقق والمتوقع معًا مقابل المستهدف</div></div>' +
-    '<div class="perf-kpi"><div class="k">المستهدف</div><div class="v">' +
-      (totT === null ? dash : perfMoney(totT)) + '</div>' +
-      '<div class="s">' + (quarter ? "الربع " + fmtN(quarter) + " · " + arYear(year) : "&nbsp;") + '</div></div>' +
-    '<div class="perf-kpi"><div class="k">المحقق</div><div class="v">' +
-      (totA === null ? dash : perfMoney(totA)) + '</div>' +
-      '<div class="s">' + (totA === null ? "&nbsp;" : (totAttain === null ? "بلا مستهدف" : fmtN(Math.round(totAttain)) + "٪ من المستهدف")) + '</div></div>' +
-    '<div class="perf-kpi"><div class="k">المتوقع من الفرص المفتوحة</div><div class="v">' +
-      (totW === null ? dash : perfMoney(totW)) + '</div>' +
-      '<div class="s">' + (totW === null ? "&nbsp;" : opNOpp(totOpen) + " مرجّحة بوزن المرحلة") + '</div></div>' +
+  var waiting = mNil("لم تصل بعد", "unset");
+  var tile = function (cls, k, v, s) {
+    return '<div class="m-card ' + cls + '"><span class="m-stat__k">' + k + "</span>" +
+      '<span class="m-stat__v">' + v + "</span>" +
+      '<span class="m-stat__s">' + s + "</span></div>";
+  };
+  return '<div class="m-kpis">' +
+    tile("m-stat--ac", "التغطية",
+      totCover === null || totCover === undefined
+        ? (totT === null ? waiting : mNil("بلا مستهدف", "owed"))
+        : perfPct(totCover),
+      "المحقق والمتوقع معًا مقابل المستهدف") +
+    tile("", "المستهدف",
+      totT === null ? waiting : (totT ? perfMoney(totT) : mNil("لم يُحدَّد", "owed")),
+      quarter ? "الربع " + mN(quarter) + " · " + perfYear(year) : "الربع الحالي") +
+    tile("", "المحقق", totA === null ? waiting : perfMoney(totA),
+      totA === null ? "من سجل المراحل"
+        : (totAttain === null ? "لا مستهدف يُقاس عليه" : perfPct(totAttain) + " من المستهدف")) +
+    /* «مرجّحة بوزن المرحلة» — a weighting the ladder stores, never a probability of winning. */
+    tile("", "المتوقع من الفرص المفتوحة", totW === null ? waiting : perfMoney(totW),
+      totW === null ? "من الفرص المفتوحة"
+        : mPlOf(totOpen, opNOpp(totOpen)) + " مرجّحة بوزن المرحلة") +
     "</div>";
 }
 
@@ -234,10 +215,13 @@ function vSalesPerf() {
   // reader saw one sentence, and the smoke test correctly called that a broken render.
   if (!d || d.error) {
     var why = !d
-      ? '<div class="perf-empty">جارٍ حساب الأداء من السجل…</div>'
-      : '<div class="perf-empty"><b>تعذّر تحميل الأداء</b>' + esc(String(d.error)) +
-        '<br><span style="font-size:12px">أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>';
-    return perfShell(perfState.quarter || 0, perfState.year || 0) + perfKpis(null, null, null, null, 0, 0, 0) + why;
+      ? '<section class="m-card" aria-busy="true"><p class="m-meta">جارٍ حساب الأداء من السجل…</p>' +
+        moSkeleton(3, ["w40", "w80", "w60"]) + "</section>"
+      : '<div class="m-alert" role="alert"><span class="m-alert__t">تعذّر تحميل الأداء</span>' +
+        '<span class="m-alert__d">' + esc(String(d.error)) +
+        " — أعد المحاولة، وإن تكرر فالمشكلة في الاتصال بقاعدة البيانات لا في هذه الشاشة.</span></div>";
+    return '<div class="ds6">' + perfShell(perfState.quarter || 0, perfState.year || 0) +
+      perfKpis(null, null, null, null, 0, 0, 0) + why + "</div>";
   }
 
   var rows = d.rows || [];
@@ -263,58 +247,73 @@ function vSalesPerf() {
   var totAttain = attainmentPct(totA, totT);
   var totCover = coveragePct(totA, totW, totT);
 
-  var head = perfShell(d.quarter, d.year);
-  var kpis = perfKpis(totT, totA, totW, totCover, totAttain, totOpen, d.quarter, d.year);
+  /* The service counts printed both in the qualifying line and in the table's foot are bound to
+     the rows they are counted from (PORT-SPEC §6): a summary that disagrees with the table under
+     it is the defect this mechanism exists for. */
+  dsD("perfServices", function () { return ((perfState.data && perfState.data.rows) || []).length; });
+  dsD("perfTargeted", function () {
+    return ((perfState.data && perfState.data.rows) || []).filter(function (r) { return Number(r.target) > 0; }).length;
+  });
+  dsD("perfNoTarget", function () {
+    return ((perfState.data && perfState.data.rows) || []).filter(function (r) { return !Number(r.target); }).length;
+  });
+
+  var h = '<div class="ds6">' + perfShell(d.quarter, d.year) +
+    perfKpis(totT, totA, totW, totCover, totAttain, totOpen, d.quarter, d.year);
 
   if (!rows.length) {
-    return head + kpis + '<div class="perf-empty"><b>لا توجد خدمات في الكتالوج بعد</b>' +
-      'المستهدفات تُدخل لكل خدمة، فأضف خدمة من «معرفة الخدمة» أولًا ثم عد إلى هنا لتحديد مستهدفها.</div>';
+    return h + '<section class="m-card m-empty"><p class="m-empty__t">لا توجد خدمات في الكتالوج بعد</p>' +
+      '<p class="m-empty__d">المستهدفات تُدخل لكل خدمة، فأضف خدمة من «المنتجات» أولًا ثم عد إلى هنا لتحديد مستهدفها.</p>' +
+      "</section></div>";
   }
-
-  var noTarget = 0;
-  for (var j = 0; j < rows.length; j++) if (!rows[j].target) noTarget++;
 
   var body = "";
   for (var k = 0; k < rows.length; k++) {
     var r = rows[k];
     var at = attainmentPct(r.achieved, r.target);
     var cv = coveragePct(r.achieved, r.weightedOpen, r.target);
+    /* THREE absences, one row, and they are not the same fact. The target is a number someone
+       OWES, and it is marked once, in the column that owes it. «الإنجاز» and «التغطية» are then
+       simply unmeasurable — a legitimate nothing — and marking them owed as well would put three
+       red dashes on one row for one missing value, which is how a reader learns to ignore all
+       three. */
     body += "<tr>" +
-      '<td><div class="perf-prod">' + esc(r.product) + "</div>" +
-        (r.sector ? '<div class="perf-sec">' + esc(r.sector) + "</div>" : "") + "</td>" +
-      '<td class="money">' + (r.target ? perfMoney(r.target) : '<span class="perf-sec">لم يُحدَّد</span>') + "</td>" +
-      '<td class="money">' + perfMoney(r.achieved) + "</td>" +
-      '<td class="money perf-sechide">' + perfMoney(r.weightedOpen) + "</td>" +
-      "<td>" + perfBar(at, elapsed) + "</td>" +
-      '<td class="money">' + (at === null ? "—" : fmtN(Math.round(at)) + "٪") + "</td>" +
-      '<td class="money perf-sechide">' + (cv === null ? "—" : fmtN(Math.round(cv)) + "٪") + "</td>" +
+      '<td class="m-td-n">' + esc(r.product) +
+        (r.sector ? '<span class="perf-sub m-meta">' + esc(r.sector) + "</span>" : "") + "</td>" +
+      '<td class="m-td-v">' + (r.target ? perfMoney(r.target) : mNil("لم يُحدَّد", "owed")) + "</td>" +
+      '<td class="m-td-v">' + perfMoney(r.achieved) + "</td>" +
+      '<td class="m-td-v perf-sechide">' + perfMoney(r.weightedOpen) + "</td>" +
+      '<td><span class="perf-ach">' + perfBar(at, elapsed) +
+        (at === null ? mNil("لم يُقَس", "none") : perfPct(at)) + "</span></td>" +
+      '<td class="m-td-v perf-sechide">' + (cv === null ? mNil("لم يُقَس", "none") : perfPct(cv)) + "</td>" +
       "<td>" + perfRag(at, elapsed) + "</td>" +
-      '<td><button class="perf-set" data-perf-product="' + esc(r.product) + '">' +
+      '<td><button class="m-btn" data-perf-product="' + esc(r.product) + '">' +
         (r.target ? "تعديل" : "تحديد المستهدف") + "</button></td>" +
       "</tr>";
   }
 
-  var table = '<div style="overflow-x:auto"><table class="perf-tbl"><thead><tr>' +
+  h += '<section class="m-card m-card--pad0 perf-tbl"><div class="m-tablewrap">' +
+    '<table class="m-table"><thead><tr>' +
     "<th>الخدمة</th><th>المستهدف</th><th>المحقق</th>" +
-    '<th class="perf-sechide">المتوقع</th><th>التقدّم</th><th>الإنجاز</th>' +
+    '<th class="perf-sechide">المتوقع</th><th>الإنجاز مقابل مضيّ الربع</th>' +
     '<th class="perf-sechide">التغطية</th><th>الحالة</th><th></th>' +
-    "</tr></thead><tbody>" + body + "</tbody></table></div>";
+    "</tr></thead><tbody>" + body + "</tbody></table></div></section>";
 
   // Day one is every target unset. Say so, say who fixes it, and say what the numbers still mean
   // in the meantime — an empty state that explains itself is a feature, not an apology.
   // The PARTIAL case needs saying too: a percentage measured on part of the catalogue reads as
-  // the whole one unless the page states what it left out.
-  var hint = noTarget === rows.length
-    ? '<div class="perf-empty"><b>لم تُحدَّد أي مستهدفات لهذا الربع</b>' +
-      'الأرقام المحققة والمتوقعة أعلاه صحيحة الآن — لكن «الإنجاز» و«الحالة» تحتاج مستهدفًا لتُقاس عليه. ' +
-      'اضغط «تحديد المستهدف» بجوار أي خدمة.</div>'
-    : (offCount
-      ? '<div class="perf-empty"><b>النسبة محسوبة على ' + fmtN(rows.length - offCount) +
-        ' من ' + fmtN(rows.length) + ' خدمة</b>' +
-        fmtN(offCount) + ' خدمة بلا مستهدف لهذا الربع' +
-        (offA ? '، ومحققها ' + perfMoney(offA) + ' غير داخل في النسبة' : '') + '.</div>'
-      : "");
+  // the whole one unless the page states what it left out. Both counts go through dsFig.
+  if (offCount === rows.length) {
+    h += '<section class="m-card m-empty"><p class="m-empty__t">لم تُحدَّد أي مستهدفات لهذا الربع</p>' +
+      '<p class="m-empty__d">الأرقام المحققة والمتوقعة أعلاه صحيحة الآن — لكن «الإنجاز» و«التغطية» و«الحالة» ' +
+      "تحتاج مستهدفًا لتُقاس عليه. اضغط «تحديد المستهدف» بجوار أي خدمة.</p></section>";
+  } else if (offCount) {
+    h += '<p class="m-status m-status--warn">النسب محسوبة على ' +
+      dsFig("perfTargeted", rows.length - offCount) + " من " + dsFig("perfServices", rows.length) +
+      " خدمة · " + dsFig("perfNoTarget", offCount) + " بلا مستهدف لهذا الربع" +
+      (offA ? "، ومحققها " + perfMoney(offA) + " غير داخل في النسبة" : "") + ".</p>";
+  }
 
-  return head + kpis + table + hint;
+  return h + "</div>";
 }
 `;

@@ -34,11 +34,15 @@
 // esc, fmtN, fmtD, ic, clip, contactByPhone, entities, campaigns, cache, tagList, alertBar,
 // pageSlice, pageBar, PAGE, TOKEN, showTest and render.
 //
-// PORTED to the new design system (docs/PORT-SPEC.md), 2026-09-17. The screen body is wrapped in
-// .ds6 and speaks the m-* vocabulary: m-card, m-table in m-tablewrap, m-board/m-col/m-deal for the
-// kanban, m-chip, m-btn, m-seg, m-tabs, m-field/m-label/m-input/m-select, m-empty, and m-n around
-// EVERY digit. Absences are typed (m-nil--owed a number someone owes, --unset a classification
-// nobody made, --none a legitimate nothing); there is no bare em-dash left on this screen.
+// PORTED to the new design system (docs/PORT-SPEC.md), 2026-09-17. vOppsCrm owns the ONE .ds6
+// wrapper for the whole screen — the board, both drawers AND the lost-reason dialog, which used to
+// be appended outside it and would have rendered in the old system on top of a ported board.
+// Everything inside speaks the m-* vocabulary: m-card, m-table in m-tablewrap, m-board/m-col/m-deal
+// for the kanban, m-chip, m-btn, m-seg, m-tabs (the drawer's four sections too — the private
+// .ox-dtabs strip and its measured indicator are gone), m-dlg__h/__b/__f inside the side-sheet
+// frame, m-field/m-label/m-input/m-select/m-form, m-empty, m-alert, and m-n around EVERY digit.
+// Absences are typed (m-nil--owed a number someone owes, --unset a classification nobody made,
+// --none a legitimate nothing); there is no bare em-dash left on this screen.
 //
 // WHAT COULD NOT BE DELETED. This module's stylesheet is not private: products-crm.ts, and to a
 // lesser extent indicators-crm.ts, revamp.ts and exec-reports-crm.ts, render .ox-sum, .ox-lbl,
@@ -376,8 +380,6 @@ export const OPPS_CRM_CSS = `
   .ox-steps.is-lost .ox-step .l { color:var(--muted); }
   .ox-exit { display:flex; flex-direction:column; gap:2px; padding:0 12px 10px; padding-inline-start:44px;
     font-size:var(--t-xs); color:var(--ink-2); line-height:var(--lh-body); position:relative; }
-  .ox-strow .ox-won:not([disabled]):hover { color:var(--s-issued-text); }
-  .ox-strow .ox-lost:not([disabled]):hover { color:var(--s-fail-text); }
   .ox-strow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
   .ox-strow .btn { height:36px; padding-inline:12px; font-size:var(--t-sm); gap:6px; }
   .ox-form { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
@@ -611,6 +613,31 @@ export const OPPS_CRM_CSS = `
   .ds6 .ox-hval { display:flex; align-items:baseline; gap:var(--m-3); flex-wrap:wrap;
     padding:var(--m-3) var(--m-5) 0; }
   .ds6 .ox-hval .fig { font-size:var(--m-t-h); font-weight:700; color:var(--m-ink); line-height:1.2; }
+  .ds6 .ox-hval .sub { font-size:var(--m-t-cap); color:var(--m-mut); }
+  /* A spacer inside the two rows the vocabulary has no layout for: the drawer footer and the stage
+     action row. One rule rather than an inline flex on every site. */
+  .ds6 .ox-dr .m-dlg__f .sp, .ds6 .ox-strow .sp { flex:1 1 auto; }
+  .ds6 .ox-dr .m-dlg__f .rv-hold { min-block-size:44px; padding-inline:var(--m-4); font-size:var(--m-t-body); }
+  /* An address or a phone number is not a quantity, so it does not take .m-n — but it is still
+     latin inside an RTL line and has to be isolated or the punctuation migrates. */
+  .ds6 bdi { unicode-bidi:isolate; }
+  /* The create form picks ONE source from five, each with its icon. The vocabulary's segmented
+     control is built for two or three and does not wrap; this one wraps and carries icons. */
+  .ds6 .ox-srcs { display:flex; flex-wrap:wrap; gap:var(--m-2); }
+  .ds6 .ox-srcs button { font:inherit; font-size:var(--m-t-cap); font-weight:600; color:var(--m-ink-2);
+    background:var(--m-paper); border:1px solid var(--m-line-2); border-radius:var(--m-r-chip);
+    min-block-size:40px; padding-inline:var(--m-3); display:inline-flex; align-items:center; gap:6px;
+    cursor:pointer;
+    transition:background var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+  .ds6 .ox-srcs button:active { transform:scale(.97); }
+  .ds6 .ox-srcs button[aria-checked="true"] { background:var(--m-ac-dim); color:var(--m-ac-deep); border-color:var(--m-ac); }
+  /* A role that may only read gets the stored value printed where its input would be. */
+  .ds6 .ox-ro { font-size:var(--m-t-body); color:var(--m-ink); min-block-size:36px; display:flex; align-items:center; }
+  /* A quantity typed into a field is still a figure: end-aligned and tabular, but start-aligned while
+     only the placeholder shows, or the hint reads as though it were cut off. */
+  .ds6 .m-input.num { text-align:end; font-variant-numeric:tabular-nums; }
+  .ds6 .m-input.num:placeholder-shown { text-align:start; }
+  .ds6 .ox-lblk .lv { font-size:var(--m-t-body); font-weight:700; color:var(--m-ink); }
   .ds6 .ox-sec { display:flex; flex-direction:column; gap:var(--m-2); }
   .ds6 .ox-sec + .ox-sec { padding-block-start:var(--m-5); border-block-start:1px solid var(--m-line); }
   .ds6 .ox-sech { font-size:var(--m-t-cap); font-weight:700; color:var(--m-mut); }
@@ -762,7 +789,9 @@ function opStage(k) {
   /* A key the ladder does not carry (a config read that failed, or a rung deleted while a line sat
      on it) is shown AS ITSELF. Falling back to OPP_ST[0] labelled it «تواصل أولي» — a wrong stage
      printed with full confidence. */
-  return { key: k, label: String(k || "—"), dot: "#A2A9B4", position: 99, active: true, slaDays: null, terminal: null };
+  /* A line with NO stage key at all is a classification nobody made; it is named as one rather than
+     drawn as a bare em-dash, which PORT-SPEC §4 leaves no room for. */
+  return { key: k, label: String(k || "مرحلة غير مسجّلة"), dot: "#A2A9B4", position: 99, active: true, slaDays: null, terminal: null };
 }
 function opOpenStages() { return OPP_ST.filter(function (s) { return isOpenStage(s.key); }); }
 /* A paused rung is not offered for new work, but never traps a line already on it (config-domain's
@@ -1463,17 +1492,17 @@ function opEscSection(l) {
         }).join("") + "</select>";
     }
     b += "</div>";
-    b += '<div class="ox-fld"><label for="opesc_why">' + (opEsc.kind === "support" ? "ما الذي تحتاجه؟" : "سبب التصعيد") + "</label>" +
-      '<input class="inp" id="opesc_why" maxlength="300" value="' + esc(opEsc.reason || "") + '" data-opesc="reason" placeholder="' +
+    b += '<div class="m-field"><label class="m-label" for="opesc_why">' + (opEsc.kind === "support" ? "ما الذي تحتاجه؟" : "سبب التصعيد") + "</label>" +
+      '<input class="m-input" id="opesc_why" maxlength="300" value="' + esc(opEsc.reason || "") + '" data-opesc="reason" placeholder="' +
       (opEsc.kind === "support" ? "مثال: العميل يسأل عن تكامل HIS ويحتاج مهندسًا" : "مثال: العميل ينتظر قرار تسعير منذ أسبوع") + '"></div>';
-    b += '<div class="ox-escbtns"><button class="btn btn-teal" data-op="escsave"' + (opEsc.busy ? ' disabled aria-busy="true"' : "") + ">" +
+    b += '<div class="ox-escbtns"><button class="m-btn m-btn--primary" data-op="escsave"' + (opEsc.busy ? ' disabled aria-busy="true"' : "") + ">" +
       (opEsc.busy ? "جارٍ التسجيل…" : opEsc.kind === "support" ? "سجّل طلب الدعم" : "سجّل التصعيد") + "</button>" +
-      '<button class="btn btn-ghost" data-op="esccancel">إلغاء</button>' +
+      '<button class="m-btn" data-op="esccancel">إلغاء</button>' +
       (opEsc.err ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opEsc.err) + "</span>" : "") + "</div></div>";
   }
   if (failed) {
     b += '<div class="ox-hint2" role="alert">' + opIco("warn") + "تعذّر تحميل سجل التصعيد — لم يُعرض شيء لأن الطلب فشل." +
-      '<button class="btn btn-ghost" data-op="escretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
+      '<button class="m-btn" data-op="escretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
   }
   if (rows.length) {
     b += '<div class="ox-esclist">' + rows.map(function (r) {
@@ -1482,8 +1511,8 @@ function opEscSection(l) {
         '<span class="m">' + (r.createdAt ? fmtD(r.createdAt) : "") + (r.createdBy ? " · " + esc(r.createdBy) : "") +
         '<span class="dl">' + esc((typeof DELIVERY_LABELS !== "undefined" && DELIVERY_LABELS[r.delivery]) || r.delivery) + "</span></span>" +
         (r.resolvedAt ? '<span class="ok">' + opIco("check") + "أُغلق</span>"
-          : opMayEdit() ? '<button class="btn btn-ghost" data-op="escdone" data-i="' + r.id + '" data-o="' + r.oppId + '">تم</button>'
-          : '<span class="ox-sub">مفتوح</span>') + "</div>";
+          : opMayEdit() ? '<button class="m-btn" data-op="escdone" data-i="' + r.id + '" data-o="' + r.oppId + '">تم</button>'
+          : '<span class="m-chip m-chip--warn">مفتوح</span>') + "</div>";
     }).join("") + "</div>";
   }
   return b + "</section>";
@@ -1524,26 +1553,36 @@ function opEscResolve(id, oppId) {
    what it is FOR. Four panels now, and the tab carries its own count so nobody opens an empty one. */
 var opTab = "deal";
 window.opSetTab = function (t) { if (opTab === t) return; opTab = t; opDrScroll = 0; opRender(); };
+/* The vocabulary's own tab rail (PORT-SPEC §2): .m-tabs / .m-tab with aria-selected, the selected
+   tab drawn by its border rather than by a strip measured after paint — so the private .ox-dtabs and
+   its sliding indicator are gone, and with them the moveInd call in opAfterRender.
+   Each count is printed HERE and again on its section heading, so both sites carry the same bound
+   derivation (PORT-SPEC §6: owActs / owQuotes / owEsc, registered at the top of this module). */
 function opTabStrip(counts) {
-  var tabs = [["deal", "الفرصة", null], ["acts", "الأنشطة", counts.acts], ["quotes", "عروض الأسعار", counts.quotes], ["esc", "التصعيد والدعم", counts.esc]];
-  return '<div class="ox-dtabs" role="tablist" aria-label="أقسام الفرصة">' + tabs.map(function (t) {
-    return '<button type="button" class="ox-dtab" role="tab" id="oxdt_' + t[0] + '" aria-selected="' + (opTab === t[0]) + '"' +
+  var tabs = [["deal", "الفرصة", null, ""], ["acts", "الأنشطة", counts.acts, "owActs"],
+    ["quotes", "عروض الأسعار", counts.quotes, "owQuotes"], ["esc", "التصعيد والدعم", counts.esc, "owEsc"]];
+  return '<div class="m-tabs" role="tablist" aria-label="أقسام الفرصة">' + tabs.map(function (t) {
+    return '<button type="button" class="m-tab" role="tab" id="oxdt_' + t[0] + '" aria-selected="' + (opTab === t[0]) + '"' +
       ' onclick="opSetTab(&quot;' + t[0] + '&quot;)">' + t[1] +
-      (t[2] ? '<span class="n">' + fmtN(t[2]) + "</span>" : "") + "</button>";
-  }).join("") + '<i class="ind" aria-hidden="true"></i></div>';
+      (t[2] ? "<b>" + dsFig(t[3], t[2]) + "</b>" : "") + "</button>";
+  }).join("") + "</div>";
 }
 
-function opDrawerShell(labelId, head, body, foot, tabs) {
+/* The FRAME stays local — the vocabulary's dialog is centred and this one is a side sheet — but
+   everything inside it is the vocabulary's: m-dlg__h / __b / __f and m-x for the close control.
+   lead is the band between the header and the tabs (the deal's leading figure); it is its own slot
+   because its padding is the drawer's, not the header row's. */
+function opDrawerShell(labelId, head, body, foot, tabs, lead) {
   var cls = opDrShown ? " in" : "";
   return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
     /* Plain divs, not aside/header/footer: the shell styles those ELEMENTS (the rail is an aside that
        becomes a centred top bar on a phone), and the drawer inherited it — its header rendered 216px
        wide inside a 390px drawer. */
     '<div class="ox-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="' + labelId + '">' +
-    '<div class="ox-dh">' + head + '<button class="ox-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></div>" +
-    (tabs || "") +
-    '<div class="ox-db" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
-    '<div class="ox-df">' + foot + "</div></div>";
+    '<div class="m-dlg__h">' + head + '<button class="m-x" id="oxclose" aria-label="إغلاق" onclick="opCloseDrawer()">' + opIco("x") + "</button></div>" +
+    (lead || "") + (tabs || "") +
+    '<div class="m-dlg__b" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
+    '<div class="m-dlg__f">' + foot + "</div></div>";
 }
 /* The STAGE STEPPER. Every open rung by name, top to bottom: passed rungs carry their tone and a
    check, the current one sits on a tinted pill with its age and its exit criterion, later rungs are
@@ -1575,12 +1614,12 @@ function opStepper(l, open, idx) {
          just chose BECOMES the current (inert) rung on the next paint — focus would fall to <body>. */
       (can ? ' onclick="opStepTo(' + l.id + ',&quot;' + s.key + '&quot;)"' : ' aria-disabled="true"') +
       ' aria-label="' + esc(s.label) + "، " + said + (paused ? "، موقوفة" : can ? "، نقل إليها" : "") + '">' +
-      '<span class="k" aria-hidden="true">' + (state === "done" ? opIco("check") : fmtN(i + 1)) + "</span>" +
+      '<span class="k" aria-hidden="true">' + (state === "done" ? opIco("check") : opN(i + 1)) + "</span>" +
       '<span class="tx"><span class="l">' + esc(s.label) + "</span>" +
-      (isCur ? '<span class="ox-sub">' + opAgo(l) + "</span>" : paused ? '<span class="ox-sub">موقوفة</span>' : "") + "</span>" +
+      (isCur ? '<span class="m-meta">' + opAgoN(l) + "</span>" : paused ? '<span class="m-meta">موقوفة</span>' : "") + "</span>" +
       (can ? '<span class="go" aria-hidden="true">نقل</span>' : "") + "</button>";
     if (isCur && s.exitCriterion) {
-      h += '<div class="ox-exit"><span class="ox-lbl">شرط الانتقال للمرحلة التالية</span><span>' + esc(s.exitCriterion) + "</span></div>";
+      h += '<div class="ox-exit"><span class="m-label">شرط الانتقال للمرحلة التالية</span><span>' + esc(s.exitCriterion) + "</span></div>";
     }
     h += "</li>";
   });
@@ -1620,17 +1659,18 @@ function opDetailDrawer(l) {
   var st = opStage(l.stage);
   var open = opOpenStages();
   var idx = -1; open.forEach(function (s, i) { if (s.key === l.stage) idx = i; });
-  var head = '<div class="ox-hero"><span class="av" aria-hidden="true">' + esc(String(l.account_name || "؟").trim().charAt(0)) + "</span>" +
-    '<div class="tt"><h2 id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
-    '<div class="st"><span>' + esc(l.product) + "</span>" +
-    (l.created_by === "المساعد" ? '<span class="ox-auto">تلقائي</span>' : "") + "</div></div></div>";
+  var head = '<div class="ox-hd"><span class="m-av m-av--sq" aria-hidden="true">' + esc(String(l.account_name || "؟").trim().charAt(0)) + "</span>" +
+    '<div class="tt"><h2 class="m-dlg__t" id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
+    '<div class="m-meta">' + esc(l.product) +
+    (l.created_by === "المساعد" ? ' <span class="m-chip m-chip--ac">تلقائي</span>' : "") + "</div></div></div>";
   /* The three facts a reader opens this drawer for, before any scrolling: what it is worth, where it
-     stands, and whether it is late. */
-  head += '<div class="ox-hval">' +
-    (opPriced(l) ? "<b>" + opMoney(opValue(l)) + "</b>" : '<b class="none">' + OPP_UNPRICED + "</b>") +
-    '<span class="sub">' + (opIsOpen(l) ? opAgo(l) : opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
-    (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متأخرة</span>" : "") +
-    '<span class="stg" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span></div>";
+     stands, and whether it is late. An unpriced line is a number someone OWES, drawn as that
+     absence rather than as grey prose (PORT-SPEC §4). */
+  var lead = '<div class="ox-hval">' +
+    '<span class="fig">' + (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</span>" +
+    '<span class="sub">' + (opIsOpen(l) ? opAgoN(l) : opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
+    (opStalled(l) ? '<span class="m-chip m-chip--warn">متأخرة</span>' : "") +
+    '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span></div>";
   var b = "";
   /* المرحلة */
   var ssk = l.id + ":stage";
@@ -1638,16 +1678,17 @@ function opDetailDrawer(l) {
   b += opStepper(l, open, idx);
   if (opIsOpen(l)) {
     b += '<div class="ox-strow">' +
-      (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة — تجاوزت " + opNDay(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
-      '<span style="flex:1"></span>' +
+      (opStalled(l) ? '<span class="m-chip m-chip--warn">متوقفة — تجاوزت ' + opNDayN(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
+      '<span class="sp"></span>' +
       (opMayEdit()
-        ? '<button class="btn btn-ghost ox-won" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
-          '<button class="btn btn-ghost ox-lost" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button>'
+        ? '<button class="m-btn" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
+          '<button class="m-btn" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button>'
         : "") + "</div>";
   } else {
-    b += '<div class="ox-strow"><span class="ox-out ' + (opIsWon(l) ? "won" : "lost") + '">' + (opIsWon(l) ? opIco("check") + "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
-      '<span class="ox-sub">' + opAgo(l) + '</span><span style="flex:1"></span>' +
-      (opMayEdit() ? '<button class="btn btn-ghost" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button>' : "") + "</div>";
+    b += '<div class="ox-strow"><span class="m-chip ' + (opIsWon(l) ? "m-chip--ok" : "m-chip--bad") + '">' +
+      (opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
+      '<span class="m-meta">' + opAgoN(l) + '</span><span class="sp"></span>' +
+      (opMayEdit() ? '<button class="m-btn" onclick="opSetStage(' + l.id + ',&quot;' + open[open.length - 1].key + '&quot;)">إعادة فتح</button>' : "") + "</div>";
     if (typeof owLostBlock === "function") b += owLostBlock(l);
   }
   b += "</section>";
@@ -1657,13 +1698,16 @@ function opDetailDrawer(l) {
   /* The figure itself now leads the drawer (ox-hval), so this section carries only HOW it is
      reached — printing the same number twice on one screen is how a reader starts checking whether
      the two agree. */
+  /* Every figure in the formula rides inside .m-n, the percent sign INSIDE its own span — outside it
+     the bidi algorithm lands «٪» to the left of its digits (PORT-SPEC §3). The <bdi> the line used to
+     carry is what .m-n already does. */
   b += opPriced(l)
-    ? '<div class="ox-form"><bdi>' + fmtN(Number(l.sale_price)) + " ر.س سنويًا × " + opNYear(Number(l.years || 1)) + " × " + fmtN(Number(l.qty || 1)) +
-      (disc ? " × (1 − " + fmtN(disc) + "٪)" : "") + " = " + opMoney(opValue(l)) + "</bdi></div>"
+    ? '<div class="ox-form">' + opNU(Number(l.sale_price), "ر.س") + " سنويًا × " + opNYearN(Number(l.years || 1)) + " × " + opN(Number(l.qty || 1)) +
+      (disc ? " × (1 − " + mPct(disc) + ")" : "") + " = " + opMoney(opValue(l)) + "</div>"
     : '<div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
-  b += '<div class="ox-g2">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
+  b += '<div class="m-form">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
     opField(l, "qty", "الكمية", "number") + opField(l, "discount", "الخصم ٪", "number") + "</div>";
-  if (disc > 50) b += '<div class="ox-hint">' + opIco("warn") + "خصم مرتفع: " + fmtN(disc) + "٪ من السعر السنوي. تأكّد أنه مقصود.</div>";
+  if (disc > 50) b += '<div class="ox-hint">' + opIco("warn") + "خصم مرتفع: " + mPct(disc) + " من السعر السنوي. تأكّد أنه مقصود.</div>";
   b += "</section>";
   /* المتابعة */
   b += '<section class="ox-sec" aria-labelledby="oxsec_f"><div class="ox-sech" id="oxsec_f">المتابعة</div>' +
@@ -1678,11 +1722,13 @@ function opDetailDrawer(l) {
     "<dt>المصدر</dt><dd>" + srcDD + "</dd>" +
     (l.source === "whatsapp" && l.source_ref ? "<dt>الحملة</dt><dd>" + esc(opCampName(l.source_ref)) + "</dd>" : "") +
     (l.source === "partner" && l.source_ref ? "<dt>الشريك</dt><dd>" + esc(l.source_ref) + "</dd>" : "") +
-    (l.source === "whatsapp" && l.phone ? '<dt>المحادثة</dt><dd><a class="ox-lnk" href="#customer/' + esc(l.phone) + '">فتح المحادثة ←</a></dd>' : "") +
+    (l.source === "whatsapp" && l.phone ? '<dt>المحادثة</dt><dd><a class="m-link" href="#customer/' + esc(l.phone) + '">فتح المحادثة ←</a></dd>' : "") +
     (l.phone ? '<dt>الجوال</dt><dd><bdi dir="ltr">+' + esc(l.phone) + "</bdi></dd>" : "") +
-    "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : '<span class="ox-none">—</span>') + "</dd>" +
-    "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : "—") + "</dd>" +
-    "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : "—") + "</dd></dl></section>";
+    /* Three absences, and they are not one state repeated: nobody recorded WHO entered the line, and
+       nobody stamped it — both are classifications nobody made, never a bare dash (PORT-SPEC §4). */
+    "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : opNil("لم يُسجَّل مُدخِلها", "unset")) + "</dd>" +
+    "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : opNil("لم يُسجَّل تاريخ الإنشاء", "unset")) + "</dd>" +
+    "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : opNil("لم يُسجَّل تحديث بعد", "none")) + "</dd></dl></section>";
   /* «نتائج المراحل» closes the deal panel: what each rung came to is the story of the line, and the
      work done inside it lives in its own tab. */
   if (typeof owJourneySection === "function") b += owJourneySection(l);
@@ -1690,11 +1736,12 @@ function opDetailDrawer(l) {
   var key = opKey(l);
   var rel = (oppRows || []).filter(function (o) { return o.id !== l.id && opKey(o) === key; });
   if (rel.length) {
-    b += '<section class="ox-sec" aria-labelledby="oxsec_r"><div class="ox-sech" id="oxsec_r">بنود أخرى لهذه الجهة (' + fmtN(rel.length) + ')</div><div class="ox-rel">' +
+    b += '<section class="ox-sec" aria-labelledby="oxsec_r"><div class="ox-sech" id="oxsec_r">بنود أخرى لهذه الجهة · ' +
+      opNLineN(rel.length) + '</div><div class="ox-rel">' +
       rel.map(function (o) {
         return '<button class="ox-relr" onclick="opSwitchLine(' + o.id + ')"><span class="p">' + esc(o.product) + "</span>" +
           '<span class="s">' + opDot(o.stage) + esc(opStage(o.stage).label) + "</span>" +
-          '<span class="v">' + (opPriced(o) ? opMoney(opValue(o)) : '<span class="ox-none">' + OPP_UNPRICED + "</span>") + "</span></button>";
+          '<span class="v">' + (opPriced(o) ? opMoney(opValue(o)) : opUnpricedNil()) + "</span></button>";
       }).join("") + "</div></section>";
   }
   /* The tabs. The deal panel is everything built above; the other three are their own sections, each
@@ -1716,13 +1763,13 @@ function opDetailDrawer(l) {
     opEscLoad(l.id, false);
   }
   var foot = (opDelErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opDelErr) + "</span>" : "") +
-    (l.phone ? '<a class="btn btn-ghost" href="#customer/' + esc(l.phone) + '" style="text-decoration:none;">ملف العميل ←</a>' : "") +
+    (l.phone ? '<a class="m-btn" href="#customer/' + esc(l.phone) + '">ملف العميل ←</a>' : "") +
     '<span class="sp"></span>' +
     (opMayEdit()
       ? '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
         ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>'
       : "");
-  return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts));
+  return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts), lead);
 }
 
 function opCreateDrawer() {
@@ -1730,18 +1777,19 @@ function opCreateDrawer() {
   // Archived products are not offered for new work; the server refuses them too (400), but a picker
   // that offers what the save will reject is a dead control.
   var reg = tagList().filter(function (t) { return !t.archived; });
-  var head = '<div class="tt"><h2 id="oxdrt" tabindex="-1">إضافة فرصة</h2><div class="st">جهة واحدة، ومنتج أو أكثر — ومن أين جاءت</div></div>';
+  var head = '<div class="ox-hd"><div class="tt"><h2 class="m-dlg__t" id="oxdrt" tabindex="-1">إضافة فرصة</h2>' +
+    '<div class="m-meta">جهة واحدة، ومنتج أو أكثر — ومن أين جاءت</div></div></div>';
   var errOf = function (f) { return opErrFld === f ? ' aria-invalid="true"' : ""; };
   var b = '<section class="ox-sec"><div class="ox-sech">الجهة</div>';
-  b += '<div class="ox-fld"><label for="opd_name">اسم الجهة <span class="req" aria-hidden="true">*</span></label>' +
-    '<input class="inp" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مثال: مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
+  b += '<div class="m-field"><label class="m-label m-req" for="opd_name">اسم الجهة</label>' +
+    '<input class="m-input" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مثال: مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
     ' oninput="opDraft(&quot;name&quot;,this.value)"></div>';
   var accts = entities.slice(0, 400);
   b += '<datalist id="opaccts">' + accts.map(function (e) { return '<option value="' + esc(e.name) + '"></option>'; }).join("") + "</datalist>";
-  b += '<div class="ox-g2"><div class="ox-fld"><label for="opd_phone">الجوال (اختياري)</label>' +
-    '<input class="inp" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr"' + errOf("phone") + ' oninput="opDraft(&quot;phone&quot;,this.value)"></div>' +
-    '<div class="ox-fld"><label for="opd_owner">مسؤول المبيعات (اختياري)</label>' +
-    '<input class="inp" id="opd_owner" list="oxowners2" value="' + esc(d.owner || "") + '" placeholder="بلا مسؤول" oninput="opDraft(&quot;owner&quot;,this.value)"></div></div>' +
+  b += '<div class="m-form"><div class="m-field"><label class="m-label" for="opd_phone">الجوال (اختياري)</label>' +
+    '<input class="m-input" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr"' + errOf("phone") + ' oninput="opDraft(&quot;phone&quot;,this.value)"></div>' +
+    '<div class="m-field"><label class="m-label" for="opd_owner">مسؤول المبيعات (اختياري)</label>' +
+    '<input class="m-input" id="opd_owner" list="oxowners2" value="' + esc(d.owner || "") + '" placeholder="بلا مسؤول" oninput="opDraft(&quot;owner&quot;,this.value)"></div></div>' +
     '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
   b += "</section>";
   b += '<section class="ox-sec"><div class="ox-sech" id="opd_srcl">مصدر الفرصة</div><div class="ox-srcs" role="radiogroup" aria-labelledby="opd_srcl">' +
@@ -1749,15 +1797,16 @@ function opCreateDrawer() {
       return '<button role="radio" aria-checked="' + (d.source === k) + '" onclick="opDraftSrc(&quot;' + k + '&quot;)">' + opIco(k) + esc(OPP_SRC[k]) + "</button>";
     }).join("") + "</div>";
   if (d.source === "whatsapp") {
-    b += '<div class="ox-fld"><label for="opd_camp">من أي حملة؟</label><span class="ox-f ox-fw"><select id="opd_camp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
-      '<option value="">— لم تُحدَّد —</option>' +
+    b += '<div class="m-field"><label class="m-label" for="opd_camp">من أي حملة؟</label>' +
+      '<select class="m-select" id="opd_camp" onchange="opDraft(&quot;source_ref&quot;,this.value)">' +
+      '<option value="">لم تُحدَّد حملة</option>' +
       (campaigns || []).map(function (cp) {
         return '<option value="' + esc(cp.id) + '"' + (String(d.source_ref) === String(cp.id) ? " selected" : "") + ">" + esc(clip(cp.name, 48)) + "</option>";
-      }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>";
+      }).join("") + "</select></div>";
   }
   if (d.source === "partner") {
-    b += '<div class="ox-fld"><label for="opd_partner">اسم الشريك <span class="req" aria-hidden="true">*</span></label>' +
-      '<input class="inp" id="opd_partner" maxlength="120" value="' + esc(d.source_ref || "") + '" placeholder="مثال: شركة الحلول الصحية"' + errOf("source_ref") +
+    b += '<div class="m-field"><label class="m-label m-req" for="opd_partner">اسم الشريك</label>' +
+      '<input class="m-input" id="opd_partner" maxlength="120" value="' + esc(d.source_ref || "") + '" placeholder="مثال: شركة الحلول الصحية"' + errOf("source_ref") +
       ' oninput="opDraft(&quot;source_ref&quot;,this.value)"></div>';
   }
   b += "</section>";
@@ -1767,29 +1816,30 @@ function opCreateDrawer() {
     var v = opValue(l); total += v; if (!opPriced(l)) unp++;
     var fid = function (k) { return "opd_" + k + "_" + i; };
     var numF = function (k, label, rng, ph) {
-      return '<div class="ox-fld"><label for="' + fid(k) + '">' + label + "</label>" +
-        '<input class="inp num" id="' + fid(k) + '" type="number" inputmode="decimal"' + rng + (ph ? ' placeholder="' + ph + '"' : "") +
+      return '<div class="m-field"><label class="m-label" for="' + fid(k) + '">' + label + "</label>" +
+        '<input class="m-input num" id="' + fid(k) + '" type="number" inputmode="decimal"' + rng + (ph ? ' placeholder="' + ph + '"' : "") +
         ' value="' + esc(l[k]) + '"' + errOf(k + "_" + i) + ' oninput="opLineSet(' + i + ',&quot;' + k + '&quot;,this.value)"></div>';
     };
-    b += '<div class="ox-lblk"><div class="hd"><span>البند ' + fmtN(i + 1) + "</span>" +
-      (d.lines.length > 1 ? '<button onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
-      '<div class="ox-fld"><label for="' + fid("product") + '">المنتج <span class="req" aria-hidden="true">*</span></label>' +
-      '<span class="ox-f ox-fw"><select id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
-      '<option value="">— اختر المنتج —</option>' +
+    b += '<div class="ox-lblk"><div class="hd"><span>البند ' + opN(i + 1) + "</span>" +
+      (d.lines.length > 1 ? '<button type="button" class="m-btn m-btn--quiet" onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
+      '<div class="m-field"><label class="m-label m-req" for="' + fid("product") + '">المنتج</label>' +
+      '<select class="m-select" id="' + fid("product") + '"' + errOf("product_" + i) + ' onchange="opLineSet(' + i + ',&quot;product&quot;,this.value)">' +
+      '<option value="">اختر المنتج</option>' +
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
-      '</select><span class="ox-chev">' + opIco("chevD") + "</span></span></div>" +
-      '<div class="ox-g2">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
+      "</select></div>" +
+      '<div class="m-form">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
       numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "0") + "</div>" +
-      '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoney(v) : OPP_UNPRICED) + "</span></div></div>";
+      '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv">' +
+      (opPriced(l) ? opMoney(v) : opUnpricedNil()) + "</span></div></div>";
   });
   b += '<button class="ox-arow" onclick="opLineAdd()">' + opIco("plus") + "منتج آخر</button>";
-  b += '<div class="ox-total"><span class="ox-lbl">قيمة الفرصة' + (unp && total ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</span>" +
-    (total ? '<span class="v">' + opMoney(total) + "</span>" : '<span class="v ox-none" style="font-size:var(--t-md);">' + OPP_UNPRICED + "</span>") + "</div>";
+  b += '<div class="ox-total"><span class="m-label">قيمة الفرصة' + (unp && total ? "، " + opNLineN(unp) + " بلا تسعير" : "") + "</span>" +
+    '<span class="v">' + (total ? opMoney(total) : opUnpricedNil()) + "</span></div>";
   b += "</section>";
   var foot = (opErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opErr) + "</span>" : "") +
-    '<button class="btn btn-teal" id="opd_submit" style="min-width:132px;justify-content:center;" onclick="opSubmit()"' + (oppBusy ? ' disabled aria-busy="true"' : "") + ">" +
+    '<button class="m-btn m-btn--primary" id="opd_submit" onclick="opSubmit()"' + (oppBusy ? ' disabled aria-busy="true"' : "") + ">" +
     (oppBusy ? "جارٍ الحفظ…" : "إنشاء الفرصة") + "</button>" +
-    '<button class="btn btn-ghost" onclick="opCloseDrawer()">إلغاء</button>';
+    '<button class="m-btn" onclick="opCloseDrawer()">إلغاء</button>';
   return opDrawerShell("oxdrt", head, b, foot);
 }
 
@@ -1825,7 +1875,8 @@ function opAfterRender() {
      class goes on <html> and is removed the moment the drawer leaves the DOM, including the paint
      after a close — a lock that outlives its dialog is a frozen page. */
   try { document.documentElement.classList.toggle("ox-lock", !!dr); } catch (e) {}
-  if (dr) { var strip = dr.querySelector(".ox-dtabs"); if (strip && typeof moveInd === "function") moveInd(strip); }
+  /* No indicator to place: .m-tab draws the selected tab with its own border, so nothing has to be
+     measured after paint (PORT-SPEC §2). */
   if (!dr) { opStepPrev = null; opStepFocus = ""; return; }
   opPlaceStepPill();
   if (opStepFocus) {
@@ -1861,7 +1912,7 @@ if (!window.__oxKeys) {
       /* Escape on an ARMED delete disarms it and keeps the drawer: the first Escape cancels the
          most recent intent, not the whole surface. */
       if (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("armed")) {
-        e.preventDefault(); opRender(); var hb = document.querySelector(".ox-df .rv-hold"); if (hb) hb.focus(); return;
+        e.preventDefault(); opRender(); var hb = document.querySelector(".ox-dr .rv-hold"); if (hb) hb.focus(); return;
       }
       e.preventDefault(); window.opCloseDrawer(); return;
     }
@@ -1905,18 +1956,24 @@ function vOppsCrm() {
   }
   var h = '<div class="ox">';
   if (oppRows === null && !oppFailed) {
-    h += '<section class="ox-sum" aria-busy="true"><div><div class="ox-lbl">القيمة المفتوحة</div><div class="ox-fig none">—</div><div class="ox-bar"></div></div></section>';
+    /* A ledger that has not been read yet is not a ledger worth nothing: the figure says which
+       nothing it is (PORT-SPEC §4) rather than standing in as an em-dash. */
+    h += '<section class="m-card ox-sum" aria-busy="true"><div><div class="m-label">القيمة المفتوحة</div>' +
+      '<div class="ox-fig">' + opNil("لم تُقرأ بعد", "none") + '</div><div class="ox-bar"></div></div></section>';
   } else if (oppRows) {
     h += opSummary();
   }
   h += '<section class="ox-led" aria-label="بنود الفرص">' + opToolbar() + opLadderNotice();
   if (oppFailed && !oppRows) {
-    h += '<div class="ox-state" role="alert">تعذّر تحميل الفرص.<span class="s">لم يُعرض شيء لأن الطلب فشل، لا لأن السجل فارغ.</span>' +
-      '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
+    h += '<div class="m-empty" role="alert"><p class="m-empty__t">تعذّر تحميل الفرص.</p>' +
+      '<p class="m-empty__d">لم يُعرض شيء لأن الطلب فشل، لا لأن السجل فارغ.</p>' +
+      '<div class="m-empty__a"><button class="m-btn" onclick="opRetry()">أعد المحاولة</button></div></div>';
   } else if (oppRows === null) {
     h += opSkeleton(5);
   } else {
-    if (oppFailed) h += '<div class="ox-state" role="alert" style="padding:var(--s2);">' + opIco("warn") + "تعذّر تحديث الفرص — المعروض آخر نسخة محمّلة." + '<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>';
+    if (oppFailed) h += '<div class="m-alert" role="alert">' + opIco("warn") +
+      '<span class="m-alert__d">تعذّر تحديث الفرص — المعروض آخر نسخة محمّلة.</span>' +
+      '<button class="m-btn" onclick="opRetry()">أعد المحاولة</button></div>';
     h += opWaRow();
     h += opMode === "kanban" ? opKanbanView() : opMode === "cards" ? opCardsView() : opListView();
   }
@@ -1926,10 +1983,13 @@ function vOppsCrm() {
     var l = oppRows.find(function (x) { return x.id === opOpen; });
     if (l) h += opDetailDrawer(l);
   }
+  /* The lost-reason dialog belongs to this screen, so it lives INSIDE the .ds6 subtree — outside it,
+     it would render in the old system on top of a ported board. */
   if (typeof owLossModal === "function") h += owLossModal();
   setTimeout(opAfterRender, 0);
   if (typeof owAfterRender === "function") setTimeout(owAfterRender, 0);
-  return h;
+  /* The ONE wrapper for the whole screen (PORT-SPEC §1): the board, both drawers and the dialog. */
+  return '<div class="ds6">' + h + "</div>";
 }
 
 /* ================================ HANDLERS ================================ */

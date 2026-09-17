@@ -6,112 +6,116 @@
 // pasted list, and a sheet to set the week's targets. Every «مهتم» is handed to the sales team as a partner
 // opportunity by the server, and the row then says so and links to it (BR-PRT-003).
 //
-// GRAMMAR. The settings table (.cf-sec/.cf-hr/.cf-r), .crm-kpi tiles, .cf-pill, .vtog, and the account
-// sheet (.ac-scrim/.ac-modal/.ac-box) so a sheet here opens, moves focus and closes like every other. Rules
-// come from partner-domain (PARTNER_DOMAIN_JS); the numbers from its summarizeWeek, so a tile and a table
-// row can never count a week two ways.
+// PORTED to the new design system (docs/PORT-SPEC.md). The whole screen body — and the sheet, which is a
+// sibling of it — is wrapped in .ds6. Rules still come from partner-domain (PARTNER_DOMAIN_JS); the numbers
+// still from its summarizeWeek, so a tile and a table row can never count a week two ways.
+//
+// GRAMMAR. .m-tabs/.m-tab for the partner rail, .m-kpis + .m-stat__* for the five measures, .m-table inside
+// .m-tablewrap for all three tables, .m-chip for a result, .m-meter for achievement, .m-seg for the result
+// filter and the record mode, .m-btn for every control, and .m-td-nil + one of the three absence kinds
+// wherever a cell is empty. The sheet keeps the account sheet's own .ac-scrim/.ac-modal/.ac-box mechanics
+// (accounts-crm.ts) so a sheet here opens, moves focus and closes like every other; its body is .m-dlg__b.
 //
 // MOTION (emil-design-eng). The sheet is the account sheet: 0.96 scale + opacity, 200ms in, 140ms out,
 // centred. Achievement bars do not animate: they repaint on every filter change, and a bar that regrows on
-// each keystroke is noise. Buttons press to 0.97. Reduced motion keeps the fade only.
+// each keystroke is noise. Buttons press to 0.97 through .m-btn. Reduced motion keeps the fade only.
+//
+// SMOKE LANDMARKS: #partners asserts «غير مهتم», which both the empty state and the loaded tiles carry, and
+// «لا شركاء بعد» is the accepted empty render. Neither may be reworded without smoke.py.
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const PARTNERS_CRM_CSS = `
-.pt { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:ptw; }
-.pt .crm-kpis { margin-block-end:0; }
-/* Five tiles, one row: the BRD's five measures read as one sentence (target, reached, and what reaching came to). */
-.pt .crm-kpis.crm-hasLead { grid-template-columns:1.3fr repeat(4, minmax(0,1fr)); }
-.pt-bar { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.pt-bar .sp { flex:1; }
-.pt-week { display:inline-flex; align-items:center; gap:4px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); padding:3px; }
-.pt-week .nav { width:34px; height:34px; border:none; background:none; border-radius:var(--r-sm); color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:var(--t-md); }
-.pt-week .nav:hover { background:var(--surface); }
-.pt-week .lbl { font-size:var(--t-sm); font-weight:600; color:var(--ink); padding:0 var(--s2); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.pt-week .lbl .cur { color:var(--accent-deep); font-weight:600; }
-.pt-bar select { font-family:inherit; height:40px; max-width:220px; font-size:var(--t-sm); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:10px; }
-.pt-bar select.on { box-shadow:inset 0 0 0 1px var(--accent-mark); background:var(--accent-tint); color:var(--accent-deep); }
-.pt-bar .lnk, .pt .lnk { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:none; border:none; padding:0 4px; cursor:pointer; min-height:28px; border-radius:var(--r-sm); }
-.pt-tabs { display:flex; gap:0; overflow-x:auto; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:0 var(--s2); scrollbar-width:thin; }
-.pt-tab { flex:none; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent;
-  padding:12px 14px; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; }
-.pt-tab:hover { color:var(--ink); }
-.pt-tab[aria-selected="true"] { color:var(--accent-deep); font-weight:600; border-bottom-color:var(--accent); }
-.pt-tab .off { font-size:var(--t-xs); font-weight:500; color:var(--muted); background:var(--surface-2); border-radius:var(--r-pill); padding:0 7px; }
-.pt-note { display:flex; align-items:center; gap:var(--s2); font-size:var(--t-xs); color:var(--muted); line-height:1.7; }
-.pt-note svg { width:16px; height:16px; flex:none; color:var(--accent-deep); }
-.pt-sec .hd { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); }
-.pt-sec .hd h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
-.pt-sec .hd .s { font-size:var(--t-xs); color:var(--muted); }
-.pt-sec .hd .sp { flex:1; }
-.pt-sec .hd .btn { height:34px; display:inline-flex; align-items:center; gap:6px; }
-.pt-prod .cf-hr, .pt-prod .cf-r { grid-template-columns:minmax(160px,1.6fr) 84px 96px minmax(140px,1.3fr) 72px 84px 72px; column-gap:var(--s3); }
-.pt-part .cf-hr, .pt-part .cf-r { grid-template-columns:minmax(180px,1.6fr) 84px 96px minmax(140px,1.3fr) 72px 84px 72px minmax(110px,1fr); column-gap:var(--s3); }
-.pt-res .cf-hr, .pt-res .cf-r { grid-template-columns:minmax(180px,1.6fr) minmax(0,1fr) 110px minmax(150px,1.2fr) 44px; column-gap:var(--s2); }
-.pt-part .cf-r { cursor:pointer; }
-.pt-part .cf-r:hover { background:var(--surface); }
-.pt-num { font-variant-numeric:tabular-nums; white-space:nowrap; }
-.pt-lbl { display:none; font-size:var(--t-xs); color:var(--muted); }
-.pt-ach { display:flex; align-items:center; gap:var(--s2); min-width:0; padding-inline-end:var(--s3); }
-.pt-ach .track { flex:1; height:6px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; min-width:48px; }
-.pt-ach .track i { display:block; height:100%; border-radius:inherit; background:var(--accent); }
-.pt-ach.hi .track i { background:var(--s-issued); }
-.pt-ach.lo .track i { background:var(--s-attn-mark); }
-.pt-ach .v { font-size:var(--t-xs); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; min-width:40px; text-align:end; }
-.pt-ach.none .v { color:var(--muted); font-weight:500; }
-.cf-pill.pr-interested { background:var(--accent-tint); color:var(--accent-deep); }
-.cf-pill.pr-not_interested { background:var(--s-fail-soft); color:var(--s-fail-text); }
-.cf-pill.pr-no_reply { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.pt-rs { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
-.pt-rs select { font-family:inherit; height:32px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:6px; }
-.pt-rs a { font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); text-decoration:none; white-space:nowrap; }
-.pt-rs a:hover { text-decoration:underline; text-underline-offset:3px; }
-.pt-arm { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:var(--t-xs); color:var(--ink); }
-.pt-arm .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
-.pt-del { width:36px; height:36px; border:none; background:none; border-radius:var(--r-sm); color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; }
-.pt-del:hover { background:var(--s-fail-soft); color:var(--s-fail-text); }
-.pt-del.armed { width:auto; padding:0 8px; background:var(--s-fail-soft); color:var(--s-fail-text); font-family:inherit; font-size:var(--t-xs); font-weight:600; }
-.pt-del:disabled { opacity:.4; cursor:default; background:none; color:var(--muted); }
-.pt-card { display:flex; align-items:flex-start; gap:var(--s3); flex-wrap:wrap; padding:var(--s3) var(--s4); }
-.pt-card .main { flex:1; min-width:220px; display:flex; flex-direction:column; gap:4px; }
-.pt-card .nm { font-size:var(--t-lg); font-weight:600; color:var(--ink); display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.pt-card .meta { font-size:var(--t-xs); color:var(--muted); line-height:1.8; display:flex; gap:4px 14px; flex-wrap:wrap; }
-.pt-card .acts { display:flex; gap:var(--s2); flex-wrap:wrap; }
-.pt-card .acts .btn { height:36px; display:inline-flex; align-items:center; gap:6px; }
-.pt-banner { border-radius:var(--r-md); padding:var(--s2) var(--s4); font-size:var(--t-sm); background:var(--s-attn-soft); color:var(--s-attn-text); display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.pt-rfilter { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); background:var(--surface); }
-/* sheets reuse the account sheet; only their own content is styled here */
-.pt-tg { display:flex; flex-direction:column; }
-.pt-tg .row { display:grid; grid-template-columns:minmax(0,1fr) 120px; gap:var(--s2); align-items:center; padding:8px 0; border-bottom:1px solid var(--line-soft); }
-.pt-tg .row:last-child { border-bottom:none; }
-.pt-tg .row label { font-size:var(--t-sm); color:var(--ink); }
-.pt-tg .row input { text-align:center; font-variant-numeric:tabular-nums; }
-.pt-tg .row input[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.pt-radio { display:flex; gap:6px; flex-wrap:wrap; }
-.pt-radio button { font-family:inherit; font-size:var(--t-sm); font-weight:500; min-height:38px; padding:0 14px; border-radius:var(--r-pill); border:none; cursor:pointer;
-  background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--s-off-mark); }
-.pt-radio button[aria-checked="true"] { background:var(--accent); color:var(--on-accent, #FFFFFF); box-shadow:none; }
-.pt-radio.bad button { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.pt-paste { width:100%; min-height:160px; font-family:inherit; font-size:var(--t-sm); line-height:1.7; padding:var(--s2) var(--s3); border:none; border-radius:var(--r-sm);
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); background:var(--paper); color:var(--ink); resize:vertical; box-sizing:border-box; }
-.pt-paste:focus { outline:2px solid var(--accent); outline-offset:1px; }
-.pt-prev { display:flex; flex-direction:column; gap:4px; font-size:var(--t-xs); }
-.pt-prev .ok { color:var(--accent-deep); font-weight:600; }
-.pt-prev .bad { color:var(--s-fail-text); }
-.pt .btn, .pt-tab, .pt-radio button, .pt-week .nav { transition:transform 140ms var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease); }
-.pt .btn:active, .pt-radio button:active, .pt-week .nav:active, .ac-box .pt-radio button:active { transform:scale(.97); }
-.pt a:focus-visible, .pt button:focus-visible, .pt select:focus-visible, .pt-radio button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@container ptw (max-width: 760px) { .pt .crm-kpis.crm-hasLead { grid-template-columns:repeat(3, minmax(0,1fr)); } }
-@container ptw (max-width: 500px) { .pt .crm-kpis.crm-hasLead { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-@container ptw (max-width: 900px) {
-  .pt-prod .cf-hr, .pt-part .cf-hr, .pt-res .cf-hr { display:none; }
-  .pt-prod .cf-r, .pt-part .cf-r, .pt-res .cf-r { grid-template-columns:repeat(3, minmax(0,1fr)); row-gap:6px; padding-block:var(--s3); }
-  .pt-prod .cf-r > :first-child, .pt-part .cf-r > :first-child, .pt-res .cf-r > :first-child, .pt-ach, .pt-rs { grid-column:1 / -1; }
-  .pt-lbl { display:inline; }
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). Deleted here because the vocabulary carries them:
+   the tab rail, the tiles, the three tables and their headers, the pills, the buttons and their press
+   and focus treatments, the selects and inputs, the empty and error states, every number and all three
+   kinds of absence. What survives is what the vocabulary genuinely lacks — the week stepper, the
+   five-tile lead grid, the achievement cell, the result-radio group the keyboard handler keys on, the
+   targets sheet's two-column rows, the paste box and its preview. */
+.ds6 .pt{display:flex;flex-direction:column;gap:var(--m-4);container-type:inline-size;container-name:ptw}
+.ds6 .pt-panel{display:flex;flex-direction:column;gap:var(--m-4)}
+.ds6 .pt-bar{display:flex;align-items:center;gap:var(--m-2);flex-wrap:wrap}
+/* A name that opens its own tab is a BUTTON wearing the link's type. .m-link is authored for an
+   anchor, so the button's own chrome has to be taken off here rather than in the vocabulary. */
+.ds6 button.m-link{font:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:start}
+.ds6 .pt-bar .sp{flex:1}
+
+/* The week stepper: two controls and the range they move. One object, so it is boxed once. */
+.ds6 .pt-week{display:inline-flex;align-items:center;gap:4px;background:var(--m-paper);
+  border:1px solid var(--m-line);border-radius:var(--m-r-ctl);padding:3px}
+.ds6 .pt-week .m-btn{min-block-size:34px;border:0;background:none;padding-inline:var(--m-2)}
+.ds6 .pt-week .lbl{font-size:var(--m-t-cap);font-weight:600;color:var(--m-ink);
+  padding-inline:var(--m-2);white-space:nowrap}
+.ds6 .pt-week .cur{color:var(--m-ac-deep)}
+@media (pointer:coarse){.ds6 .pt-week .m-btn{min-block-size:44px}}
+
+/* Five measures read as one sentence, and the first of them leads. */
+.ds6 .pt-kpis{grid-template-columns:1.3fr repeat(4,minmax(0,1fr))}
+@container ptw (max-width: 900px){.ds6 .pt-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container ptw (max-width: 560px){.ds6 .pt-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.ds6 .pt-tbl .m-table{min-inline-size:880px}
+.ds6 .pt-res-tbl .m-table{min-inline-size:720px}
+.ds6 .pt-sec .m-card__h{padding-inline:var(--m-5);padding-block:var(--m-4);margin-block-end:0;
+  border-block-end:1px solid var(--m-line);align-items:baseline;flex-wrap:wrap;gap:var(--m-3)}
+.ds6 .pt-sec .m-card__h .sp{flex:1}
+.ds6 .pt-filter{padding-inline:var(--m-5);padding-block:var(--m-3);border-block-end:1px solid var(--m-line)}
+.ds6 .pt-sub{display:block;font-weight:400;margin-block-start:2px}
+.ds6 .pt-clip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-inline-size:28ch}
+.ds6 .pt-ltr{direction:ltr;unicode-bidi:isolate}
+
+/* achievement: the bar and its figure on one line, inside a table cell */
+.ds6 .pt-ach{display:flex;align-items:center;gap:var(--m-2);min-inline-size:0}
+.ds6 .pt-ach .m-meter{margin-block:0;flex:1 1 auto;min-inline-size:56px}
+.ds6 .pt-ach.hi .m-meter i{background:var(--m-ok)}
+.ds6 .pt-ach.lo .m-meter i{background:var(--m-warn)}
+
+/* the result cell: a pill, then either where it went or the control that changes it */
+.ds6 .pt-rs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-inline-size:0}
+.ds6 .pt-rs .m-select{min-block-size:36px;font-size:var(--m-t-cap);padding-inline:var(--m-2)}
+.ds6 .pt-arm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:var(--m-t-cap);color:var(--m-ink)}
+.ds6 .pt-arm .m-btn{min-block-size:32px;padding-inline:var(--m-3);font-size:var(--m-t-cap)}
+.ds6 .pt-del--armed{background:var(--m-bad-dim);color:var(--m-bad);border-color:var(--m-bad-line)}
+
+/* a radio group, because the three results are one exclusive choice and the keyboard handler
+   walks it with the arrow keys. .m-seg is aria-pressed and cannot carry that contract. */
+.ds6 .pt-radio{display:flex;gap:6px;flex-wrap:wrap}
+.ds6 .pt-radio button{font:inherit;font-size:var(--m-t-body);font-weight:600;min-block-size:40px;
+  padding-inline:var(--m-4);border-radius:var(--m-r-chip);border:1px solid var(--m-line-2);
+  cursor:pointer;background:var(--m-paper);color:var(--m-ink);
+  transition:background-color var(--m-out) var(--m-ease),transform var(--m-press) var(--m-ease)}
+.ds6 .pt-radio button:active{transform:scale(.97)}
+.ds6 .pt-radio button[aria-checked="true"]{background:var(--m-ac);color:#fff;border-color:var(--m-ac)}
+.ds6 .pt-radio button:focus-visible{outline:none;box-shadow:var(--m-focus)}
+.ds6 .pt-radio.bad button{border-color:var(--m-bad)}
+
+/* the targets sheet: one row per product, the number at a fixed width so the column reads */
+.ds6 .pt-tg{display:flex;flex-direction:column}
+.ds6 .pt-tg .row{display:grid;grid-template-columns:minmax(0,1fr) 128px;gap:var(--m-3);
+  align-items:center;padding-block:var(--m-2);border-block-end:1px solid var(--m-line)}
+.ds6 .pt-tg .row:last-child{border-block-end:0}
+.ds6 .pt-tg .row label{font-size:var(--m-t-body);color:var(--m-ink)}
+.ds6 .pt-tg .row .m-input{text-align:center;font-variant-numeric:tabular-nums}
+
+.ds6 .pt-paste{inline-size:100%;min-block-size:160px;font:inherit;font-size:var(--m-t-body);
+  line-height:1.7;padding:var(--m-2) var(--m-3);border:1px solid var(--m-line-2);
+  border-radius:var(--m-r-ctl);background:var(--m-paper);color:var(--m-ink);resize:vertical;
+  box-sizing:border-box}
+.ds6 .pt-paste:focus{outline:none;box-shadow:var(--m-focus)}
+.ds6 .pt-prev{display:flex;flex-direction:column;gap:4px;font-size:var(--m-t-cap)}
+.ds6 .pt-prev .ok{color:var(--m-ac-deep);font-weight:600}
+.ds6 .pt-prev .bad{color:var(--m-bad)}
+
+/* the screen-reader-only label, for a control whose name is carried by its row */
+.ds6 .pt-say{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@container ptw (max-width: 900px){
+  .ds6 .pt-tbl .m-table, .ds6 .pt-res-tbl .m-table{min-inline-size:640px}
 }
-@media (pointer:coarse) { .pt-bar select, .pt-rs select, .pt-bar .lnk, .pt .lnk, .pt-arm .btn { min-height:44px; } .pt-week .nav, .pt-del { width:44px; height:44px; } }
-@media (prefers-reduced-motion: reduce) { .pt .btn, .pt-tab, .pt-radio button, .pt-week .nav { transition:none; } .pt .btn:active, .pt-radio button:active, .pt-week .nav:active { transform:none; } }
+@media (prefers-reduced-motion: reduce){
+  .ds6 .pt-radio button{transition:none}
+  .ds6 .pt-radio button:active{transform:none}
+}
 `;
 
 export const PARTNERS_CRM_JS = `
@@ -122,10 +126,15 @@ var ptSheet = null;        /* the open sheet: partner form, targets, or results 
 var ptArm = {};            /* result id -> "del" | "interest" while a destructive or handing-over change waits for its second press */
 var ptBusy = {};           /* result id -> true while a change is being written */
 
+/* PLAIN text, for a toast: opToast writes with textContent, so markup would print as markup.
+   The MARKED variants below carry .m-n and are the ones the screen prints. */
 function ptPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
 function ptNOrg(n) { return ptPl(n, "منشأة واحدة", "منشأتان", "منشآت", "منشأة"); }
 function ptNRes(n) { return ptPl(n, "نتيجة واحدة", "نتيجتان", "نتائج", "نتيجة"); }
 function ptNPartner(n) { return ptPl(n, "شريك واحد", "شريكان", "شركاء", "شريكًا"); }
+function ptNOrgN(n) { return mPlOf(n, ptNOrg(n)); }
+function ptNResN(n) { return mPlOf(n, ptNRes(n)); }
+function ptNPartnerN(n) { return mPlOf(n, ptNPartner(n)); }
 function ptIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function ptToast(m, bad, act, fn) { if (typeof opToast === "function") opToast(m, bad, act, fn); else alertBar(m, bad); }
 function ptDay(iso) { return typeof owDay === "function" ? owDay(iso) : esc(iso); }
@@ -136,10 +145,18 @@ function ptWeekLabel(start, end) {
   return (sameMonth ? fmt(a, { day: "numeric" }) : fmt(a, { day: "numeric", month: "long" })) + " – " + fmt(b, { day: "numeric", month: "long" }) +
     (b.getFullYear() !== new Date().getFullYear() ? " " + b.getFullYear() : "");
 }
+/* The same label with its DIGITS marked. The whole phrase cannot go inside .m-n — it sets
+   direction:ltr, and «8 – 14 سبتمبر» would then read left-to-right with the Arabic month
+   stranded. The dates are formatted nu-latn, so each run of digits is wrapped where it stands. */
+function ptWeekLabelN(start, end) {
+  return esc(ptWeekLabel(start, end)).replace(/[0-9]+/g, function (d) {
+    return '<span class="m-n">' + d + "</span>";
+  });
+}
 /* Every product the week can show: the live catalogue, then any archived one this week's targets or results still name. */
 function ptAllProducts() { return ptData ? ptData.products.concat(ptData.archivedProducts || []) : []; }
 function ptIsArchived(p) { return !!ptData && (ptData.archivedProducts || []).indexOf(p) >= 0; }
-function ptPhone(ph) { return '<bdi dir="ltr">' + (String(ph).charAt(0) === "0" ? "" : "+") + esc(ph) + "</bdi>"; }
+function ptPhone(ph) { return '<bdi class="pt-ltr">' + (String(ph).charAt(0) === "0" ? "" : "+") + esc(ph) + "</bdi>"; }
 function ptPartner(id) { return ((ptData && ptData.partners) || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 
 var ptRoute0 = "";
@@ -173,21 +190,48 @@ function ptTargetsFor(pid, product) {
 function ptResultsFor(pid, product) {
   return (ptData.results || []).filter(function (r) { return (pid === "all" || String(r.partnerId) === String(pid)) && (!product || r.product === product); });
 }
+/* A week with no target has no achievement to report. That is a number someone OWES — the target —
+   so it takes the owed treatment, not a dash that reads like a legitimate zero. */
 function ptAch(line) {
-  if (line.pct === null) return '<span class="pt-ach none"><span class="track" aria-hidden="true"></span><span class="v">بلا مستهدف</span></span>';
+  if (line.pct === null) return '<span class="pt-ach">' + mNil("بلا مستهدف", "owed") + "</span>";
   var cls = line.pct >= 100 ? " hi" : line.pct < 50 ? " lo" : "";
-  return '<span class="pt-ach' + cls + '" role="img" aria-label="الإنجاز ' + fmtN(line.pct) + '٪"><span class="track"><i style="width:' + Math.min(100, line.pct) + '%"></i></span><span class="v">' + fmtN(line.pct) + "٪</span></span>";
+  return '<span class="pt-ach' + cls + '" role="img" aria-label="' + esc("الإنجاز " + fmtN(line.pct) + "٪") + '">' +
+    '<span class="m-meter"><i style="--m-pct:' + Math.min(100, line.pct) + '%"></i></span>' +
+    mPct(line.pct) + "</span>";
 }
-function ptShare(n, of) { return of > 0 ? fmtN(Math.round((n / of) * 100)) + "٪ من المتواصل معهم" : "—"; }
+/* A share over nothing is UNMEASURED, not zero: a legitimate nothing, so it takes the quiet
+   treatment rather than the owed one. */
+function ptShare(n, of) { return of > 0 ? mPct(Math.round((n / of) * 100)) + " من المتواصل معهم" : mNil("لم يُقَس", "none"); }
+
+/* The five measures. «تم التواصل» and «مهتمون» are each printed twice — in this strip and in the
+   table under it — so both go through dsD/dsFig and cannot drift (PORT-SPEC §6). */
+function ptBind(pid, product) {
+  dsD("ptContacted", function () {
+    return summarizeWeek(ptTargetsFor(pid, product), ptResultsFor(pid, product)).contacted;
+  });
+  dsD("ptInterested", function () {
+    return summarizeWeek(ptTargetsFor(pid, product), ptResultsFor(pid, product)).interested;
+  });
+}
 function ptKpis(line) {
-  var tile = function (k, v, s, lead) { return '<div class="crm-kpi' + (lead ? " crm-lead" : "") + '"><div class="crm-k">' + k + '</div><div class="crm-v">' + v + "</div>" + (s ? '<div class="crm-s">' + s + "</div>" : "") + "</div>"; };
-  return '<div class="crm-kpis crm-hasLead">' +
-    tile("المستهدف الأسبوعي", fmtN(line.target), line.target ? "منشآت مطلوب التواصل معها" : "لم يُحدَّد مستهدف", true) +
-    tile("تم التواصل", fmtN(line.contacted), (line.pct === null ? "بلا مستهدف" : fmtN(line.pct) + "٪ من المستهدف") +
-      (line.pct !== null && line.contactedTargeted !== line.contacted ? " · لمنتجات لها مستهدف: " + fmtN(line.contactedTargeted) : "")) +
-    tile("مهتمون", fmtN(line.interested), line.interested ? ptShare(line.interested, line.contacted) + " · حُوّل للمبيعات: " + fmtN(line.handedOver) : "—") +
-    tile("غير مهتمين", fmtN(line.notInterested), ptShare(line.notInterested, line.contacted)) +
-    tile("لم يردوا", fmtN(line.noReply), ptShare(line.noReply, line.contacted)) + "</div>";
+  var tile = function (k, v, s, lead) {
+    return '<div class="m-card' + (lead ? " m-stat--ac" : "") + '"><span class="m-stat__k">' + k + "</span>" +
+      '<span class="m-stat__v">' + v + "</span>" +
+      '<span class="m-stat__s">' + s + "</span></div>";
+  };
+  return '<div class="m-kpis pt-kpis">' +
+    tile("المستهدف الأسبوعي", line.target ? mN(line.target) : mNil("لم يُحدَّد", "owed"),
+      line.target ? "منشآت مطلوب التواصل معها" : "لا مستهدف مسجّل لهذا الأسبوع", true) +
+    tile("تم التواصل", dsFig("ptContacted", line.contacted),
+      (line.pct === null ? "لا مستهدف يُقاس عليه" : mPct(line.pct) + " من المستهدف") +
+      (line.pct !== null && line.contactedTargeted !== line.contacted
+        ? " · لمنتجات لها مستهدف: " + mN(line.contactedTargeted) : "")) +
+    tile("مهتمون", dsFig("ptInterested", line.interested),
+      line.interested
+        ? ptShare(line.interested, line.contacted) + " · حُوّل للمبيعات: " + mN(line.handedOver)
+        : "لم يُسجَّل مهتم بعد") +
+    tile("غير مهتمين", mN(line.notInterested), ptShare(line.notInterested, line.contacted)) +
+    tile("لم يردوا", mN(line.noReply), ptShare(line.noReply, line.contacted)) + "</div>";
 }
 
 /* ---------------- the screen ---------------- */
@@ -201,126 +245,188 @@ function ptPaintCrumb() {
 function vPartners() {
   ptLoad(ptWeek, false);
   setTimeout(ptPaintCrumb, 0);
-  var h = '<div class="pt">';
-  if (!ptData && !ptFailed) return h + '<section class="cf-sec"><div class="cf-state" role="status">جارٍ تحميل الشركاء…</div></section></div>' + ptModal();
-  if (!ptData) return h + '<section class="cf-sec"><div class="cf-state" role="alert">تعذّر تحميل الشركاء.<button class="btn btn-ghost" data-pt="retry">أعد المحاولة</button></div></section></div>' + ptModal();
-  if (ptFailed) h += '<section class="cf-sec"><div class="cf-state" role="alert">' + ptIco("warn") + 'تعذّر التحديث — المعروض آخر نسخة محمّلة.<button class="btn btn-ghost" data-pt="retry">أعد المحاولة</button></div></section>';
+  var h = '<div class="ds6"><div class="pt">';
+  if (!ptData && !ptFailed) {
+    return h + '<section class="m-card" aria-busy="true"><p class="m-meta" role="status">جارٍ تحميل الشركاء…</p>' +
+      moSkeleton(3, ["w40", "w80", "w60"]) + "</section></div></div>" + ptModal();
+  }
+  if (!ptData) {
+    return h + '<div class="m-alert" role="alert">' + ptIco("warn") +
+      '<span class="m-alert__d">تعذّر تحميل الشركاء.</span>' +
+      '<button class="m-btn" data-pt="retry">أعد المحاولة</button></div></div></div>' + ptModal();
+  }
+  if (ptFailed) {
+    h += '<div class="m-alert" role="alert">' + ptIco("warn") +
+      '<span class="m-alert__d">تعذّر التحديث — المعروض آخر نسخة محمّلة.</span>' +
+      '<button class="m-btn" data-pt="retry">أعد المحاولة</button></div>';
+  }
   var d = ptData;
   if (!d.partners.length) {
-    return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا شركاء بعد</b>' +
-      "الشريك شركة متعاقدة تتولى التواصل الأولي مع العملاء لمنتج ما. حدّد لكل شريك مستهدفًا أسبوعيًا لكل منتج، وسجّل ما انتهى إليه كل تواصل: مهتم، غير مهتم، لم يرد. كل «مهتم» يُحوَّل فرصة بيع لفريق المبيعات." +
-      (typeof meCan !== "function" || meCan("partners.manage") ? '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="ptnewempty" data-pt="newpartner" style="display:inline-flex;align-items:center;gap:6px">' + ptIco("plus") + "إضافة شريك</button></div>" : "") + "</div></section></div>" + ptModal();
+    /* SMOKE: «لا شركاء بعد» is the accepted empty render for #partners, and the paragraph below
+       carries «غير مهتم», the route's landmark. Neither may be reworded without smoke.py. */
+    return h + '<section class="m-card m-empty"><p class="m-empty__t">لا شركاء بعد</p>' +
+      '<p class="m-empty__d">الشريك شركة متعاقدة تتولى التواصل الأولي مع العملاء لمنتج ما. حدّد لكل شريك مستهدفًا أسبوعيًا لكل منتج، وسجّل ما انتهى إليه كل تواصل: مهتم، غير مهتم، لم يرد. كل «مهتم» يُحوَّل فرصة بيع لفريق المبيعات.</p>' +
+      (typeof meCan !== "function" || meCan("partners.manage")
+        ? '<div class="m-empty__a"><button class="m-btn m-btn--primary" id="ptnewempty" data-pt="newpartner">' + ptIco("plus") + "إضافة شريك</button></div>"
+        : "") + "</section></div></div>" + ptModal();
   }
   var isCur = d.week === d.currentWeek;
   h += '<div class="pt-bar"><span class="pt-week" role="group" aria-label="الأسبوع">' +
-    '<button class="nav" data-pt="week" data-v="-7" aria-label="الأسبوع السابق">›</button>' +
-    '<span class="lbl" aria-live="polite">' + (isCur ? '<span class="cur">الأسبوع الحالي</span> · ' : "") + ptWeekLabel(d.week, d.weekEnd) + (ptLoading ? " …" : "") + "</span>" +
-    '<button class="nav" data-pt="week" data-v="7" aria-label="الأسبوع التالي"' + (d.week >= d.currentWeek ? " disabled" : "") + ">‹</button></span>" +
-    (isCur ? "" : '<button class="lnk" data-pt="thisweek">العودة إلى هذا الأسبوع</button>') +
-    '<span class="sp"></span><select aria-label="المنتج" data-ptset="product"' + (ptF.product ? ' class="on"' : "") + '><option value="">كل المنتجات</option>' +
+    '<button class="m-btn" data-pt="week" data-v="-7" aria-label="الأسبوع السابق">&#8250;</button>' +
+    '<span class="lbl" aria-live="polite">' + (isCur ? '<span class="cur">الأسبوع الحالي</span> · ' : "") +
+      ptWeekLabelN(d.week, d.weekEnd) + (ptLoading ? " …" : "") + "</span>" +
+    '<button class="m-btn" data-pt="week" data-v="7" aria-label="الأسبوع التالي"' + (d.week >= d.currentWeek ? " disabled" : "") + ">&#8249;</button></span>" +
+    (isCur ? "" : '<button class="m-btn m-btn--quiet" data-pt="thisweek">العودة إلى هذا الأسبوع</button>') +
+    '<span class="sp"></span><select class="m-select" aria-label="المنتج" data-ptset="product"><option value="">كل المنتجات</option>' +
     ptAllProducts().map(function (p) { return '<option value="' + esc(p) + '"' + (ptF.product === p ? " selected" : "") + ">" + esc(p) + (ptIsArchived(p) ? " (مؤرشف)" : "") + "</option>"; }).join("") + "</select></div>";
-  h += '<div class="pt-tabs" role="tablist" aria-label="الشركاء">' +
+  h += '<div class="m-tabs" role="tablist" aria-label="الشركاء">' +
     [{ id: "all", name: "الإجمالي" }].concat(d.partners).map(function (p) {
       var on = String(ptF.tab) === String(p.id);
-      return '<button class="pt-tab" role="tab" id="pttab_' + p.id + '" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-pt="tab" data-v="' + p.id + '">' + esc(p.name) +
-        (p.status === "paused" ? '<span class="off">موقوف</span>' : "") + "</button>";
+      return '<button class="m-tab" role="tab" id="pttab_' + p.id + '" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-pt="tab" data-v="' + p.id + '">' + esc(p.name) +
+        (p.status === "paused" ? '<span class="m-chip m-chip--plain">موقوف</span>' : "") + "</button>";
     }).join("") + "</div>";
   var pid = ptF.tab;
+  ptBind(pid, ptF.product);
   var line = summarizeWeek(ptTargetsFor(pid, ptF.product), ptResultsFor(pid, ptF.product));
-  h += '<div role="tabpanel" aria-labelledby="pttab_' + pid + '" style="display:flex;flex-direction:column;gap:var(--s3)">';
+  h += '<div role="tabpanel" aria-labelledby="pttab_' + pid + '" class="pt-panel">';
   var partner = pid === "all" ? null : ptPartner(pid);
   if (partner) h += ptPartnerCard(partner);
   h += ptKpis(line);
-  h += '<div class="pt-note">' + ptIco("check") + "تنتهي مسؤولية الشريك عند تحديد الاهتمام: كل «مهتم» يُحوَّل تلقائيًا فرصة بيع لفريق المبيعات، ولا يعدّله الشريك بعدها.</div>";
+  h += '<p class="m-meta">' + ptIco("check") + "تنتهي مسؤولية الشريك عند تحديد الاهتمام: كل «مهتم» يُحوَّل تلقائيًا فرصة بيع لفريق المبيعات، ولا يعدّله الشريك بعدها.</p>";
   h += ptProductTable(pid);
   h += partner ? ptResultsTable(partner) : ptPartnerTable();
-  return h + "</div></div>" + ptModal();
+  return h + "</div></div></div>" + ptModal();
 }
 function ptPartnerCard(p) {
-  var meta = [PARTNER_KIND_LABELS[p.kind] || p.kind, p.contactName ? "المسؤول: " + esc(p.contactName) : "", p.phone ? '<bdi dir="ltr">' + esc(p.phone) + "</bdi>" : "",
-    p.email ? '<a href="mailto:' + esc(p.email) + '" dir="ltr">' + esc(p.email) + "</a>" : "",
-    p.opps.count ? "فرص منه: " + fmtN(p.opps.count) + " (قائمة " + fmtN(p.opps.open) + " · رابحة " + fmtN(p.opps.won) + ")" : ""].filter(Boolean);
-  var h = '<section class="cf-sec"><div class="pt-card"><div class="main"><div class="nm">' + esc(p.name) + ' <span class="cf-pill ' + (p.status === "active" ? "ap-approved" : "ap-rejected") + '">' + esc(PARTNER_STATUS_LABELS[p.status]) + "</span></div>" +
-    '<div class="meta">' + meta.map(function (m) { return "<span>" + m + "</span>"; }).join("") + "</div>" +
-    (p.opps.wonValue || p.opps.openValue ? '<div class="meta"><span>قيمة الفرص الرابحة: ' + acMoney(p.opps.wonValue) + "</span><span>القائمة: " + acMoney(p.opps.openValue) + "</span></div>" : "") + "</div>" +
-    '<div class="acts">' + (p.status === "active" ? '<button class="btn btn-teal" id="ptrecord" data-pt="record">' + ptIco("plus") + "تسجيل نتائج</button>" : "") +
-    (typeof meCan !== "function" || meCan("partners.manage") ? '<button class="btn btn-ghost" id="pttargets" data-pt="targets">تحديد المستهدف</button><button class="btn btn-ghost" id="ptedit" data-pt="editpartner">تعديل</button>' : "") + "</div></div>";
-  if (p.status !== "active") h += '<div class="bd" style="padding:0 var(--s4) var(--s3)"><div class="pt-banner">الشريك موقوف: تُعرض نتائجه ولا تُسجَّل له نتائج جديدة. فعّله من «تعديل».</div></div>';
+  var meta = [esc(PARTNER_KIND_LABELS[p.kind] || p.kind), p.contactName ? "المسؤول: " + esc(p.contactName) : "", p.phone ? ptPhone(p.phone) : "",
+    p.email ? '<a class="m-link" href="mailto:' + esc(p.email) + '" dir="ltr">' + esc(p.email) + "</a>" : "",
+    p.opps.count ? "فرص منه: " + mN(p.opps.count) + " (قائمة " + mN(p.opps.open) + " · رابحة " + mN(p.opps.won) + ")" : ""].filter(Boolean);
+  var h = '<section class="m-card"><div class="m-between" style="flex-wrap:wrap">' +
+    '<div style="min-inline-size:0"><h2 class="m-h2">' + esc(p.name) +
+      ' <span class="m-chip' + (p.status === "active" ? " m-chip--ok" : " m-chip--bad") + '">' + esc(PARTNER_STATUS_LABELS[p.status]) + "</span></h2>" +
+    '<p class="m-meta">' + meta.join(" · ") + "</p>" +
+    (p.opps.wonValue || p.opps.openValue
+      ? '<p class="m-meta">قيمة الفرص الرابحة: ' + acMoney(p.opps.wonValue) + " · القائمة: " + acMoney(p.opps.openValue) + "</p>"
+      : '<p class="m-meta">' + mNil("لا فرص بعد", "none") + "</p>") + "</div>" +
+    '<div class="m-head__a">' + (p.status === "active" ? '<button class="m-btn m-btn--primary" id="ptrecord" data-pt="record">' + ptIco("plus") + "تسجيل نتائج</button>" : "") +
+    (typeof meCan !== "function" || meCan("partners.manage") ? '<button class="m-btn" id="pttargets" data-pt="targets">تحديد المستهدف</button><button class="m-btn" id="ptedit" data-pt="editpartner">تعديل</button>' : "") + "</div></div>";
+  if (p.status !== "active") h += '<div class="m-alert" style="margin-block-start:var(--m-4)">الشريك موقوف: تُعرض نتائجه ولا تُسجَّل له نتائج جديدة. فعّله من «تعديل».</div>';
   return h + "</section>";
 }
 function ptProductTable(pid) {
   var prods = ptF.product ? [ptF.product] : ptAllProducts().filter(function (p) { return ptTargetsFor(pid, p).length || ptResultsFor(pid, p).length; });
-  var h = '<section class="cf-sec pt-sec pt-prod"><div class="hd"><h2>حسب المنتج</h2><span class="s">المنشآت التي تم التواصل معها مقابل المستهدف</span></div>';
-  if (!prods.length) return h + '<div class="cf-state">لا مستهدفات ولا نتائج في هذا الأسبوع' + (pid !== "all" && (typeof meCan !== "function" || meCan("partners.manage")) ? '.<button class="btn btn-ghost" data-pt="targets">تحديد المستهدف</button>' : pid !== "all" ? "." : " لأي شريك.") + "</div></section>";
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>المنتج</span><span>المستهدف</span><span>تم التواصل</span><span>الإنجاز</span><span>مهتم</span><span>غير مهتم</span><span>لم يرد</span></div>';
+  var h = '<section class="m-card m-card--pad0 pt-sec pt-tbl"><div class="m-card__h">' +
+    '<h2 class="m-card__t">حسب المنتج</h2>' +
+    '<span class="m-meta">المنشآت التي تم التواصل معها مقابل المستهدف</span></div>';
+  if (!prods.length) {
+    return h + '<div class="m-empty"><p class="m-empty__t">لا مستهدفات ولا نتائج في هذا الأسبوع' +
+      (pid === "all" ? " لأي شريك" : "") + "</p>" +
+      (pid !== "all" && (typeof meCan !== "function" || meCan("partners.manage"))
+        ? '<div class="m-empty__a"><button class="m-btn" data-pt="targets">تحديد المستهدف</button></div>' : "") +
+      "</div></section>";
+  }
+  h += '<div class="m-tablewrap"><table class="m-table"><thead><tr><th>المنتج</th>' +
+    '<th class="num">المستهدف</th><th class="num">تم التواصل</th><th>الإنجاز</th>' +
+    '<th class="num">مهتم</th><th class="num">غير مهتم</th><th class="num">لم يرد</th></tr></thead><tbody>';
   prods.forEach(function (p) {
     var l = summarizeWeek(ptTargetsFor(pid, p), ptResultsFor(pid, p));
-    h += '<div class="cf-r"><span class="ac-clip" title="' + esc(p) + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="cf-sub">(مؤرشف)</span>' : "") + "</span>" +
-      '<span class="pt-num"><span class="pt-lbl">المستهدف: </span>' + (l.target ? fmtN(l.target) : '<span class="cf-sub">—</span>') + "</span>" +
-      '<span class="pt-num"><span class="pt-lbl">تم التواصل: </span>' + fmtN(l.contacted) + "</span>" + ptAch(l) +
-      '<span class="pt-num"><span class="pt-lbl">مهتم: </span>' + fmtN(l.interested) + '</span><span class="pt-num"><span class="pt-lbl">غير مهتم: </span>' + fmtN(l.notInterested) +
-      '</span><span class="pt-num"><span class="pt-lbl">لم يرد: </span>' + fmtN(l.noReply) + "</span></div>";
+    h += '<tr><td class="m-td-n"><span class="pt-clip" title="' + esc(p) + '">' + esc(p) + "</span>" +
+      (ptIsArchived(p) ? '<span class="pt-sub m-meta">مؤرشف</span>' : "") + "</td>" +
+      '<td class="m-td-v">' + (l.target ? mN(l.target) : mNil("لم يُحدَّد", "owed")) + "</td>" +
+      '<td class="m-td-v">' + mN(l.contacted) + "</td>" +
+      "<td>" + ptAch(l) + "</td>" +
+      '<td class="m-td-v">' + mN(l.interested) + "</td>" +
+      '<td class="m-td-v">' + mN(l.notInterested) + "</td>" +
+      '<td class="m-td-v">' + mN(l.noReply) + "</td></tr>";
   });
-  return h + "</div></section>";
+  return h + "</tbody></table></div></section>";
 }
 function ptPartnerTable() {
-  var h = '<section class="cf-sec pt-sec pt-part"><div class="hd"><h2>حسب الشريك</h2><span class="s">' + ptNPartner(ptData.partners.length) + " · اختر شريكًا لعرض نتائجه وتسجيلها</span></div>" +
-    '<div class="cf-t"><div class="cf-hr" role="row"><span>الشريك</span><span>المستهدف</span><span>تم التواصل</span><span>الإنجاز</span><span>مهتم</span><span>غير مهتم</span><span>لم يرد</span><span>فرص البيع منه</span></div>';
+  var h = '<section class="m-card m-card--pad0 pt-sec pt-tbl"><div class="m-card__h">' +
+    '<h2 class="m-card__t">حسب الشريك</h2>' +
+    '<span class="m-meta">' + ptNPartnerN(ptData.partners.length) + " · اختر شريكًا لعرض نتائجه وتسجيلها</span></div>" +
+    '<div class="m-tablewrap"><table class="m-table"><thead><tr><th>الشريك</th>' +
+    '<th class="num">المستهدف</th><th class="num">تم التواصل</th><th>الإنجاز</th>' +
+    '<th class="num">مهتم</th><th class="num">غير مهتم</th><th class="num">لم يرد</th>' +
+    "<th>فرص البيع منه</th></tr></thead><tbody>";
   ptData.partners.forEach(function (p) {
     var l = summarizeWeek(ptTargetsFor(p.id, ptF.product), ptResultsFor(p.id, ptF.product));
-    h += '<div class="cf-r" data-pt="tab" data-v="' + p.id + '"><span class="ac-nm"><button class="in-link ac-clip" data-pt="tab" data-v="' + p.id + '" title="' + esc(p.name) + '">' + esc(p.name) + '</button><span class="cf-sub">' +
-      esc(PARTNER_KIND_LABELS[p.kind] || p.kind) + (p.status !== "active" ? " · موقوف" : "") + "</span></span>" +
-      '<span class="pt-num"><span class="pt-lbl">المستهدف: </span>' + (l.target ? fmtN(l.target) : '<span class="cf-sub">—</span>') + "</span>" +
-      '<span class="pt-num"><span class="pt-lbl">تم التواصل: </span>' + fmtN(l.contacted) + "</span>" + ptAch(l) +
-      '<span class="pt-num"><span class="pt-lbl">مهتم: </span>' + fmtN(l.interested) + '</span><span class="pt-num"><span class="pt-lbl">غير مهتم: </span>' + fmtN(l.notInterested) +
-      '</span><span class="pt-num"><span class="pt-lbl">لم يرد: </span>' + fmtN(l.noReply) + "</span>" +
-      '<span class="pt-num"><span class="pt-lbl">فرص البيع منه: </span>' + (p.opps.count ? fmtN(p.opps.count) + ' <span class="cf-sub">(رابحة ' + fmtN(p.opps.won) + ")</span>" : '<span class="cf-sub">—</span>') + "</span></div>";
+    h += '<tr data-pt="tab" data-v="' + p.id + '"><td class="m-td-n">' +
+      '<button class="m-link" data-pt="tab" data-v="' + p.id + '" title="' + esc(p.name) + '">' + esc(p.name) + "</button>" +
+      '<span class="pt-sub m-meta">' + esc(PARTNER_KIND_LABELS[p.kind] || p.kind) + (p.status !== "active" ? " · موقوف" : "") + "</span></td>" +
+      '<td class="m-td-v">' + (l.target ? mN(l.target) : mNil("لم يُحدَّد", "owed")) + "</td>" +
+      '<td class="m-td-v">' + mN(l.contacted) + "</td>" +
+      "<td>" + ptAch(l) + "</td>" +
+      '<td class="m-td-v">' + mN(l.interested) + "</td>" +
+      '<td class="m-td-v">' + mN(l.notInterested) + "</td>" +
+      '<td class="m-td-v">' + mN(l.noReply) + "</td>" +
+      "<td>" + (p.opps.count
+        ? mN(p.opps.count) + '<span class="pt-sub m-meta">رابحة ' + fmtN(p.opps.won) + "</span>"
+        : mNil("لا فرص", "none")) + "</td></tr>";
   });
-  return h + "</div></section>";
+  return h + "</tbody></table></div></section>";
 }
 function ptResultsTable(p) {
   var all = ptResultsFor(p.id, ptF.product);
   var rows = ptF.res === "all" ? all : all.filter(function (r) { return r.result === ptF.res; });
-  var h = '<section class="cf-sec pt-sec pt-res"><div class="hd"><h2>نتائج التواصل</h2><span class="s">' + (all.length ? ptNRes(all.length) + " هذا الأسبوع" : "") + '</span><span class="sp"></span>' +
-    (p.status === "active" ? '<button class="btn btn-ghost" id="ptrecord2" data-pt="record">' + ptIco("plus") + "تسجيل نتائج</button>" : "") + "</div>";
-  if (!all.length) return h + '<div class="cf-state">لم تُسجَّل نتائج ' + (ptF.product ? "لهذا المنتج " : "") + "في هذا الأسبوع.</div></section>";
+  var h = '<section class="m-card m-card--pad0 pt-sec pt-res-tbl"><div class="m-card__h">' +
+    '<h2 class="m-card__t">نتائج التواصل</h2>' +
+    '<span class="m-meta">' + (all.length ? ptNResN(all.length) + " هذا الأسبوع" : "") + '</span><span class="sp"></span>' +
+    (p.status === "active" ? '<button class="m-btn" id="ptrecord2" data-pt="record">' + ptIco("plus") + "تسجيل نتائج</button>" : "") + "</div>";
+  if (!all.length) {
+    return h + '<div class="m-empty"><p class="m-empty__t">لم تُسجَّل نتائج ' + (ptF.product ? "لهذا المنتج " : "") + "في هذا الأسبوع</p>" +
+      '<p class="m-empty__d">تظهر هنا فور تسجيل أول تواصل للشريك في هذا الأسبوع.</p></div></section>';
+  }
   var counts = { all: all.length }; PARTNER_RESULTS.forEach(function (k) { counts[k] = all.filter(function (r) { return r.result === k; }).length; });
-  h += '<div class="pt-rfilter"><span class="vtog" role="radiogroup" aria-label="النتيجة">' + [["all", "الكل"]].concat(PARTNER_RESULTS.map(function (k) { return [k, PARTNER_RESULT_LABELS[k]]; })).map(function (t) {
-    var on = ptF.res === t[0];
-    return '<button role="radio" aria-checked="' + on + '" tabindex="' + (on ? 0 : -1) + '" class="' + (on ? "on" : "") + '" data-pt="res" data-v="' + t[0] + '">' + t[1] + " " + fmtN(counts[t[0]]) + "</button>";
-  }).join("") + "</span></div>";
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>المنشأة</span><span>المنتج</span><span>تاريخ التواصل</span><span>النتيجة</span><span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">حذف</span></span></div>';
-  if (!rows.length) h += '<div class="cf-state">لا نتائج «' + esc(PARTNER_RESULT_LABELS[ptF.res] || "") + "» في هذا الأسبوع.</div>";
+  h += '<div class="pt-filter"><span class="m-seg" role="group" aria-label="النتيجة">' +
+    [["all", "الكل"]].concat(PARTNER_RESULTS.map(function (k) { return [k, PARTNER_RESULT_LABELS[k]]; })).map(function (t) {
+      return '<button type="button" aria-pressed="' + (ptF.res === t[0]) + '" data-pt="res" data-v="' + t[0] + '">' + t[1] + " " + mN(counts[t[0]]) + "</button>";
+    }).join("") + "</span></div>";
+  h += '<div class="m-tablewrap"><table class="m-table"><thead><tr><th>المنشأة</th><th>المنتج</th>' +
+    '<th>تاريخ التواصل</th><th>النتيجة</th><th><span class="pt-say">حذف</span></th></tr></thead><tbody>';
+  if (!rows.length) {
+    h += '<tr class="m-table__empty"><td colspan="5"><div class="m-empty"><p class="m-empty__t">لا نتائج «' +
+      esc(PARTNER_RESULT_LABELS[ptF.res] || "") + "» في هذا الأسبوع</p></div></td></tr>";
+  }
   rows.forEach(function (r) {
-    var name = r.entityId ? '<a class="in-link ac-clip" href="#account/' + r.entityId + '" title="' + esc(r.accountName) + '">' + esc(r.accountName) + "</a>" : '<span class="ac-clip" title="' + esc(r.accountName) + '">' + esc(r.accountName) + "</span>";
-    h += '<div class="cf-r" data-ptrow="' + r.id + '"><span class="ac-nm">' + name + '<span class="cf-sub ac-clip">' + ptPhone(r.phone) + (r.note ? " · " + esc(clip(r.note, 60)) : "") + "</span></span>" +
-      '<span class="ac-clip"><span class="pt-lbl">المنتج: </span>' + esc(r.product) + "</span>" +
-      '<span class="pt-num"><span class="pt-lbl">التاريخ: </span>' + ptDay(r.contactedOn) + "</span>" + ptResultCell(r, p) + ptDelCell(r) + "</div>";
+    var name = r.entityId
+      ? '<a class="m-link pt-clip" href="#account/' + r.entityId + '" title="' + esc(r.accountName) + '">' + esc(r.accountName) + "</a>"
+      : '<span class="pt-clip" title="' + esc(r.accountName) + '">' + esc(r.accountName) + "</span>";
+    h += '<tr data-ptrow="' + r.id + '"><td class="m-td-n">' + name +
+      '<span class="pt-sub m-meta">' + ptPhone(r.phone) + (r.note ? " · " + esc(clip(r.note, 60)) : "") + "</span></td>" +
+      '<td><span class="pt-clip">' + esc(r.product) + "</span></td>" +
+      "<td>" + ptDay(r.contactedOn) + "</td>" +
+      "<td>" + ptResultCell(r, p) + "</td>" +
+      "<td>" + ptDelCell(r) + "</td></tr>";
   });
-  return h + "</div></section>";
+  return h + "</tbody></table></div></section>";
 }
+/* The result pill's colour is a CLASSIFICATION of what the contact came to, which is the only
+   reason it is allowed to be a colour at all. It maps onto the system's own three status tones
+   rather than a fourth palette. */
+var PT_RESULT_TONE = { interested: " m-chip--ac", not_interested: " m-chip--bad", no_reply: " m-chip--warn" };
 function ptResultCell(r, p) {
-  var pill = '<span class="cf-pill pr-' + r.result + '">' + esc(PARTNER_RESULT_LABELS[r.result] || r.result) + "</span>";
+  var pill = '<span class="m-chip' + (PT_RESULT_TONE[r.result] || "") + '">' + esc(PARTNER_RESULT_LABELS[r.result] || r.result) + "</span>";
   if (!canChangeResult(r)) {
     var st = r.oppStage && typeof opStage === "function" ? opStage(r.oppStage).label : "";
     var linked = r.oppPartnerId !== r.partnerId;
     /* A partner user is not shown a deal it did not bring (-1 from the server): the fact of the handover only. */
-    if (r.oppId === -1 || (typeof meCan === "function" && !meCan("opps.view"))) return '<span class="pt-rs">' + pill + '<span class="cf-sub">حُوّل للمبيعات</span></span>';
-    return '<span class="pt-rs">' + pill + '<a href="#opps/' + r.oppId + '" title="تُتابَع من «فرص البيع»">' + (linked ? "رُبط بفرصة قائمة" : "حُوّل للمبيعات") + (st ? " · " + esc(st) : "") + "</a></span>";
+    if (r.oppId === -1 || (typeof meCan === "function" && !meCan("opps.view"))) return '<span class="pt-rs">' + pill + '<span class="m-meta">حُوّل للمبيعات</span></span>';
+    return '<span class="pt-rs">' + pill + '<a class="m-link" href="#opps/' + r.oppId + '" title="تُتابَع من «فرص البيع»">' + (linked ? "رُبط بفرصة قائمة" : "حُوّل للمبيعات") + (st ? " · " + esc(st) : "") + "</a></span>";
   }
   if (ptArm[r.id] === "interest") {
-    return '<span class="pt-arm" role="group" aria-label="تأكيد التحويل"><span>يُحوَّل فرصة بيع ولا يُعدَّل بعدها.</span><button class="btn btn-teal" id="ptok' + r.id + '" data-pt="confirminterest" data-i="' + r.id + '"' + (ptBusy[r.id] ? " disabled" : "") + '>تأكيد «مهتم»</button><button class="btn btn-ghost" data-pt="cancelarm" data-i="' + r.id + '">تراجع</button></span>';
+    return '<span class="pt-arm" role="group" aria-label="تأكيد التحويل"><span>يُحوَّل فرصة بيع ولا يُعدَّل بعدها.</span><button class="m-btn m-btn--primary" id="ptok' + r.id + '" data-pt="confirminterest" data-i="' + r.id + '"' + (ptBusy[r.id] ? " disabled" : "") + '>تأكيد «مهتم»</button><button class="m-btn" data-pt="cancelarm" data-i="' + r.id + '">تراجع</button></span>';
   }
   if (p.status !== "active") return '<span class="pt-rs">' + pill + "</span>";
-  return '<span class="pt-rs"><label style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" for="ptsel' + r.id + '">نتيجة ' + esc(r.accountName) + '</label><select id="ptsel' + r.id + '" data-ptres="' + r.id + '"' + (ptBusy[r.id] ? " disabled" : "") + ">" +
+  return '<span class="pt-rs"><label class="pt-say" for="ptsel' + r.id + '">نتيجة ' + esc(r.accountName) + '</label><select class="m-select" id="ptsel' + r.id + '" data-ptres="' + r.id + '"' + (ptBusy[r.id] ? " disabled" : "") + ">" +
     PARTNER_RESULTS.map(function (k) { return '<option value="' + k + '"' + (r.result === k ? " selected" : "") + ">" + PARTNER_RESULT_LABELS[k] + "</option>"; }).join("") + "</select></span>";
 }
 function ptDelCell(r) {
   var pp = ptPartner(r.partnerId);
-  if (pp && pp.status !== "active") return "<span></span>";
-  if (!canChangeResult(r)) return '<span><button class="pt-del" disabled aria-label="لا تُحذف نتيجة حُوّلت للمبيعات" title="لا تُحذف نتيجة حُوّلت للمبيعات">' + ptIco("x") + "</button></span>";
-  if (ptArm[r.id] === "del") return '<span><button class="pt-del armed" id="ptdel' + r.id + '" data-pt="del" data-i="' + r.id + '">احذف</button></span>';
-  return '<span><button class="pt-del" id="ptdel' + r.id + '" data-pt="del" data-i="' + r.id + '" aria-label="حذف نتيجة ' + esc(r.accountName) + '">' + ptIco("x") + "</button></span>";
+  if (pp && pp.status !== "active") return "";
+  if (!canChangeResult(r)) return '<button class="m-btn m-btn--icon" disabled aria-label="لا تُحذف نتيجة حُوّلت للمبيعات" title="لا تُحذف نتيجة حُوّلت للمبيعات">' + ptIco("x") + "</button>";
+  if (ptArm[r.id] === "del") return '<button class="m-btn pt-del--armed" id="ptdel' + r.id + '" data-pt="del" data-i="' + r.id + '">احذف</button>';
+  return '<button class="m-btn m-btn--icon" id="ptdel' + r.id + '" data-pt="del" data-i="' + r.id + '" aria-label="حذف نتيجة ' + esc(r.accountName) + '">' + ptIco("x") + "</button>";
 }
 
 /* ---------------- result changes ---------------- */
@@ -390,61 +496,62 @@ function ptClose(force) {
   setTimeout(function () { ptSheet = null; render(false); var t = from && document.getElementById(from); if (t) t.focus(); }, reduce ? 0 : 150);
 }
 function ptFld(f) { return ptSheet && ptSheet.field === f ? ' aria-invalid="true" aria-describedby="err_pt_' + f.replace(/\\./g, "_") + '"' : ""; }
-function ptErr(f) { return ptSheet && ptSheet.field === f && ptSheet.err ? '<span class="ferr" id="err_pt_' + f.replace(/\\./g, "_") + '" role="alert">' + ptIco("warn") + esc(ptSheet.err) + "</span>" : ""; }
+function ptErr(f) { return ptSheet && ptSheet.field === f && ptSheet.err ? '<span class="m-err" id="err_pt_' + f.replace(/\\./g, "_") + '" role="alert">' + ptIco("warn") + esc(ptSheet.err) + "</span>" : ""; }
 function ptInp(id, label, key, value, opt) {
   opt = opt || {};
-  return '<div class="cf-fl"><label for="' + id + '">' + label + (opt.req ? ' <span class="req" aria-hidden="true">*</span>' : "") + "</label>" +
-    '<input class="inp" id="' + id + '" data-ptfld="' + key + '" value="' + esc(value || "") + '"' + (opt.max ? ' maxlength="' + opt.max + '"' : "") + (opt.ph ? ' placeholder="' + esc(opt.ph) + '"' : "") +
+  return '<div class="m-field"><label class="m-label' + (opt.req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+    '<input class="m-input" id="' + id + '" data-ptfld="' + key + '" value="' + esc(value || "") + '"' + (opt.max ? ' maxlength="' + opt.max + '"' : "") + (opt.ph ? ' placeholder="' + esc(opt.ph) + '"' : "") +
     (opt.type ? ' type="' + opt.type + '"' : "") + (opt.ltr ? ' dir="ltr"' : "") + (opt.req ? ' aria-required="true"' : "") + (opt.extra || "") + ptFld(key) + ">" +
-    (opt.hint ? '<span class="hint">' + opt.hint + "</span>" : "") + ptErr(key) + "</div>";
+    (opt.hint ? '<span class="m-hint">' + opt.hint + "</span>" : "") + ptErr(key) + "</div>";
 }
 function ptModal() {
   if (!ptSheet) return "";
   var s = ptSheet, cls = s.shown ? " in" : "";
   var title = s.kind === "partner" ? (s.mode === "edit" ? "تعديل الشريك" : "إضافة شريك") : s.kind === "targets" ? "المستهدف الأسبوعي — " + s.name : "تسجيل نتائج التواصل — " + s.name;
   var sub = s.kind === "partner" ? "الشريك شركة متعاقدة تتولى التواصل الأولي مع العملاء." :
-    s.kind === "targets" ? "عدد المنشآت التي يتواصل معها الشريك لكل منتج في أسبوع " + ptWeekLabel(s.week, s.weekEnd) + ". اترك الحقل فارغًا لمنتج بلا مستهدف." :
+    s.kind === "targets" ? "عدد المنشآت التي يتواصل معها الشريك لكل منتج في أسبوع " + ptWeekLabelN(s.week, s.weekEnd) + ". اترك الحقل فارغًا لمنتج بلا مستهدف." :
     "كل «مهتم» يُحوَّل فرصة بيع لفريق المبيعات فور الحفظ، ويُضاف العميل بحالة «مقترح» إن لم يكن مسجّلًا.";
-  var h = '<div class="ac-scrim' + cls + '" data-pt="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="ptmt" aria-describedby="ptms">' +
-    '<div class="mh"><div><h2 id="ptmt">' + esc(title) + '</h2><div class="s" id="ptms">' + sub + '</div></div><span class="sp"></span><button class="ac-x" data-pt="close" aria-label="إغلاق">' + ptIco("x") + "</button></div><div class=\\"mb\\">";
+  var h = '<div class="ds6"><div class="ac-scrim' + cls + '" data-pt="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="ptmt" aria-describedby="ptms">' +
+    '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="ptmt">' + esc(title) + '</h2><p class="m-meta" id="ptms">' + sub + '</p></div>' +
+    '<button type="button" class="m-x" data-pt="close" aria-label="إغلاق">&#215;</button></div><div class="m-dlg__b">';
   if (s.kind === "partner") h += ptPartnerForm(s);
   else if (s.kind === "targets") h += ptTargetsForm(s);
   else h += ptRecordForm(s);
-  h += '</div><div class="mf">';
+  h += '</div><div class="m-dlg__f">';
   if (s.confirm) {
-    h += '<span class="cf-err msg" role="alert">لديك تغييرات لم تُحفظ.</span><button class="btn btn-ghost" id="ptkeep" data-pt="keep">متابعة</button><button class="btn btn-ghost" data-pt="discard" style="color:var(--s-fail-text)">تجاهل التغييرات</button>';
+    h += '<span class="m-err" role="alert">لديك تغييرات لم تُحفظ.</span><button class="m-btn" id="ptkeep" data-pt="keep">متابعة</button><button class="m-btn" data-pt="discard">تجاهل التغييرات</button>';
   } else {
     var label = s.kind === "partner" ? (s.mode === "edit" ? "حفظ التعديلات" : "إضافة الشريك") : s.kind === "targets" ? "حفظ المستهدف" :
       s.mode === "paste" ? (ptPastePreview(s).ok.length ? "تسجيل " + ptPl(ptPastePreview(s).ok.length, "نتيجة واحدة", "نتيجتين", "نتائج", "نتيجة") : "تسجيل القائمة") : "تسجيل النتيجة";
-    h += '<button class="btn btn-teal" id="ptsave" data-pt="save"' + (s.busy ? ' disabled aria-busy="true"' : "") + ">" + (s.busy ? "جارٍ الحفظ…" : label) + "</button>" +
-      '<button class="btn btn-ghost" data-pt="close">إلغاء</button>' + (s.err && !ptFieldTarget(s.field) ? '<span class="cf-err msg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
+    h += '<button class="m-btn m-btn--primary" id="ptsave" data-pt="save"' + (s.busy ? ' disabled aria-busy="true"' : "") + ">" + (s.busy ? "جارٍ الحفظ…" : esc(label)) + "</button>" +
+      '<button class="m-btn" data-pt="close">إلغاء</button>' + (s.err && !ptFieldTarget(s.field) ? '<span class="m-err" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
   }
-  return h + "</div></div></div>";
+  return h + "</div></div></div></div>";
 }
 function ptPartnerForm(s) {
   var d = s.d;
-  var h = '<div class="cf-g">' + ptInp("ptf_name", "اسم الشريك", "name", d.name, { req: true, max: PARTNER_NAME_MAX, ph: "مثال: شركة إجادة" }) +
-    '<div class="cf-fl"><span class="cf-sub" id="ptf_kind_l">نوع الشريك <span class="req" aria-hidden="true">*</span></span><span class="pt-radio' + (s.field === "kind" ? " bad" : "") + '" role="radiogroup" aria-labelledby="ptf_kind_l" id="ptf_kind">' +
-    PARTNER_KINDS.map(function (k) { return '<button role="radio" aria-checked="' + (d.kind === k) + '" data-pt="kind" data-v="' + k + '">' + PARTNER_KIND_LABELS[k] + "</button>"; }).join("") + "</span>" + ptErr("kind") + "</div></div>";
-  h += '<div class="cf-g">' + ptInp("ptf_contact", "اسم المسؤول لدى الشريك", "contactName", d.contactName, { max: PARTNER_CONTACT_MAX }) +
-    ptInp("ptf_phone", "الهاتف", "phone", d.phone, { ltr: true, type: "tel" }) + "</div>";
-  h += '<div class="cf-g">' + ptInp("ptf_email", "البريد الإلكتروني", "email", d.email, { ltr: true, type: "email", max: PARTNER_EMAIL_MAX }) +
-    ptInp("ptf_note", "ملاحظة", "note", d.note, { max: PARTNER_NOTE_MAX, ph: "مثال: متعاقد حتى نهاية 2026" }) + "</div>";
+  var h = '<div class="m-form">' + ptInp("ptf_name", "اسم الشريك", "name", d.name, { req: true, max: PARTNER_NAME_MAX, ph: "مثال: شركة إجادة" }) +
+    '<div class="m-field"><span class="m-label m-req" id="ptf_kind_l">نوع الشريك</span><span class="pt-radio' + (s.field === "kind" ? " bad" : "") + '" role="radiogroup" aria-labelledby="ptf_kind_l" id="ptf_kind">' +
+    PARTNER_KINDS.map(function (k) { return '<button role="radio" aria-checked="' + (d.kind === k) + '" data-pt="kind" data-v="' + k + '">' + PARTNER_KIND_LABELS[k] + "</button>"; }).join("") + "</span>" + ptErr("kind") + "</div>";
+  h += ptInp("ptf_contact", "اسم المسؤول لدى الشريك", "contactName", d.contactName, { max: PARTNER_CONTACT_MAX }) +
+    ptInp("ptf_phone", "الهاتف", "phone", d.phone, { ltr: true, type: "tel" });
+  h += ptInp("ptf_email", "البريد الإلكتروني", "email", d.email, { ltr: true, type: "email", max: PARTNER_EMAIL_MAX }) +
+    ptInp("ptf_note", "ملاحظة", "note", d.note, { max: PARTNER_NOTE_MAX, ph: "مثال: متعاقد حتى نهاية السنة" });
   if (s.mode === "edit") {
-    h += '<div class="cf-fl"><span class="cf-sub" id="ptf_status_l">الحالة</span><span class="pt-radio" role="radiogroup" aria-labelledby="ptf_status_l">' +
+    h += '<div class="m-field full"><span class="m-label" id="ptf_status_l">الحالة</span><span class="pt-radio" role="radiogroup" aria-labelledby="ptf_status_l">' +
       PARTNER_STATUSES.map(function (k) { return '<button role="radio" aria-checked="' + (d.status === k) + '" data-pt="status" data-v="' + k + '">' + PARTNER_STATUS_LABELS[k] + "</button>"; }).join("") +
-      '</span><span class="hint">الشريك الموقوف تبقى نتائجه، ولا تُسجَّل له نتائج جديدة.</span></div>';
+      '</span><span class="m-hint">الشريك الموقوف تبقى نتائجه، ولا تُسجَّل له نتائج جديدة.</span></div>';
   }
-  return h;
+  return h + "</div>";
 }
 function ptTargetsForm(s) {
-  var h = '<div class="in-row" style="justify-content:flex-start"><button class="ac-add" id="ptcopyprev" data-pt="copyprev"' + (s.copying ? " disabled" : "") + ">" + (s.copying ? "جارٍ النسخ…" : "انسخ مستهدف الأسبوع السابق") + "</button></div>";
-  if (s.field === "targets" && s.err) h += '<div class="cf-err" role="alert">' + ptIco("warn") + esc(s.err) + "</div>";
+  var h = '<div><button class="m-btn" id="ptcopyprev" data-pt="copyprev"' + (s.copying ? " disabled" : "") + ">" + (s.copying ? "جارٍ النسخ…" : "انسخ مستهدف الأسبوع السابق") + "</button></div>";
+  if (s.field === "targets" && s.err) h += '<div class="m-err" role="alert">' + ptIco("warn") + esc(s.err) + "</div>";
   h += '<div class="pt-tg">';
   s.rows.forEach(function (p, i) {
     var bad = s.field === "targets." + i;
-    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="cf-sub">(مؤرشف — امسح مستهدفه فقط)</span>' : "") + '</label><input class="inp" id="ptt_' + i + '" inputmode="numeric" dir="ltr" data-pttg="' + esc(p) + '" value="' + esc(s.d[p] || "") + '" placeholder="—"' +
-      (bad ? ' aria-invalid="true" aria-describedby="err_pt_tg"' : "") + "></div>" + (bad ? '<span class="ferr cf-err" id="err_pt_tg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
+    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="m-meta">(مؤرشف — امسح مستهدفه فقط)</span>' : "") + '</label><input class="m-input" id="ptt_' + i + '" inputmode="numeric" dir="ltr" data-pttg="' + esc(p) + '" value="' + esc(s.d[p] || "") + '" placeholder="بلا مستهدف"' +
+      (bad ? ' aria-invalid="true" aria-describedby="err_pt_tg"' : "") + "></div>" + (bad ? '<span class="m-err" id="err_pt_tg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
   });
   return h + "</div>";
 }
@@ -466,26 +573,30 @@ function ptPastePreview(s) {
 }
 function ptRecordForm(s) {
   var d = s.d;
-  var h = '<span class="vtog" role="radiogroup" aria-label="طريقة التسجيل"><button role="radio" aria-checked="' + (s.mode === "one") + '" class="' + (s.mode === "one" ? "on" : "") + '" data-pt="mode" data-v="one">نتيجة واحدة</button>' +
-    '<button role="radio" aria-checked="' + (s.mode === "paste") + '" class="' + (s.mode === "paste" ? "on" : "") + '" data-pt="mode" data-v="paste">لصق قائمة</button></span>';
-  h += '<div class="cf-g"><div class="cf-fl"><label for="ptr_product">المنتج <span class="req" aria-hidden="true">*</span></label><select id="ptr_product" data-ptfld="product"' + ptFld("product") + '><option value="">— اختر المنتج —</option>' +
+  var h = '<span class="m-seg" role="group" aria-label="طريقة التسجيل">' +
+    '<button type="button" aria-pressed="' + (s.mode === "one") + '" data-pt="mode" data-v="one">نتيجة واحدة</button>' +
+    '<button type="button" aria-pressed="' + (s.mode === "paste") + '" data-pt="mode" data-v="paste">لصق قائمة</button></span>';
+  h += '<div class="m-form"><div class="m-field"><label class="m-label m-req" for="ptr_product">المنتج</label><select class="m-select" id="ptr_product" data-ptfld="product"' + ptFld("product") + '><option value="">— اختر المنتج —</option>' +
     ptData.products.map(function (p) { return '<option value="' + esc(p) + '"' + (d.product === p ? " selected" : "") + ">" + esc(p) + "</option>"; }).join("") + "</select>" + ptErr("product") + "</div>" +
     ptInp("ptr_date", "تاريخ التواصل", "contactedOn", d.contactedOn, { req: true, type: "date", extra: ' max="' + ptData.today + '"' }) + "</div>";
   if (s.mode === "one") {
-    h += '<div class="cf-g">' + ptInp("ptr_name", "اسم المنشأة", "accountName", d.accountName, { req: true, max: RESULT_NAME_MAX, ph: "مثال: مستشفى الأمل" }) +
+    h += '<div class="m-form">' + ptInp("ptr_name", "اسم المنشأة", "accountName", d.accountName, { req: true, max: RESULT_NAME_MAX, ph: "مثال: مستشفى الأمل" }) +
       ptInp("ptr_phone", "جوال المنشأة", "phone", d.phone, { req: true, ltr: true, type: "tel", ph: "05xxxxxxxx", hint: "به يرتبط العميل بحسابه وفرصه" }) + "</div>";
-    h += '<div class="cf-fl"><span class="cf-sub" id="ptr_result_l">النتيجة <span class="req" aria-hidden="true">*</span></span><span class="pt-radio' + (s.field === "result" ? " bad" : "") + '" role="radiogroup" aria-labelledby="ptr_result_l" id="ptr_result">' +
+    h += '<div class="m-field"><span class="m-label m-req" id="ptr_result_l">النتيجة</span><span class="pt-radio' + (s.field === "result" ? " bad" : "") + '" role="radiogroup" aria-labelledby="ptr_result_l" id="ptr_result">' +
       PARTNER_RESULTS.map(function (k, i) { return '<button role="radio" aria-checked="' + (d.result === k) + '" tabindex="' + (d.result === k || (!d.result && i === 0) ? 0 : -1) + '" data-pt="result" data-v="' + k + '">' + PARTNER_RESULT_LABELS[k] + "</button>"; }).join("") + "</span>" +
-      (d.result === "interested" ? '<span class="hint">يُحوَّل فرصة بيع لفريق المبيعات فور الحفظ.</span>' : "") + ptErr("result") + "</div>";
+      (d.result === "interested" ? '<span class="m-hint">يُحوَّل فرصة بيع لفريق المبيعات فور الحفظ.</span>' : "") + ptErr("result") + "</div>";
     h += ptInp("ptr_note", "ملاحظة", "note", d.note, { max: RESULT_NOTE_MAX });
   } else {
-    h += '<div class="cf-fl"><label for="ptr_paste">القائمة <span class="req" aria-hidden="true">*</span></label><textarea class="pt-paste" id="ptr_paste" data-ptfld="paste" dir="auto" placeholder="مستشفى الأمل، 0551234567، مهتم&#10;عيادة النور، 0559876543، لم يرد، اتصلنا مرتين">' + esc(s.paste) + "</textarea>" +
-      '<span class="hint">سطر لكل منشأة: الاسم، الجوال، النتيجة (مهتم / غير مهتم / لم يرد)، ثم ملاحظة اختيارية. يُقبل النسخ من جدول.</span>' + ptErr("paste") + "</div>";
+    h += '<div class="m-field"><label class="m-label m-req" for="ptr_paste">القائمة</label><textarea class="pt-paste" id="ptr_paste" data-ptfld="paste" dir="auto" placeholder="مستشفى الأمل، 0551234567، مهتم&#10;عيادة النور، 0559876543، لم يرد، اتصلنا مرتين">' + esc(s.paste) + "</textarea>" +
+      '<span class="m-hint">سطر لكل منشأة: الاسم، الجوال، النتيجة (مهتم / غير مهتم / لم يرد)، ثم ملاحظة اختيارية. يُقبل النسخ من جدول.</span>' + ptErr("paste") + "</div>";
     var pv = ptPastePreview(s);
     if (s.paste.trim()) {
-      h += '<div class="pt-prev" aria-live="polite"><span class="ok">' + (pv.ok.length ? ptPl(pv.ok.length, "نتيجة واحدة جاهزة", "نتيجتان جاهزتان", "نتائج جاهزة", "نتيجة جاهزة") : "لا نتيجة جاهزة") + " للتسجيل" + (pv.ok.filter(function (x) { return x.value.result === "interested"; }).length ? " · مهتمون يُحوَّلون للمبيعات: " + fmtN(pv.ok.filter(function (x) { return x.value.result === "interested"; }).length) : "") + "</span>" +
-        pv.bad.slice(0, 8).map(function (b) { return '<span class="bad">السطر ' + fmtN(b.line) + ": " + esc(b.reason) + "</span>"; }).join("") +
-        (pv.bad.length > 8 ? '<span class="bad">و' + ptPl(pv.bad.length - 8, "سطر آخر فيه خطأ", "سطران آخران فيهما أخطاء", "أسطر أخرى فيها أخطاء", "سطرًا آخر فيها أخطاء") + ".</span>" : "") + "</div>";
+      var hot = pv.ok.filter(function (x) { return x.value.result === "interested"; }).length;
+      h += '<div class="pt-prev" aria-live="polite"><span class="ok">' +
+        (pv.ok.length ? mPlOf(pv.ok.length, ptPl(pv.ok.length, "نتيجة واحدة جاهزة", "نتيجتان جاهزتان", "نتائج جاهزة", "نتيجة جاهزة")) : "لا نتيجة جاهزة") +
+        " للتسجيل" + (hot ? " · مهتمون يُحوَّلون للمبيعات: " + mN(hot) : "") + "</span>" +
+        pv.bad.slice(0, 8).map(function (b) { return '<span class="bad">السطر ' + mN(b.line) + ": " + esc(b.reason) + "</span>"; }).join("") +
+        (pv.bad.length > 8 ? '<span class="bad">و' + mPlOf(pv.bad.length - 8, ptPl(pv.bad.length - 8, "سطر آخر فيه خطأ", "سطران آخران فيهما أخطاء", "أسطر أخرى فيها أخطاء", "سطرًا آخر فيها أخطاء")) + ".</span>" : "") + "</div>";
     }
   }
   return h;
@@ -687,8 +798,8 @@ document.addEventListener("change", function (ev) {
 });
 document.addEventListener("keydown", function (ev) {
   if (!ptSheet || !document.querySelector(".ac-box")) {
-    var tb = ev.target && ev.target.closest ? ev.target.closest(".pt-tab") : null;
-    if (tb && ptData && (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "Home" || ev.key === "End")) {
+    var tb = ev.target && ev.target.closest ? ev.target.closest(".m-tab") : null;
+    if (tb && tb.getAttribute("data-pt") === "tab" && ptData && (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "Home" || ev.key === "End")) {
       ev.preventDefault();
       var order = ["all"].concat(ptData.partners.map(function (p) { return String(p.id); }));
       var at = ev.key === "Home" ? 0 : ev.key === "End" ? order.length - 1 : order.indexOf(String(ptF.tab)) + (ev.key === "ArrowLeft" ? 1 : -1);
