@@ -5007,8 +5007,10 @@ export async function lossesByReason(): Promise<LossReason[]> {
 }
 
 export type ProductQuarter = {
-  product: string; annualTarget: number;
-  quarters: { quarter: number; target: number; achieved: number; coveragePct: number | null }[];
+  // null means NO TARGET RECORDED. A recorded target of zero is a different fact - someone
+  // decided this product is not being sold this period - and the two must not print alike.
+  product: string; annualTarget: number | null; targetQuarters: number;
+  quarters: { quarter: number; target: number | null; achieved: number; coveragePct: number | null }[];
   achieved: number; coveragePct: number | null;
 };
 
@@ -5042,7 +5044,7 @@ export async function quarterlyByProduct(
         GROUP BY o.product, q.quarter
      )
      SELECT g.product, g.quarter,
-            COALESCE(tg.amount, 0) AS target,
+            tg.amount AS target,
             COALESCE(won.achieved, 0) AS achieved
        FROM grid g
        LEFT JOIN targets tg ON tg.product = g.product AND tg.year = $${params.length + 1} AND tg.quarter = g.quarter
@@ -5053,17 +5055,23 @@ export async function quarterlyByProduct(
   const by = new Map<string, ProductQuarter>();
   for (const x of r.rows as any[]) {
     const p = String(x.product);
-    const row = by.get(p) ?? { product: p, annualTarget: 0, quarters: [], achieved: 0, coveragePct: null };
-    const target = Number(x.target), achieved = Number(x.achieved);
+    const row = by.get(p) ?? { product: p, annualTarget: null, targetQuarters: 0, quarters: [], achieved: 0, coveragePct: null };
+    const target = x.target === null || x.target === undefined ? null : Number(x.target);
+    const achieved = Number(x.achieved);
     row.quarters.push({
       quarter: Number(x.quarter), target, achieved,
       // null, not 0 — a quarter with no target has no coverage, which is not 0% coverage.
-      coveragePct: target > 0 ? Math.round((achieved / target) * 100) : null,
+      coveragePct: target !== null && target > 0 ? Math.round((achieved / target) * 100) : null,
     });
-    row.annualTarget += target; row.achieved += achieved;
+    if (target !== null) { row.annualTarget = (row.annualTarget ?? 0) + target; row.targetQuarters++; }
+    row.achieved += achieved;
     by.set(p, row);
   }
   const out = [...by.values()];
-  for (const r2 of out) r2.coveragePct = r2.annualTarget > 0 ? Math.round((r2.achieved / r2.annualTarget) * 100) : null;
-  return out.sort((a, b) => b.annualTarget - a.annualTarget || a.product.localeCompare(b.product, "ar"));
+  for (const r2 of out) {
+    r2.coveragePct = r2.annualTarget !== null && r2.annualTarget > 0
+      ? Math.round((r2.achieved / r2.annualTarget) * 100) : null;
+  }
+  return out.sort((a, b) => (b.annualTarget ?? -1) - (a.annualTarget ?? -1)
+    || a.product.localeCompare(b.product, "ar"));
 }
