@@ -918,13 +918,15 @@ function pxSheetHtml() {
   var exists = nameCheck && nameCheck.ok && (pcCat || []).some(function (p) { return p.product === nameCheck.name; });
   var nameErr = d.touched && d.name.trim() ? (nameCheck && !nameCheck.ok ? nameCheck.reason : exists ? "يوجد منتج بهذا الاسم." : "") : "";
   var fld = function (id, label, key, value, extra, ph, err) {
-    return '<div class="m-field"><label class="m-label' + (extra && extra.req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
-      '<input class="m-input" id="' + id + '" data-pxsheet="' + key + '" value="' + esc(value) + '"' +
-      (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") +
-      (extra && extra.num ? ' type="number" inputmode="numeric" dir="ltr" step="1" min="' + extra.min + '"' + (extra.hi ? ' max="' + extra.hi + '"' : "") : "") +
-      (extra && extra.req ? ' aria-required="true"' : "") +
+    var rest = (extra && extra.req ? ' aria-required="true"' : "") +
       (err ? ' aria-invalid="true" aria-describedby="' + id + '_e"' : "") +
-      (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" +
+      (ph ? ' placeholder="' + esc(ph) + '"' : "");
+    return '<div class="m-field"><label class="m-label' + (extra && extra.req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+      (extra && extra.num
+        ? mNum({ id: id, value: value, label: label, min: extra.min, max: extra.hi, step: extra.step || 1, mode: "numeric",
+            attrs: ' data-pxsheet="' + key + '"' + rest })
+        : '<input class="m-input" id="' + id + '" data-pxsheet="' + key + '" value="' + esc(value) + '"' +
+          (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") + rest + ">") +
       (err ? '<span class="m-err" id="' + id + '_e" role="alert">' + esc(err) + "</span>" : "") + "</div>";
   };
   var h = '<div class="ds6"><div class="px-scrim' + cls + '" data-px="sheetclose"></div>';
@@ -945,7 +947,7 @@ function pxSheetHtml() {
   h += '<section><h3 class="m-label">الباقة الأولى (اختياري)</h3><div class="m-form">' +
     fld("pxs_pn", "اسم الباقة", "pkgName", d.pkgName, { max: 60 }, "الباقة القياسية", "") +
     fld("pxs_ps", "النطاق", "pkgScope", d.pkgScope, { max: 120 }, "فرع واحد", "") +
-    fld("pxs_pp", "السعر السنوي (ر.س)", "pkgPrice", d.pkgPrice, { num: true, min: 0 }, "", "") +
+    fld("pxs_pp", "السعر السنوي (ر.س)", "pkgPrice", d.pkgPrice, { num: true, min: 0, step: 100 }, "", "") +
     fld("pxs_py", "المدة (سنوات)", "pkgYears", d.pkgYears, { num: true, min: 1, hi: 10 }, "", "") +
     "</div></section>";
   h += "</div>";
@@ -1071,8 +1073,9 @@ function pxPricingSection(p) {
     return '<div class="px-secb"><div class="m-form">' +
       '<div class="m-field"><label class="m-label m-req" for="pxpk_n">اسم الباقة</label><input class="m-input" id="pxpk_n" maxlength="60" value="' + esc(d.name) + '" data-pxpkg="name"></div>' +
       '<div class="m-field"><label class="m-label" for="pxpk_s">النطاق</label><input class="m-input" id="pxpk_s" maxlength="120" value="' + esc(d.scope) + '" data-pxpkg="scope"></div>' +
-      '<div class="m-field"><label class="m-label" for="pxpk_y">المدة (سنوات)</label><input class="m-input" id="pxpk_y" type="number" dir="ltr" min="1" max="10" step="1" value="' + esc(d.years) + '" data-pxpkg="years"></div>' +
-      '<div class="m-field"><label class="m-label" for="pxpk_p">السعر السنوي (ر.س)</label><input class="m-input" id="pxpk_p" type="number" dir="ltr" min="0" step="1" value="' + esc(d.listPrice) + '" data-pxpkg="listPrice"></div></div>' +
+      '<div class="m-field"><label class="m-label" for="pxpk_y">المدة (سنوات)</label>' + mNum({ id: "pxpk_y", value: d.years, label: "المدة", min: 1, max: 10, step: 1, mode: "numeric", attrs: ' data-pxpkg="years"' }) +
+      '<span class="m-hint">' + mNumRange(1, 10) + "</span></div>" +
+      '<div class="m-field"><label class="m-label" for="pxpk_p">السعر السنوي (ر.س)</label>' + mNum({ id: "pxpk_p", value: d.listPrice, label: "السعر السنوي", min: 0, step: 100, attrs: ' data-pxpkg="listPrice"' }) + "</div></div>" +
       (ed.err ? '<span class="m-err" role="alert">' + esc(ed.err) + "</span>" : "") +
       '<div class="px-acts"><button type="button" class="m-btn m-btn--primary" data-px="pkgsave"' + (ed.busy ? " disabled" : "") + ">" + (ed.busy ? "جارٍ الحفظ…" : "حفظ الباقة") + "</button>" +
       '<button type="button" class="m-btn" data-px="pkgcancel">إلغاء</button>' +
@@ -1135,7 +1138,9 @@ function pxTargetsSection(p) {
     b += '<div class="m-field"><span class="px-acts">' +
       '<label class="m-label" for="pxq_' + q.quarter + '">مستهدف الربع ' + mN(q.quarter) + "</label>" +
       pxStatusSlot(key, "pxq_" + q.quarter) + "</span>" +
-      '<input class="m-input" id="pxq_' + q.quarter + '" type="number" min="0" step="1" inputmode="numeric" dir="ltr" placeholder="بلا مستهدف" value="' + esc(val) + '" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") + ">" +
+      /* Steps of 1,000: a quarterly target is set in thousands of riyals. Empty stays «بلا مستهدف». */
+      mNum({ id: "pxq_" + q.quarter, value: val, label: "مستهدف الربع", min: 0, step: 1000, mode: "numeric",
+        attrs: ' placeholder="بلا مستهدف" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") }) +
       '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">المحقق ' + pxMoney(q.achieved) + "</span>" +
       '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + (has ? Math.min(100, cov || 0) : 0) + '%"></i></span>' +
       /* No target is not a coverage of zero: there is no denominator for the percentage to be a

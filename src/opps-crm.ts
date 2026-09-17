@@ -1435,13 +1435,17 @@ function opField(l, key, label, type) {
   }
   var val = st && st.s !== "saved" ? st.v : cur;
   var num = type === "number";
-  var rng = key === "years" ? ' min="1" max="20" step="1"' : key === "discount" ? ' min="0" max="100"' : key === "qty" ? ' min="1" step="1"' : key === "sale_price" ? ' min="0"' : "";
-  return '<div class="m-field"><div class="ox-lr"><label class="m-label" for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>" +
-    '<input class="m-input' + (num ? " num" : "") + '" id="' + id + '" type="' + (num ? "number" : "text") + '"' + rng +
-    (num ? ' inputmode="decimal"' : "") +
-    (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="ما الذي يجب فعله بعد؟"' : "") +
-    ' value="' + esc(val) + '"' + (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
-    ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"></div>';
+  var tail = (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="ما الذي يجب فعله بعد؟"' : "") +
+    (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
+    ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"';
+  var field = '<div class="m-field"><div class="ox-lr"><label class="m-label" for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>";
+  /* Numeric fields are the shared number field (number-field-crm.ts), with the SAME bounds the server's
+     validateOppLine enforces, so the control can never step to a value the save would reject. */
+  if (num) {
+    var bd = opLineBounds(key);
+    return field + mNum({ id: id, value: val, label: label, attrs: tail, min: bd.min, max: bd.max, step: bd.step, mode: bd.mode }) + "</div>";
+  }
+  return field + '<input class="m-input" id="' + id + '" type="text" value="' + esc(val) + '"' + tail + "></div>";
 }
 /* ===== التصعيد وطلب الدعم =====
    Recorded, never sent: no mail sender is configured (founder, 2026-09-13), so the row says
@@ -1616,6 +1620,15 @@ window.opStepTo = function (id, key) {
   opStepFocus = el && el.classList && el.classList.contains("ox-stb") ? "oxst_" + id + "_" + key : "";
   return window.opSetStage(id, key);
 };
+/* The server's own bounds for a line's numbers (db.ts validateOppLine): years 1–20, quantity 1–10,000,
+   discount 0–100, price from 0. Price steps by 100 because a step of one riyal on an annual licence is
+   a button nobody would press. */
+function opLineBounds(key) {
+  return key === "years" ? { min: 1, max: 20, step: 1, mode: "numeric" }
+    : key === "qty" ? { min: 1, max: 10000, step: 1, mode: "numeric" }
+    : key === "discount" ? { min: 0, max: 100, step: 1, mode: "decimal" }
+    : { min: 0, max: 1000000000000, step: 100, mode: "decimal" };
+}
 function opStepper(l, open, idx) {
   var states = stageSteps(open.map(function (s) { return s.key; }), l.stage);
   var selectable = {};
@@ -1671,13 +1684,12 @@ function opDetailDrawer(l) {
   b += '<section class="ox-sec" aria-labelledby="oxsec_st"><div class="ox-lr"><div class="ox-sech" id="oxsec_st">المرحلة</div>' + opFieldStatus(ssk, "oxd_stage_" + l.id) + "</div>";
   b += opStepper(l, open, idx);
   if (opIsOpen(l)) {
-    b += '<div class="ox-strow">' +
-      (opStalled(l) ? '<span class="m-chip m-chip--warn">متوقفة — تجاوزت ' + opNDayN(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span>" : "") +
-      '<span class="sp"></span>' +
-      (opMayEdit()
-        ? '<button class="m-btn" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
-          '<button class="m-btn" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button>'
-        : "") + "</div>";
+    /* The two closing actions moved to the drawer's footer (founder, 2026-09-17: «move these buttons
+       below»): they end the deal, so they sit with the drawer's other terminal action and stay in reach
+       while the record scrolls. Only the stall warning stays with the stepper it describes. */
+    if (opStalled(l)) {
+      b += '<div class="ox-strow"><span class="m-chip m-chip--warn">متوقفة — تجاوزت ' + opNDayN(opStageSla(l) === null ? OPP_STALL_DAYS : opStageSla(l)) + "</span></div>";
+    }
   } else {
     b += '<div class="ox-strow"><span class="m-chip ' + (opIsWon(l) ? "m-chip--ok" : "m-chip--bad") + '">' +
       (opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
@@ -1757,6 +1769,10 @@ function opDetailDrawer(l) {
     opEscLoad(l.id, false);
   }
   var foot = (opDelErr ? '<span class="ox-derr" role="alert">' + opIco("warn") + esc(opDelErr) + "</span>" : "") +
+    (opIsOpen(l) && opMayEdit()
+      ? '<button class="m-btn" onclick="opSetStage(' + l.id + ',&quot;' + opWonKey() + '&quot;)">' + opIco("check") + "أُغلقت ربحًا</button>" +
+        '<button class="m-btn" id="oxlost_' + l.id + '" onclick="opSetStage(' + l.id + ',&quot;' + opLostKey() + '&quot;)">أُغلقت خسارة</button>'
+      : "") +
     (l.phone ? '<a class="m-btn" href="#customer/' + esc(l.phone) + '">ملف العميل ←</a>' : "") +
     '<span class="sp"></span>' +
     (opMayEdit()
@@ -1809,10 +1825,12 @@ function opCreateDrawer() {
   d.lines.forEach(function (l, i) {
     var v = opValue(l); total += v; if (!opPriced(l)) unp++;
     var fid = function (k) { return "opd_" + k + "_" + i; };
-    var numF = function (k, label, rng, ph) {
+    var numF = function (k, label, key, ph) {
+      var bd = opLineBounds(key);
       return '<div class="m-field"><label class="m-label" for="' + fid(k) + '">' + label + "</label>" +
-        '<input class="m-input num" id="' + fid(k) + '" type="number" inputmode="decimal"' + rng + (ph ? ' placeholder="' + ph + '"' : "") +
-        ' value="' + esc(l[k]) + '"' + errOf(k + "_" + i) + ' oninput="opLineSet(' + i + ',&quot;' + k + '&quot;,this.value)"></div>';
+        mNum({ id: fid(k), value: l[k], label: label, min: bd.min, max: bd.max, step: bd.step, mode: bd.mode,
+          attrs: (ph ? ' placeholder="' + ph + '"' : "") + errOf(k + "_" + i) + ' oninput="opLineSet(' + i + ',&quot;' + k + '&quot;,this.value)"' }) +
+        (bd.max && bd.max <= 100 ? '<span class="m-hint">' + mNumRange(bd.min, bd.max) + "</span>" : "") + "</div>";
     };
     b += '<div class="ox-lblk"><div class="hd"><span>البند ' + opN(i + 1) + "</span>" +
       (d.lines.length > 1 ? '<button type="button" class="m-btn m-btn--quiet" onclick="opLineDel(' + i + ')">إزالة</button>' : "") + "</div>" +
@@ -1821,8 +1839,8 @@ function opCreateDrawer() {
       '<option value="">اختر المنتج</option>' +
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
       "</select></div>" +
-      '<div class="m-form">' + numF("sale_price", "السعر السنوي (ر.س)", ' min="0"', "بلا سعر") + numF("years", "السنوات", ' min="1" max="20" step="1"', "") +
-      numF("qty", "الكمية", ' min="1" step="1"', "") + numF("discount", "الخصم ٪", ' min="0" max="100"', "0") + "</div>" +
+      '<div class="m-form">' + numF("sale_price", "السعر السنوي (ر.س)", "sale_price", "بلا سعر") + numF("years", "السنوات", "years", "") +
+      numF("qty", "الكمية", "qty", "") + numF("discount", "الخصم ٪", "discount", "0") + "</div>" +
       '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv">' +
       (opPriced(l) ? opMoney(v) : opUnpricedNil()) + "</span></div></div>";
   });

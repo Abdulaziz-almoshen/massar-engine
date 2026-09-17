@@ -24,6 +24,41 @@ export const OPP_WORK_CRM_CSS = `
 .ds6 .ow-jpct { display:flex; align-items:center; gap:var(--m-3); margin-block:var(--m-2) var(--m-3); }
 .ds6 .ow-jpct .l { font-size:var(--m-t-cap); color:var(--m-mut); white-space:nowrap; }
 .ds6 .ow-jpct .m-meter { flex:1; margin-block:0; }
+/* The progress fill, as the founder specified it (2026-09-17): a blue-to-green fill that runs past its
+   mark and settles back onto it, on a loop. His keyframes settled on a fixed 87%; here they settle on
+   THIS deal's own percentage, and overshoot by nine points capped at the track, so the bar never
+   claims a figure the line does not have. The gradient starts at the inline start, which in this RTL
+   drawer is the right-hand end the fill grows from. */
+.ds6 .ow-jpct .m-meter i {
+  background: linear-gradient(to left, #5b8def, #4cd08a);
+  animation: ow-settle 2.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+@keyframes ow-settle {
+  0% { inline-size: 0; }
+  55% { inline-size: min(calc(var(--m-pct, 0%) + 9%), 100%); }
+  72%, 100% { inline-size: var(--m-pct, 0%); }
+}
+/* The stage-outcome log ages, as the founder specified it: each entry arrives, holds, and fades back.
+   His delays are kept for the second and third entries; later entries continue the same 0.9s cadence,
+   so a long ladder reads as one wave rather than every fourth row flashing in step with the first. */
+.ds6 .ow-j > li { animation: ow-ledger-age 4.6s cubic-bezier(.16, 1, .3, 1) infinite; }
+.ds6 .ow-j > li:nth-child(2) { animation-delay: -.9s; }
+.ds6 .ow-j > li:nth-child(3) { animation-delay: -1.8s; }
+.ds6 .ow-j > li:nth-child(4) { animation-delay: -2.7s; }
+.ds6 .ow-j > li:nth-child(5) { animation-delay: -3.6s; }
+.ds6 .ow-j > li:nth-child(6) { animation-delay: -4.5s; }
+.ds6 .ow-j > li:nth-child(7) { animation-delay: -5.4s; }
+.ds6 .ow-j > li:nth-child(8) { animation-delay: -6.3s; }
+@keyframes ow-ledger-age {
+  0% { opacity: 0; transform: translateY(-10px) scale(1.03); }
+  18%, 58% { opacity: 1; transform: none; }
+  100% { opacity: .22; transform: translateY(5px) scale(.95); }
+}
+/* Both loops stop for anyone who has asked the system for less motion: the log sits at full opacity
+   and the bar at its value. */
+@media (prefers-reduced-motion: reduce) {
+  .ds6 .ow-jpct .m-meter i, .ds6 .ow-j > li { animation: none; }
+}
 .ds6 .ow-jpct .v { font-size:var(--m-t-cap); font-weight:700; color:var(--m-ink); }
 /* A closed deal reports its OUTCOME where an open one reports its progress. */
 .ds6 .ow-jout { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; margin-block:var(--m-2) var(--m-3); }
@@ -433,9 +468,16 @@ function owQuotesSection(l) {
   if (owQuote && owQuote.oppId === l.id) {
     var Q = owQuote;
     var inv = function (f) { return Q.field === f ? ' aria-invalid="true" aria-describedby="owqerr"' : ""; };
+    /* The quote's own bounds (opp-work-domain checkQuote): years 1–10 — tighter than a line's 20 —
+       quantity 1–10,000, a whole-percent discount. */
+    var QB = { salePrice: { min: 0, step: 100, mode: "decimal" }, years: { min: 1, max: 10, step: 1, mode: "numeric" },
+      qty: { min: 1, max: 10000, step: 1, mode: "numeric" }, discount: { min: 0, max: 100, step: 1, mode: "numeric" } };
     var num = function (k, id, label, req) {
+      var bd = QB[k] || { step: 1 };
       return '<div class="m-field"><label class="m-label' + (req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
-        '<input class="m-input num" type="number" inputmode="decimal" id="' + id + '" value="' + esc(Q[k]) + '" data-owq="' + k + '"' + inv(k) + "></div>";
+        mNum({ id: id, value: Q[k], label: label, min: bd.min, max: bd.max, step: bd.step, mode: bd.mode,
+          attrs: ' data-owq="' + k + '"' + inv(k) }) +
+        (bd.max && bd.max <= 100 ? '<span class="m-hint">' + mNumRange(bd.min, bd.max) + "</span>" : "") + "</div>";
     };
     b += '<div class="ow-form" role="group" aria-label="عرض سعر جديد"><div class="m-form">' +
       num("salePrice", "owq_price", "السعر السنوي (ر.س)", true) + num("years", "owq_years", "السنوات") +

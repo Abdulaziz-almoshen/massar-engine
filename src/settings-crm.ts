@@ -143,6 +143,13 @@ function cfClose() { cfEdit = null; render(false); }
 function cfSet(k, v) { if (cfEdit) { cfEdit.d[k] = v; cfEdit.err = ""; cfEdit.field = ""; } }
 function cfFieldErr(f) { return cfEdit && cfEdit.field === f ? ' aria-invalid="true"' : ""; }
 function cfInput(id, label, value, extra, hint) {
+  /* A numeric setting is the shared number field, bounded as config-domain's checkStage bounds it. */
+  if (extra && extra.num) {
+    return '<div class="m-field"><label class="m-label" for="' + id + '">' + label + "</label>" +
+      mNum({ id: id, value: value == null ? "" : value, label: label, min: extra.min, max: extra.hi, step: extra.step || 1, mode: "numeric",
+        attrs: ' data-cfset="' + extra.k + '"' + (extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : "") + cfFieldErr(extra.k) }) +
+      (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
+  }
   return '<div class="m-field"><label class="m-label" for="' + id + '">' + label + '</label><input class="m-input' + (extra && extra.num ? " num" : "") + '" id="' + id +
     '" data-cfset="' + (extra && extra.k) + '" value="' + esc(value == null ? "" : String(value)) + '"' +
     (extra && extra.type ? ' type="' + extra.type + '"' : "") + (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") +
@@ -177,9 +184,9 @@ function cfStageEditor() {
   var h = '<div class="cf-ed">';
   h += '<div class="m-form">' +
     cfInput("cf_label", "اسم المرحلة", d.label, { k: "label", max: 40, ph: "مثال: مراجعة قانونية" }) +
-    cfInput("cf_weight", "الوزن ٪", d.weightPct, { k: "weightPct", num: true, type: "number" }, terminal ? "وزن مرحلتي الربح والخسارة ثابت" : "احتمال الإغلاق على هذه المرحلة") +
-    cfInput("cf_pos", "الترتيب", d.position, { k: "position", num: true, type: "number" }) +
-    cfInput("cf_sla", "مدة الالتزام (أيام)", d.slaDays, { k: "slaDays", num: true, type: "number", ph: "بلا مدة" }, "بعدها تُعلَّم الفرصة «متأخرة» — اتركها فارغة بلا التزام") +
+    cfInput("cf_weight", "الوزن ٪", d.weightPct, { k: "weightPct", num: true, min: 0, hi: 100, step: 5 }, terminal ? "وزن مرحلتي الربح والخسارة ثابت" : "احتمال الإغلاق على هذه المرحلة") +
+    cfInput("cf_pos", "الترتيب", d.position, { k: "position", num: true, min: 1, hi: 99 }) +
+    cfInput("cf_sla", "مدة الالتزام (أيام)", d.slaDays, { k: "slaDays", num: true, min: 1, hi: SLA_DAYS_MAX, ph: "بلا مدة" }, "بعدها تُعلَّم الفرصة «متأخرة» — اتركها فارغة بلا التزام") +
     cfSelect("cf_active", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّلة"], ["", "موقوفة"]], terminal ? "لا تُوقف" : "الموقوفة لا تُعرض للاختيار") +
     "</div>";
   h += '<div class="m-field">' + cfInput("cf_exit", "شرط الانتقال منها", d.exitCriterion, { k: "exitCriterion", max: 200, ph: "ما الذي يجب أن يتحقق قبل نقل الفرصة من هنا؟" }) + "</div>";

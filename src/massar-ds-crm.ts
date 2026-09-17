@@ -1676,4 +1676,64 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-sw.is-lost{ background: var(--m-bad); }
 .ds6 .hx-kpi .hx-link{ margin-block-start: auto; }
 @media (max-width: 760px){.ds6 .hx-hero__c{ padding-inline: var(--m-4); }.ds6 .hx-big{ font-size: 40px; line-height: 48px; }}
+/* ============================================================================
+   THE NUMBER FIELD — every numeric input (number-field-crm.ts), after the coss ui NumberField,
+   measured on coss.com/ui/particles?tags=input: one joined control, − and + as borderless 38px
+   buttons with 16px glyphs either side of a centred tabular value, a 10px radius, a 1px ring that
+   becomes the focus ring when anything inside it has focus. Sized to Massar's controls, not the
+   reference's: 44px tall to sit level with every other .m-input in a form, 40px buttons (44px on a
+   coarse pointer, the touch target floor).
+   ============================================================================ */.ds6 .m-nf{
+  display: flex;
+  align-items: stretch;
+  direction: ltr;
+  min-block-size: 44px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  border-radius: var(--m-r-ctl);
+  background: var(--m-paper);
+  box-shadow: 0 0 0 1px var(--m-line-2), 0 1px 2px rgba(0, 0, 0, .05);
+  transition: box-shadow var(--m-out) var(--m-ease);
+}
+.ds6 .m-nf:focus-within{ box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line); }
+.ds6 .m-nf:has(.m-nf__in[aria-invalid="true"]){ box-shadow: 0 0 0 1px var(--m-bad), 0 0 0 3px var(--m-bad-dim); }
+.ds6 .m-nf:has(.m-nf__in:disabled){ background: var(--m-page); }
+/* The input gives up its own ring and radius: the group draws them, once. */.ds6 .m-nf .m-nf__in, .ds6 .m-nf .m-nf__in:focus, .ds6 .m-nf .m-nf__in:focus-visible, .ds6 .m-nf .m-nf__in[aria-invalid="true"]{
+  flex: 1 1 0;
+  inline-size: auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding-inline: var(--m-1);
+}
+.ds6 .m-nf .m-nf__in::placeholder{ text-align: center; }
+.ds6 .m-nf__b{
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--m-ink-2);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  transition: background-color var(--m-out) var(--m-ease), color var(--m-out) var(--m-ease);
+}
+.ds6 .m-nf__b:first-child{ border-start-start-radius: var(--m-r-ctl); border-end-start-radius: var(--m-r-ctl); }
+.ds6 .m-nf__b:last-child{ border-start-end-radius: var(--m-r-ctl); border-end-end-radius: var(--m-r-ctl); }
+.ds6 .m-nf__b svg{ inline-size: 16px; block-size: 16px; fill: none; stroke: currentColor;
+  stroke-width: 1.75; stroke-linecap: round; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-nf__b:not(:disabled):hover{ background: var(--m-page); color: var(--m-ink); }}
+.ds6 .m-nf__b:not(:disabled):active{ background: var(--m-sunk); }
+.ds6 .m-nf__b:disabled{ color: var(--m-line-2); cursor: default; }
+@media (pointer: coarse){.ds6 .m-nf__b{ inline-size: 44px; }}
+@media (prefers-reduced-motion: reduce){.ds6 .m-nf, .ds6 .m-nf__b{ transition: none; }}
 `;

@@ -557,8 +557,8 @@ function ptTargetsForm(s) {
   h += '<div class="pt-tg">';
   s.rows.forEach(function (p, i) {
     var bad = s.field === "targets." + i;
-    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="m-meta">(مؤرشف — امسح مستهدفه فقط)</span>' : "") + '</label><input class="m-input" id="ptt_' + i + '" inputmode="numeric" dir="ltr" data-pttg="' + esc(p) + '" value="' + esc(s.d[p] || "") + '" placeholder="بلا مستهدف"' +
-      (bad ? ' aria-invalid="true" aria-describedby="err_pt_tg"' : "") + "></div>" + (bad ? '<span class="m-err" id="err_pt_tg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
+    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="m-meta">(مؤرشف — امسح مستهدفه فقط)</span>' : "") + '</label>' + mNum({ id: "ptt_" + i, value: s.d[p] || "", label: p, min: 0, max: PARTNER_TARGET_MAX, step: 1, mode: "numeric",
+        attrs: ' data-pttg="' + esc(p) + '" placeholder="بلا مستهدف"' + (bad ? ' aria-invalid="true" aria-describedby="err_pt_tg"' : "") }) + "</div>" + (bad ? '<span class="m-err" id="err_pt_tg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
   });
   return h + "</div>";
 }

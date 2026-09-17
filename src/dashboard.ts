@@ -33,6 +33,8 @@ import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
 import { SALES_DOMAIN_JS } from "./sales-domain.js";
 import { STAGE_TONE_JS } from "./stage-tone-domain.js";
+import { NUMBER_FIELD_DOMAIN_JS } from "./number-field-domain.js";
+import { NUMBER_FIELD_JS } from "./number-field-crm.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
 import { CONFIG_DOMAIN_JS } from "./config-domain.js";
@@ -5274,6 +5276,8 @@ ${PRODUCT_DOMAIN_JS}
 ${CONFIG_DOMAIN_JS}
 ${SALES_DOMAIN_JS}
 ${STAGE_TONE_JS}
+${NUMBER_FIELD_DOMAIN_JS}
+${NUMBER_FIELD_JS}
 ${OPPS_CRM_JS}
 ${OPP_WORK_CRM_JS}
 ${OPP_WORK_DOMAIN_JS}
