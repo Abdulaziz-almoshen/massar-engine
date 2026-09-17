@@ -415,55 +415,58 @@ function vHomeHealth() {
 }
 
 /* ---------- the partners' week ---------- */
+/* The partners' week, on the new system. The ring is gone: it encoded one number (attainment)
+   in a shape that takes 80px square to read, next to five figures that each take a line. The
+   five figures ARE the week, and «تم التواصل من المستهدف» is one of them, not a crown above
+   them. A partner week with no target prints that it has none rather than a 0٪ ring. */
 function vHomePartners() {
   if (typeof meCan === "function" && !meCan("partners.view")) return "";
   hmPtLoad(false);
-  var h = "";
-  if (!hmPt && hmPtLoading) return '<div class="hm-state" aria-busy="true">جارٍ قراءة أسبوع الشركاء…</div>';
+  if (!hmPt && hmPtLoading) return '<div class="m-empty" aria-busy="true"><div class="m-empty__t">جارٍ قراءة أسبوع الشركاء…</div></div>';
   if (!hmPt) {
-    return '<div class="hm-state" role="alert">' + hmIco("warn") + 'تعذّر تحميل أداء الشركاء.<button class="hm-lnk" onclick="hmRetry()">أعد المحاولة</button></div>';
+    return '<div class="m-empty" role="alert"><div class="m-empty__t">تعذّر تحميل أداء الشركاء</div>' +
+      '<div class="m-empty__a"><button class="m-btn" onclick="hmRetry()">أعد المحاولة</button></div></div>';
   }
   var wk = summarizeWeek(hmPt.targets || [], hmPt.results || []);
   var b = partnerWeekBand(wk);
   if (!b.target && !b.contacted) {
-    return '<div class="hm-state">لا مستهدفات ولا نتائج في هذا الأسبوع — تُحدَّد من «شركاء المبيعات».</div>';
+    return '<div class="m-empty"><div class="m-empty__t">لا مستهدفات ولا نتائج في هذا الأسبوع</div>' +
+      '<div class="m-empty__d">تُحدَّد من «شركاء المبيعات».</div></div>';
   }
   var pct = wholePct(attainmentPct(b.contacted, b.target));
-  var R = 33, C = 2 * Math.PI * R;
-  var dash = pct === null ? 0 : Math.max(0, Math.min(100, pct)) / 100 * C;
-  var fig = function (cls, label, n, p, sub) {
-    return '<div class="hm-fig ' + cls + '"><span class="l">' + label + "</span>" +
-      '<span class="n">' + fmtN(n) + "</span>" +
-      '<span class="p">' + (p === null || p === undefined ? esc(sub || "") : fmtN(p) + "٪ من المستهدف") + "</span></div>";
-  };
-  h += '<div class="hm-pt"><div class="hm-ring">' +
-    '<svg viewBox="0 0 80 80" role="img" aria-label="تحقيق المستهدف ' + (pct === null ? "غير محسوب" : fmtN(pct) + "٪") + '">' +
-    '<circle class="track" cx="40" cy="40" r="' + R + '"></circle>' +
-    '<circle class="arc" cx="40" cy="40" r="' + R + '" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + (C - dash).toFixed(1) + '"></circle></svg>' +
-    '<span class="cap">' + (pct === null ? "—" : fmtN(pct) + "٪") + "<span>تحقيق المستهدف</span></span></div>" +
-    '<div class="hm-figs">' +
-    fig("", "إجمالي المستهدف الأسبوعي", b.target, null, "منشأة متعاقد عليها") +
-    fig("", "تم التواصل", b.contacted, b.contactedPct, "") +
-    fig("ok", "العملاء المهتمون", b.interested, b.interestedPct, "") +
-    fig("bad", "غير مهتمين", b.notInterested, b.notInterestedPct, "") +
-    fig("mute", "لم يردوا", b.noReply, b.noReplyPct, "") +
-    "</div>";
-  /* Shares of the TARGET, so the untouched remainder is visible as the gap the bar does not fill. */
+
+  /* Share OF THE TARGET, so the untouched remainder stays visible as the gap the bar does not
+     fill. A bar normalised to the contacted count would always look full. */
   var den = b.target || b.contacted || 0;
   var w = function (n) { return den ? Math.max(0, Math.min(100, (n / den) * 100)) : 0; };
-  if (den) {
-    h += '<span class="hm-split" role="img" aria-label="توزيع الأسبوع: ' +
-      esc(fmtN(b.interested) + " مهتم، " + fmtN(b.notInterested) + " غير مهتم، " + fmtN(b.noReply) + " لم يرد، من " + fmtN(den)) + '">' +
-      '<i class="ok" style="width:' + w(b.interested).toFixed(1) + '%"></i>' +
-      '<i class="bad" style="width:' + w(b.notInterested).toFixed(1) + '%"></i>' +
-      '<i class="mute" style="width:' + w(b.noReply).toFixed(1) + '%"></i></span>' +
-      '<span class="hm-legend" aria-hidden="true">' +
-      '<span><i style="background:#1E9E63"></i>مهتمون</span>' +
-      '<span><i style="background:#D9534F"></i>غير مهتمين</span>' +
-      '<span><i style="background:#767D89"></i>لم يردوا</span>' +
-      '<span><i style="background:#E5E8EE"></i>لم يُتواصل بهم بعد</span></span>';
+
+  var row = function (label, n, tone, note) {
+    return '<div class="m-seg-row"><span class="m-seg-row__t">' + label + "</span>" +
+      '<span class="m-seg-row__b"><i class="' + tone + '" style="--m-pct:' + w(n).toFixed(1) + '%"></i></span>' +
+      '<span class="m-seg-row__v"><span class="m-n">' + fmtN(n) + "</span></span>" +
+      (note ? '<span class="m-cap">' + note + "</span>" : "") + "</div>";
+  };
+
+  var h = '<div class="m-row" style="justify-content:space-between;flex-wrap:wrap;gap:var(--m-3)">' +
+    '<div><div class="m-card__k">تم التواصل من المستهدف الأسبوعي</div>' +
+    '<div class="m-stat__v">' +
+      (pct === null
+        ? '<span class="m-td-nil m-nil--owed">بلا مستهدف أسبوعي</span>'
+        : '<span class="m-n">' + fmtN(pct) + "٪</span>") + "</div></div>" +
+    '<div class="m-cap">' + opPl(b.target, "منشأة واحدة", "منشأتان", "منشآت", "منشأة") +
+      " مستهدفة · " + opPl(b.contacted, "تم التواصل مع واحدة", "تم التواصل مع اثنتين",
+        "تم التواصل مع", "تم التواصل مع") + "</div></div>";
+
+  h += '<div class="m-segs" style="margin-block-start:var(--m-4)">' +
+    row("العملاء المهتمون", b.interested, "ok", "") +
+    row("غير مهتمين", b.notInterested, "low", "") +
+    row("لم يردوا", b.noReply, "mid", "") + "</div>";
+
+  if (den && den > b.contacted) {
+    h += '<div class="m-cap" style="margin-block-start:var(--m-3)">' +
+      opPl(den - b.contacted, "منشأة واحدة لم يُتواصل بها بعد", "منشأتان لم يُتواصل بهما بعد",
+           "منشآت لم يُتواصل بها بعد", "منشأة لم يُتواصل بها بعد") + "</div>";
   }
-  h += "</div>";
   return h;
 }
 

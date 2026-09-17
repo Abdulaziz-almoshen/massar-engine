@@ -1875,7 +1875,11 @@ function vHome(d) {
   // render in the old system until they are ported in turn.
   const deck = (typeof vHomeDs === "function") ? vHomeDs()
     : ((typeof vHomeDeck === "function") ? vHomeDeck() : "");
-  return deck + ((typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join(""));
+  // The bands go inside .ds6 too, so الرئيسية is one system end to end rather than a new surface
+  // sitting on an old page. Their CONTENTS move over module by module; the wrapper is what lets a
+  // ported band look right the moment its module lands.
+  const bandsHtml = (typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join("");
+  return deck + '<div class="ds6">' + bandsHtml + "</div>";
 }
 
 // Segment groups derive from whatever columns the imported file carried:
