@@ -1349,4 +1349,287 @@ export const MASSAR_DS_CSS = `
 .ds6 .hds-ind:active{ transform: scale(.997); }
 .ds6 .hds-ind:focus-visible{ outline: none; box-shadow: var(--m-focus); border-radius: var(--m-r-ctl); }
 @media (prefers-reduced-motion: reduce){.ds6 .hds-ind, .ds6 .hds-ind__b i{ transition: none; }.ds6 .hds-ind:active{ transform: none; }}
+/* ============================================================================
+   THE HOME SURFACE — a hero band over a three-column grid of graph cards.
+   From the GPT-Astra entry at massar-ds/review/entries/astra-home2/, chosen by
+   the founder on 2026-09-17 after he rejected the previous flat layout twice.
+
+   WHY EVERY CLASS HERE IS hm- PREFIXED. The entry as delivered used .card,
+   .metric, .tag, .segment, .plot. Those are exactly the unprefixed names that
+   lost the design competition: .btn alone already has 98 definitions in this
+   app. Scoping to .ds6 is not enough, because the bands this screen composes
+   below the fold are themselves wrapped in .ds6 and still carry old-system
+   classes. A .ds6 .card rule would reach straight into them.
+   ============================================================================ */
+
+/* The hero: three panes divided by hairlines, not three cards with gutters.
+   One object saying three things beats three objects saying one each. */.ds6 .hm-hero{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  background: var(--m-paper);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  overflow: hidden;
+}
+.ds6 .hm-hero__c{ padding-block: var(--m-5); padding-inline: var(--m-5); min-inline-size: 0; }
+.ds6 .hm-hero__c + .hm-hero__c{ border-inline-start: 1px solid var(--m-line); }
+.ds6 .hm-eyebrow{
+  margin: 0;
+  font-size: var(--m-t-cap);
+  font-weight: 500;
+  color: var(--m-mut);
+  line-height: var(--m-leading-meta);
+}
+.ds6 .hm-rev{
+  margin-block: var(--m-2) var(--m-1);
+  font-size: var(--m-t-hero);
+  line-height: var(--m-leading-hero);
+  font-weight: 500;
+  letter-spacing: var(--m-tracking-hero);
+  color: var(--m-ink);
+}
+.ds6 .hm-rev .hm-cur, .ds6 .hm-tgt .hm-cur{
+  font-size: var(--m-t-h);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ds6 .hm-sub{ margin: 0; font-size: var(--m-t-cap); color: var(--m-mut);
+  line-height: var(--m-leading-meta); }
+.ds6 .hm-tgt{
+  margin-block: var(--m-2) 0;
+  font-size: var(--m-t-display);
+  line-height: var(--m-leading-figure);
+  font-weight: 500;
+  letter-spacing: var(--m-tracking-figure);
+  color: var(--m-ink);
+}
+.ds6 .hm-tgt__x{ margin: 0; font-size: var(--m-t-body); color: var(--m-ink-2);
+  line-height: var(--m-leading-body); }
+.ds6 .hm-tgt__s{
+  display: inline-flex; align-items: center; gap: var(--m-1);
+  margin-block-start: var(--m-1);
+  font-size: var(--m-t-micro); color: var(--m-mut);
+}
+.ds6 .hm-tgt__s svg{ inline-size: 13px; block-size: 13px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; flex-shrink: 0; }
+.ds6 .hm-link{ align-self: flex-start; margin-block-start: var(--m-2); }
+.ds6 .hm-link{
+  display: inline-flex; align-items: center; gap: var(--m-1);
+  color: var(--m-ac); font-size: var(--m-t-cap); font-weight: 500;
+  text-decoration: none;
+}
+.ds6 .hm-glabel{
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--m-3);
+  margin-block: var(--m-5) var(--m-3);
+}
+.ds6 .hm-glabel h2{ margin: 0; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
+.ds6 .hm-glabel p{ margin: 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+/* THE THREE COLUMNS. The founder has asked for this twice and it is not a
+   breakpoint preference: a graph card is only readable at a width where its
+   bars still separate, and full-width rows of four short values were what he
+   rejected. minmax(0, 1fr) rather than 1fr so a long Arabic label inside a
+   card cannot push its column wider than its share. */.ds6 .hm-grid{
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--m-4);
+  align-items: stretch;
+}
+.ds6 .hm-card{
+  min-inline-size: 0;
+  background: var(--m-paper);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  padding-block: var(--m-4) var(--m-3);
+  padding-inline: var(--m-5);
+  display: flex;
+  flex-direction: column;
+}
+.ds6 .hm-card__h{ display: flex; align-items: center; justify-content: space-between;
+  gap: var(--m-2); margin-block-end: var(--m-3); }
+.ds6 .hm-card__t{ display: flex; align-items: center; gap: var(--m-2);
+  margin: 0; font-size: var(--m-t-body); font-weight: 600; color: var(--m-ink); }
+.ds6 .hm-card__t > svg{ inline-size: 17px; block-size: 17px; color: var(--m-mut);
+  fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round;
+  stroke-linejoin: round; flex-shrink: 0; }
+.ds6 .hm-tag{
+  border: 1px solid var(--m-line); background: var(--m-page);
+  border-radius: 5px; padding-block: 1px; padding-inline: 6px;
+  font-size: var(--m-t-micro); color: var(--m-mut); white-space: nowrap;
+}
+.ds6 .hm-fig{ display: flex; align-items: baseline; gap: var(--m-1); }
+.ds6 .hm-fig__v{ font-size: var(--m-t-fig); line-height: var(--m-leading-figure);
+  font-weight: 500; letter-spacing: var(--m-tracking-figure); color: var(--m-ink); }
+.ds6 .hm-fig__v .hm-cur{ font-size: var(--m-t-sub); font-weight: 400; letter-spacing: 0; }
+.ds6 .hm-fig__l{ font-size: var(--m-t-cap); color: var(--m-mut); }
+.ds6 .hm-note{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut);
+  line-height: var(--m-leading-meta); }
+/* margin-block-start:auto pins the foot to the bottom whatever each card holds,
+   so six cards of different content still line their rules up across a row. */.ds6 .hm-card__f{
+  display: flex; align-items: center; justify-content: space-between; gap: var(--m-2);
+  border-block-start: 1px solid var(--m-line);
+  margin-block-start: auto;
+  padding-block-start: var(--m-2);
+  font-size: var(--m-t-micro); color: var(--m-mut);
+}
+.ds6 .hm-src{
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--m-1);
+  min-block-size: 28px; flex-shrink: 0;
+  border: 0; background: none; padding-block: 2px; padding-inline: 3px;
+  font: inherit; font-size: var(--m-t-micro); color: var(--m-mut); cursor: pointer;
+}
+.ds6 .hm-src svg{ inline-size: 13px; block-size: 13px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+/* The stage distribution. One scale across every rung: a bar whose length is
+   relative to its own row says nothing about which stage holds the work. */.ds6 .hm-stage{ margin: var(--m-4) 0 0; }
+.ds6 .hm-stage__r{
+  display: grid;
+  grid-template-columns: 107px minmax(0, 1fr) 20px;
+  gap: var(--m-2); align-items: center;
+  margin-block-end: var(--m-3);
+}
+.ds6 .hm-stage__l{ font-size: var(--m-t-micro); color: var(--m-ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hm-stage__t{ block-size: 13px; background: var(--m-sunk); border-radius: 3px;
+  overflow: hidden; }
+/* NO transition on the fill. This screen repaints on every route change and every app open —
+   tens of times a day — and a bar that grows each time is an animation the reader has to wait
+   out to read a number they came here for. Motion is spent on the press, which is feedback,
+   not on the paint, which is not. */.ds6 .hm-stage__f{ display: block; block-size: 100%; inline-size: var(--hm-v, 0%);
+  background: var(--m-ink-2); border-radius: 3px; }
+.ds6 .hm-stage__n{ font-size: var(--m-t-cap); color: var(--m-ink); text-align: end; }
+/* The empty rungs are drawn, not omitted. Five stages with nothing in them is
+   the finding on this card; a chart that lists only occupied stages hides it. */.ds6 .hm-rungs{ display: flex; align-items: center; gap: var(--m-3);
+  padding-block: var(--m-2) var(--m-3); }
+.ds6 .hm-rungs__g{ display: grid; grid-template-columns: repeat(var(--hm-c, 5), 1fr);
+  gap: var(--m-1); flex: 1; }
+.ds6 .hm-rung{ block-size: 25px; border: 1px solid var(--m-line); border-radius: 3px;
+  display: grid; place-items: center; background: var(--m-page);
+  font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hm-rungs__c{ font-size: var(--m-t-micro); line-height: 1.5; color: var(--m-ink-2); }
+/* A column plot. Bars are positioned by height only; nothing here animates,
+   because this paints on every route change and a growing bar would replay
+   dozens of times a day. */.ds6 .hm-plot{ position: relative; margin-block-start: var(--m-5); }
+/* No z-index. The guides are absolute and come FIRST in the markup, the columns are positioned
+   and come second, so the columns already paint above them by document order — and DESIGN.md
+   defines a z-scale that a bare integer here would sit outside of. */.ds6 .hm-cols{ display: grid; grid-template-columns: repeat(var(--hm-c, 6), minmax(0, 1fr));
+  gap: var(--m-3); block-size: 132px; align-items: end; position: relative; }
+.ds6 .hm-col{ position: relative; block-size: var(--hm-h, 0%); min-block-size: 0;
+  display: flex; align-items: flex-start; justify-content: center; }
+.ds6 .hm-col i{ position: absolute; inset-block: 0; inset-inline: 3px;
+  background: var(--m-line-2); border-start-start-radius: 3px; border-start-end-radius: 3px; }
+.ds6 .hm-col b{ position: absolute; inset-block-end: calc(100% + 4px);
+  font-size: var(--m-t-micro); font-weight: 400; color: var(--m-ink); }
+.ds6 .hm-col.is-max i{ background: var(--m-ac); }
+.ds6 .hm-col.is-max b{ color: var(--m-ac); font-weight: 600; }
+/* Zero is a baseline mark, not a one-pixel bar pretending to be a quantity. */.ds6 .hm-col.is-zero i{ block-size: 1px; inset-block-start: auto; background: var(--m-line-2);
+  border-radius: 0; }
+.ds6 .hm-col.is-zero::after{ content: ""; position: absolute; inset-block-end: -3px;
+  inline-size: 7px; block-size: 7px; border-radius: 50%;
+  border: 1.5px solid var(--m-mut); background: var(--m-paper); }
+.ds6 .hm-guides{ position: absolute; inset-block: 0; inset-inline: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  pointer-events: none; }
+.ds6 .hm-guides i{ display: block; border-block-start: 1px solid var(--m-line);
+  inline-size: 100%; }
+.ds6 .hm-plot--axis{ padding-inline-start: 21px; }
+.ds6 .hm-plot--axis .hm-guides{ inset-inline-start: 21px; }
+.ds6 .hm-axis{ position: absolute; inset-inline-start: 0; font-size: var(--m-t-micro);
+  color: var(--m-faint); line-height: 1; }
+.ds6 .hm-axis--hi{ inset-block-start: -4px; }
+.ds6 .hm-axis--mid{ inset-block-start: calc(50% - 4px); }
+.ds6 .hm-axis--lo{ inset-block-end: -4px; }
+.ds6 .hm-xlabels{ display: grid; grid-template-columns: repeat(var(--hm-c, 6), minmax(0, 1fr));
+  gap: var(--m-3); text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
+  margin-block-start: var(--m-2); }
+.ds6 .hm-cap{ display: flex; justify-content: space-between; align-items: center;
+  gap: var(--m-2); font-size: var(--m-t-micro); color: var(--m-mut);
+  margin-block: var(--m-2) var(--m-3); }
+.ds6 .hm-cap--plain{ display: block; }
+.ds6 .hm-legend{ display: inline-flex; align-items: center; gap: var(--m-1); white-space: nowrap; }
+.ds6 .hm-legend i{ inline-size: 6px; block-size: 6px; border-radius: 1px; background: var(--m-ac); }
+/* Coverage strips. One cell per record: filled when the figure was recorded,
+   hatched when it was not. Never a zero-height bar, which would read as a
+   recorded zero. */.ds6 .hm-segs{ display: grid; gap: var(--m-1); block-size: 12px;
+  grid-template-columns: repeat(var(--hm-c, 8), minmax(0, 1fr));
+  margin-block: var(--m-3) var(--m-1); }
+.ds6 .hm-segs i{ border-radius: 2px; background: var(--m-sunk); border: 1px solid var(--m-line); }
+.ds6 .hm-segs i.is-on{ background: var(--m-ac); border-color: var(--m-ac); }
+.ds6 .hm-segs i.is-off{
+  background-color: var(--m-page);
+  background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--m-line-2) 3px 4px);
+}
+.ds6 .hm-cov{ display: flex; align-items: center; justify-content: space-between;
+  gap: var(--m-2); font-size: var(--m-t-micro); color: var(--m-mut); flex-wrap: wrap; }
+.ds6 .hm-qhead{ display: flex; justify-content: space-between; gap: var(--m-2);
+  margin-block: var(--m-4) var(--m-1); font-size: var(--m-t-micro); color: var(--m-ink-2); }
+.ds6 .hm-qs{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-1); }
+.ds6 .hm-q{ min-inline-size: 0; text-align: center; }
+.ds6 .hm-q__n{ margin: 0 0 var(--m-1); font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hm-q__c{ min-block-size: 48px; border-radius: 5px; border: 1px solid var(--m-line);
+  background: var(--m-sunk); display: flex; align-items: center; justify-content: center;
+  padding-block: var(--m-1); padding-inline: 2px; }
+.ds6 .hm-q__c .m-nil--owed{ border: 0; padding: 0; background: transparent;
+  color: var(--m-mut); white-space: normal; }
+.ds6 .hm-q.is-on .hm-q__c{ border-color: var(--m-ac-line); background: var(--m-ac-dim);
+  color: var(--m-ac); font-size: var(--m-t-micro); font-weight: 600; }
+.ds6 .hm-q.is-on .hm-q__n{ color: var(--m-ac); font-weight: 600; }
+.ds6 .hm-sectors{ margin-block-end: var(--m-2); }
+.ds6 .hm-sectors > div{ display: flex; align-items: center; justify-content: space-between;
+  gap: var(--m-2); padding-block: var(--m-2);
+  border-block-start: 1px solid var(--m-line); font-size: var(--m-t-micro); }
+.ds6 .hm-sectors dt{ display: flex; align-items: center; gap: var(--m-1); color: var(--m-ink-2); }
+.ds6 .hm-sectors dd{ margin: 0; color: var(--m-ink); }
+.ds6 .hm-sectors svg{ inline-size: 12px; block-size: 12px; color: var(--m-ac); fill: none;
+  stroke: currentColor; stroke-width: 1.7; flex-shrink: 0; }
+.ds6 .hm-dots{ display: grid; grid-template-columns: repeat(var(--hm-c, 16), minmax(0, 1fr));
+  gap: var(--m-1); margin-block: var(--m-3) var(--m-2); }
+.ds6 .hm-dots i{ block-size: 9px; background: var(--m-sunk); border: 1px solid var(--m-line);
+  border-radius: 2px; }
+.ds6 .hm-dots i.is-on{ background: var(--m-ac); border-color: var(--m-ac); }
+.ds6 .hm-know{ display: flex; align-items: center; gap: var(--m-3);
+  border-block-start: 1px solid var(--m-line);
+  margin-block: var(--m-4) var(--m-3); padding-block-start: var(--m-4); }
+.ds6 .hm-ring{ position: relative; inline-size: 74px; block-size: 74px; flex-shrink: 0; }
+.ds6 .hm-ring svg{ inline-size: 100%; block-size: 100%; transform: rotate(-90deg); }
+.ds6 .hm-ring circle{ fill: none; stroke-width: 5; }
+.ds6 .hm-ring .hm-ring__t{ stroke: var(--m-sunk); }
+.ds6 .hm-ring .hm-ring__v{ stroke: var(--m-ac); stroke-dasharray: var(--hm-v, 0) 100; }
+.ds6 .hm-ring__l{ position: absolute; inset-block: 0; inset-inline: 0;
+  display: grid; place-content: center; font-size: var(--m-t-sub); line-height: 1.3;
+  text-align: center; color: var(--m-ink); }
+.ds6 .hm-ring__l small{ font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hm-know h3{ margin: 0; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
+.ds6 .hm-know p{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hm-foot{ display: flex; align-items: center; justify-content: space-between;
+  gap: var(--m-3); padding-block: var(--m-4) var(--m-1);
+  font-size: var(--m-t-micro); color: var(--m-faint); }
+@media (hover: hover) and (pointer: fine){.ds6 .hm-src:hover, .ds6 .hm-link:hover{ color: var(--m-ac); text-decoration: underline;
+    text-underline-offset: 4px; }}
+.ds6 .hm-src:focus-visible, .ds6 .hm-link:focus-visible{
+  outline: none; box-shadow: var(--m-focus); border-radius: 5px;
+}
+/* Press feedback, the one place motion earns its keep here: it confirms the interface heard the
+   pointer. Gated on a fine pointer so it never fires from a keyboard activation. */.ds6 @media (hover: hover) and (pointer: fine){
+  .hm-src:active, .hm-link:active { transform: scale(.97); }
+  .hm-src, .hm-link { transition: transform var(--m-press) var(--m-ease); }
+}
+/* Under 1100px the three columns keep their count and lose their padding: two
+   columns would leave one card orphaned on its own row, and the founder asked
+   for three. Below 760px they stack, because at a phone width three bar charts
+   side by side are three unreadable bar charts. */.ds6 @media (max-width: 1100px){
+  .hm-grid { gap: var(--m-3); }
+  .hm-card { padding-inline: var(--m-3); }
+  .hm-hero__c { padding-inline: var(--m-4); }
+  .hm-stage__r { grid-template-columns: 87px minmax(0, 1fr) 17px; gap: var(--m-1); }
+  .hm-cols, .hm-xlabels { gap: var(--m-1); }
+  .hm-rungs { gap: var(--m-1); }
+}
+@media (max-width: 760px){.ds6 .hm-hero{ grid-template-columns: minmax(0, 1fr); }.ds6 .hm-hero__c + .hm-hero__c{ border-inline-start: 0;
+    border-block-start: 1px solid var(--m-line); }.ds6 .hm-grid{ grid-template-columns: minmax(0, 1fr); }.ds6 .hm-card__f, .ds6 .hm-src{ min-block-size: 44px; }.ds6 .hm-cols{ block-size: 142px; }}
+@media (prefers-reduced-motion: reduce){.ds6 .hm-src, .ds6 .hm-link{ transition: none; }.ds6 .hm-src:active, .ds6 .hm-link:active{ transform: none; }}
+/* A card foot's link never wraps: two lines of «لوحة / المتابعة» beside a one-line note is a
+   foot that is taller in one card than in its row-mates. The note gives way instead. */.ds6 .hm-card__f > span{ min-inline-size: 0; }
+.ds6 .hm-card__f .hm-link{ white-space: nowrap; flex-shrink: 0; }
+.ds6 .hm-tag{ max-inline-size: 50%; overflow: hidden; text-overflow: ellipsis; }
 `;

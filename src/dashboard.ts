@@ -1908,31 +1908,20 @@ function vHome(d) {
   // rather than under it, which is what stopped this page being a 2,554px ribbon.
   const analytics = '<div class="hd-split"><div class="hd-col">' + vHomeCharts(cs) + "</div>" +
     '<div class="hd-col">' + latest + ((typeof winLossBoard === "function") ? winLossBoard() : "") + "</div></div>";
-  // خط البيع is a band, not part of the surface, so it shares the three-column grid with the
-  // rest instead of stretching across the page above them.
-  const pipeBand = (typeof hdsPipelineBand === "function") ? hdsPipelineBand() : "";
-  const bands = (pipeBand
-    ? [["خط البيع", "ما يحمل الرقم أعلاه.", pipeBand, '<a class="go" href="#opps">كل الفرص ←</a>']]
-    : []).concat((typeof vHomeExecBands === "function") ? vHomeExecBands() : []).concat([
-    // NOT «المستهدفات والأداء ←» — the deck already carries that link, and the audit found the
-    // string printed twice on one screen. A second copy of a link is not emphasis, it is a reader
-    // checking whether the two go to the same place.
-    ["أين نحن من المستهدف", "القطاعات، والمنتجات الأقل إنجازًا، والأرباع الأربعة.",
-      (typeof vExecBand === "function") ? vExecBand() : "",
-      '<a class="go" href="#products">كل المنتجات ←</a>', "", true],
-    // The five-tile strip and the analytics block moved to «متابعة الحملات» (2026-09-17). What
-    // stays is the two figures that bear on the number this page is about: who became interested,
-    // and who replied. Everything else about campaigns is one click away and says so.
-    ["الحملات", "ما أنتجته الحملات في الفترة المختارة.",
-      '<div class="ds6"><div class="m-segs">' +
-        '<div class="m-seg-row"><span class="m-seg-row__t">جهات مهتمة ومؤهلة</span>' +
-          '<span class="m-seg-row__v"><span class="m-n">' + fmtN(interestedList.length) + "</span></span>" +
-          '<span class="m-cap">' + (kNewQual ? "+" + fmtN(kNewQual) + " " + KWORD : "بلا تغيّر") + "</span></div>" +
-        '<div class="m-seg-row"><span class="m-seg-row__t">ردّوا</span>' +
-          '<span class="m-seg-row__v"><span class="m-n">' + fmtN(replied) + "</span></span>" +
-          '<span class="m-cap">' + (kNewRepl ? "+" + fmtN(kNewRepl) + " " + KWORD : "بلا تغيّر") + "</span></div>" +
-      "</div></div>", '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
-  ]);
+  // THE BANDS ARE GONE, except partners (2026-09-17, on the founder's approval of the rebuilt
+  // home). Every one of them is now a card in the three-column grid that vHomeDs renders, and
+  // this repo has caught the same defect three times: a figure moved onto a surface while its old
+  // band was left registered, so the page printed it twice and two copies drifted apart.
+  //   خط البيع            -> the «زمن بلا حركة» and «قيمة الفرص وقطاعاتها» cards
+  //   أين نحن من المستهدف -> the «تغطية المستهدفات» card (and the sector list on the value card)
+  //   الحملات             -> the «مسار الحملة» card, which follows ONE cohort rather than summing
+  //                          several of different ages and calling the result a funnel
+  // vExecBand() now has no caller; it stays in products-crm.ts until its screen is ported, and
+  // scripts/check-browser-globals.mjs still sees it, so it cannot rot into a name collision.
+  // vHomeExecBands() stays: it is the partner week, role-conditional, and no card covers it.
+  // No type annotation and no cast: vHome is serialised into the client script verbatim, so any
+  // TypeScript syntax here ships to the browser as a parse error.
+  const bands = (typeof vHomeExecBands === "function") ? vHomeExecBands() : [];
   // The deck is full-bleed and sits ABOVE the numbered bands: it is one dark object continuous with
   // the rail, not a section of the page, so it carries its own header and escapes .body's padding.
   // The surface is the new design system (home-ds-crm.ts), scoped to .ds6. It replaces vHomeDeck,
