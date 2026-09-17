@@ -242,11 +242,20 @@ var AC_TONE = {
   unsold: "--tn:#A2A9B4;--tn-soft:var(--surface-2);--tn-text:var(--muted)",
   thin: "--tn:#5B8DEF;--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"
 };
+/* annualTarget is NOT an annual target: db.ts builds it from only the quarters that have a
+   target row, and says how many in targetQuarters. achieved is the whole fiscal year. So a
+   product targeted in Q1 alone for 100,000 that won 400,000 across the year printed «400٪».
+   attainmentPct only returns null when the sum is 0, so the all-missing case was caught and the
+   partial case — the common one here — was not. Both sibling screens already disclose this;
+   this one dropped it. Returns the percentage AND its basis so the caller can qualify it. */
 function acAttainOf(product) {
   var rows = (typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.byProduct) || [];
   for (var i = 0; i < rows.length; i++) {
     if (rows[i].product === product) {
-      return typeof wholePct === "function" ? wholePct(attainmentPct(rows[i].achieved, rows[i].annualTarget)) : null;
+      var qs = Number(rows[i].targetQuarters) || 0;
+      if (!qs) return null;
+      var pc = typeof wholePct === "function" ? wholePct(attainmentPct(rows[i].achieved, rows[i].annualTarget)) : null;
+      return pc === null ? null : { pct: pc, quarters: qs, partial: qs < 4 };
     }
   }
   return null;
@@ -287,7 +296,14 @@ function vReportsAccept() {
       '<span class="num">' + fmtN(r.won) + "</span>" +
       '<span class="num">' + fmtN(r.lost) + "</span>" +
       '<span class="num">' + fmtN(r.open) + "</span>" +
-      '<span class="num">' + (r.attainmentPct === null ? "—" : fmtN(r.attainmentPct) + "٪ من المستهدف") + "</span>" +
+      /* A percentage measured against a partial year cannot be printed bare: it reads as the
+         year's. Say what it was measured on, the way the two sibling screens already do. */
+      '<span class="num">' + (r.attainmentPct === null
+        ? '<span class="crm-none">بلا مستهدف</span>'
+        : (fmtN(r.attainmentPct.pct) + "٪" +
+           (r.attainmentPct.partial
+             ? " · مستهدف " + fmtN(r.attainmentPct.quarters) + " من أربعة أرباع"
+             : " من المستهدف"))) + "</span>" +
       '<span class="ac-why">' + why + "</span></div>";
   });
   h += "</div>";

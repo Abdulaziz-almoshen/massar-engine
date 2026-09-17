@@ -184,8 +184,24 @@ function vReportsKpis() {
     kpTile("عائد المؤشرات", "Indicator Opportunity Yield", fmtN(d.indicatorYield.opportunities), "فرص الاستهداف المقترحة الآن: " + fmtN(d.indicatorYield.suggestionsNow) + " · حملات من مؤشرات: " + fmtN(d.indicatorYield.campaigns),
       "فرص البيع المنسوبة لحملات بُنيت على مؤشرات الاستخدام") +
     kpTile("تبنّي التوصيات", "Recommendation Adoption", crPct(d.adoption.pct), ratio(d.adoption.launched, d.adoption.launched + d.adoption.dismissed) + (d.adoption.open ? " · مفتوحة الآن: " + fmtN(d.adoption.open) : ""), "التوصيات التي أُطلقت منها حملة ÷ التوصيات التي حُسم أمرها (أُطلقت أو تُجوهلت). لا يُسجَّل عرض التوصية، فلا تدخل المفتوحة في النسبة") +
-    kpTile("تحقيق المستهدف", "Target Achievement", d.target ? crPct(d.target.pct) : "—",
-      d.target ? crMoney(d.target.achieved) + " من " + (d.target.target ? crMoney(d.target.target) : "لا مستهدف") + " · الربع " + d.target.quarter + " من " + d.target.year : "", "المحقق ÷ المستهدف للربع الحالي") + "</div></section>";
+    /* The ratio now covers only the products that have a target; the caption says how many
+       that is and how much revenue sits outside it, because a percentage over part of the
+       catalogue reads as the whole one. */
+    kpTile("تحقيق المستهدف", "Target Achievement",
+      (d.target && d.target.target) ? crPct(d.target.pct) : "—",
+      d.target
+        ? ((d.target.target
+            ? crMoney(d.target.achieved) + " من " + crMoney(d.target.target)
+            : "لا مستهدف مسجّل") +
+           " · الربع " + d.target.quarter + " من " + d.target.year +
+           (d.target.targetedCount != null && d.target.productCount != null &&
+            d.target.targetedCount < d.target.productCount
+             ? " · على " + fmtN(d.target.targetedCount) + " من " + fmtN(d.target.productCount) + " منتجًا" +
+               (d.target.untargetedAchieved
+                 ? "، و" + crMoney(d.target.untargetedAchieved) + " خارج النسبة" : "")
+             : ""))
+        : "",
+      "المحقق ÷ المستهدف للربع الحالي، على المنتجات التي لها مستهدف مسجّل وحدها") + "</div></section>";
   var ho = d.assistant.handoff;
   h += '<section class="kp-grp" aria-labelledby="kph4"><h2 class="hd" id="kph4">المساعد الذكي</h2><div class="kp-tiles">' +
     kpTile("الثقة في الإجابات", "Answer Confidence", crPct(d.assistant.answerConfidence ? d.assistant.answerConfidence.pct : null),

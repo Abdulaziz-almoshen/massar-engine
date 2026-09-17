@@ -49,7 +49,13 @@ def scope_sel(sel):
     for p in [x.strip() for x in sel.split(",")]:
         if not p:
             continue
-        if p in (":root", "body", "html"):
+        if p == ":root":
+            # Tokens go on :root UNSCOPED. They are --m-* prefixed, so they collide with
+            # nothing in the old system, and the shell (one shared rail and top bar, outside
+            # any screen's subtree) has to be able to read them. Only the component RULES are
+            # scoped; a variable that is merely declared paints nothing on its own.
+            parts.append(":root")
+        elif p in ("body", "html"):
             parts.append(SCOPE)
         elif p.startswith(SCOPE):
             parts.append(p)

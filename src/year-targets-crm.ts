@@ -86,8 +86,19 @@ function vYearTargets() {
   var year = q.year;
   var cur = q.currentQuarter;
 
+  /* A ratio has to have the SAME population on both sides. This summed annualTarget with
+     «|| 0», which silently drops an untargeted product from the denominator, while achieved
+     kept summing every product — so a product with revenue and no target inflated the
+     percentage without ever appearing in what it was measured against. Attainment could pass
+     100٪ with real targets unmet, and «المتبقّي» could read 0 at the same time.
+     Targeted products decide the ratio; the rest are counted and stated, never folded in. */
+  var targeted = rows.filter(function (r) { return r.annualTarget !== null && r.annualTarget !== undefined; });
   var target = 0, achieved = 0;
-  rows.forEach(function (r) { target += Number(r.annualTarget) || 0; achieved += Number(r.achieved) || 0; });
+  targeted.forEach(function (r) { target += Number(r.annualTarget) || 0; achieved += Number(r.achieved) || 0; });
+  var outsideAch = 0, outside = rows.length - targeted.length;
+  rows.forEach(function (r) {
+    if (r.annualTarget === null || r.annualTarget === undefined) outsideAch += Number(r.achieved) || 0;
+  });
   var pct = typeof wholePct === "function" ? wholePct(attainmentPct(achieved, target)) : null;
   var left = Math.max(0, target - achieved);
 
@@ -95,9 +106,13 @@ function vYearTargets() {
     /* A YEAR is not a quantity: fmtN would print «2,026». Same defect the campaign chain shipped once. */
     '<div class="yt-kpi"><span class="l">إجمالي المستهدف · ' + esc(String(year)) + '</span>' +
       (target ? '<span class="n">' + ytMoney(target) + "</span>" : '<span class="n none">—</span>') +
-      '<span class="s">' + (target ? "لكل المنتجات" : "لم يُحدَّد مستهدف بعد") + "</span></div>" +
+      '<span class="s">' + (target
+        ? ("لكل المنتجات التي حُدِّد لها مستهدف" + (outside ? " · " + fmtN(outside) + " خارجها" : ""))
+        : "لم يُحدَّد مستهدف بعد") + "</span></div>" +
     '<div class="yt-kpi"><span class="l">إجمالي المحقق</span><span class="n">' + ytMoney(achieved) + "</span>" +
-      '<span class="s">من الصفقات الرابحة</span></div>' +
+      '<span class="s">' + (outside
+        ? ("من المنتجات المستهدفة · " + ytMoney(outsideAch) + " خارج النسبة")
+        : "من الصفقات الرابحة") + "</span></div>" +
     '<div class="yt-kpi"><span class="l">المتبقّي للمستهدف</span>' +
       (target ? '<span class="n">' + ytMoney(left) + "</span>" : '<span class="n none">—</span>') +
       '<span class="s">' + (target ? (left ? "حتى نهاية السنة" : "تحقق المستهدف") : "بلا مستهدف") + "</span></div>" +

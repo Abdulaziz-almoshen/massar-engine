@@ -26,6 +26,7 @@ import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { REVAMP_CSS, HOLD_CSS, HOLD_JS } from "./revamp.js";
 import { MASSAR_DS_CSS } from "./massar-ds-crm.js";
 import { HOME_DS_JS } from "./home-ds-crm.js";
+import { MASSAR_DS_SHELL_CSS } from "./massar-ds-shell.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
@@ -819,6 +820,8 @@ ${HOLD_CSS}
 /* Last, so a ported screen wins over revamp.ts. It can only reach inside .ds6,
    so the 25 screens that have not been ported are untouched by it. */
 ${MASSAR_DS_CSS}
+/* The shell is deliberately unscoped: one rail, shared by every route. */
+${MASSAR_DS_SHELL_CSS}
 </style>
 </head>
 <body>

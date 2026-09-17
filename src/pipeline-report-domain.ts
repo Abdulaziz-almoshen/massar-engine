@@ -133,6 +133,8 @@ export type Funnel = {
   lostUnplaced: number;
   /** True when at least one rung had a decided deal — «nothing measured» and «nothing leaked» differ. */
   measured: boolean;
+  // The denominator behind the 100%% branch, so no percentage prints without one.
+  decidedTotal: number;
   weakest: { from: string; to: string; conversionPct: number; moved: number; decided: number } | null;
   action: NextAction | null;
 };
@@ -204,7 +206,8 @@ export function buildFunnel(
       }
     : null;
   const lostUnplaced = idx.filter((f, k) => lostOf[k] && f === -1).length;
-  return { steps, won, lost, lines: lines.length, wonKey, lostUnplaced, measured: steps.some((x) => x.decided > 0), weakest: w, action };
+  return { steps, won, lost, lines: lines.length, wonKey, lostUnplaced, measured: steps.some((x) => x.decided > 0),
+           decidedTotal: steps.reduce((n, x) => n + x.decided, 0), weakest: w, action };
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -217,6 +220,9 @@ export type VelocityStep = {
 };
 export type Velocity = {
   steps: VelocityStep[]; overSla: number; bottleneck: string | null; action: NextAction | null;
+  // A stage with no sla_days cannot be late. Counting it as 0 and summing made «متأخرة عن
+  // المهلة: 0» read as "nothing is late" when most rungs simply have no deadline set.
+  slaStages: number; openStages: number;
 };
 
 export function buildVelocity(
@@ -252,6 +258,8 @@ export function buildVelocity(
     };
   });
   const overSla = steps.reduce((n, s) => n + s.overSla, 0);
+  const openStages = steps.filter((s) => s.openCount > 0).length;
+  const slaStages = steps.filter((s) => s.openCount > 0 && s.slaDays !== null).length;
   // The bottleneck is where SLAs are being broken; failing that, where deals have sat longest.
   const ranked = [...steps].filter((s) => s.openCount > 0)
     .sort((a, b) => (b.overSla - a.overSla) || ((b.medianOpenDays ?? 0) - (a.medianOpenDays ?? 0)));
@@ -266,7 +274,7 @@ export function buildVelocity(
       }
     : { text: "لا تجاوز لمهل المراحل. أطول بقاء الآن في «" + top.label + "»: " + nDay(top.maxOpenDays ?? 0) + ".",
         stage: top.key };
-  return { steps, overSla, bottleneck: top ? top.key : null, action };
+  return { steps, overSla, bottleneck: top ? top.key : null, action, slaStages, openStages };
 }
 
 // ------------------------------------------------------------------------------------------------

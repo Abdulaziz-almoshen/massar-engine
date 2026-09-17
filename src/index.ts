@@ -3243,7 +3243,24 @@ app.get("/admin/kpis", async (req, reply) => {
     const live = all.filter((c) => !c.test);
     const sum = (k: keyof results.CampaignResults) => live.reduce((a, c) => a + c.results[k], 0);
     const fromIndicators = live.filter((c) => Array.isArray((c.origin as any)?.indicatorIds) && (c.origin as any).indicatorIds.length);
-    const target = (perf as { target: number; achieved: number }[]).reduce((a, r) => ({ target: a.target + (Number(r.target) || 0), achieved: a.achieved + (Number(r.achieved) || 0) }), { target: 0, achieved: 0 });
+    // salesPerformance emits COALESCE(tgt.amount, 0), so a product with no target row arrives
+    // with target 0 and its full achieved. Summing both over every row put the untargeted
+    // products' revenue in the numerator and nothing in the denominator: two products, one
+    // 200k/500k and one 300k/no-target, rendered «100٪ · 500,000 من 500,000». Both a fabricated
+    // percentage and a fabricated money figure. The ratio takes only the rows that have a
+    // target; the rest are counted so the client can say what was left out.
+    const perfRows = perf as { target: number; achieved: number }[];
+    const targetedRows = perfRows.filter((r) => (Number(r.target) || 0) > 0);
+    const target = {
+      ...targetedRows.reduce(
+        (a, r) => ({ target: a.target + (Number(r.target) || 0), achieved: a.achieved + (Number(r.achieved) || 0) }),
+        { target: 0, achieved: 0 }),
+      targetedCount: targetedRows.length,
+      productCount: perfRows.length,
+      untargetedAchieved: perfRows
+        .filter((r) => !((Number(r.target) || 0) > 0))
+        .reduce((a, r) => a + (Number(r.achieved) || 0), 0),
+    };
 
     return {
       ok: true, attributionDays: results.ATTRIBUTION_DAYS,

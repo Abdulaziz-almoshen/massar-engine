@@ -12,7 +12,7 @@
 // (No backticks anywhere below, including in comments: this is one template literal.)
 
 export const MASSAR_DS_CSS = `
-.ds6{
+:root{
   
   --m-page: #F6F7F5;
   --m-paper: #FFFFFF;
@@ -1197,7 +1197,7 @@ export const MASSAR_DS_CSS = `
     opacity: 1;
     transform: none;
   }.ds6 .m-page, .ds6 .m-bar{ padding-inline: var(--m-4); }}
-@media (max-width: 700px){.ds6{
+@media (max-width: 700px){:root{
     --m-t-hero: 56px;
     --m-leading-hero: 64px;
   }.ds6 .m-home{ gap: var(--m-5); }.ds6 .m-card--revenue{

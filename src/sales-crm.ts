@@ -221,7 +221,7 @@ function perfKpis(totT, totA, totW, totCover, totAttain, totOpen, quarter, year)
       '<div class="s">' + (totA === null ? "&nbsp;" : (totAttain === null ? "بلا مستهدف" : fmtN(Math.round(totAttain)) + "٪ من المستهدف")) + '</div></div>' +
     '<div class="perf-kpi"><div class="k">المتوقع من الفرص المفتوحة</div><div class="v">' +
       (totW === null ? dash : perfMoney(totW)) + '</div>' +
-      '<div class="s">' + (totW === null ? "&nbsp;" : opNOpp(totOpen) + " مرجّحة باحتمال مرحلتها") + '</div></div>' +
+      '<div class="s">' + (totW === null ? "&nbsp;" : opNOpp(totOpen) + " مرجّحة بوزن المرحلة") + '</div></div>' +
     "</div>";
 }
 
@@ -243,12 +243,23 @@ function vSalesPerf() {
   var rows = d.rows || [];
   var elapsed = periodElapsedFraction(d.now, d.periodStart, d.periodEnd);
 
-  var totT = 0, totA = 0, totW = 0, totOpen = 0;
-  for (var i = 0; i < rows.length; i++) {
-    totT += rows[i].target; totA += rows[i].achieved; totW += rows[i].weightedOpen; totOpen += rows[i].openCount;
-  }
   // Aggregate as SUM(numerator)/SUM(target), never the average of the product percentages —
   // averaging percentages weights a tiny product the same as the biggest one.
+  //
+  // And aggregate over ONE population. db.salesPerformance emits COALESCE(tgt.amount, 0), so an
+  // unset target arrives as 0 and is indistinguishable in a sum: the denominator covered only the
+  // targeted services while the numerator covered the whole catalogue, and the lead tile was
+  // inflated by exactly the revenue of every untargeted one. The guard below only fired when NO
+  // service had a target; the partial case is the normal case here and it was silent.
+  var totT = 0, totA = 0, totW = 0, totOpen = 0, offA = 0, offCount = 0;
+  for (var i = 0; i < rows.length; i++) {
+    totOpen += rows[i].openCount;
+    if (Number(rows[i].target) > 0) {
+      totT += rows[i].target; totA += rows[i].achieved; totW += rows[i].weightedOpen;
+    } else {
+      offCount++; offA += Number(rows[i].achieved) || 0;
+    }
+  }
   var totAttain = attainmentPct(totA, totT);
   var totCover = coveragePct(totA, totW, totT);
 
@@ -291,11 +302,18 @@ function vSalesPerf() {
 
   // Day one is every target unset. Say so, say who fixes it, and say what the numbers still mean
   // in the meantime — an empty state that explains itself is a feature, not an apology.
+  // The PARTIAL case needs saying too: a percentage measured on part of the catalogue reads as
+  // the whole one unless the page states what it left out.
   var hint = noTarget === rows.length
     ? '<div class="perf-empty"><b>لم تُحدَّد أي مستهدفات لهذا الربع</b>' +
       'الأرقام المحققة والمتوقعة أعلاه صحيحة الآن — لكن «الإنجاز» و«الحالة» تحتاج مستهدفًا لتُقاس عليه. ' +
       'اضغط «تحديد المستهدف» بجوار أي خدمة.</div>'
-    : "";
+    : (offCount
+      ? '<div class="perf-empty"><b>النسبة محسوبة على ' + fmtN(rows.length - offCount) +
+        ' من ' + fmtN(rows.length) + ' خدمة</b>' +
+        fmtN(offCount) + ' خدمة بلا مستهدف لهذا الربع' +
+        (offA ? '، ومحققها ' + perfMoney(offA) + ' غير داخل في النسبة' : '') + '.</div>'
+      : "");
 
   return head + kpis + table + hint;
 }

@@ -741,16 +741,24 @@ function pxSummary() {
   if (!perf) {
     h += '<div class="ox-fig none">' + (pcPerfFailed[pcPerfYear] ? "تعذّر تحميل الأداء" : "—") + "</div>";
   } else {
-    var ach = 0, tgt = 0, anyT = false, won = [];
+    /* ach was accumulated for EVERY product while tgt only for the targeted ones, so the
+       printed «٪» was a percentage of a denominator that did not cover its own numerator.
+       One population decides the ratio; revenue outside it is stated, never folded in. */
+    var ach = 0, tgt = 0, anyT = false, won = [], offA = 0, offN = 0;
     rows.forEach(function (p) {
       var x = perf[p.product]; if (!x) return;
-      ach += Number(x.achieved) || 0;
-      if (x.annualTarget !== null && x.annualTarget !== undefined) { anyT = true; tgt += Number(x.annualTarget) || 0; }
-      if ((Number(x.achieved) || 0) > 0) won.push({ n: p.product, v: Number(x.achieved) });
+      var a = Number(x.achieved) || 0;
+      if (x.annualTarget !== null && x.annualTarget !== undefined) {
+        anyT = true; tgt += Number(x.annualTarget) || 0; ach += a;
+      } else { offN++; offA += a; }
+      if (a > 0) won.push({ n: p.product, v: a });
     });
     var cov = anyT ? targetCoveragePct(ach, tgt) : null;
     h += '<div class="ox-fig">' + pxMoney(ach) + '<span class="ox-figsub">' +
-      (anyT ? "من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + fmtN(cov) + "٪") : "بلا مستهدف سنوي") + "</span></div>";
+      (anyT
+        ? ("من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + fmtN(cov) + "٪") +
+           (offN ? " · " + fmtN(offN) + " بلا مستهدف، محققها " + pxMoney(offA) + " خارج النسبة" : ""))
+        : "بلا مستهدف سنوي") + "</span></div>";
     if (won.length || (anyT && tgt > 0)) {
       won.sort(function (a, b) { return b.v - a.v; });
       var denom = Math.max(ach, tgt, 1);
@@ -1893,7 +1901,11 @@ function vExecBand() {
   // chart row itself.
   var h = '<div class="pc-g3">';
   h += '<div class="sh-sec card3"><div class="sh-h">القطاعات</div>' +
-    '<div class="sh-hs">المحقق مقابل المستهدف السنوي. اضغط قطاعًا للوحته.</div>' +
+    /* pcSectors is /admin/sales/sectors with no query string, and index.ts defaults that to the
+       CURRENT QUARTER. These are one quarter's figures; the heading called them the year's. */
+      '<div class="sh-hs">المحقق مقابل مستهدف الربع '
+      + fmtN(pcSectors.quarter) + ' · ' + esc(String(pcSectors.year))
+      + '. اضغط قطاعًا للوحته.</div>' +
     pcSectorRows(secs) + '</div>';
 
   var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
@@ -2090,7 +2102,9 @@ function vSectorDrill(name) {
   var cov = sec.coveragePct;
   h += '<div class="sh-tiles">' +
     '<div class="sh-tile lead"><div><div class="k">المحقق</div>' +
-      '<div class="s">من ' + pcMoney(sec.target) + '</div></div>' +
+      /* «من 0 ر.س» asserts a target of zero. An absent target is not a zero one, and the
+         التغطية tile eight lines down already says «بلا مستهدف» — the row contradicted itself. */
+      '<div class="s">' + (Number(sec.target) > 0 ? "من " + pcMoney(sec.target) : "بلا مستهدف") + '</div></div>' +
       '<div class="v">' + fmtN(Math.round(sec.achieved)) + '</div></div>' +
     '<div class="sh-tile"><div><div class="k">المتوقع من المفتوح</div>' +
       '<div class="s">' + fmtN(sec.openCount) + ' فرصة مفتوحة</div></div>' +
@@ -2110,7 +2124,10 @@ function vSectorDrill(name) {
     var cls = c === null ? "crm-none" : (c >= 100 ? "crm-ok" : (c >= 70 ? "crm-warn" : "crm-bad"));
     h += '<div class="sh-card go" data-go="product" data-nm="' + esc(nm) + '">' +
       '<div><div class="nm">' + esc(nm) + '</div>' +
-      '<div class="sub">' + (pq ? pcMoney(pq.achieved) + " من " + pcMoney(pq.annualTarget) : "—") + '</div></div>' +
+      '<div class="sub">' + (pq
+        ? (pcMoney(pq.achieved) + (pq.annualTarget === null || pq.annualTarget === undefined
+            ? " · بلا مستهدف سنوي" : " من " + pcMoney(pq.annualTarget)))
+        : '<span class="crm-none">لم يُقرأ الأداء</span>') + '</div></div>' +
       '<div class="end"><span class="crm-st ' + cls + '"><i></i>' +
         (c === null ? "بلا مستهدف" : fmtN(c) + "٪") + '</span></div></div>';
   });

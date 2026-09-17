@@ -297,8 +297,21 @@ function vReportsExec() {
         : "لم تُحسم صفقة بعد") +
     kpi("", "دورة البيع (الوسيط)", hd.medianCycleDays === null ? '<span class="n none">—</span>' : '<span class="n">' + opNDay(hd.medianCycleDays) + "</span>",
       hd.medianCycleDays === null ? "تُقاس على الصفقات الرابحة" : "من فتح الفرصة إلى الربح، على " + opPl(hd.cycleBasis, "صفقة واحدة", "صفقتين", "صفقات", "صفقة")) +
-    kpi(r.velocity.overSla ? "warn" : "", "متأخرة عن المهلة", '<span class="n">' + fmtN(r.velocity.overSla) + "</span>",
-      r.movement.quietOpen ? opNLine(r.movement.quietOpen) + " بلا حركة " + fmtN(r.movement.days) + " يومًا" : "كل البنود تحركت") +
+    /* pipeline_stages.sla_days is nullable and only two keys were ever backfilled, so a stage
+       with no deadline scored 0 and summed into the headline. A flat «0» then read as "nothing
+       is late" when most rungs cannot be judged at all. No stage with a deadline means no
+       verdict, and a partial ladder says what it covered. */
+    kpi(r.velocity.slaStages && r.velocity.overSla ? "warn" : "", "متأخرة عن المهلة",
+      r.velocity.slaStages
+        ? '<span class="n">' + fmtN(r.velocity.overSla) + "</span>"
+        : '<span class="n none">—</span>',
+      r.velocity.slaStages
+        ? (r.velocity.slaStages < r.velocity.openStages
+            ? "على " + fmtN(r.velocity.slaStages) + " من " + fmtN(r.velocity.openStages) + " مرحلة لها مهلة مسجّلة"
+            : (r.movement.quietOpen
+                ? opNLine(r.movement.quietOpen) + " بلا حركة " + fmtN(r.movement.days) + " يومًا"
+                : "كل البنود تحركت"))
+        : "لا مهلة مسجّلة على أي مرحلة مفتوحة") +
     "</div>";
 
   h += '<div class="rx-grid">' + rxFunnel(r.funnel) + rxVelocity(r.velocity) + rxProducts(r.products) + rxSources(r.sources) + rxMovement(r.movement) + "</div>";
@@ -342,7 +355,8 @@ function rxFunnel(f) {
     : f.lostUnplaced
       ? "<b>" + fmtN(f.lostUnplaced) + "</b><span>خسارة بلا مرحلة معروفة، فلا يمكن تحديد موضع تسرّبها</span>"
     : f.measured
-      ? "<b>" + rxPct(100) + "</b><span>لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية</span>"
+      ? "<b>" + rxPct(100) + "</b><span>لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية، على " +
+        opPl(f.decidedTotal, "فرصة واحدة محسومة", "فرصتين محسومتين", "فرص محسومة", "فرصة محسومة") + "</span>"
       : '<b class="none">—</b><span>لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها</span>';
   return rxCard("fun", "قمع المراحل", "كم فرصة وصلت كل مرحلة، وكم ممن غادرها انتقل إلى التالية؟ الفرصة الباقية في مرحلتها لا تُحسب تسرّبًا.", sig, body, f.action, false);
 }
