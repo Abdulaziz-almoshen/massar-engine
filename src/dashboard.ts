@@ -1873,8 +1873,7 @@ function vHome(d) {
   // which summed ONE quarter's target and achieved under a «السنة المالية» label and computed a
   // company attainment percentage while most products carry no target at all. The bands below still
   // render in the old system until they are ported in turn.
-  const deck = (typeof vHomeDs === "function") ? vHomeDs()
-    : ((typeof vHomeDeck === "function") ? vHomeDeck() : "");
+  const deck = vHomeDs();
   // The bands go inside .ds6 too, so الرئيسية is one system end to end rather than a new surface
   // sitting on an old page. Their CONTENTS move over module by module; the wrapper is what lets a
   // ported band look right the moment its module lands.
