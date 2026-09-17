@@ -3026,7 +3026,9 @@ app.post("/admin/opps", async (req, reply) => {
       return problem(reply, 400, "archived_product", "المنتج مؤرشف — استعده قبل تسجيل فرصة جديدة", "product");
     }
   }
-  const rows = await db.createOppLines(
+  let rows: Awaited<ReturnType<typeof db.createOppLines>>;
+  try {
+  rows = await db.createOppLines(
     { account_name: name, phone: phone || null, source, source_ref: sourceRef, created_by: adminName(req), partner_id: partnerId },
     lines.map((l) => ({
       product: String(l.product).trim(),
@@ -3037,7 +3039,20 @@ app.post("/admin/opps", async (req, reply) => {
       owner: String(l.owner ?? "").trim().slice(0, 60) || null,
       close_on: l.close_on == null || l.close_on === "" ? null : Number(l.close_on),
       next_step: String(l.next_step ?? "").trim().slice(0, 300) || null,
+      // The reference only; quoted_list_price and quoted_years are read from the packages table
+      // inside the same transaction (db.createOppLines), never taken from the request.
+      package_id: l.package_id == null || l.package_id === "" ? null : Math.round(Number(l.package_id)),
     })));
+  } catch (e) {
+    // A package that is not this product's, or one that has been retired, is the caller's mistake,
+    // not a server fault: the composite FK would otherwise surface it as a 500.
+    if (e instanceof db.PackageNotForProduct) {
+      return problem(reply, 400, "invalid_field", e.reason === "retired"
+        ? "الباقة متقاعدة — اخترها من الباقات السارية أو اترك البند بلا باقة"
+        : "الباقة ليست من باقات هذا المنتج", "package_id");
+    }
+    throw e;
+  }
   if (!rows.length) return reply.code(503).send({ ok: false, persisted: false, error: "db_unavailable" });
   return { ok: true, opps: rows };
 });
@@ -3087,6 +3102,9 @@ app.patch("/admin/opps/:id", async (req, reply) => {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
   }
   if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
+  // «بلا باقة» is a real answer, not a missing field: it is how a line priced from scratch is
+  // recorded, and it clears the snapshot with it.
+  if (b.package_id !== undefined) patch.package_id = b.package_id == null || b.package_id === "" ? null : Math.round(Number(b.package_id));
   let row: Awaited<ReturnType<typeof db.updateOpp>>;
   try { row = await db.updateOpp(id, patch as never, adminName(req)); }
   catch (e) {
@@ -3094,6 +3112,11 @@ app.patch("/admin/opps/:id", async (req, reply) => {
       return e.kind === "not_lost"
         ? problem(reply, 400, "invalid_field", "سبب الخسارة يُسجَّل على بند مغلق خسارة فقط", "lost_reason")
         : problem(reply, 400, "lost_reason_required", "اختر سبب الخسارة — يُسجَّل في تقرير الخسائر", "lost_reason");
+    }
+    if (e instanceof db.PackageNotForProduct) {
+      return problem(reply, 400, "invalid_field", e.reason === "retired"
+        ? "الباقة متقاعدة — اخترها من الباقات السارية أو اترك البند بلا باقة"
+        : "الباقة ليست من باقات هذا المنتج", "package_id");
     }
     throw e;
   }

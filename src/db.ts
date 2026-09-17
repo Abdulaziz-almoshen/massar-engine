@@ -3372,6 +3372,12 @@ export type OppRow = {
   sale_price: number; years: number; qty: number; discount: number;
   owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null; lost_note: string | null;
   partner_id: number | null;
+  /** The package this line is sold under, and the LIST PRICE AND TERM AS THEY WERE when it was
+   *  linked. The snapshot is what makes a realised discount answerable a year later: the package's
+   *  own list_price may have moved since, and comparing today's list to last year's sale would
+   *  report a discount nobody gave. Both are null together, always — a snapshot with no package is a
+   *  number with no provenance. */
+  package_id: number | null; quoted_list_price: number | null; quoted_years: number | null;
   created_by: string | null; created_at: number; updated_at: number; stage_at: number;
 };
 
@@ -3394,6 +3400,13 @@ export const OPP_SOURCES = ["whatsapp", "call", "visit", "referral", "inbound", 
  *  pipeline value, and «قيمة الفرصة» is a number the founder reads as money. */
 export function validateOppLine(l: Record<string, unknown>, allowedStages?: readonly string[]): string | null {
   if (typeof l.product !== "string" || !l.product.trim()) return "product";
+  // A package is a reference, not a quantity: a positive integer or nothing. The package's OWNERSHIP
+  // (does it belong to this product, is it retired) is checked against the table in the same
+  // transaction as the write — a client cannot be trusted to say which package is whose.
+  if (l.package_id !== undefined && l.package_id !== null && l.package_id !== "") {
+    const pid = Number(l.package_id);
+    if (!Number.isFinite(pid) || pid <= 0 || pid % 1 !== 0) return "package_id";
+  }
   // The LIVE ladder when the caller passes it (an admin may have added a rung since this file was
   // compiled), the compiled list when it does not. The Postgres CHECK that used to be the backstop
   // was dropped in migration 009 precisely because it could not know about a stage added at runtime.
@@ -3425,6 +3438,9 @@ function rowToOpp(r: Record<string, unknown>): OppRow {
     next_step: (r.next_step as string) ?? null, lost_reason: (r.lost_reason as string) ?? null,
     lost_note: (r.lost_note as string) ?? null,
     partner_id: r.partner_id == null ? null : Number(r.partner_id),
+    package_id: r.package_id == null ? null : Number(r.package_id),
+    quoted_list_price: r.quoted_list_price == null ? null : Number(r.quoted_list_price),
+    quoted_years: r.quoted_years == null ? null : Number(r.quoted_years),
     created_by: (r.created_by as string) ?? null,
     created_at: Number(r.created_at), updated_at: Number(r.updated_at), stage_at: Number(r.stage_at),
   };
@@ -3444,6 +3460,29 @@ export async function listOpps(): Promise<OppRow[]> {
   return (await pool.query(`SELECT * FROM opportunities ORDER BY id DESC`)).rows.map(rowToOpp);
 }
 
+/** Thrown when a line names a package that is not this product's, or one that has been retired. The
+ *  route answers 400 rather than letting the composite FK fail as a 500. */
+export class PackageNotForProduct extends Error {
+  constructor(public readonly reason: "wrong_product" | "retired" | "missing" = "missing") { super("package_not_for_product"); }
+}
+
+/** Resolve a package to the snapshot a line stores. Runs inside the caller's transaction, against
+ *  the table — never from anything the browser sent. Returns nulls for "no package". */
+async function pkgSnapshot(client: { query: (q: string, v?: unknown[]) => Promise<{ rows: any[] }> },
+                           product: string, packageId: number | null | undefined,
+                           allowRetired: boolean): Promise<{ id: number | null; listPrice: number | null; years: number | null }> {
+  if (packageId === null || packageId === undefined) return { id: null, listPrice: null, years: null };
+  const q = await client.query(
+    `SELECT id, product, list_price, years, retired_at FROM packages WHERE id = $1`, [packageId]);
+  const row = q.rows[0];
+  if (!row) throw new PackageNotForProduct("missing");
+  if (String(row.product) !== String(product)) throw new PackageNotForProduct("wrong_product");
+  // A RETIRED package may STAY on a line that already carries it — that is the whole reason packages
+  // are retired and never deleted — but it may not be newly chosen.
+  if (row.retired_at != null && !allowRetired) throw new PackageNotForProduct("retired");
+  return { id: Number(row.id), listPrice: Number(row.list_price), years: Number(row.years) };
+}
+
 /** One account, N product lines, ONE write. The lines of a deal are created together on the board
  *  and must arrive together: a partial insert would paint a card whose «3 منتجات» is a lie. */
 export async function createOppLines(head: {
@@ -3456,14 +3495,17 @@ export async function createOppLines(head: {
   try {
     await client.query("BEGIN");
     for (const l of lines) {
+      // The snapshot is read from the packages table here, in this transaction.
+      const snap = await pkgSnapshot(client, String(l.product), l.package_id ?? null, false);
       const q = await client.query(
         `INSERT INTO opportunities (account_name, phone, product, stage, source, source_ref,
            sale_price, years, qty, discount, owner, close_on, next_step, created_by,
-           created_at, updated_at, stage_at, partner_id)
-         VALUES ($1,$2,$3,COALESCE($4,'contact'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$15,$16) RETURNING *`,
+           created_at, updated_at, stage_at, partner_id, package_id, quoted_list_price, quoted_years)
+         VALUES ($1,$2,$3,COALESCE($4,'contact'),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$15,$16,$17,$18,$19) RETURNING *`,
         [head.account_name, head.phone, l.product, l.stage ?? null, head.source, head.source_ref,
          l.sale_price ?? 0, l.years ?? 1, l.qty ?? 1, l.discount ?? 0, l.owner ?? null,
-         l.close_on ?? null, l.next_step ?? null, head.created_by, now, head.partner_id ?? null]);
+         l.close_on ?? null, l.next_step ?? null, head.created_by, now, head.partner_id ?? null,
+         snap.id, snap.listPrice, snap.years]);
       // The opening event, same transaction. Without it a deal created directly at a closed stage
       // (an import of already-won business, or a rep logging a deal after the fact) would never
       // appear in «المحقق» — the won CTE reads the ledger, and the migration backfill runs once
@@ -3498,7 +3540,10 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
     "close_on", "next_step", "lost_reason", "lost_note", "source", "source_ref", "account_name"] as const) {
     if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
   }
-  if (!sets.length) return null;
+  // A package-only edit is a real edit. package_id is not in the SET list above — it is resolved
+  // against the packages table inside the transaction — so without this line, linking a package and
+  // changing nothing else fell through to "no change" and answered 404. Measured on production.
+  if (!sets.length && patch.package_id === undefined) return null;
   sets.push(`updated_at = $${i++}`); vals.push(Date.now());
   if (patch.stage !== undefined) {
     sets.push(`stage_at = CASE WHEN stage = $${i} THEN stage_at ELSE $${i + 1} END`);
@@ -3522,9 +3567,12 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const prev = await client.query("SELECT stage FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
+    const prev = await client.query(
+      "SELECT stage, product, package_id FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
     if (!prev.rows[0]) { await client.query("ROLLBACK"); return null; }
     const fromStage = String(prev.rows[0].stage);
+    const prevProduct = String(prev.rows[0].product);
+    const prevPkg = prev.rows[0].package_id == null ? null : Number(prev.rows[0].package_id);
     // BRULE-009 decided on the LOCKED row: the route's pre-read raced a concurrent reopen, and 8 closes in 40
     // landed lost with no reason (review, S3). A reason without a lost line is refused here for the same reason.
     const lostAfter = patch.stage !== undefined ? patch.stage === "lost" : fromStage === "lost";
@@ -3541,6 +3589,29 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
     }
     if (patch.stage === "lost" && fromStage !== "lost" && !patch.lost_reason) { await client.query("ROLLBACK"); throw new LossReasonRequired(); }
     if ((patch.lost_reason !== undefined || patch.lost_note !== undefined) && !lostAfter) { await client.query("ROLLBACK"); throw new LossReasonRequired("not_lost"); }
+    // THE PACKAGE LINK, in this transaction and under the same row lock, as its own statement: the
+    // SET list above was built before the transaction opened and cannot see the locked row.
+    //
+    //   · package_id given      -> resolved against the packages table and SNAPSHOTTED. Keeping the
+    //                              one already on the line is allowed even if it has since been
+    //                              retired; choosing a retired one is not.
+    //   · package_id null       -> the link and its snapshot are cleared together. This is how a
+    //                              custom price with no package is recorded.
+    //   · product changed away  -> the old package belongs to the old product, and the composite FK
+    //     from the package        would reject the row. The link is cleared rather than failing the
+    //                              edit, because the user asked to change the product and the link
+    //                              is a consequence, not their intent.
+    const newProduct = patch.product !== undefined ? String(patch.product) : prevProduct;
+    if (patch.package_id !== undefined) {
+      const wanted = patch.package_id === null ? null : Number(patch.package_id);
+      const snap = await pkgSnapshot(client, newProduct, wanted, wanted !== null && wanted === prevPkg);
+      await client.query(
+        "UPDATE opportunities SET package_id = $1, quoted_list_price = $2, quoted_years = $3 WHERE id = $4",
+        [snap.id, snap.listPrice, snap.years, id]);
+    } else if (prevPkg !== null && newProduct !== prevProduct) {
+      await client.query(
+        "UPDATE opportunities SET package_id = NULL, quoted_list_price = NULL, quoted_years = NULL WHERE id = $1", [id]);
+    }
     const q = await client.query(
       `UPDATE opportunities SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`, vals);
     if (!q.rows[0]) { await client.query("ROLLBACK"); return null; }

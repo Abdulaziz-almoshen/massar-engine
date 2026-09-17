@@ -311,6 +311,43 @@ function rxBind() {
   dsD("rxOverSla", function () { return rxData.report.velocity.overSla; });
 }
 
+/* «كم تحت السعر المعلن بيعت» — the same rollup the home card prints, from the same function, over the
+   same rows. Computed from the deal lines in the browser rather than from the server report, and it
+   says so: the exec report above it is the server's, and two figures that look alike must not be
+   allowed to come from two different places without the reader being told. */
+function rxOffListCard() {
+  if (typeof opLoad === "function") opLoad(false);
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : null;
+  if (!rows) return "";
+  var lines = rows.map(function (l) {
+    return { value: opValue(l), quotedListPrice: l.quoted_list_price == null ? null : Number(l.quoted_list_price),
+             qty: Number(l.qty || 1), years: Number(l.years || 1) };
+  });
+  var off = offListRollup(lines);
+  var h = '<section class="m-card"><div class="m-card__h"><div>' +
+    '<h2 class="m-card__t">الخصم عن السعر المعلن</h2>' +
+    '<p class="m-meta">من البنود المرتبطة بباقة منشورة · بالمقارنة مع السعر وقت الربط، لا سعر اليوم</p>' +
+    "</div></div>";
+  if (off.pct === null) {
+    h += '<div class="m-empty"><div class="m-empty__t">' + mNil("لا بند مرتبط بباقة", "none") + "</div>" +
+      '<div class="m-empty__d">اربط البنود بباقاتها من سجل الفرصة ليصبح الفرق قابلًا للقياس.</div></div>';
+    return h + "</section>";
+  }
+  var pctR = Math.round(off.pct);
+  h += '<div class="m-stats">' +
+    '<div class="m-stat"><span class="m-stat__k">الفرق</span><span class="m-stat__v"><span class="m-n">' +
+      fmtN(pctR) + '٪</span></span><span class="m-stat__s">' +
+      (off.pct >= 0 ? "أقل من المعلن" : "أعلى من المعلن") + "</span></div>" +
+    '<div class="m-stat"><span class="m-stat__k">المعلن</span><span class="m-stat__v">' + mMoney(off.referenceTotal) + "</span>" +
+      '<span class="m-stat__s">مجموع المرجع</span></div>' +
+    '<div class="m-stat"><span class="m-stat__k">المتفق عليه</span><span class="m-stat__v">' + mMoney(off.valueTotal) + "</span>" +
+      '<span class="m-stat__s">مجموع قيم البنود</span></div>' +
+    '<div class="m-stat"><span class="m-stat__k">الفارق بالريال</span><span class="m-stat__v">' + mMoney(off.savedTotal) + "</span>" +
+      '<span class="m-stat__s">' + mPlOf(off.withReference, opNLine(off.withReference)) + " من " + mN(off.lines) + "</span></div>" +
+    "</div>";
+  return h + "</section>";
+}
+
 function vReportsExec() {
   rxLoad(false);
   if (rxFailed && !rxData) {
@@ -376,6 +413,7 @@ function vReportsExec() {
     "</div>";
 
   h += '<div class="rx-grid">' + rxFunnel(r.funnel) + rxVelocity(r.velocity) + rxProducts(r.products) + rxSources(r.sources) + rxMovement(r.movement) + "</div>";
+  h += rxOffListCard();
   if (rxData.valueBasis) {
     h += '<p class="rx-basis m-meta"><b>' + esc(rxData.valueBasis.label) + "</b> — " + esc(rxData.valueBasis.note) + "</p>";
   }

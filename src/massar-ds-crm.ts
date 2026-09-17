@@ -1962,4 +1962,45 @@ export const MASSAR_DS_CSS = `
 /* A person field a viewer may only read: the control still says what it holds, and says it is not
    theirs to change, rather than disappearing. */.ds6 .m-cb__t:disabled{ background: var(--m-page); color: var(--m-mut); cursor: default; }
 .ds6 .m-cb__t:disabled .m-cb__c{ stroke: var(--m-line-2); }
+/* ============================================================================
+   ONE SELECT (founder, 2026-09-17: «all select fields should have one design system»). Every native
+   <select class="m-select"> — 49 of them across thirteen modules — is drawn as the combobox trigger
+   this app now uses for its person fields: the same 44px pill on the same soft ground, the same
+   chevron at the inline end, the same hover, focus ring and disabled treatment.
+
+   WHY THE NATIVE ELEMENT STAYS. The combobox in combobox-crm.ts exists because a list of PEOPLE has
+   to be searchable and has to accept a name that is not on it yet. A stage, a sector or a period is a
+   short, closed list, and the native control is better at exactly that: it is the OS picker on a
+   phone, it is what a screen reader announces without any ARIA of ours, and it cannot fall out of
+   step with the value it holds. So the two share one look, and each keeps the behaviour its content
+   needs. Anything drawn with mCombo keeps its popup.
+   ============================================================================ */.ds6 .m-select{
+  /* The native arrow goes, or the control draws two chevrons — it did, on the live toolbar. The
+     element stays a <select>, so the picker itself is still the OS one. */
+  -webkit-appearance: none;
+  appearance: none;
+  min-block-size: 44px;
+  padding-inline: var(--m-3);
+  padding-inline-end: var(--m-6);
+  border: 1px solid transparent;
+  border-radius: var(--m-r-ctl);
+  background-color: var(--m-sunk);
+  box-shadow: none;
+  color: var(--m-ink);
+  /* The same chevron the combobox draws, at the inline end in both directions. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646D69' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 16px;
+  background-position: left var(--m-3) center;
+  transition: background-color var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease);
+}
+.ds6 [dir="ltr"] .m-select{ background-position: right var(--m-3) center; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-select:hover{ background-color: var(--m-line); }}
+.ds6 .m-select:focus, .ds6 .m-select:focus-visible{
+  outline: none;
+  border-color: transparent;
+  background-color: var(--m-paper);
+  box-shadow: var(--m-focus);
+}
+.ds6 .m-select:disabled{ background-color: var(--m-page); color: var(--m-mut); cursor: default; }
 `;

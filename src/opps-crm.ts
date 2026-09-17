@@ -1632,6 +1632,36 @@ window.opStepTo = function (id, key) {
 /* The server's own bounds for a line's numbers (db.ts validateOppLine): years 1–20, quantity 1–10,000,
    discount 0–100, price from 0. Price steps by 100 because a step of one riyal on an annual licence is
    a button nobody would press. */
+/* A product's LIVE packages, from the catalogue the products screen already loads. pcLoad is
+   idempotent and repaints itself, so asking for it here costs one request the first time a deal is
+   opened and nothing afterwards. */
+function opPackages(product) {
+  if (typeof pcLoad === "function") pcLoad(false);
+  if (typeof pcCat === "undefined" || !pcCat || !product) return [];
+  var row = pcCat.filter(function (p) { return p.product === product; })[0];
+  return (row && row.packages) || [];
+}
+function opPkgLabel(k) {
+  return k.name + " — " + fmtN(k.listPrice) + " ر.س/سنة" + (k.scope ? " · " + k.scope : "");
+}
+/* «كم تحت السعر المعلن» for ONE line, against the price snapshotted when the package was linked —
+   never today's package price, or every historical figure would move when someone edits a price.
+   The line's OWN years are the term on both sides of the comparison. */
+function opOffList(l) {
+  if (l.quoted_list_price == null) return null;
+  return offListPct(opValue(l), Number(l.quoted_list_price), Number(l.qty || 1), Number(l.years || 1));
+}
+function opOffListChip(l) {
+  var pct = opOffList(l);
+  if (pct === null) return "";
+  var r = Math.round(pct);
+  if (r === 0) return '<span class="m-chip m-chip--plain">على السعر المعلن</span>';
+  /* Held in its own name first: the numeral gate reads a Math.* call concatenated into markup as a
+     raw number, and it is right to — the wrapper is what makes it a figure. */
+  var mag = Math.abs(r);
+  return '<span class="m-chip ' + (r > 0 ? "m-chip--warn" : "m-chip--ok") + '">' +
+    (r > 0 ? "أقل من المعلن بـ " : "أعلى من المعلن بـ ") + mPct(mag) + "</span>";
+}
 function opLineBounds(key) {
   return key === "years" ? { min: 1, max: 20, step: 1, mode: "numeric" }
     : key === "qty" ? { min: 1, max: 10000, step: 1, mode: "numeric" }
@@ -1720,8 +1750,16 @@ function opDetailDrawer(l) {
     ? '<div class="ox-form">' + opNU(Number(l.sale_price), "ر.س") + " سنويًا × " + opNYearN(Number(l.years || 1)) + " × " + opN(Number(l.qty || 1)) +
       (disc ? " × (1 − " + mPct(disc) + ")" : "") + " = " + opMoney(opValue(l)) + "</div>"
     : '<div class="ox-form">أدخل السعر السنوي ليُحسب البند ويدخل في المجاميع.</div>';
+  b += opPkgDrawerField(l);
   b += '<div class="m-form">' + opField(l, "sale_price", "السعر السنوي (ر.س)", "number") + opField(l, "years", "السنوات", "number") +
     opField(l, "qty", "الكمية", "number") + opField(l, "discount", "الخصم ٪", "number") + "</div>";
+  /* THE REFERENCE, AND WHAT WAS ACTUALLY AGREED AGAINST IT. Printed only when the line carries a
+     snapshot: a percentage off a price nobody published is a number with no meaning. */
+  if (l.quoted_list_price != null) {
+    var ref = Number(l.quoted_list_price) * Number(l.qty || 1) * Number(l.years || 1);
+    b += '<div class="ox-form">السعر المعلن وقت الربط ' + opNU(Number(l.quoted_list_price), "ر.س") + " سنويًا · " +
+      "المرجع لهذا البند " + opMoney(ref) + " " + opOffListChip(l) + "</div>";
+  }
   if (disc > 50) b += '<div class="ox-hint">' + opIco("warn") + "خصم مرتفع: " + mPct(disc) + " من السعر السنوي. تأكّد أنه مقصود.</div>";
   b += "</section>";
   /* المتابعة */
@@ -1850,6 +1888,7 @@ function opCreateDrawer() {
       '<option value="">اختر المنتج</option>' +
       reg.map(function (t) { return '<option value="' + esc(t.name) + '"' + (l.product === t.name ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
       "</select></div>" +
+      opPkgField(i, l) +
       '<div class="m-form">' + numF("sale_price", "السعر السنوي (ر.س)", "sale_price", "بلا سعر") + numF("years", "السنوات", "years", "") +
       numF("qty", "الكمية", "qty", "") + numF("discount", "الخصم ٪", "discount", "0") + "</div>" +
       '<div class="ox-total"><span class="ox-sech">قيمة البند</span><span class="lv">' +
@@ -2247,7 +2286,7 @@ window.opDrop = async function (e, stage, el) {
 };
 
 /* ---- create ---- */
-function opBlankLine() { return { product: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
+function opBlankLine() { return { product: "", package_id: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
 window.opOpenSheet = function (opener) {
   if (!opMayEdit()) return;  // the button is hidden; this closes the keyboard/console path too
   opSheet = { name: "", phone: "", source: "call", source_ref: "", owner: "", lines: [opBlankLine()] };
@@ -2256,7 +2295,77 @@ window.opOpenSheet = function (opener) {
 };
 window.opDraft = function (k, v) { opSheet[k] = v; opErr = ""; opErrFld = ""; if (k === "source") opRender(); };
 window.opDraftSrc = function (k) { if (opSheet.source !== k) opSheet.source_ref = ""; opSheet.source = k; opRender(); if (k === "partner") { var pf = document.getElementById("opd_partner"); if (pf) pf.focus(); } };
-window.opLineSet = function (i, k, v) { opSheet.lines[i][k] = v; opErr = ""; opErrFld = ""; opRender(); };
+window.opLineSet = function (i, k, v) {
+  opSheet.lines[i][k] = v;
+  /* Changing the product invalidates a package chosen for the previous one — the server would
+     refuse the write, so the picker does not carry a stale choice into it. */
+  if (k === "product") { opSheet.lines[i].package_id = ""; }
+  opErr = ""; opErrFld = ""; opRender();
+};
+/* Choosing a package PREFILLS the price and the term on a new line, because that is the published
+   offer and typing it again is work the screen can do. Both stay editable: the moment either is
+   changed the line is a negotiated price against a recorded reference, which is exactly what the
+   realised-discount figure is for. «بلا باقة» is a first-class answer — a line priced from scratch. */
+window.opLinePkg = function (i, id) {
+  var l = opSheet.lines[i];
+  l.package_id = id || "";
+  var k = opPackages(l.product).filter(function (x) { return String(x.id) === String(id); })[0];
+  if (k) { l.sale_price = String(k.listPrice); l.years = String(k.years || 1); }
+  opErr = ""; opErrFld = ""; opRender();
+};
+/* On an EXISTING line the package is changed on its own: linking one must not silently overwrite a
+   price that was negotiated and saved. The comparison appears underneath instead, and «استخدم سعر
+   الباقة» is there for when the published price IS the agreed one. */
+function opPkgDrawerField(l) {
+  var pk = opPackages(l.product);
+  var cur = l.package_id == null ? "" : String(l.package_id);
+  var sk = l.id + ":package_id", id = "oxd_pkg_" + l.id;
+  if (!pk.length && !cur) {
+    return '<div class="m-field"><span class="m-label">الباقة</span><div class="ox-ro">' +
+      opNil("لا باقات منشورة لهذا المنتج — السعر يُحدَّد هنا", "none") + "</div></div>";
+  }
+  if (!opMayEdit()) {
+    var name0 = pk.filter(function (x) { return String(x.id) === cur; })[0];
+    return '<div class="m-field"><span class="m-label">الباقة</span><div class="ox-ro">' +
+      (name0 ? esc(name0.name) : opNil("بلا باقة", "none")) + "</div></div>";
+  }
+  var listed = pk.filter(function (x) { return String(x.id) === cur; })[0];
+  var h = '<div class="m-field"><div class="ox-lr"><label class="m-label" for="' + id + '">الباقة</label>' +
+    opFieldStatus(sk, id) + "</div>" +
+    '<select class="m-select" id="' + id + '" onchange="opSaveField(' + l.id + ',&quot;package_id&quot;,this.value)">' +
+    '<option value=""' + (cur ? "" : " selected") + ">بلا باقة — سعر مخصص</option>" +
+    pk.map(function (k) {
+      return '<option value="' + k.id + '"' + (cur === String(k.id) ? " selected" : "") + ">" + esc(opPkgLabel(k)) + "</option>";
+    }).join("");
+  /* A package that has since been retired stays on the line that carries it, and stays in the list
+     so the control shows what the line actually holds. */
+  if (cur && !listed) h += '<option value="' + esc(cur) + '" selected>باقة متقاعدة</option>';
+  h += "</select>";
+  if (listed && Number(l.sale_price) !== Number(listed.listPrice)) {
+    h += '<button type="button" class="m-btn m-btn--quiet" onclick="opSaveField(' + l.id +
+      ',&quot;sale_price&quot;,' + listed.listPrice + ')">استخدم سعر الباقة</button>';
+  }
+  return h + "</div>";
+}
+function opPkgField(i, l) {
+  var pk = opPackages(l.product);
+  if (!l.product) return "";
+  if (!pk.length) {
+    /* Five of the six products publish no package at all («يحدده المختص»), so this is the ordinary
+       case and it is stated rather than shown as an empty control. */
+    return '<div class="m-field"><span class="m-label">الباقة</span>' +
+      '<div class="ox-ro">' + opNil("لا باقات منشورة لهذا المنتج — السعر يُحدَّد هنا", "none") + "</div></div>";
+  }
+  var cur = String(l.package_id || "");
+  return '<div class="m-field"><label class="m-label" for="opd_pkg_' + i + '">الباقة</label>' +
+    '<select class="m-select" id="opd_pkg_' + i + '" onchange="opLinePkg(' + i + ', this.value)">' +
+    '<option value=""' + (cur ? "" : " selected") + ">بلا باقة — سعر مخصص</option>" +
+    pk.map(function (k) {
+      return '<option value="' + k.id + '"' + (cur === String(k.id) ? " selected" : "") + ">" + esc(opPkgLabel(k)) + "</option>";
+    }).join("") + "</select>" +
+    (cur ? '<span class="m-hint">السعر والمدة مأخوذان من الباقة — عدِّلهما لتسجيل سعر متفاوَض عليه.</span>' : "") +
+    "</div>";
+}
 window.opLineAdd = function () { opSheet.lines.push(opBlankLine()); opRender(); };
 window.opLineDel = function (i) { opSheet.lines.splice(i, 1); opRender(); };
 /* Prefill from a reply the assistant already read: account, number, the service it asked about and
@@ -2321,7 +2430,10 @@ window.opSubmit = async function () {
         source: d.source, source_ref: d.source === "whatsapp" || d.source === "partner" ? String(d.source_ref || "").trim() : "",
         lines: lines.map(function (l) {
           return { product: l.product, sale_price: Number(l.sale_price || 0), years: Number(l.years || 1),
-            qty: Number(l.qty || 1), discount: Number(l.discount || 0), owner: d.owner || "" };
+            qty: Number(l.qty || 1), discount: Number(l.discount || 0), owner: d.owner || "",
+            /* The reference only. The server reads the list price and the term from the packages
+               table in the same transaction — a browser cannot be trusted to say what was published. */
+            package_id: l.package_id || null };
         })
       })
     });

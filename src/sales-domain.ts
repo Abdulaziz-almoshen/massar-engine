@@ -296,6 +296,7 @@ export function contactState(engagementCount: number, hasOwner: boolean): "untou
 const DOMAIN_FNS = [
   stageWeight, isTerminalStage, isStalled, weightedValue,
   riyadhFiscalPeriod, riyadhPeriodBounds, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
+  offListPct, offListRollup,
 ] as const;
 
 export const SALES_DOMAIN_JS: string = [
@@ -342,6 +343,47 @@ export function offListPct(
   const reference = quotedListPrice * qty * quotedYears;
   if (!(reference > 0)) return null;
   return (1 - value / reference) * 100;
+}
+
+/**
+ * THE ONE ROLLUP every screen reads for «الخصم عن السعر المعلن» — the home band, the reports page and
+ * the product record all call this, so a figure cannot mean one thing on one screen and another on
+ * the next.
+ *
+ * WEIGHTED, NOT AN AVERAGE OF PERCENTAGES. A 40٪ discount on a 5,000 line and a 2٪ discount on a
+ * 500,000 line do not average to 21٪ of anything anybody gave away; the money does. So the total
+ * asked and the total agreed are summed first and compared once.
+ *
+ * LINES WITH NO REFERENCE ARE EXCLUDED FROM THE RATIO AND COUNTED SEPARATELY. Five of the six
+ * products publish no price, so most lines carry no reference at all. Dropping them silently would
+ * report the discount of the minority as the discount of the book; counting them as zero would
+ * invent a figure nobody quoted. `withReference` is what a screen prints beside the percentage so
+ * the reader knows how much of the book it speaks for.
+ *
+ * `years` is each line's OWN current term, never the package's snapshotted one: the value being
+ * compared covers that term, and reading the snapshot would make the ratio drift the moment anyone
+ * edited the years.
+ */
+export function offListRollup(
+  lines: readonly { value: number; quotedListPrice: number | null; qty: number; years: number }[],
+): { lines: number; withReference: number; referenceTotal: number; valueTotal: number; savedTotal: number; pct: number | null } {
+  let withReference = 0, referenceTotal = 0, valueTotal = 0;
+  for (const l of lines) {
+    if (l.quotedListPrice == null) continue;
+    const reference = Number(l.quotedListPrice) * (Number(l.qty) || 1) * (Number(l.years) || 1);
+    if (!(reference > 0)) continue;
+    withReference++;
+    referenceTotal += reference;
+    valueTotal += Number(l.value) || 0;
+  }
+  return {
+    lines: lines.length,
+    withReference,
+    referenceTotal,
+    valueTotal,
+    savedTotal: referenceTotal - valueTotal,
+    pct: referenceTotal > 0 ? (1 - valueTotal / referenceTotal) * 100 : null,
+  };
 }
 
 // ---------------------------------------------------------------------------

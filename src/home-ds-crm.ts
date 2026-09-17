@@ -80,7 +80,10 @@ function hdsLines() {
   var open = rows.filter(function (l) { return opIsOpen(l); });
   return open.map(function (l) {
     return { id: l.id, account: l.account_name || "", product: l.product || "",
-             stage: l.stage, source: l.source || "", value: opValue(l), days: opDays(l) };
+             stage: l.stage, source: l.source || "", value: opValue(l), days: opDays(l),
+             /* Carried so the discount-off-list rollup reads the SAME array this screen renders. */
+             quotedListPrice: l.quoted_list_price == null ? null : Number(l.quoted_list_price),
+             qty: Number(l.qty || 1), years: Number(l.years || 1) };
   }).sort(function (a, b) {
     if (!a.value !== !b.value) return a.value ? -1 : 1;   /* priced first */
     return b.days - a.days;
@@ -544,6 +547,16 @@ function hdsValueCard(f, lines) {
     if (unpriced) {
       body += '<p class="hx-note">إجمالي قيمة الفرص غير معروف حتى يكتمل التسعير.</p>';
     }
+    /* THE ONE DISCOUNT FIGURE. offListRollup (sales-domain) is what the reports page calls too, so
+       the two screens cannot disagree. It weighs money, not lines, and it speaks only for the lines
+       that carry a published reference — most do not, and the count says so rather than the ratio
+       quietly standing for the whole book. */
+    var off = offListRollup(lines);
+    body += '<div class="hx-cov"><span>الخصم عن السعر المعلن</span>' +
+      (off.pct === null
+        ? hdsNil("لا باقة مرتبطة بأي بند", "none")
+        : '<span class="m-n">' + fmtN(Math.round(off.pct)) + "٪</span> على " +
+          hdsN(off.withReference) + " من " + hdsN(off.lines)) + "</div>";
   }
 
   var secs = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.sectors)
