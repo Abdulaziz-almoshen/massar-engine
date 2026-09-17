@@ -1862,4 +1862,101 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-cb__e{ padding: var(--m-2); font-size: var(--m-t-cap); color: var(--m-mut); }
 .ds6 .m-cb__e[hidden]{ display: none; }
 @media (prefers-reduced-motion: reduce){.ds6 .m-cb__t{ transition: none; }}
+/* ============================================================================
+   THE DATE PICKER and THE RANGE PICKER (date-field-crm.ts), after coss ui's p-date-picker-3 and
+   p-date-picker-2: an outline trigger carrying a calendar glyph and the formatted date, opening a
+   popover whose month and year are comboboxes, a seven-column grid under them. RTL: الأحد is the
+   first (rightmost) column and «previous» points right.
+   ============================================================================ */.ds6 .m-dp{ position: relative; display: inline-flex; min-inline-size: 0; }
+.ds6 .m-dp--wide{ display: flex; inline-size: 100%; }
+.ds6 .m-dp__t{
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--m-2);
+  min-block-size: 44px;
+  min-inline-size: 0;
+  padding-inline: var(--m-3);
+  border: 1px solid var(--m-line-2);
+  border-radius: var(--m-r-ctl);
+  background: var(--m-paper);
+  font: inherit;
+  font-size: var(--m-t-body);
+  color: var(--m-ink);
+  text-align: start;
+  cursor: pointer;
+  transition: border-color var(--m-out) var(--m-ease), background-color var(--m-out) var(--m-ease);
+}
+@media (hover: hover) and (pointer: fine){.ds6 .m-dp__t:hover{ background: var(--m-page); }}
+.ds6 .m-dp__t[aria-expanded="true"]{ border-color: var(--m-ac); }
+.ds6 .m-dp__t:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+.ds6 .m-dp__i{ flex: none; inline-size: 16px; block-size: 16px; fill: none; stroke: var(--m-mut);
+  stroke-width: 1.7; stroke-linecap: round; }
+.ds6 .m-dp__v{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.ds6 .m-dp__v.is-ph{ color: var(--m-faint); }
+.ds6 .m-dp__p{
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  z-index: var(--z-overlay, 300);
+  inline-size: 296px;
+  max-inline-size: calc(100vw - var(--m-5));
+  padding: var(--m-3);
+  border-radius: var(--m-r-card);
+  background: var(--m-paper);
+  box-shadow: 0 0 0 1px var(--m-line), var(--m-lift);
+}
+.ds6 .m-dp__p[hidden]{ display: none; }
+.ds6 .m-dp__h{ display: flex; align-items: center; gap: var(--m-1); margin-block-end: var(--m-2); }
+.ds6 .m-dp__sel{ display: flex; gap: var(--m-1); flex: 1 1 auto; min-inline-size: 0; }
+/* Inside the header the two comboboxes are compact: the popover is 296px wide and they share it. */.ds6 .m-dp__sel .m-cb{ flex: 1 1 0; min-inline-size: 0; }
+.ds6 .m-dp__sel .m-cb__t{ min-block-size: 34px; font-size: var(--m-t-cap); padding-inline: var(--m-2); }
+.ds6 .m-dp__sel .m-cb__p{ min-inline-size: 140px; }
+.ds6 .m-dp__nav{
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 32px;
+  block-size: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--m-r-ctl);
+  background: transparent;
+  color: var(--m-ink-2);
+  cursor: pointer;
+  transition: background-color var(--m-out) var(--m-ease);
+}
+.ds6 .m-dp__nav svg{ inline-size: 18px; block-size: 18px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-dp__nav:hover{ background: var(--m-sunk); }}
+.ds6 .m-dp__nav:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+.ds6 .m-dp__w, .ds6 .m-dp__g{ display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.ds6 .m-dp__w{ margin-block-end: var(--m-1); }
+.ds6 .m-dp__w span{ text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
+  overflow: hidden; text-overflow: ellipsis; }
+.ds6 .m-dp__d{
+  display: grid;
+  place-items: center;
+  block-size: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--m-r-ctl);
+  background: transparent;
+  font: inherit;
+  font-size: var(--m-t-cap);
+  color: var(--m-ink);
+  cursor: pointer;
+}
+.ds6 .m-dp__d.is-out{ color: var(--m-faint); }
+.ds6 .m-dp__d:disabled{ color: var(--m-line-2); cursor: default; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-dp__d:not(:disabled):hover{ background: var(--m-sunk); }}
+.ds6 .m-dp__d:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+/* Today is marked by a ring, the chosen day by the accent: a mark for «where we are» and a fill for
+   «what you chose» are two different statements. */.ds6 .m-dp__d.is-today{ box-shadow: inset 0 0 0 1px var(--m-line-2); }
+.ds6 .m-dp__d.is-mid{ background: var(--m-ac-dim); border-radius: 0; }
+.ds6 .m-dp__d.is-on{ background: var(--m-ac); color: #FFFFFF; font-weight: 600; box-shadow: none; }
+.ds6 .m-dp__f{ display: flex; gap: var(--m-2); margin-block-start: var(--m-2);
+  padding-block-start: var(--m-2); border-block-start: 1px solid var(--m-line); }
+@media (prefers-reduced-motion: reduce){.ds6 .m-dp__t, .ds6 .m-dp__nav{ transition: none; }}
 `;

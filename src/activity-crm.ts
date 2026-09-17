@@ -42,7 +42,8 @@ export const ACTIVITY_CRM_JS = `
 /* ============================ activity-crm (client) ============================ */
 var actTab = "all";      /* all | out | in | delivery | failed */
 var actQ = "";
-var actWin = 7;          /* days */
+var actWin = 7;          /* days; -1 = the custom range below */
+var actFrom = "", actTo = "";   /* «YYYY-MM-DD», inclusive, when actWin is -1 */
 
 /* Every event kind Massar can OBSERVE, with the field that produces it. There is no kind here that
    is not written by the engine — an event type with no writer would be a fabricated row. tone maps
@@ -71,16 +72,24 @@ function actNoun(n) { return n === 1 ? "حدث" : n === 2 ? "حدثان" : (n >=
 
 function actEvents() {
   var out = [];
-  var cutoff = actWin ? Date.now() - actWin * 86400000 : 0;
+  /* A custom range is a pair of calendar days, inclusive: its end is the END of that day, or a range
+     that begins and ends on the same day would match nothing. */
+  var from0 = 0, to0 = Infinity;
+  if (actWin === -1) {
+    var f0 = parseISODate(actFrom), t0 = parseISODate(actTo);
+    if (f0) from0 = new Date(f0.getFullYear(), f0.getMonth(), f0.getDate(), 0, 0, 0, 0).getTime();
+    if (t0) to0 = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate(), 23, 59, 59, 999).getTime();
+  }
+  var cutoff = actWin > 0 ? Date.now() - actWin * 86400000 : from0;
   ((cache && cache.contacts) || []).forEach(function (c) {
     if (c.test) return;                       /* sandbox traffic is not the operator's ledger */
     (c.transcript || []).forEach(function (t) {
-      if (!t.ts || t.ts < cutoff) return;
+      if (!t.ts || t.ts < cutoff || t.ts > to0) return;
       out.push({ ts: t.ts, kind: t.role, phone: c.phone, name: c.waName || "", text: t.text || "" });
     });
     var st = c.statusTimes || {};
     ["sent", "delivered", "read", "failed"].forEach(function (k) {
-      if (!st[k] || st[k] < cutoff) return;
+      if (!st[k] || st[k] < cutoff || st[k] > to0) return;
       out.push({ ts: st[k], kind: k, phone: c.phone, name: c.waName || "",
                  text: k === "failed" ? (c.lastError || "") : "" });
     });
@@ -171,9 +180,16 @@ function actToolbar(n) {
   h += '<div class="m-head__a">' +
     mSearch({ id: "actq", value: actQ, placeholder: "ابحث في الأحداث…", label: "ابحث في الأحداث", wide: true, attrs: ' oninput="actSearch(this)"' }) +
     '<select class="m-select" onchange="actSetWin(this.value)" aria-label="الفترة">' +
-    [[1, "آخر يوم"], [7, "آخر 7 أيام"], [30, "آخر 30 يومًا"], [0, "كل الفترة"]].map(function (w) {
+    [[1, "آخر يوم"], [7, "آخر 7 أيام"], [30, "آخر 30 يومًا"], [0, "كل الفترة"], [-1, "مدى مخصص"]].map(function (w) {
       return '<option value="' + w[0] + '"' + (String(actWin) === String(w[0]) ? " selected" : "") + ">" + w[1] + "</option>";
-    }).join("") + "</select></div>";
+    }).join("") + "</select>" +
+    /* The range picker (coss p-date-picker-2) appears only when the period is «مدى مخصص», so the
+       toolbar does not carry a control that decides nothing. Both ends filter in the browser, the
+       same way the day windows beside it always have. */
+    (actWin === -1
+      ? mDateRange({ id: "actrange", from: actFrom, to: actTo, max: toISODate(new Date()),
+          label: "المدى", placeholder: "اختر المدى", attrs: ' data-actrange="1"' })
+      : "") + "</div>";
   h += '<span class="m-cap">' + actPl(n) + " في هذه الفترة</span>";
   return h + "</div>";
 }
@@ -210,7 +226,26 @@ function actPaintCrumb() {
 }
 
 window.actSetTab = function (t) { actTab = t; render(false); };
-window.actSetWin = function (w) { actWin = Number(w); render(false); };
+window.actSetWin = function (w) {
+  actWin = Number(w);
+  /* Choosing «مدى مخصص» with nothing picked yet starts on today, so the table is never silently
+     empty while the picker waits for a second click. */
+  if (actWin === -1 && !actFrom && !actTo) { actFrom = toISODate(new Date()); actTo = actFrom; }
+  render(false);
+};
+/* The range picker writes «YYYY-MM-DD» into its two hidden inputs and changes them, exactly as the
+   type=date fields it is modelled on would. */
+document.addEventListener("change", function (ev) {
+  var t = ev.target;
+  if (!t || !t.getAttribute || !t.getAttribute("data-actrange")) return;
+  var f = document.getElementById("actrange"), to = document.getElementById("actrange_to");
+  actFrom = f ? f.value : "";
+  actTo = to ? to.value : "";
+  /* A HALF-PICKED RANGE DOES NOT REPAINT. The first click sets only the start, and repainting the
+     screen there replaced the open calendar — so the second click had nothing to land on (measured).
+     Half a range filters nothing anyway; the table waits for both ends. */
+  if (actFrom && actTo) render(false);
+});
 window.actSearch = function (el) { actQ = el.value; clearTimeout(window.__aq); window.__aq = setTimeout(function () { render(false); }, 250); };
 /* ========================= end activity-crm (client) ========================= */
 `;

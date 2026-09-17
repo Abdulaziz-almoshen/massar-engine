@@ -37,6 +37,8 @@ import { NUMBER_FIELD_DOMAIN_JS } from "./number-field-domain.js";
 import { NUMBER_FIELD_JS } from "./number-field-crm.js";
 import { SEARCH_FIELD_JS } from "./search-field-crm.js";
 import { COMBOBOX_JS } from "./combobox-crm.js";
+import { DATE_FIELD_DOMAIN_JS } from "./date-field-domain.js";
+import { DATE_FIELD_JS } from "./date-field-crm.js";
 import { OPPS_DOMAIN_JS } from "./opps-domain.js";
 import { PRODUCT_DOMAIN_JS } from "./product-domain.js";
 import { CONFIG_DOMAIN_JS } from "./config-domain.js";
@@ -1045,10 +1047,17 @@ const SUBS = {
   // conversation list is one view OF those customers, not the door to them. Every #customers link
   // still works; only which route the door lands on changed.
   accounts:  [["accounts", "العملاء"], ["customers", "المحادثات"], ["indicators", "مؤشرات الاستخدام"], ["tasks", "المهام"], ["notes", "الملاحظات"]],
-  products:  [["products", "المنتجات"], ["knowledge", "معرفة المنتج"], ["perf", "المستهدفات والأداء"], ["org", "الهيكل التنظيمي"]],
+  // THE PRODUCTS DOOR HAS ONE DESTINATION (founder, 2026-09-17: the strip «should be removed» from the
+  // products page). It carried three screens that are not the product list and not read beside it:
+  // «معرفة المنتج» is a tab INSIDE a product record, and its cross-product view is a readiness REPORT;
+  // «المستهدفات والأداء» is a report; «الهيكل التنظيمي» is configuration, beside الأقسام and الفريق.
+  // Each moved to the door it belongs to, so nothing became unreachable — and with one destination the
+  // strip is not rendered at all (see the subs.length > 1 rule below).
+  products:  [["products", "المنتجات"]],
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
-  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
+  reports:   [["reports", "التقارير"], ["perf", "المستهدفات والأداء"], ["knowledge", "جاهزية المعرفة"]],
+  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"], ["org", "الهيكل التنظيمي"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
 };
 
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
@@ -4812,6 +4821,12 @@ function dataSignature() {
 function render(fetchNew) {
   // A poll that changes nothing must not repaint the screen — otherwise the page
   // visibly churns every 5 seconds while the operator is reading it.
+  // AN OPEN MENU OUTRANKS A POLL. Every screen but #home repaints on the 5s tick, and a repaint
+  // replaces the DOM — which silently removed an open calendar or combobox popup between two clicks.
+  // Measured on «سجل الأحداث»: a range picker lost its second click every time the tick landed. A poll
+  // is deferred while one of these is open (the next tick, or the user's own action, paints it);
+  // anything the user themselves triggered (fetchNew false) still paints at once.
+  if (fetchNew && document.querySelector(".m-dp__p:not([hidden]), .m-cb__p:not([hidden])")) { stamp(); return; }
   const sig = dataSignature();
   if (fetchNew && sig === _viewSig && document.getElementById("body").innerHTML) { stamp(); return; }
   _viewSig = sig;
@@ -5282,6 +5297,8 @@ ${NUMBER_FIELD_DOMAIN_JS}
 ${NUMBER_FIELD_JS}
 ${SEARCH_FIELD_JS}
 ${COMBOBOX_JS}
+${DATE_FIELD_DOMAIN_JS}
+${DATE_FIELD_JS}
 ${OPPS_CRM_JS}
 ${OPP_WORK_CRM_JS}
 ${OPP_WORK_DOMAIN_JS}

@@ -375,11 +375,13 @@ function owActivitiesSection(l) {
         var on = A.kind === k;
         return '<button type="button" role="radio" id="owk_' + k + '" aria-checked="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-ow="kind" data-k="' + k + '">' + esc(ACTIVITY_KIND_LABELS[k]) + "</button>";
       }).join("") + "</div>" +
-      '<div class="m-form"><div class="m-field"><label class="m-label m-req" for="owa_on">التاريخ</label><input class="m-input" type="date" id="owa_on" max="' + owToday() + '" value="' + esc(A.occurredOn) + '" data-owf="occurredOn"' + inv("occurredOn") + "></div>" +
+      '<div class="m-form"><div class="m-field"><label class="m-label m-req" for="owa_on">التاريخ</label>' + mDate({ id: "owa_on", value: A.occurredOn, max: owToday(), label: "تاريخ النشاط", wide: true,
+        attrs: ' data-owf="occurredOn"' + inv("occurredOn") }) + "</div>" +
       '<div class="m-field"><label class="m-label" for="owa_owner">المسؤول</label><input class="m-input" id="owa_owner" list="oxowners2" maxlength="' + ACTIVITY_OWNER_MAX + '" value="' + esc(A.owner) + '" data-owf="owner"' + inv("owner") + "></div></div>" +
       '<div class="m-field"><label class="m-label m-req" for="owa_sum">ما الذي دار؟</label><textarea class="m-input" id="owa_sum" rows="3" maxlength="' + ACTIVITY_SUMMARY_MAX + '" data-owf="summary" placeholder="مثال: استعراض متطلبات التكامل مع إدارة تقنية المعلومات"' + inv("summary") + ">" + esc(A.summary) + "</textarea></div>" +
       '<div class="m-form"><div class="m-field"><label class="m-label" for="owa_next">الخطوة التالية</label><input class="m-input" id="owa_next" maxlength="' + ACTIVITY_NEXT_MAX + '" value="' + esc(A.nextStep) + '" data-owf="nextStep" placeholder="مثال: إرسال العرض الفني"' + inv("nextStep") + "></div>" +
-      '<div class="m-field"><label class="m-label" for="owa_nexton">موعدها</label><input class="m-input" type="date" id="owa_nexton" value="' + esc(A.nextOn) + '" data-owf="nextOn"' + inv("nextOn") + "></div></div>" +
+      '<div class="m-field"><label class="m-label" for="owa_nexton">موعدها</label>' + mDate({ id: "owa_nexton", value: A.nextOn, label: "موعد الخطوة التالية", placeholder: "بلا موعد", wide: true,
+        attrs: ' data-owf="nextOn"' + inv("nextOn") }) + "</div></div>" +
       '<div class="m-field"><label class="m-label" for="owa_dept">الإدارة المعنية</label><select class="m-select" id="owa_dept" data-owf="dept"' + inv("dept") + '><option value="">المبيعات</option>' +
         depts.map(function (d) { return '<option value="' + esc(d) + '"' + (A.dept === d ? " selected" : "") + ">" + esc(d) + "</option>"; }).join("") + "</select></div>" +
       '<div class="ow-btns"><button class="m-btn m-btn--primary" id="owasave" data-ow="actsave"' + (A.busy ? ' disabled aria-busy="true"' : "") + ">" + (A.busy ? "جارٍ الحفظ…" : "حفظ النشاط") + "</button>" +
@@ -475,7 +477,8 @@ function owQuotesSection(l) {
     b += '<div class="ow-form" role="group" aria-label="عرض سعر جديد"><div class="m-form">' +
       num("salePrice", "owq_price", "السعر السنوي (ر.س)", true) + num("years", "owq_years", "السنوات") +
       num("qty", "owq_qty", "الكمية") + num("discount", "owq_disc", "الخصم ٪") + "</div>" +
-      '<div class="m-form"><div class="m-field"><label class="m-label" for="owq_valid">صالح حتى</label><input class="m-input" type="date" id="owq_valid" min="' + owToday() + '" value="' + esc(Q.validUntil) + '" data-owq="validUntil"' + inv("validUntil") + "></div>" +
+      '<div class="m-form"><div class="m-field"><label class="m-label" for="owq_valid">صالح حتى</label>' + mDate({ id: "owq_valid", value: Q.validUntil, min: owToday(), label: "صالح حتى", placeholder: "بلا تاريخ", wide: true,
+        attrs: ' data-owq="validUntil"' + inv("validUntil") }) + "</div>" +
       '<div class="m-field"><label class="m-label" for="owq_note">ملاحظة</label><input class="m-input" id="owq_note" maxlength="' + QUOTE_NOTE_MAX + '" value="' + esc(Q.note) + '" data-owq="note" placeholder="مثال: يشمل التدريب والتفعيل"' + inv("note") + "></div></div>" +
       '<div class="ow-total" id="owq_total" aria-live="polite">إجمالي العرض: <b>' + opMoney(owQuoteTotal(Q)) + "</b></div>" +
       '<div class="ow-btns"><button class="m-btn m-btn--primary" id="owqsave" data-ow="qsave"' + (Q.busy ? ' disabled aria-busy="true"' : "") + ">" + (Q.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
