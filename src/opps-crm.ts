@@ -345,41 +345,28 @@ export const OPPS_CRM_CSS = `
   .ox-sec { display:flex; flex-direction:column; gap:var(--s2); }
   .ox-sec + .ox-sec { padding-top:var(--s4); border-top:1px solid var(--line-soft); }
   .ox-sech { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-  /* ---- the stage stepper (tones: stage-tone-domain.ts, via --tn / --tn-soft / --tn-text) ---- */
-  .ox-steps { list-style:none; margin:0; padding:0; position:relative; display:flex; flex-direction:column; }
-  .ox-steps-pill { position:absolute; inset-inline:0; top:0; height:0; border-radius:var(--r-md); pointer-events:none;
-    background:var(--tn-soft); border-inline-start:3px solid var(--tn); }
-  .ox-step { position:relative; }
-  /* The connector runs from this rung's circle to the next one's: toned once the rung is passed. */
-  .ox-step:not(:last-of-type)::before { content:""; position:absolute; inset-inline-start:23px; top:32px; bottom:-8px;
-    width:2px; background:var(--line); border-radius:var(--r-pill); }
-  .ox-step.done::before { background:var(--tn); }
-  .ox-stb { position:relative; width:100%; font-family:inherit; display:flex; align-items:center; gap:var(--s2);
-    min-height:40px; padding:6px 12px; background:transparent; border:none; border-radius:var(--r-md); text-align:start;
-    cursor:pointer; color:var(--ink-2); transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
+  /* ---- the stage stepper: horizontal, after ui.halaska.com's Stepper. Structure lives here; its
+         colours live in the .ds6 block below, because this screen is ported. ---- */
+  .ox-hs { display:flex; flex-direction:column; gap:var(--s2); }
+  .ox-steps { list-style:none; margin:0; padding:0; display:grid;
+    grid-template-columns:repeat(var(--ox-n, 6), minmax(0, 1fr)); align-items:start; }
+  .ox-step { position:relative; min-width:0; }
+  /* The connector into this step from the one before it. Logical insets, so in RTL it runs from the
+     previous node on the right to this one — measured from node centre to node centre. */
+  .ox-step + .ox-step::before { content:""; position:absolute; top:13px; height:2px;
+    inset-inline-start:calc(-50% + 16px); inset-inline-end:calc(50% + 16px); border-radius:2px; }
+  .ox-stb { width:100%; font-family:inherit; display:flex; flex-direction:column; align-items:center; gap:6px;
+    padding:0 2px 4px; background:transparent; border:none; border-radius:var(--r-md); text-align:center;
+    cursor:pointer; }
   .ox-stb[aria-disabled="true"] { cursor:default; }
-  @media (hover:hover) and (pointer:fine) {
-    .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover { background:var(--surface); }
-    .ox-stb:not([aria-disabled="true"]):hover .go { opacity:1; }
-  }
-  .ox-stb:not([aria-disabled="true"]):active { transform:scale(0.98); }
-  @media (pointer:coarse) { .ox-stb { min-height:44px; } }
-  .ox-stb .k { flex:none; width:24px; height:24px; border-radius:var(--r-pill); display:inline-flex; align-items:center;
-    justify-content:center; font-size:var(--t-xs); font-weight:600; font-variant-numeric:tabular-nums;
-    background:var(--paper); color:var(--muted); box-shadow:inset 0 0 0 1.5px var(--s-off-mark); position:relative; }
-  .ox-stb .k .ox-ico { width:14px; height:14px; stroke-width:2.25; }
-  .ox-stb .tx { display:flex; flex-direction:column; min-width:0; flex:1; }
-  .ox-stb .l { font-size:var(--t-sm); line-height:var(--lh-body); }
-  .ox-stb .go { font-size:var(--t-xs); font-weight:500; color:var(--accent-deep); opacity:0; transition:opacity var(--fast) var(--ease); }
-  .ox-stb:focus-visible .go { opacity:1; }
-  .ox-step.done .k { background:var(--tn); color:#FFFFFF; box-shadow:none; }
-  .ox-step.done .l { color:var(--tn-text); font-weight:500; }
-  .ox-step.current .k { background:var(--tn); color:#FFFFFF; box-shadow:0 0 0 3px var(--paper); }
-  .ox-step.current .l { color:var(--ink); font-weight:600; }
-  .ox-step.paused .l { color:var(--muted); }
-  .ox-steps.is-lost .ox-step .l { color:var(--muted); }
-  .ox-exit { display:flex; flex-direction:column; gap:2px; padding:0 12px 10px; padding-inline-start:44px;
-    font-size:var(--t-xs); color:var(--ink-2); line-height:var(--lh-body); position:relative; }
+  .ox-stb .k { flex:none; width:20px; height:20px; margin-block:4px; border-radius:999px; display:inline-flex;
+    align-items:center; justify-content:center; font-size:12px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .ox-stb .k .ox-ico { width:12px; height:12px; stroke-width:2.5; }
+  .ox-step.current .ox-stb .k { width:28px; height:28px; margin-block:0; }
+  .ox-stb .l { font-size:var(--t-xs); line-height:1.35; overflow-wrap:anywhere; max-width:100%; }
+  .ox-hs-cur { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:var(--s2); row-gap:2px;
+    padding:10px 12px; border-radius:var(--r-md); }
+  .ox-hs-cur .ex { flex-basis:100%; }
   .ox-strow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
   .ox-strow .btn { height:36px; padding-inline:12px; font-size:var(--t-sm); gap:6px; }
   .ox-form { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
@@ -676,37 +663,44 @@ export const OPPS_CRM_CSS = `
 
   /* --- the stage stepper: a vertical ladder of real buttons. m-steps is a horizontal wizard rail,
          which cannot carry a per-rung age, an exit criterion or a move action. --- */
-  /* ONE ACCENT, NOT SIX HUES (founder, 2026-09-17: «change this», on the stepper). Each rung used to
-     wear its stage tone from stage-tone-domain.ts, so a deal half-way up the ladder read as slate,
-     teal, blue, violet and a magenta panel: five colours saying one thing, «passed». Colour here now
-     means progress and nothing else. Passed rungs are the soft accent with a check, the current rung
-     is the solid accent with a halo, later rungs are quiet outlines. The stage tones still exist and
-     still colour the board and the stage chips, where telling stages APART is the point. */
-  .ds6 .ox-steps-pill { background:var(--m-page); border-inline-start:3px solid var(--m-ac);
-    box-shadow:inset 0 0 0 1px var(--m-line); }
-  .ds6 .ox-step:not(:last-of-type)::before { background:var(--m-line); }
-  .ds6 .ox-step.done::before { background:var(--m-ac-line); }
-  .ds6 .ox-stb { color:var(--m-ink-2); border-radius:var(--m-r-ctl); }
-  @media (hover:hover) and (pointer:fine) { .ds6 .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover { background:var(--m-page); } }
-  .ds6 .ox-stb .k { background:var(--m-paper); color:var(--m-mut); box-shadow:inset 0 0 0 1.5px var(--m-line-2); }
-  .ds6 .ox-stb .l { font-size:var(--m-t-body); }
-  .ds6 .ox-stb .go { font-size:var(--m-t-cap); color:var(--m-ac-deep); }
-  .ds6 .ox-step.done .k { background:var(--m-ac-dim); color:var(--m-ac); box-shadow:inset 0 0 0 1px var(--m-ac-line); }
-  .ds6 .ox-step.current .k { background:var(--m-ac); color:#FFFFFF; box-shadow:0 0 0 4px var(--m-ac-dim); }
-  .ds6 .ox-step.done .l { color:var(--m-ink-2); font-weight:500; }
-  .ds6 .ox-step.current .l { color:var(--m-ink); font-weight:700; }
-  .ds6 .ox-step:not(.done):not(.current) .l { color:var(--m-mut); }
-  .ds6 .ox-step.paused .l, .ds6 .ox-steps.is-lost .ox-step .l { color:var(--m-faint); }
-  /* A lost deal has no progress to show: its ladder goes neutral, and only the rung it was lost
-     from keeps a mark, in the loss colour, so the reader sees where it stopped. */
-  .ds6 .ox-steps.is-lost .ox-steps-pill { border-inline-start-color:var(--m-bad); }
-  .ds6 .ox-steps.is-lost .ox-step.done .k { background:var(--m-sunk); color:var(--m-mut); box-shadow:none; }
-  .ds6 .ox-steps.is-lost .ox-step.done::before { background:var(--m-line-2); }
-  .ds6 .ox-steps.is-lost .ox-step.current .k { background:var(--m-bad); box-shadow:0 0 0 4px var(--m-bad-dim); }
-  .ds6 .ox-exit { font-size:var(--m-t-cap); color:var(--m-ink-2); gap:var(--m-1);
-    margin-inline-end:var(--m-3); padding-block:var(--m-2) var(--m-3); }
-  .ds6 .ox-exit .m-label { font-size:var(--m-t-micro); line-height:var(--m-leading-meta);
-    font-weight:600; color:var(--m-mut); }
+  /* Monochrome, as the reference is: passed and current in ink, later steps pale. Colour on this row
+     would say nothing a node's size and fill do not already say, and the stage tones stay on the board
+     and the chips, where telling stages APART is the point. Measured from ui.halaska.com: passed node
+     solid ink with a white check, current node a 2px ink ring on paper, later node a pale fill with a
+     faint number, connector solid behind and pale ahead. Sizes are Massar's (20/28px, 12px figures):
+     the reference's 16/24px nodes carry 9px text, which is off this app's type ladder. */
+  .ds6 .ox-step + .ox-step::before { background:var(--m-line); }
+  .ds6 .ox-step.done + .ox-step::before,
+  .ds6 .ox-step.done + .ox-step.current::before { background:var(--m-ink-2); }
+  .ds6 .ox-stb { color:var(--m-mut); border-radius:var(--m-r-ctl); }
+  .ds6 .ox-stb .k { background:var(--m-sunk); color:var(--m-faint); }
+  .ds6 .ox-stb .l { font-size:var(--m-t-micro); color:var(--m-mut); }
+  .ds6 .ox-step.done .k { background:var(--m-ink-2); color:#FFFFFF; }
+  .ds6 .ox-step.done .l { color:var(--m-mut); }
+  .ds6 .ox-step.current .k { background:var(--m-paper); color:var(--m-ink); box-shadow:inset 0 0 0 2px var(--m-ink-2); }
+  .ds6 .ox-step.current .l { color:var(--m-ink); font-weight:600; }
+  .ds6 .ox-step.paused .k { background:var(--m-paper); box-shadow:inset 0 0 0 1px var(--m-line-2); }
+  .ds6 .ox-step.paused .l { color:var(--m-faint); text-decoration:line-through; text-decoration-color:var(--m-line-2); }
+  /* A lost deal: the row goes pale and the step it stopped on takes the loss colour. */
+  .ds6 .ox-hs.is-lost .ox-step.done .k { background:var(--m-line-2); }
+  .ds6 .ox-hs.is-lost .ox-step.done + .ox-step::before { background:var(--m-line-2); }
+  .ds6 .ox-hs.is-lost .ox-step.current .k { color:var(--m-bad); box-shadow:inset 0 0 0 2px var(--m-bad); }
+  @media (hover:hover) and (pointer:fine) {
+    .ds6 .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover .k { box-shadow:0 0 0 3px var(--m-ac-dim); }
+    .ds6 .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover .l { color:var(--m-ink); }
+    /* Press feedback, pointer only, so a keyboard activation never animates. */
+    .ds6 .ox-stb { transition:transform var(--m-press) var(--m-ease); }
+    .ds6 .ox-stb:not([aria-disabled="true"]):active { transform:scale(.97); }
+  }
+  .ds6 .ox-stb:focus-visible { outline:none; box-shadow:var(--m-focus); }
+  .ds6 .ox-hs-cur { background:var(--m-page); box-shadow:inset 0 0 0 1px var(--m-line); }
+  .ds6 .ox-hs-cur .nm { font-size:var(--m-t-body); font-weight:600; color:var(--m-ink); }
+  .ds6 .ox-hs-cur .ex { font-size:var(--m-t-cap); color:var(--m-ink-2); }
+  .ds6 .ox-hs-cur .ex .m-label { font-size:var(--m-t-cap); font-weight:600; color:var(--m-mut); }
+  @media (prefers-reduced-motion: reduce) {
+    .ds6 .ox-stb { transition:none; }
+    .ds6 .ox-stb:not([aria-disabled="true"]):active { transform:none; }
+  }
   .ds6 .ox-go { color:var(--m-mut); }
   @media (hover:hover) and (pointer:fine) { .ds6 .ox-go:hover { color:var(--m-ac-deep); background:var(--m-page); } }
 
@@ -1601,12 +1595,20 @@ function opDrawerShell(labelId, head, body, foot, tabs, lead) {
     '<div class="m-dlg__b" id="oxdb" onscroll="opDrScroll=this.scrollTop">' + body + "</div>" +
     '<div class="m-dlg__f">' + foot + "</div></div>";
 }
-/* The STAGE STEPPER. Every open rung by name, top to bottom: passed rungs carry their tone and a
-   check, the current one sits on a tinted pill with its age and its exit criterion, later rungs are
-   quiet. Each rung is a real button — the 6px bars it replaces were aria-hidden and named their
-   stage only in a tooltip, so the ladder could not be read without hovering every bar. A paused rung
-   stays visible and is disabled, the same rule isStageSelectable applies to the write. */
-var opStepPrev = null, opStepAnim = null, opStepFocus = "";
+/* The STAGE STEPPER, after the Stepper in ui.halaska.com (founder, 2026-09-17), measured there with
+   getComputedStyle rather than recalled: a horizontal row of nodes with the label under each; a passed
+   step is a small solid node with a check, the current step a larger hollow ring carrying its number,
+   a later step a small pale node; a 2px connector is solid behind the current step and pale ahead.
+
+   What Massar keeps that the reference does not have: every node is a real button that moves the deal
+   (aria-disabled, not disabled, so focus survives the repaint that makes it current), a paused rung is
+   visible and inert — the same rule isStageSelectable applies to the write — and the current rung's age
+   and exit criterion sit on one line under the row, where the vertical ladder used to open a panel.
+
+   Where it departs from the reference, on purpose: Halaska moves a node with transition:all over 400ms
+   on an overshooting spring. Massar's motion rules forbid all three, and the drawer repaints on every
+   save anyway, so the change is confirmed by the field status beside «المرحلة», not by a bounce. */
+var opStepFocus = "";
 /* A stepper click remembers WHICH rung was pressed, so every repaint the save causes (pending, saved,
    failed) can put focus back on that rung's button instead of dropping it. */
 window.opStepTo = function (id, key) {
@@ -1618,59 +1620,34 @@ function opStepper(l, open, idx) {
   var states = stageSteps(open.map(function (s) { return s.key; }), l.stage);
   var selectable = {};
   opSelectableStages(l.stage).forEach(function (s) { selectable[s.key] = 1; });
-  var h = '<ol class="ox-steps' + (opIsLost(l) ? " is-lost" : "") + '" aria-label="مراحل البيع">';
-  if (idx !== -1) h += '<li class="ox-steps-pill" aria-hidden="true" style="' + opToneVars(l.stage) + '"></li>';
+  var lost = opIsLost(l);
+  var h = '<div class="ox-hs' + (lost ? " is-lost" : "") + '">';
+  h += '<ol class="ox-steps" aria-label="مراحل البيع" style="--ox-n:' + open.length + '">';
   open.forEach(function (s, i) {
     var state = states[i], isCur = state === "current";
     var paused = !selectable[s.key] && !isCur;
     var can = !isCur && !paused && !oppBusy && opMayEdit();
     var said = state === "done" ? "مرحلة مكتملة" : isCur ? "المرحلة الحالية" : "مرحلة قادمة";
-    h += '<li class="ox-step ' + state + (paused ? " paused" : "") + '" style="' + opToneVars(s.key) + '"' + (isCur ? ' aria-current="step"' : "") + ">";
+    h += '<li class="ox-step ' + state + (paused ? " paused" : "") + '"' + (isCur ? ' aria-current="step"' : "") + ">";
     h += '<button type="button" class="ox-stb" id="oxst_' + l.id + "_" + esc(s.key) + '"' +
-      /* aria-disabled, not disabled: a disabled button cannot hold focus, and the rung a keyboard user
-         just chose BECOMES the current (inert) rung on the next paint — focus would fall to <body>. */
       (can ? ' onclick="opStepTo(' + l.id + ',&quot;' + s.key + '&quot;)"' : ' aria-disabled="true"') +
+      (paused ? ' title="موقوفة"' : "") +
       ' aria-label="' + esc(s.label) + "، " + said + (paused ? "، موقوفة" : can ? "، نقل إليها" : "") + '">' +
       '<span class="k" aria-hidden="true">' + (state === "done" ? opIco("check") : opN(i + 1)) + "</span>" +
-      '<span class="tx"><span class="l">' + esc(s.label) + "</span>" +
-      (isCur ? '<span class="m-meta">' + opAgoN(l) + "</span>" : paused ? '<span class="m-meta">موقوفة</span>' : "") + "</span>" +
-      (can ? '<span class="go" aria-hidden="true">نقل</span>' : "") + "</button>";
-    if (isCur && s.exitCriterion) {
-      h += '<div class="ox-exit"><span class="m-label">شرط الانتقال للمرحلة التالية</span><span>' + esc(s.exitCriterion) + "</span></div>";
-    }
-    h += "</li>";
+      '<span class="l">' + esc(s.label) + "</span></button></li>";
   });
-  return h + "</ol>";
-}
-/* The pill slides from the rung it sat on to the new one and takes the new rung's tone on the way:
-   the move is the confirmation that the stage changed. On-screen movement, so ease-in-out, 240ms,
-   transform only for position; reduced motion gets the new place with no travel. */
-function opPlaceStepPill() {
-  var steps = document.querySelector(".ox-steps");
-  var pill = steps && steps.querySelector(".ox-steps-pill");
-  var cur = steps && steps.querySelector(".ox-step.current");
-  if (!pill || !cur) { opStepPrev = null; return; }
-  var top = cur.offsetTop, hgt = cur.offsetHeight;
-  pill.style.transform = "translateY(" + top + "px)";
-  pill.style.height = hgt + "px";
-  var bg = getComputedStyle(pill).backgroundColor, bar = getComputedStyle(pill).borderInlineStartColor;
-  var prev = opStepPrev;
-  opStepPrev = { id: opOpen, top: top, h: hgt, bg: bg, bar: bar };
-  if (!pill.animate || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
-  var now = performance.now();
-  /* A save repaints the drawer within milliseconds of the click (pending, then saved), and innerHTML
-     replaces the pill that was sliding. The slide is therefore remembered and RESUMED on the new pill
-     at its elapsed time, or the move would be cut to a jump by its own confirmation. */
-  var run = opStepAnim && opStepAnim.id === opOpen && opStepAnim.to === top && now - opStepAnim.start < 240 ? opStepAnim : null;
-  if (!run) {
-    if (!prev || prev.id !== opOpen || prev.top === top) return;
-    run = opStepAnim = { id: opOpen, to: top, start: now, frames: [
-      { transform: "translateY(" + prev.top + "px)", height: prev.h + "px", backgroundColor: prev.bg, borderInlineStartColor: prev.bar },
-      { transform: "translateY(" + top + "px)", height: hgt + "px", backgroundColor: bg, borderInlineStartColor: bar },
-    ] };
+  h += "</ol>";
+  /* The current rung's two facts, once, under the row. A won deal has no open rung to describe, and a
+     line on a rung the ladder does not carry has none either, so the line is simply absent. */
+  if (idx !== -1) {
+    var cur = open[idx];
+    h += '<div class="ox-hs-cur">' +
+      '<span class="nm">' + esc(cur.label) + '</span><span class="m-meta">' + opAgoN(l) + "</span>" +
+      (cur.exitCriterion
+        ? '<span class="ex"><span class="m-label">شرط الانتقال</span> ' + esc(cur.exitCriterion) + "</span>"
+        : "") + "</div>";
   }
-  var a = pill.animate(run.frames, { duration: 240, easing: "cubic-bezier(0.77, 0, 0.175, 1)" });
-  a.currentTime = now - run.start;
+  return h + "</div>";
 }
 function opDetailDrawer(l) {
   var st = opStage(l.stage);
@@ -1894,8 +1871,7 @@ function opAfterRender() {
   try { document.documentElement.classList.toggle("ox-lock", !!dr); } catch (e) {}
   /* No indicator to place: .m-tab draws the selected tab with its own border, so nothing has to be
      measured after paint (PORT-SPEC §2). */
-  if (!dr) { opStepPrev = null; opStepFocus = ""; return; }
-  opPlaceStepPill();
+  if (!dr) { opStepFocus = ""; return; }
   if (opStepFocus) {
     /* Only put focus back when the repaint DROPPED it (to <body>) or it is still on the stepper — a
        user who has since tabbed to «السعر» keeps their place. Once the save is no longer pending
