@@ -304,7 +304,7 @@ function vAccounts() {
   var prods = {}; acRows.forEach(function (a) { acProducts(a).forEach(function (p) { prods[p] = 1; }); });
   var anyF = acF.product || acF.sector || acF.city || acF.owner || acF.importance || acF.ind;
   h += '<div class="m-tools"><div class="m-head__a">' +
-    '<input class="m-input" id="acq" value="' + esc(acF.q) + '" placeholder="بحث بالاسم أو جهة الاتصال…" aria-label="بحث في العملاء" data-acset="q">' +
+    mSearch({ id: "acq", value: acF.q, placeholder: "بحث بالاسم أو جهة الاتصال…", label: "بحث في العملاء", wide: true, attrs: ' data-acset="q"' }) +
     acSel("product", "المنتج", acF.product, Object.keys(prods).sort().map(function (p) { return [p, p]; })) +
     acSel("sector", "القطاع", acF.sector, acDistinct("sector").map(function (s) { return [s, s]; })) +
     acSel("city", "المدينة", acF.city, acDistinct("city").map(function (s) { return [s, s]; })) +

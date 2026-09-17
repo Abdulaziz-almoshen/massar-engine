@@ -1736,4 +1736,55 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-nf__b:disabled{ color: var(--m-line-2); cursor: default; }
 @media (pointer: coarse){.ds6 .m-nf__b{ inline-size: 44px; }}
 @media (prefers-reduced-motion: reduce){.ds6 .m-nf, .ds6 .m-nf__b{ transition: none; }}
+/* ============================================================================
+   THE SEARCH FIELD — every screen's search box (search-field-crm.ts), after the Command search at
+   ui.halaska.com, measured there: a pill with a hairline and a soft 16/48 shadow, a 14px magnifier
+   leading, the input borderless inside it, a small keyboard chip at the far end. Massar's sizes:
+   44px tall, the control height every toolbar here is built on.
+   ============================================================================ */.ds6 .m-sf{
+  display: flex;
+  align-items: center;
+  gap: var(--m-2);
+  min-block-size: 44px;
+  min-inline-size: 0;
+  padding-inline: var(--m-3);
+  border-radius: 999px;
+  background: var(--m-paper);
+  box-shadow: 0 0 0 1px var(--m-line), 0 8px 24px rgba(0, 0, 0, .06);
+  transition: box-shadow var(--m-out) var(--m-ease);
+}
+.ds6 .m-sf--wide{ flex: 1 1 260px; }
+.ds6 .m-sf:focus-within{ box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line), 0 8px 24px rgba(0, 0, 0, .06); }
+.ds6 .m-sf__i{ inline-size: 16px; block-size: 16px; flex: none; fill: none; stroke: var(--m-mut);
+  stroke-width: 1.8; stroke-linecap: round; }
+/* The input gives up its own ring, ground and radius: the pill draws them, once. */.ds6 .m-sf .m-sf__in, .ds6 .m-sf .m-sf__in:focus, .ds6 .m-sf .m-sf__in:focus-visible{
+  flex: 1 1 0;
+  inline-size: auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding-inline: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+/* Safari draws its own decorations inside type=search; they would sit beside ours. */.ds6 .m-sf .m-sf__in::-webkit-search-decoration, .ds6 .m-sf .m-sf__in::-webkit-search-cancel-button, .ds6 .m-sf .m-sf__in::-webkit-search-results-button{ -webkit-appearance: none; appearance: none; }
+.ds6 .m-sf__x{
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--m-sunk);
+  color: var(--m-mut);
+  cursor: pointer;
+  transition: background-color var(--m-out) var(--m-ease), color var(--m-out) var(--m-ease);
+}
+.ds6 .m-sf__x svg{ inline-size: 12px; block-size: 12px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-sf__x:hover{ background: var(--m-line-2); color: var(--m-ink); }}
+/* The reference's shortcut chip is not drawn (founder: «remove the / sign in the search»). */.ds6 @media (prefers-reduced-motion: reduce){ .m-sf, .m-sf__x { transition: none; } }
 `;

@@ -1126,7 +1126,7 @@ function opToolbar() {
     return h + "</div>";
   }
   h += '<span class="ox-srch m-rel"><span class="ox-si">' + opIco("search") + "</span>" +
-    '<input id="opq" class="m-input" type="search" value="' + esc(opQ) + '" oninput="opSearch(this)" aria-label="بحث في الفرص" placeholder="بحث بالجهة أو المنتج أو المسؤول"></span>';
+    mSearch({ id: "opq", value: opQ, placeholder: "بحث بالجهة أو المنتج أو المسؤول", label: "بحث في الفرص", wide: true, attrs: ' oninput="opSearch(this)"' }) + "</span>";
   h += '<span class="ox-filt">';
   h += opSelect("oxf_stg", "المرحلة", opStg,
     [["all", "كل المراحل"]].concat(OPP_ST.map(function (s) { return [s.key, s.label]; })), opStg !== "all", "opSetStg");
@@ -1735,9 +1735,8 @@ function opDetailDrawer(l) {
     "<dt>سجّلها</dt><dd>" + (l.created_by ? esc(l.created_by) : opNil("لم يُسجَّل مُدخِلها", "unset")) + "</dd>" +
     "<dt>أُنشئت</dt><dd>" + (l.created_at ? fmtD(l.created_at) : opNil("لم يُسجَّل تاريخ الإنشاء", "unset")) + "</dd>" +
     "<dt>آخر تحديث</dt><dd>" + (l.updated_at ? fmtD(l.updated_at) : opNil("لم يُسجَّل تحديث بعد", "none")) + "</dd></dl></section>";
-  /* «نتائج المراحل» closes the deal panel: what each rung came to is the story of the line, and the
-     work done inside it lives in its own tab. */
-  if (typeof owJourneySection === "function") b += owJourneySection(l);
+  /* «نتائج المراحل» moved to «الأنشطة» (founder, 2026-09-17): what each rung came to IS activity on
+     the line, and it belongs beside the activities rather than under the deal's own fields. */
   /* بنود أخرى لهذه الجهة */
   var key = opKey(l);
   var rel = (oppRows || []).filter(function (o) { return o.id !== l.id && opKey(o) === key; });
@@ -1755,11 +1754,15 @@ function opDetailDrawer(l) {
   var w0 = (typeof owWork !== "undefined" && owWork[l.id] && owWork[l.id].data) || null;
   var escRows = (typeof opEscRows !== "undefined" && opEscRows[l.id]) || [];
   var counts = {
-    acts: w0 ? (w0.activities || []).length : 0,
+    /* The badge counts what the tab now shows: recorded stage moves. */
+    acts: w0 ? (w0.stageEvents || []).length : 0,
     quotes: w0 ? (w0.quotes || []).length : 0,
     esc: escRows.filter(function (r) { return !r.resolvedAt; }).length
   };
-  if (opTab === "acts") b = typeof owActivitiesSection === "function" ? owActivitiesSection(l) : "";
+  /* «الأنشطة» is «نتائج المراحل» alone (founder, 2026-09-17: «remove this الأنشطة section»). The
+     activity list and its composer are no longer rendered anywhere; owActivitiesSection and its
+     endpoints are untouched, so putting it back is one line. */
+  if (opTab === "acts") b = typeof owJourneySection === "function" ? owJourneySection(l) : "";
   else if (opTab === "quotes") b = typeof owQuotesSection === "function" ? owQuotesSection(l) : "";
   else if (opTab === "esc") b = opEscSection(l);
   else {

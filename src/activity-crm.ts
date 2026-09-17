@@ -169,7 +169,7 @@ function actTabs() {
 function actToolbar(n) {
   var h = '<div class="m-tools">';
   h += '<div class="m-head__a">' +
-    '<input id="actq" class="m-input" value="' + esc(actQ) + '" oninput="actSearch(this)" placeholder="ابحث في الأحداث…" aria-label="ابحث في الأحداث">' +
+    mSearch({ id: "actq", value: actQ, placeholder: "ابحث في الأحداث…", label: "ابحث في الأحداث", wide: true, attrs: ' oninput="actSearch(this)"' }) +
     '<select class="m-select" onchange="actSetWin(this.value)" aria-label="الفترة">' +
     [[1, "آخر يوم"], [7, "آخر 7 أيام"], [30, "آخر 30 يومًا"], [0, "كل الفترة"]].map(function (w) {
       return '<option value="' + w[0] + '"' + (String(actWin) === String(w[0]) ? " selected" : "") + ">" + w[1] + "</option>";

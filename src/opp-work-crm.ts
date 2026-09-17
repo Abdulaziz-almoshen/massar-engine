@@ -24,41 +24,12 @@ export const OPP_WORK_CRM_CSS = `
 .ds6 .ow-jpct { display:flex; align-items:center; gap:var(--m-3); margin-block:var(--m-2) var(--m-3); }
 .ds6 .ow-jpct .l { font-size:var(--m-t-cap); color:var(--m-mut); white-space:nowrap; }
 .ds6 .ow-jpct .m-meter { flex:1; margin-block:0; }
-/* The progress fill, as the founder specified it (2026-09-17): a blue-to-green fill that runs past its
-   mark and settles back onto it, on a loop. His keyframes settled on a fixed 87%; here they settle on
-   THIS deal's own percentage, and overshoot by nine points capped at the track, so the bar never
-   claims a figure the line does not have. The gradient starts at the inline start, which in this RTL
-   drawer is the right-hand end the fill grows from. */
-.ds6 .ow-jpct .m-meter i {
-  background: linear-gradient(to left, #5b8def, #4cd08a);
-  animation: ow-settle 2.8s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-}
-@keyframes ow-settle {
-  0% { inline-size: 0; }
-  55% { inline-size: min(calc(var(--m-pct, 0%) + 9%), 100%); }
-  72%, 100% { inline-size: var(--m-pct, 0%); }
-}
-/* The stage-outcome log ages, as the founder specified it: each entry arrives, holds, and fades back.
-   His delays are kept for the second and third entries; later entries continue the same 0.9s cadence,
-   so a long ladder reads as one wave rather than every fourth row flashing in step with the first. */
-.ds6 .ow-j > li { animation: ow-ledger-age 4.6s cubic-bezier(.16, 1, .3, 1) infinite; }
-.ds6 .ow-j > li:nth-child(2) { animation-delay: -.9s; }
-.ds6 .ow-j > li:nth-child(3) { animation-delay: -1.8s; }
-.ds6 .ow-j > li:nth-child(4) { animation-delay: -2.7s; }
-.ds6 .ow-j > li:nth-child(5) { animation-delay: -3.6s; }
-.ds6 .ow-j > li:nth-child(6) { animation-delay: -4.5s; }
-.ds6 .ow-j > li:nth-child(7) { animation-delay: -5.4s; }
-.ds6 .ow-j > li:nth-child(8) { animation-delay: -6.3s; }
-@keyframes ow-ledger-age {
-  0% { opacity: 0; transform: translateY(-10px) scale(1.03); }
-  18%, 58% { opacity: 1; transform: none; }
-  100% { opacity: .22; transform: translateY(5px) scale(.95); }
-}
-/* Both loops stop for anyone who has asked the system for less motion: the log sits at full opacity
-   and the bar at its value. */
-@media (prefers-reduced-motion: reduce) {
-  .ds6 .ow-jpct .m-meter i, .ds6 .ow-j > li { animation: none; }
-}
+/* THE LOOPS ARE OFF (founder, 2026-09-17: «it keeps moving and dancing stop it»). Both were his own
+   keyframes and both were wrong here for the same reason: they ran forever. The log spent most of every
+   4.6s cycle below full opacity, so reading a stage outcome meant waiting for it to come back; the bar
+   never settled either. The bar keeps his blue-to-green fill and now simply sits at the deal's own
+   percentage, and the log entries hold still. */
+.ds6 .ow-jpct .m-meter i { background: linear-gradient(to left, #5b8def, #4cd08a); }
 .ds6 .ow-jpct .v { font-size:var(--m-t-cap); font-weight:700; color:var(--m-ink); }
 /* A closed deal reports its OUTCOME where an open one reports its progress. */
 .ds6 .ow-jout { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; margin-block:var(--m-2) var(--m-3); }
@@ -66,6 +37,7 @@ export const OPP_WORK_CRM_CSS = `
 .ds6 .ow-j .m-tl__d { background:var(--tn, var(--m-ac)); }
 .ds6 .ow-js.future .m-tl__d, .ds6 .ow-js.skipped .m-tl__d { background:var(--m-paper); box-shadow:0 0 0 1.5px var(--m-line-2); }
 .ds6 .ow-js .hd { display:flex; align-items:baseline; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .ow-js .who { display:block; margin-block-start:2px; font-size:var(--m-t-micro); color:var(--m-mut); }
 .ds6 .ow-js .hd b { color:var(--m-ink); font-weight:700; }
 .ds6 .ow-js.current .hd b { color:var(--m-ac-deep); }
 .ds6 .ow-js .m-chip.res { background:var(--tn-soft, var(--m-sunk)); color:var(--tn-text, var(--m-ink-2)); }
@@ -352,6 +324,12 @@ function owJourneySection(l) {
       (st.state === "done" && (why || act)
         ? '<span class="why">' + (why ? "السبب: " + esc(why) : "") + (why && act ? " · " : "") + (act ? "الإجراء: " + esc(act) : "") + "</span>"
         : st.state === "current" && typeof opAgo === "function" ? '<span class="why">' + esc(opAgo(l)) + "</span>" : "") +
+      /* WHO MOVED IT (founder, 2026-09-17). The actor is stamped on the event that LEFT this rung, so
+         only a rung the deal has left can name one. A rung it left with nobody recorded says that —
+         a classification nobody made, never a blank (PORT-SPEC §4). */
+      (st.state === "done"
+        ? '<span class="who">' + (st.actor ? "نقلها " + esc(st.actor) : opNil("لم يُسجَّل من نقلها", "unset")) + "</span>"
+        : "") +
       "</span>" +
       '<span class="m-tl__t">' + (st.leftAt || st.reachedAt
         ? esc(owStamp(st.leftAt || st.reachedAt))

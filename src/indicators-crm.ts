@@ -469,7 +469,7 @@ function vIndicators() {
   var prodOpts = {}; inRows.forEach(function (r) { if (r.product) prodOpts[r.product] = 1; });
   h += '<section class="m-card m-card--pad0 in-tbl" aria-label="مؤشرات الاستخدام"><div class="m-tools">' +
     '<div class="in-filters">' +
-    '<input class="m-input" id="inq" type="search" value="' + esc(inQ) + '" placeholder="بحث باسم المؤشر أو وصفه…" aria-label="بحث في المؤشرات" data-inset="q">' +
+    mSearch({ id: "inq", value: inQ, placeholder: "بحث باسم المؤشر أو وصفه…", label: "بحث في المؤشرات", wide: true, attrs: ' data-inset="q"' }) +
     '<select class="m-select' + (inFProd ? " in-on" : "") + '" aria-label="المنتج" data-inset="prod"><option value="">كل المنتجات</option>' +
       Object.keys(prodOpts).sort().map(function (p) { return '<option value="' + esc(p) + '"' + (inFProd === p ? " selected" : "") + ">" + esc(clip(p, 28)) + "</option>"; }).join("") + "</select>" +
     '<select class="m-select' + (inFStat ? " in-on" : "") + '" aria-label="الحالة" data-inset="stat"><option value="">كل الحالات</option>' +
@@ -550,7 +550,7 @@ function inDrawer() {
       (it.periodFrom || it.periodTo ? " · الفترة " + inDateC(it.periodFrom, "بلا بداية", "none") + " ← " + inDateC(it.periodTo, "بلا نهاية", "none") : "") +
       (it.source === "file" && it.sourceFilename ? " · من ملف " + esc(it.sourceFilename) : it.source === "manual" ? " · اختيار يدوي" : "") + "</p>";
     if (it.description) b += '<p class="m-body">' + esc(it.description) + "</p>";
-    b += '<input class="m-input" id="indrq" data-inset="drq" value="' + esc(inDr.q) + '" placeholder="ابحث في عملاء المؤشر…" aria-label="بحث في عملاء المؤشر">';
+    b += mSearch({ id: "indrq", value: inDr.q, placeholder: "ابحث في عملاء المؤشر…", label: "بحث في عملاء المؤشر", wide: true, attrs: ' data-inset="drq"' });
     var q = inDr.q.trim();
     var list = it.members.filter(function (m) { return !q || m.name.indexOf(q) >= 0 || m.phone.indexOf(q) >= 0; });
     var shown = list.slice(0, 200);
@@ -797,7 +797,7 @@ function inManualView() {
   var q = inF.manualQ.trim();
   var picked = {}; inF.picked.forEach(function (p) { picked[p.entityId] = 1; });
   var cands = (entities || []).filter(function (e) { return !q || e.name.indexOf(q) >= 0 || e.phone.indexOf(q) >= 0; });
-  var h = '<input class="m-input" id="inmq" data-infld="manualQ" value="' + esc(inF.manualQ) + '" placeholder="ابحث باسم العميل أو رقمه…" aria-label="ابحث عن عميل">';
+  var h = mSearch({ id: "inmq", value: inF.manualQ, placeholder: "ابحث باسم العميل أو رقمه…", label: "ابحث عن عميل", wide: true, attrs: ' data-infld="manualQ"' });
   if (!(entities || []).length) {
     return h + '<div class="m-empty"><p class="m-empty__t">لا عملاء في مسار بعد</p>' +
       '<p class="m-empty__d">أضفهم من <a class="m-link" href="#targets">جهات الاستهداف</a>.</p></div>';

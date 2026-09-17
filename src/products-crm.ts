@@ -763,7 +763,7 @@ function pxSelect(id, label, value, opts, on) {
 function pxToolbar() {
   var nArch = (pcCat || []).filter(function (p) { return p.archived; }).length;
   var h = '<div class="px-filters" role="toolbar" aria-label="أدوات المنتجات">';
-  h += '<input id="pxq" class="m-input" type="search" value="' + esc(pxQ) + '" data-pxinput="q" aria-label="ابحث باسم المنتج" placeholder="ابحث باسم المنتج">';
+  h += mSearch({ id: "pxq", value: pxQ, placeholder: "ابحث باسم المنتج", label: "ابحث باسم المنتج", wide: true, attrs: ' data-pxinput="q"' });
   h += pxSelect("pxf_sector", "القطاع", pxSector, [["all", "كل القطاعات"], ["__none", "بلا قطاع"]].concat(pcSectorList.map(function (s) { return [String(s.id), s.name]; })), pxSector !== "all");
   // «القسم» is the company unit that owns the product; «القطاع» above is the market it sells into.
   // Two different questions, two selects, and the labels are deliberately not interchangeable.

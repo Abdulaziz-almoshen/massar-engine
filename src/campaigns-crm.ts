@@ -776,7 +776,7 @@ function vKmonDetailCrm(id, d) {
 
   h += '<section class="m-card m-card--pad0 cx-tbl"><div class="m-tools"><div class="m-head__a">' +
     '<span class="m-cap">' + dsFig("cxCohort", shown.length) + " من " + mN(rows.length) + "</span>" +
-    '<input class="m-input" id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" aria-label="بحث في جهات الاستهداف">' +
+    mSearch({ id: "rq", value: rQ, placeholder: "بحث…", label: "بحث في جهات الاستهداف", wide: true, attrs: ' oninput="rSearch(this)"' }) +
     "</div>" +
     (shown.length ? '<button type="button" class="m-btn" onclick="startRetarget()">إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
     "</div>";

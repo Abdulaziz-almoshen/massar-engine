@@ -185,7 +185,7 @@ function cusHead(allOn) {
 /* ------------------------------- control bar ------------------------------- */
 function cusControlBar(nTotal) {
   var h = '<div class="m-tools"><div class="m-head__a">';
-  h += '<input id="cusq" class="m-input" value="' + esc(cusQ) + '" oninput="cusSearch(this)" placeholder="ابحث بالاسم أو الرقم أو الخدمة…" aria-label="ابحث في العملاء">';
+  h += mSearch({ id: "cusq", value: cusQ, placeholder: "ابحث بالاسم أو الرقم أو الخدمة…", label: "ابحث في العملاء", wide: true, attrs: ' oninput="cusSearch(this)"' });
   h += '<div class="m-seg" role="group" aria-label="طريقة العرض">' + [["list", "قائمة"], ["group", "تجميع"]].map(function (v) {
       return '<button type="button" aria-pressed="' + (cusView === v[0]) + '" onclick="cusSetView(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
     }).join("") + "</div>";

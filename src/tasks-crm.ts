@@ -132,7 +132,7 @@ function vTasksCrm() {
 
   var h = '<div class="ds6"><div class="m-task">';
   h += '<div class="m-tools"><div class="m-head__a">' +
-    '<input id="tskq" class="m-input" value="' + esc(tskQ) + '" oninput="tskSearch(this)" placeholder="ابحث في المهام…" aria-label="ابحث في المهام"></div>' +
+    mSearch({ id: "tskq", value: tskQ, placeholder: "ابحث في المهام…", label: "ابحث في المهام", wide: true, attrs: ' oninput="tskSearch(this)"' }) + "</div>" +
     '<span class="m-cap">' + tskPl(rows.length) + " في هذا التبويب</span></div>";
 
   h += '<div class="m-tabs" role="tablist" aria-label="حالة المهام">' +
@@ -168,7 +168,7 @@ function vNotesCrm() {
   });
   var h = '<div class="ds6"><div class="m-task">';
   h += '<div class="m-tools"><div class="m-head__a">' +
-    '<input id="nteq" class="m-input" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" aria-label="ابحث في الملاحظات"></div>' +
+    mSearch({ id: "nteq", value: nteQ, placeholder: "ابحث في الملاحظات…", label: "ابحث في الملاحظات", wide: true, attrs: ' oninput="nteSearch(this)"' }) + "</div>" +
     /* The count had no label: a bare «ملاحظة واحدة» floating in a toolbar says what it is only
        if you already know. Naming the surface also gives smoke a landmark that does not depend
        on how many rows happen to exist - the counted noun alone reads «ملاحظات» at three rows
