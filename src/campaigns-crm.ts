@@ -1,35 +1,47 @@
-// campaigns-crm.ts — the Frappe-CRM view layer for Massar's campaigns module.
+// campaigns-crm.ts — «الحملات»: the list, the three views over it, and the campaign record.
 //
-// WHY THIS FILE EXISTS. dashboard.ts is ONE template literal (lines 9-2329) with the whole client
-// script inside it, and ADR-0001 forbids range edits there. So the port lives here as two exported
-// strings that dashboard.ts interpolates at two anchor points. Everything below is CLIENT JS: it is
-// appended into the same <script> scope as the original views, which is deliberate — it lets these
-// views call campStats, campWin, atOrAfter, seenOf, repliedIn, interestedOf, esc,
-// fmtN, fmtD, ic and contactRowsHtml directly instead of reimplementing them. Product
-// discovery named that reimplementation as the exact path by which round-22's invented numbers
-// would come back, so there is ONE definition of every statistic and this file owns none of them.
+// WHY THIS FILE EXISTS. dashboard.ts is ONE template literal with the whole client script inside it,
+// and ADR-0001 forbids range edits there. So the screen lives here as two exported strings that
+// dashboard.ts interpolates at two anchor points. Everything below is CLIENT JS: it is appended into
+// the same <script> scope as the original views, which is deliberate — it lets these views call
+// campStats, campWin, atOrAfter, seenOf, repliedIn, interestedOf, esc, fmtN, fmtD, ic and
+// contactByPhone directly instead of reimplementing them. Product discovery named that
+// reimplementation as the exact path by which round-22's invented numbers would come back, so there
+// is ONE definition of every statistic and this file owns none of them.
 //
-// WHAT IS PORTED (patterns only — user-model Rule 3: adopt the pattern, never the palette):
-//   Frappe ViewControls   -> one merged control bar with a قائمة|تجميع|كانبان toggle
-//   Frappe ListBulkActions-> row selection + a floating bulk bar (the highest-value gap)
-//   Frappe Deal.vue tabs  -> a 3-tab campaign record
-// WHAT IS NOT: the right-hand field rail (field census: 1 unrendered substantive field vs a >=5
-// threshold), the Create modal, assignment/owner/@mentions, Tasks/Notes/Email tabs, and the
-// WhatsAppBox composer — a send affordance under the standing NO-SEND rule.
+// PORTED to the new design system (docs/PORT-SPEC.md). Both screens are wrapped in .ds6 and the
+// nine-track .crow grid is gone: the list, every group and the campaign's target cohort are real
+// .m-table elements inside .m-tablewrap, the board is .m-board/.m-col/.m-deal, the record's tabs are
+// .m-tabs, and every figure goes through .m-n or dsFig. Every empty cell states WHICH KIND of
+// absence it is; there is no bare em-dash left on either screen.
 //
-// DESCOPED, and named here because an omission nobody wrote down is indistinguishable from a bug:
-//   FR-2 filter CONDITION BUILDER (add/remove AND-ed conditions over name/product/class/date/
-//        counters). Shipped instead: search + the three class quick-filters + sort. Re-trigger:
-//        the first time a real question needs two conditions at once.
-//   FR-5 COLUMN PICKER (choose/reorder from the closed set of real fields). Shipped instead: one
-//        fixed column set. Re-trigger: a second operator, or a column someone wants gone.
-// Both are Frappe ViewControls affordances over six fields; neither was worth its surface yet.
+// TWO DEFECTS FIXED IN THE SAME PASS, both of them figures the records do not support:
+//   1. «أبرز الأسباب» was the mode of a loss-cause tally with NO MINIMUM and no count rendered, so a
+//      single lost deal carrying a cause was printed as the campaign's leading reason. The count is
+//      now printed with its denominator, and the card is suppressed unless the cause was recorded on
+//      at least two deals — one lost deal is an anecdote, not a pattern.
+//   2. A verdict tile labelled «جهات مهتمة لكل 100» rendered its unit as «٪», stating the unit twice
+//      in two different systems. It is one measure and it is a percentage, so it is named as one:
+//      «نسبة الجهات المهتمة», with «من جهات الاستهداف» underneath saying what it is measured on.
+//
+// SMOKE LANDMARKS: #kmon asserts «كانبان» (the view switch, which renders before any fetch) and
+// accepts «لا حملات بعد» as an honest empty render; #kmon/<id> asserts «حكم الحملة». None of the
+// three may be reworded without smoke.py.
 //
 // NO HANDLER IN THIS FILE SENDS A WHATSAPP MESSAGE. The only network call is the pre-existing
 // POST /admin/campaign/test (reclassify), reached through the pre-existing setCampClass.
+//
+// NO BACKTICKS ANYWHERE IN THIS FILE, comments included — and exactly four in the file, the two
+// template-literal delimiters (check-numerals asserts the count).
 
 export const CAMPAIGNS_CRM_CSS = `
-  /* ===== campaigns-crm: control bar ===== */
+  /* ===== what this file still owns for OTHER screens =====
+     These are not the campaign screen's classes any more — it is fully on the m-* vocabulary. They
+     are declared here because dashboard.ts's own legacy views (the fallback vKmon/vKmonDetail, the
+     services board and the opportunity groups), indicators-crm and record-tabs still render them,
+     and those files are not ported. They come out with the last screen, not with this one.
+     .bulkbar is the exception that is still LIVE here: a floating action bar over a table is the one
+     thing the vocabulary has no equivalent for, and both this screen and جهات الاستهداف use it. */
   .crmbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px;
     background:#fff; border:1px solid #ECEEF2; border-radius:13px; margin-bottom:14px; }
   .crmbar .hair { width:1px; height:22px; background:#ECEEF2; flex:none; }
@@ -44,116 +56,22 @@ export const CAMPAIGNS_CRM_CSS = `
   .qpill.on { color:#1A47BE; background:#DCE8FC; border-color:#5B8DEF; }
   .crmsel { font-family:inherit; height:38px; border:1px solid #ECEEF2; border-radius:999px;
     background:#EFF1F5; color:#14161A; font-size:12px; font-weight:600; padding:0 12px; cursor:pointer; }
-
-  /* ===== selection ===== */
-  .selcell { width:40px; flex:none; display:flex; align-items:center; justify-content:center; }
-  .selcell input { width:16px; height:16px; accent-color:#2563EB; cursor:pointer; }
-  .krow .selcell { opacity:0; transition:opacity .12s ease; }
-  .krow:hover .selcell, .krow:focus-within .selcell, .krow.sel .selcell { opacity:1; }
-  @media (pointer:coarse) { .krow .selcell { opacity:1; } }
-  /* border-inline-start, not an inset box-shadow: a +3px x-offset is PHYSICAL, so in RTL it
-     painted the accent on the end (left) edge while every other rule here is logical. */
-  .krow.sel { background:#FFFFFF; border-inline-start: 3px solid #2563EB; }
-
-  /* ===== bulk bar ===== */
-  .bulkbar { position:fixed; inset-block-end:18px; inset-inline:0; display:flex; justify-content:center;
-    z-index:var(--z-toast); pointer-events:none; padding:0 12px; }  /* above alertBar (z-index:99), which occluded this for its full lifetime on the select-page path */
-  .bulkbar > div { pointer-events:auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap;
-    background:#14161A; color:#fff; border-radius:999px; padding:9px 14px; max-width:92vw;
-    box-shadow:0 12px 32px rgba(16,24,40,.28); }
-  .bulkbar .cnt { font-size:12px; font-weight:600; background:rgba(255,255,255,.14); border-radius:999px;
-    padding:5px 12px; white-space:nowrap; }
-  .bulkbar button { font-family:inherit; font-size:12px; font-weight:600; border-radius:999px;
-    padding:7px 13px; cursor:pointer; border:1px solid rgba(255,255,255,.22); background:transparent;
-    color:#fff; white-space:nowrap; }
-  .bulkbar button.pri { background:#5B8DEF; border-color:#5B8DEF; color:#14161A; }
-  .bulkbar button.x { border:none; background:transparent; font-size:16px; padding:4px 8px; }
-
-  /* ===== kanban / group ===== */
-  .kboard { display:flex; gap:14px; overflow-x:auto; padding-bottom:10px; align-items:flex-start; }
-  .kcol { flex:none; width:290px; background:#EFF1F5; border:1px solid #ECEEF2; border-radius:13px; padding:11px; }
-  .kcol.over { border-color:#5B8DEF; background:#EAF1FE; }
-  .kcolh { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 4px; }
-  .kcolh .lb { font-size:12px; font-weight:600; color:#14161A; }
-  .kcard { background:#fff; border:1px solid #ECEEF2; border-radius:10px; padding:12px;
-    margin-bottom:9px; cursor:pointer; display:block; text-decoration:none; }
-  .kcard:hover { border-color:#656B76; }
-  .kcard:focus-visible { outline:2px solid #2563EB; outline-offset:-2px; }
-  .kcard .ktitle { display:flex; align-items:center; gap:8px; min-width:0; }
-  .kcard .kline { font-size:14px; font-weight:450; color:#33373E; margin-top:6px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .kcard .kfoot { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px;
-    border-top:1px solid #ECEEF2; margin-block-start:10px; padding-block-start:8px; }
-  .kcard .kfoot .kl { font-size:12px; color:#656B76; }
-  .kcard .kfoot .kv { font-size:14px; font-weight:500; color:#14161A; font-variant-numeric:tabular-nums; }
-  .kcard .kfoot .ksep { color:#656B76; font-size:12px; }
-  .kcard:hover { border-color:#5B8DEF; }
-  .kcard .nm { font-size:14px; font-weight:500; color:#14161A; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
-  .kdrop { border:1.5px dashed #D8DCE3; border-radius:11px; padding:18px 12px; text-align:center;
-    color:#656B76; font-size:12px; }
-
-  /* ===== detail: spec strip + tabs ===== */
-  .spec { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; background:#EFF1F5;
-    border:1px solid #ECEEF2; border-radius:13px; padding:16px 18px; margin-bottom:16px; }
-  .spec .wa { flex:1; min-width:260px; background:#E5DDD4; border-radius:11px; padding:11px; }
-  /* line-height and the clamp height are both in PX on purpose. -webkit-line-clamp only works on
-     display:-webkit-box, and the computed display here resolves to flow-root, so the clamp never
-     engaged and overflow:hidden cut the text mid-line — a ragged half-row of Arabic under the
-     bubble. An explicit max-height of exactly 2 line-heights clips on a line boundary regardless. */
-  .spec .bub2 { background:#DCF8C6; border-radius:9px; padding:10px 12px; font-size:12px; color:#14161A;
-    line-height:24px; white-space:pre-wrap; word-break:break-word; }
-  .spec .clamp { max-height:48px; overflow:hidden; }
-  .spec .facts { flex:none; display:flex; flex-direction:column; gap:10px; min-width:150px; }
-  .spec .facts .k { font-size:12px; color:#656B76; font-weight:600; }
-  .spec .facts .v { font-size:12px; color:#14161A; font-weight:600; margin-top:2px; }
-  .spec .ro { flex-basis:100%; font-size:12px; color:#656B76; }
-  /* EXACT-1: tab list min-height 45px, gap-7.5 = 30px, px-5 */
-  .ctabs { display:flex; gap:30px; min-height:45px; align-items:center; padding-inline:20px;
-    border-bottom:1px solid #ECEEF2; margin-bottom:16px; flex-wrap:wrap; }
-  .ctabs button { font-family:inherit; font-size:14px; font-weight:500; color:#656B76; background:none;
-    border:none; border-bottom:2px solid transparent; padding:0 0 11px; cursor:pointer; white-space:nowrap; }
-  .ctabs button.on { color:#2563EB; border-bottom-color:#2563EB; }
-
-  /* ===== the interaction layer, extracted from Frappe CRM's own source =====
-     Measured usage there: transition-colors (19) · duration-300 (34) · ease-in (33) ·
-     hover:bg-surface-gray-2/3 (40) · hover:shadow-sm (10) · group-hover:opacity-100 (14) ·
-     focus-visible:ring-2 (11) · animate-pulse/spin. Massar had none of this: every control
-     changed state instantly, nothing revealed on hover, and focus was the browser default.
-     That absence is most of why the UI read as unfinished next to the reference. */
-  .crmbar, .crow, .kcard, .ncard, .rtask, .qpill, .vtog button, .ptab, .btn, .nv, .switcher,
-  .collapse, .rtabs button, .ctabs button, .kebab, .selcell input, .lnk, .chip {
-    /* 140ms, not Frappe's 300: at our row density 300 reads as lag rather than polish. */
-    transition: background-color .14s ease-in, color .14s ease-in, border-color .14s ease-in,
-                box-shadow .14s ease-in, opacity .14s ease-in;
+  .crmflat { background:var(--paper); border:0; border-radius:var(--r-md);
+             box-shadow:var(--sh-1); overflow:hidden; margin-bottom:var(--s4); }
+  .crmgrid { min-width: 940px; }
+  .crmflat .thead { position:sticky; inset-block-start:0; background:var(--surface);
+                    z-index:var(--z-sticky); border-block-end:1px solid var(--line); }
+  .thead-narrow { display:none; align-items:center; gap:10px; padding:12px 16px; background:#EFF1F5;
+    border-block-end:1px solid #ECEEF2; font-size:12px; font-weight:600; color:#656B76; }
+  @media (max-width: 939px) {
+    .crmgrid { min-width: 0; }
+    .thead-wide { display:none; }
+    .thead-narrow { display:flex; }
   }
-  /* rows and cards take a grey wash on hover, the way every Frappe list row does */
-  .crmflat .crow:hover { background:#EFF1F5; }
-  .crmflat .crow.sel:hover { background:#E5E8EE; }
-  .kcard:hover, .ncard:hover { box-shadow:0 1px 2px rgba(0,0,0,.06); }
-  .qpill:hover:not(.on), .ptab:hover:not(.on) { background:#E5E8EE; border-color:#D8DCE3; }
-  .vtog button:hover:not(.on) { color:#14161A; }
-  .rtabs button:hover:not(.on), .ctabs button:hover:not(.on) { color:#33373E; }
-  .kebab:hover { background:#E5E8EE; }
-  .lnk:hover { opacity:.7; }
-  .btn:hover { filter:brightness(.96); }
-
-  /* one focus treatment everywhere, replacing the browser default (focus:outline-none +
-     focus-visible:ring-2 in Frappe). Keyboard users get a ring; mouse users get nothing. */
-  .crmbar :focus, .crow :focus, .btn:focus, .qpill:focus, .ptab:focus { outline:none; }
-  .btn:focus-visible, .qpill:focus-visible, .ptab:focus-visible, .vtog button:focus-visible,
-  .rtabs button:focus-visible, .ctabs button:focus-visible, .nv:focus-visible,
-  .switcher:focus-visible, .collapse:focus-visible, .kebab:focus-visible,
-  .inp:focus-visible, .crmsel:focus-visible, .selcell input:focus-visible {
-    outline:2px solid #2563EB; outline-offset:1px; }
-  .inp:focus, .crmsel:focus { border-color:#2563EB; }
-
-  /* actions reveal on row hover instead of shouting on every row (group-hover:opacity-100) */
-  .crow .c-act { opacity:0; transition:opacity .14s ease-in; }
-  .crow:hover .c-act, .crow:focus-within .c-act, .crow.sel .c-act { opacity:1; }
-  @media (pointer:coarse) { .crow .c-act { opacity:1; } }
-
-  /* loading is a skeleton, not the word «جارٍ التحميل» (animate-pulse) */
+  /* the KPI card dashboard.ts draws on الرئيسية; revamp.ts gives it radius and shadow, this gives
+     it its ground */
+  .kcard { background:#fff; border:1px solid #ECEEF2; }
+  /* the skeleton row record-tabs.ts writes while a tab loads */
   @keyframes crmpulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
   .skel-row { display:grid; grid-template-columns:40px 2fr 1.1fr 1.5fr 1fr; gap:12px;
     padding:8px 20px 8px 12px; border-top:1px solid #ECEEF2; align-items:center; }
@@ -161,85 +79,67 @@ export const CAMPAIGNS_CRM_CSS = `
     animation:crmpulse 1.4s ease-in-out infinite; }
   .skel-row > i:nth-child(2) { width:70%; } .skel-row > i:nth-child(3) { width:50%; }
   .skel-row > i:nth-child(4) { width:60%; } .skel-row > i:nth-child(5) { width:40%; }
-  @media (prefers-reduced-motion: reduce) {
-    .skel-row > i { animation:none; }
-    .crmbar, .crow, .kcard, .ncard, .rtask, .qpill, .vtog button, .ptab, .btn, .nv, .switcher,
-    .collapse, .rtabs button, .ctabs button, .kebab, .lnk, .chip { transition:none; }
-  }
+  @media (prefers-reduced-motion: reduce) { .skel-row > i { animation:none; } }
 
+  /* ===== the floating bulk bar, on the new system's tokens =====
+     Selection acts on rows you can see, and the bar has to clear the table without covering the
+     row that is selected — so it is fixed to the block-end edge, above alertBar's z-index, which
+     occluded it for its whole first life. */
+  .bulkbar { position:fixed; inset-block-end:18px; inset-inline:0; display:flex; justify-content:center;
+    z-index:var(--z-toast); pointer-events:none; padding-inline:12px; }
+  .bulkbar > div { pointer-events:auto; display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+    background:var(--m-ink, #17201F); color:#fff; border-radius:var(--m-r-chip, 999px);
+    padding:9px 14px; max-inline-size:92vw; box-shadow:var(--m-lift, 0 12px 32px rgba(16,24,40,.28)); }
+  .bulkbar .cnt { font-size:13px; font-weight:600; background:rgba(255,255,255,.14);
+    border-radius:999px; padding:5px 12px; white-space:nowrap; }
+  .bulkbar button, .bulkbar select { font-family:inherit; font-size:13px; font-weight:600;
+    border-radius:999px; padding:7px 13px; cursor:pointer; border:1px solid rgba(255,255,255,.22);
+    background:transparent; color:#fff; white-space:nowrap; min-block-size:34px;
+    transition:background-color var(--m-out, 120ms) var(--m-ease, ease); }
+  .bulkbar select { background:#fff; color:#14161A; border-color:#fff; }
+  .bulkbar button.pri { background:#5B8DEF; border-color:#5B8DEF; color:#14161A; }
+  .bulkbar button.x { border:none; background:transparent; font-size:16px; padding:4px 8px; }
+  .bulkbar button:focus-visible, .bulkbar select:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  @media (hover:hover) and (pointer:fine) { .bulkbar button:hover { background:rgba(255,255,255,.14); } }
+  @media (pointer:coarse) { .bulkbar button, .bulkbar select { min-block-size:44px; } }
+  @media (prefers-reduced-motion: reduce) { .bulkbar button { transition:none; } }
 
-  /* ===== S1: the row grid lives in CSS, not in an inline style attribute =====
-     It was an inline style on every row and header, which no media query can override — the phone
-     layout was unreachable without !important until this moved here. .c-fig uses display:contents
-     on the wide layout so its three children act as grid items, and becomes a flex line on the
-     phone: ONE dom for both, never a parallel mobile row. */
-  /* THE TABLE IS THE OBJECT. This rule used to strip the card entirely — flush, no radius, no
-     shadow — which was the PREVIOUS design system's invariant. The approved Seha system puts
-     objects on elevated --paper surfaces, so the surface goes back, once, around the whole table
-     rather than around each row: these four screens carry selection checkboxes and aligned columns,
-     and turning a selectable table into cards would cost column scanning and bulk select for
-     nothing. Its own comment said "until their own cycle" — this is that cycle.
-     One rule, five screens: العملاء · لوحة المتابعة · المهام · جهات الاستهداف · الحملات. */
-  .crmflat { background:var(--paper); border:0; border-radius:var(--r-md);
-             box-shadow:var(--sh-1); overflow:hidden; margin-bottom:var(--s4); }
-  .crmflat .crow { border-top:1px solid var(--line-soft); transition:background var(--fast) var(--ease); }
-  .crmflat .crow:first-of-type { border-top:0; }
-  /* A table you scroll loses its column names without this. */
-  .crmflat .thead { position:sticky; inset-block-start:0; background:var(--surface);
-                    z-index:var(--z-sticky); border-block-end:1px solid var(--line); }
-  /* targets table: seven cells, seven tracks */
-  .tgtrow { grid-template-columns: 40px 1.8fr 1fr 1.9fr 1.5fr .55fr .85fr; border-top:1px solid #ECEEF2; }
-  /* every cell clips: an interest chip wider than its track was overlapping آخر رسالة */
-  .tgtrow > div { min-width:0; overflow:hidden; }
-  .tgtrow .chip { max-width:100%; overflow:hidden; text-overflow:ellipsis; display:inline-block;
-    line-height:1.7; }
-  @media (max-width: 939px) { .tgtrow { grid-template-columns: 40px minmax(0,1fr) auto; } }
-  .crmgrid { min-width: 940px; }
-  .crow { display:grid; grid-template-columns: 40px 2fr 1.15fr .95fr .7fr .7fr .7fr 1.15fr 44px;
-    gap:12px; align-items:center; padding:8px 20px 8px 12px; min-height:36px; }
-  .crow .c-fig, .crow .c-meta { display: contents; }
-  .fig { display:flex; gap:12px; font-size:12px; color:#33373E; }
-  .crow .c-num { text-align:center; font-size:14px; font-weight:450; color:#14161A; font-variant-numeric:tabular-nums; }
-  /* The wide layout has a column header saying exactly this, and a leading Arabic label also
-     destroys the tabular-nums alignment the cell exists for. Hidden here, revealed on the phone. */
-  .crow .c-num .lbl-ph { display:none; }
-  /* display lives in CSS, never inline: an inline display:flex beats a media query and
-     kept التقدّم rendering as a squeezed 40px stub on the phone row. */
-  .crow .c-prog { display:flex; align-items:center; gap:9px; }
-  .cedge { display:none; }
-  /* Authored BEFORE the media query so the reveal inside it wins on source order, without !important. */
-  .thead-narrow { display:none; align-items:center; gap:10px; padding:12px 16px; background:#EFF1F5;
-    border-block-end:1px solid #ECEEF2; font-size:12px; font-weight:600; color:#656B76; }
+  /* ===== the campaign screens, on the m-* vocabulary =====
+     Only what the vocabulary genuinely lacks survives here: the quoted WhatsApp message (a real
+     surface with its own two grounds, both measured), the row meter, and the board card's own
+     figure line. */
+  .ds6 .cx { display:flex; flex-direction:column; gap:var(--m-4); }
+  .ds6 .cx-tbl .m-table { min-inline-size:940px; }
+  .ds6 .cx-sub { display:block; font-weight:400; margin-block-start:2px; }
+  .ds6 .cx-clip { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-inline-size:30ch; }
+  .ds6 .cx-prog { display:flex; align-items:center; gap:var(--m-2); min-inline-size:0; }
+  .ds6 .cx-prog .m-meter { margin-block:0; flex:1 1 auto; min-inline-size:56px; }
+  .ds6 .cx-dot { inline-size:9px; block-size:9px; border-radius:50%; flex:none; display:inline-block; }
 
-  @media (max-width: 939px) {
-    /* The nine-column grid cannot answer "which campaign, did it work" on a phone — at 375 every
-       figure sat behind a sideways drag. Three stacked lines, same DOM, same cells. */
-    .crmgrid { min-width: 0; }
-    .crow { grid-template-columns: 40px minmax(0,1fr) auto; row-gap:6px; column-gap:10px;
-      align-items:start; position:relative; padding-block-end:16px; }
-    .crow .selcell { grid-row: 1 / 4; grid-column: 1; align-self:center; }
-    .crow .c-name  { grid-row: 1; grid-column: 2; }
-    .crow .c-act   { grid-row: 1; grid-column: 3; }
-    /* product + chip are ONE line: the chip is flex:none and the product ellipsizes first, so a
-       long state label can never squeeze the campaign name the way it did when both sat in the
-       auto-sized third column. */
-    .crow .c-meta  { display:flex; align-items:center; gap:8px; min-width:0;
-      grid-row: 2; grid-column: 2 / 4; }
-    .crow .c-meta .c-prod  { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .crow .c-meta .c-state { flex:none; }
-    .crow .c-fig   { display:flex; grid-row: 3; grid-column: 2 / 4; flex-wrap:wrap; }
-    .crow .c-num   { text-align:start; }
-    .crow .c-num .lbl-ph { display:inline; color:#656B76; font-weight:600; }
-    /* التقدّم is the one column that cannot survive as text here: it becomes a hairline meter on
-       the row's block-end edge, so stacked rows read as a scannable column of bars. */
-    .crow .c-prog  { display:none; }
-    .crow .cedge   { display:block; position:absolute; inset-inline:0; inset-block-end:0; height:3px;
-      background:#ECEEF2; }
-    .crow .cedge > i { display:block; height:100%; background:#2563EB; }
-    .thead-wide { display:none; }
-    .thead-narrow { display:flex; }
-  }
+  /* the message, quoted on WhatsApp's own wallpaper. #54594B clears 4.5 on BOTH grounds — the
+     wallpaper at 5.37 and the bubble at 6.29 — and is the one ink allowed on either. */
+  .ds6 .cx-wa { flex:1 1 260px; min-inline-size:0; background:#E5DDD4; border-radius:var(--m-r-card); padding:11px; }
+  .ds6 .cx-bub { background:#DCF8C6; border-radius:9px; padding:10px 12px; font-size:var(--m-t-cap);
+    color:#14161A; line-height:24px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  /* line-height and the clamp height are both in px on purpose: -webkit-line-clamp only works on
+     display:-webkit-box and the computed display here resolves to flow-root, so an explicit
+     max-height of exactly two line-heights is what clips on a line boundary. */
+  .ds6 .cx-bub.clamp { max-block-size:48px; overflow:hidden; }
+  .ds6 .cx-spec { display:flex; gap:var(--m-5); flex-wrap:wrap; align-items:flex-start; }
+  .ds6 .cx-spec__f { flex:none; min-inline-size:150px; display:flex; flex-direction:column; gap:var(--m-3); }
 
+  /* the board card's figure line: four label/value pairs that must stay on one reading line */
+  .ds6 .cx-kf { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px;
+    border-block-start:1px solid var(--m-line); margin-block-start:var(--m-2); padding-block-start:var(--m-2); }
+  .ds6 .cx-kf .kl { font-size:var(--m-t-micro); color:var(--m-mut); }
+  .ds6 .cx-kf .kv { font-size:var(--m-t-cap); font-weight:600; color:var(--m-ink); }
+  .ds6 .cx-kf .kb { color:var(--m-bad); font-size:var(--m-t-micro); font-weight:600; }
+
+  /* the next-step strip and its cards: a leading rule in the tone of what it is about */
+  .ds6 .cx-move { border-inline-start:3px solid var(--tn, var(--m-ac)); }
+  .ds6 .cx-moves { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:var(--m-3); }
+
+  @media (max-width: 939px) { .ds6 .cx-tbl .m-table { min-inline-size:680px; } }
 `;
 
 export const CAMPAIGNS_CRM_JS = `
@@ -263,13 +163,14 @@ var crmDragId = null;
 function crmWasSent(st) { return !!(st.sent || st.delivered); }
 /* The five states, declared ONCE and in board order. campPerfState selects from this table and the
    kanban seeds its empty columns from it, so a renamed label cannot leave the board saying one
-   thing and the row chip another — the drift the check:crm assertion exists to catch. */
+   thing and the row chip another — the drift the check:crm assertion exists to catch. The tone is
+   the vocabulary's own status chip: colour means status, never decoration. */
 var CRM_PERF = [
-  { key: "test",       label: "تجريبية",       cls: "c-warn", dot: "#7A5600" },
-  { key: "noaudience", label: "بلا جمهور",     cls: "c-grey", dot: "#A2A9B4" },
-  { key: "unsent",     label: "لم تُرسل بعد",   cls: "c-grey", dot: "#A2A9B4" },
-  { key: "replied",    label: "فيها ردود",     cls: "c-ok",   dot: "#12633F" },
-  { key: "silent",     label: "بلا ردود بعد",  cls: "c-blue", dot: "#1E5FCC" }
+  { key: "test",       label: "تجريبية",       cls: "m-chip--warn",  dot: "var(--m-warn)" },
+  { key: "noaudience", label: "بلا جمهور",     cls: "m-chip--plain", dot: "var(--m-idle)" },
+  { key: "unsent",     label: "لم تُرسل بعد",   cls: "m-chip--plain", dot: "var(--m-idle)" },
+  { key: "replied",    label: "فيها ردود",     cls: "m-chip--ok",    dot: "var(--m-ok)" },
+  { key: "silent",     label: "بلا ردود بعد",  cls: "m-chip--ac",    dot: "var(--m-ac)" }
 ];
 function crmPerf(key) {
   for (var i = 0; i < CRM_PERF.length; i++) if (CRM_PERF[i].key === key) return CRM_PERF[i];
@@ -285,13 +186,18 @@ function campPerfState(c, st) {
   if (st.replied > 0) return crmPerf("replied");
   return crmPerf("silent");
 }
-/* A rate with no denominator is not zero, it is unknown. Returning null (rendered «—») is the whole
-   point: base=Math.max(1,targeted) used to print a confident 0٪ for a campaign with no audience. */
+function crmChip(ps) { return '<span class="m-chip ' + ps.cls + '">' + ps.label + "</span>"; }
+/* A rate with no denominator is not zero, it is unknown. Returning null (rendered as an absence) is
+   the whole point: base=Math.max(1,targeted) used to print a confident 0٪ for a campaign with no
+   audience. */
 function crmRate(a, b) { return b ? Math.round(a / b * 100) : null; }
 /* Delivery rates for a campaign that was never sent are undefined, not zero. */
 function crmDeliveryRate(a, st) { return crmWasSent(st) ? crmRate(a, st.targeted) : null; }
-function crmPctD(a, st) { var r = crmDeliveryRate(a, st); return r === null ? "—" : fmtN(r) + "٪"; }
-function crmPct(a, b) { var r = crmRate(a, b); return r === null ? "—" : fmtN(r) + "٪"; }
+/* The three numeric columns say «لم يُقَس», not WHY: the state column on the same row already says
+   whether the campaign has no audience or has simply not been sent, and repeating the reason three
+   times per row is how a reader learns to stop reading the column. */
+function crmPctD(a, st) { var r = crmDeliveryRate(a, st); return r === null ? mNil("لم يُقَس", "none") : mPct(r); }
+function crmPct(a, b) { var r = crmRate(a, b); return r === null ? mNil("لم يُقَس", "none") : mPct(r); }
 /* SELECTION IS INTERSECTED WITH WHAT IS ON SCREEN, STRUCTURALLY.
    Clearing on every state change is necessary but not sufficient — it relies on remembering to call
    it from each of the four handlers, and a missed one stages the WRONG cohort into the launch
@@ -299,9 +205,9 @@ function crmPct(a, b) { var r = crmRate(a, b); return r === null ? "—" : fmtN(
    to return anything the operator cannot currently see: a hidden selection is unactionable by
    construction, not by discipline. Both layers are kept; this one is the guarantee. */
 function crmVisibleIds() {
-  /* Deliberately the whole filter match, NOT the LIST_CAP slice: «تحديد المطابقين» selects beyond
-     what is rendered, and that is legitimate because the operator asked for it explicitly and the
-     count says so. What must never be actionable is a selection the CURRENT FILTER excludes. */
+  /* Deliberately the whole filter match, NOT the page slice: «تحديد المطابقين» selects beyond what
+     is rendered, and that is legitimate because the operator asked for it explicitly and the count
+     says so. What must never be actionable is a selection the CURRENT FILTER excludes. */
   var ids = {};
   crmFiltered().forEach(function (x) { ids[x.c.id] = true; });
   return ids;
@@ -322,10 +228,10 @@ function crmSelPhones() {
 function crmVerdict(st) {
   if (!st.targeted) return "لا جهات استهداف لهذه الحملة — لم يُرسل شيء.";
   if (st.replied) {
-    return "وصلت إلى " + fmtN(st.delivered) + " جهة، ردّ " + fmtN(st.replied) + " منهم" +
-      (st.interested ? " وأبدى " + fmtN(st.interested) + " اهتمامًا مؤهلًا" : "") + ".";
+    return "وصلت إلى " + mN(st.delivered) + " جهة، ردّ " + mN(st.replied) + " منهم" +
+      (st.interested ? " وأبدى " + mN(st.interested) + " اهتمامًا مؤهلًا" : "") + ".";
   }
-  if (st.sent || st.delivered) return "أُرسلت، وبانتظار الرد الأول.";
+  if (crmWasSent(st)) return "أُرسلت، وبانتظار الرد الأول.";
   return "لم يُسجَّل إرسال لهذه الحملة بعد.";
 }
 
@@ -357,50 +263,61 @@ function crmKeyDef(k) {
   for (var i = 0; i < CRM_KEYS.length; i++) if (CRM_KEYS[i][0] === k) return CRM_KEYS[i];
   return CRM_KEYS[0];
 }
+/* The unit noun is four-way and agrees with its own count (PORT-SPEC §5). dsPageBar prints the
+   number, so this returns the noun alone. */
+function crmNoun(n) { return n === 1 ? "حملة" : n === 2 ? "حملتان" : (n >= 3 && n <= 10) ? "حملات" : "حملة"; }
+
+/* The campaign count is printed on the «الكل» tab, beside the filter bar and in the pager, and the
+   match count in two of those. Both are bound to the arrays they are counted from, so no two sites
+   can disagree (PORT-SPEC §6). */
+function crmBind() {
+  dsD("crmAll", function () { return campaigns.length; });
+  dsD("crmShown", function () { return crmFiltered().length; });
+}
 
 /* ------------------------------- control bar ------------------------------- */
 function crmControlBar(nShown, nTotal) {
   var tabs = [["all", "الكل", campaigns.length],
     ["real", "فعلية", campaigns.filter(function (c) { return !campIsTest(c); }).length],
     ["test", "تجريبية", campaigns.filter(function (c) { return campIsTest(c); }).length]];
-  var h = '<div class="crmbar rise">';
-  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
-    '<input id="campq" class="inp" value="' + esc(campQ) + '" oninput="campSearchFn(this)" placeholder="ابحث في الحملات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
-  if (campProd) h += '<button class="px-toggle" aria-pressed="true" onclick="campClearProd()" title="إزالة تصفية المنتج">كل الحملات · المنتج: ' + esc(campProd) + ' ×</button>';
-  h += '<span class="vtog">' +
+  /* Two controls, two different questions, so two different idioms: the tab rail chooses WHICH
+     campaigns, the segmented control chooses HOW they are drawn. */
+  var h = '<div class="m-tabs" role="tablist" aria-label="تصنيف الحملات">' + tabs.map(function (t) {
+    return '<button type="button" class="m-tab" role="tab" aria-selected="' + (campTab === t[0]) + '"' +
+      ' onclick="setCampTab(&quot;' + t[0] + '&quot;)">' + t[1] +
+      "<b>" + (t[0] === "all" ? dsFig("crmAll", t[2]) : fmtN(t[2])) + "</b></button>";
+  }).join("") + "</div>";
+
+  h += '<div class="m-tools"><div class="m-head__a">';
+  h += '<input class="m-input" id="campq" value="' + esc(campQ) + '" oninput="campSearchFn(this)" ' +
+    'placeholder="ابحث في الحملات…" aria-label="بحث في الحملات">';
+  if (campProd) h += '<button type="button" class="m-btn" aria-pressed="true" onclick="campClearProd()" title="إزالة تصفية المنتج">المنتج: ' + esc(campProd) + " &#215;</button>";
+  /* SMOKE: «كانبان» is the landmark smoke.py asserts for #kmon, and it renders before any fetch. */
+  h += '<span class="m-seg" role="group" aria-label="طريقة العرض">' +
     [["list", "قائمة"], ["group", "تجميع"], ["kanban", "كانبان"]].map(function (v) {
-      return '<button class="' + (crmView === v[0] ? "on" : "") + '" onclick="crmSetView(&quot;' + v[0] + '&quot;)">' + v[1] + '</button>';
-    }).join("") + '</span>';
-  /* Today's three class tabs, unchanged in behaviour — these ARE Frappe's quick filters, keyed on
-     the one real boolean on the table. */
-  h += tabs.map(function (t) {
-    return '<button class="qpill' + (campTab === t[0] ? " on" : "") + '" onclick="setCampTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>";
-  }).join("");
-  h += '<span style="flex:1"></span><span class="hair"></span>';
+      return '<button type="button" aria-pressed="' + (crmView === v[0]) + '" onclick="crmSetView(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
+    }).join("") + "</span>";
   if (crmView === "list") {
-    h += '<select onchange="setCampSort(this)" class="crmsel">' +
-      '<option value="new"' + (campSortKey === "new" ? " selected" : "") + '>الأحدث أولًا</option>' +
-      '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + '>الأكثر ردودًا</option>' +
-      '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + '>الأكثر مشاهدة</option></select>';
+    h += '<select class="m-select" aria-label="الترتيب" onchange="setCampSort(this)">' +
+      '<option value="new"' + (campSortKey === "new" ? " selected" : "") + ">الأحدث أولًا</option>" +
+      '<option value="replies"' + (campSortKey === "replies" ? " selected" : "") + ">الأكثر ردودًا</option>" +
+      '<option value="seen"' + (campSortKey === "seen" ? " selected" : "") + ">الأكثر مشاهدة</option></select>";
   } else {
-    h += '<select onchange="crmSetGroup(this.value)" class="crmsel">' +
+    h += '<select class="m-select" aria-label="مفتاح التجميع" onchange="crmSetGroup(this.value)">' +
       CRM_KEYS.map(function (k) {
-        return '<option value="' + k[0] + '"' + (crmActiveKey() === k[0] ? " selected" : "") + '>' +
-          (crmView === "kanban" ? "لوحة: " : "تجميع حسب: ") + k[1] + '</option>';
-      }).join("") + '</select>';
+        return '<option value="' + k[0] + '"' + (crmActiveKey() === k[0] ? " selected" : "") + ">" +
+          (crmView === "kanban" ? "لوحة: " : "تجميع حسب: ") + k[1] + "</option>";
+      }).join("") + "</select>";
   }
-  h += '<button class="btn btn-ghost" style="height:32px;padding:0 12px;border-radius:6px;font-size:12px;" onclick="exportCampaigns()">' + ic("doc", 15) + ' تصدير CSV</button>';
-  h += '<span class="cntpill">' + fmtN(nTotal) + " حملة</span>";
+  h += '<button type="button" class="m-btn" onclick="exportCampaigns()">' + ic("doc", 15) + " تصدير CSV</button>";
+  h += '</div><span class="m-cap">' + dsFig("crmShown", nTotal) + " " + crmNoun(nTotal) + "</span></div>";
   /* Said ONCE, beside the selector that chose it, instead of repeated on every group header and
      again under the board. */
   if (crmView !== "list") {
     var kd = crmKeyDef(crmActiveKey());
-    h += '<div style="flex-basis:100%;font-size:12px;color:#656B76;padding-top:2px;">' +
-      esc(kd[1]) + " — " + esc(kd[3]) +
-      (crmView === "kanban" && crmActiveKey() !== "class" ? " · هذه اللوحة للعرض فقط." : "") + '</div>';
+    h += '<p class="m-meta">' + esc(kd[1]) + " — " + esc(kd[3]) +
+      (crmView === "kanban" && crmActiveKey() !== "class" ? " · هذه اللوحة للعرض فقط." : "") + "</p>";
   }
-  h += "</div>";
   return h;
 }
 
@@ -427,69 +344,48 @@ function crmRow(c, st) {
   var ps = campPerfState(c, st);
   var prog = crmRate(st.delivered, st.targeted);
   var on = !!crmSel[c.id];
-  /* N1: one icon with STATE, not two directional glyphs. The two actions are opposite ends of a
-     single boolean, and it reuses the row's own status-dot colours so the dot above teaches the
-     mapping. The directional title/aria-label stay — they are the a11y floor for an icon button. */
+  /* ONE icon with STATE, not two directional glyphs. The two actions are opposite ends of a single
+     boolean, and it reuses the row's own status-dot colours so the dot above teaches the mapping.
+     The directional title/aria-label stay — they are the a11y floor for an icon button. */
   var actTitle = isTest ? "إعادة الحملة إلى القائمة الفعلية" : "نقل الحملة إلى التجريبية";
-  /* The km class is not decoration: dashboard.ts:229 applies a legacy 4-column mobile grid to
-     .trow:not(.km) below 900px, with nth-child(4) and (5) hidden. That selector is (0,2,0) and
-     beat .crow, which is why the row rendered four tracks with the figures line missing.
-     The original vKmon row carries km for exactly this reason. */
-  return '<div class="trow km krow crow' + (on ? " sel" : "") + '" role="link" tabindex="0"' +
-    ' onclick="location.hash=&quot;kmon/' + c.id + '&quot;"' +
-    ' onkeydown="if(event.key===&quot;Enter&quot;){location.hash=&quot;kmon/' + c.id + '&quot;}">' +
-    '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(c.name) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggle(' + c.id + ')"></div>' +
-    '<div class="c-name" style="display:flex;align-items:center;gap:12px;min-width:0;"><span role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '" style="width:9px;height:9px;border-radius:999px;flex:none;background:' + (isTest ? "#D8DCE3" : "#2563EB") + ';box-shadow:0 0 0 3px ' + (isTest ? "rgba(208,213,221,.28)" : "rgba(31,122,115,.16)") + ';"></span>' +
-    '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#14161A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(c.name) + '</div></div>' +
-    '<span style="font-size:12px;color:#656B76;flex:none;">' + fmtD(c.created_at) + '</span></div>' +
-    '<div class="c-meta">' +
-    '<div class="c-prod" style="font-size:12px;color:#33373E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' + esc(c.product || "—") +
-      /* BR-MON-001 / BR-CAM-001: the objective the campaign was launched for, and whether it came from a
-         Massar recommendation — the two things a report groups a campaign by. */
-      (c.objective && typeof CAMPAIGN_OBJECTIVE_LABELS !== "undefined" ? '<span style="color:#656B76;"> · ' + esc(CAMPAIGN_OBJECTIVE_LABELS[c.objective] || "") + '</span>' : "") +
-      (c.origin && c.origin.suggestionKey ? ' <span class="cf-pill sys" style="font-size:12px;padding:1px 8px;" title="' + (c.origin.rule === "indicator" ? "مبنية على قائمة مؤشر استخدام" : "مبنية على توصية من مسار") + '">' + (c.origin.rule === "indicator" ? "من مؤشر" : "من توصية") + '</span>' : "") + '</div>' +
-    '<div class="c-state" style="display:flex;align-items:center;gap:7px;white-space:nowrap;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + ps.dot + ';"></span><span style="font-size:14px;color:#33373E;">' + ps.label + '</span></div></div>' +
-    '<div class="c-fig fig">' +
-      '<div class="c-num"><span class="lbl-ph">الجمهور </span>' + fmtN(st.targeted) + '</div>' +
-      '<div class="c-num"><span class="lbl-ph">مشاهدة </span>' + crmPctD(st.seen, st) + '</div>' +
-      '<div class="c-num"><span class="lbl-ph">ردود </span>' + crmPctD(st.replied, st) + '</div>' +
-    '</div>' +
-    '<div class="c-prog">' +
-      (prog === null
-        ? '<span style="font-size:12px;color:#656B76;">لا جهات استهداف</span>'
-        : !crmWasSent(st)
-        ? '<span style="font-size:12px;color:#656B76;">لم تُرسل بعد</span>'
-        : '<div class="prog" style="flex:1;height:6px;background:#ECEEF2;border-radius:999px;overflow:hidden;"><i style="display:block;height:100%;width:' + prog + '%;background:#2563EB;border-radius:999px;"></i></div><span style="font-size:12px;font-weight:600;color:#656B76;flex:none;font-variant-numeric:tabular-nums;">' + fmtN(prog) + '٪</span>') +
-    '</div>' +
-    '<div class="c-act" style="text-align:center;"><button class="kebab" title="' + actTitle + '" aria-label="' + actTitle + '" onclick="event.stopPropagation();setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' + ic("target", 17, isTest ? "#D8DCE3" : "#2563EB") + '</button></div>' +
-    /* prog === null renders NO bar rather than an empty one: the «بلا جمهور» chip already says why. */
-    (prog === null ? "" : '<div class="cedge" role="img" aria-label="التقدّم ' + fmtN(prog) + '٪"><i style="width:' + prog + '%;"></i></div>') +
-  '</div>';
+  return "<tr" + (on ? ' aria-selected="true"' : "") + ">" +
+    '<td class="m-sel"><input type="checkbox" class="m-cb" aria-label="تحديد ' + esc(c.name) + '"' + (on ? " checked" : "") + ' onclick="crmToggle(' + c.id + ')"></td>' +
+    '<td class="m-td-n"><span class="cx-dot" style="background:' + (isTest ? "var(--m-idle)" : "var(--m-ac)") + '" role="img" aria-label="' + (isTest ? "حملة تجريبية" : "حملة فعلية") + '"></span> ' +
+      '<a class="m-link" href="#kmon/' + c.id + '">' + esc(c.name) + "</a>" +
+      '<span class="cx-sub m-meta">' + fmtD(c.created_at) + "</span></td>" +
+    '<td><span class="cx-clip">' + (c.product ? esc(c.product) : mNil("بلا خدمة", "unset")) + "</span>" +
+      /* BR-MON-001 / BR-CAM-001: the objective the campaign was launched for, and whether it came
+         from a Massar recommendation — the two things a report groups a campaign by. */
+      (c.objective && typeof CAMPAIGN_OBJECTIVE_LABELS !== "undefined"
+        ? '<span class="cx-sub m-meta">' + esc(CAMPAIGN_OBJECTIVE_LABELS[c.objective] || "") + "</span>" : "") +
+      (c.origin && c.origin.suggestionKey
+        ? ' <span class="m-chip m-chip--plain" title="' + (c.origin.rule === "indicator" ? "مبنية على قائمة مؤشر استخدام" : "مبنية على توصية من مسار") + '">' +
+          (c.origin.rule === "indicator" ? "من مؤشر" : "من توصية") + "</span>" : "") + "</td>" +
+    "<td>" + crmChip(ps) + "</td>" +
+    '<td class="m-td-v">' + mN(st.targeted) + "</td>" +
+    '<td class="m-td-v">' + crmPctD(st.seen, st) + "</td>" +
+    '<td class="m-td-v">' + crmPctD(st.replied, st) + "</td>" +
+    "<td>" + (prog === null
+      ? mNil("بلا جمهور", "none")
+      : !crmWasSent(st)
+      ? mNil("لم تُرسل بعد", "none")
+      : '<span class="cx-prog"><span class="m-meter"><i style="--m-pct:' + prog + '%"></i></span>' + mPct(prog) + "</span>") + "</td>" +
+    '<td><button type="button" class="m-btn m-btn--icon" title="' + actTitle + '" aria-label="' + actTitle + '" onclick="setCampClass(' + c.id + ',' + (isTest ? "false" : "true") + ')">' +
+      ic("target", 17) + "</button></td></tr>";
 }
 
 function crmHeaderRow(withSelectAll, allOn, nOver, nTotal) {
   var selAll = withSelectAll && nOver > 0
-    ? ' <span class="lnk" onclick="event.stopPropagation();crmSelectAllMatching()" style="color:#2563EB;font-weight:600;cursor:pointer;font-size:12px;">تحديد المطابقين (' + fmtN(nTotal) + ')</span>'
+    ? ' <button type="button" class="m-link" onclick="crmSelectAllMatching()">تحديد المطابقين (' + fmtN(nTotal) + ")</button>"
     : "";
   var box = withSelectAll
-    ? '<input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()">'
+    ? '<input type="checkbox" class="m-cb" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePage()">'
     : "";
-  /* Below 600 the nine-column header cannot render and must not be faked — the stacked row labels
-     its own figures. It collapses to one strip carrying only the selection controls. */
-  return '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-      '<div class="selcell" style="opacity:1;">' + box + '</div>' +
-      '<div>الحملة' + selAll + '</div><div class="c-meta"><div>الخدمة</div><div>الحالة</div></div>' +
-      '<div class="c-fig fig" style="font-weight:600;color:#656B76;">' +
-        '<div class="c-num" style="color:#656B76;font-size:12px;">الجمهور</div>' +
-        '<div class="c-num" style="color:#656B76;font-size:12px;">مشاهدة</div>' +
-        '<div class="c-num" style="color:#656B76;font-size:12px;">ردود</div>' +
-      '</div>' +
-      '<div>التقدّم</div><div></div></div>' +
-    /* Only emit the narrow strip when it has controls to carry: crmGroupView passes
-       withSelectAll=false, which otherwise left a ~40px empty grey bar under every group heading. */
-    (withSelectAll
-      ? '<div class="thead-narrow"><span class="selcell" style="opacity:1;">' + box + '</span><span>تحديد المعروض</span><span style="flex:1"></span>' + selAll + '</div>'
-      : "");
+  return "<thead><tr>" +
+    '<th class="m-sel">' + box + "</th>" +
+    "<th>الحملة" + selAll + "</th><th>الخدمة</th><th>الحالة</th>" +
+    '<th class="num">الجمهور</th><th class="num">مشاهدة</th><th class="num">ردود</th>' +
+    "<th>التقدّم</th><th>التصنيف</th></tr></thead>";
 }
 
 function crmListView(withStAll) {
@@ -498,19 +394,23 @@ function crmListView(withStAll) {
   var withSt = pageSlice("kmon", withStAll);
   var nOver = withStAll.length - withSt.length;
   var allOn = withSt.length > 0 && withSt.every(function (x) { return crmSel[x.c.id]; });
-  var h = '<div class="tblwrap crmflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
-    crmHeaderRow(true, allOn, nOver, withStAll.length);
+  var h = '<section class="m-card m-card--pad0 cx-tbl"><div class="m-tablewrap">' +
+    '<table class="m-table m-table--sticky">' + crmHeaderRow(true, allOn, nOver, withStAll.length) + "<tbody>";
   withSt.forEach(function (x) { h += crmRow(x.c, x.st); });
-  if (!withSt.length) h += crmEmptyList();
-  h += '</div></div>';
-  h += '<div class="tfoot">' + pageBar("kmon", withStAll.length, "حملة") +
-    '<span>' + ic("clock", 14) + ' الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span></div></div>';
+  if (!withSt.length) h += '<tr class="m-table__empty"><td colspan="9">' + crmEmptyList() + "</td></tr>";
+  h += "</tbody></table></div>";
+  h += '<div class="m-foot">' + dsPageBar("kmon", withStAll.length, crmNoun(withStAll.length), "crmShown") +
+    '<span class="m-cap">' + ic("clock", 14) + " الأرقام تُحدَّث لحظيًا من حالات تسليم واتساب. لا تقديرات.</span></div></section>";
   return h;
 }
 
 function crmEmptyList() {
-  if (campQ.trim()) return '<div style="padding:44px;text-align:center;color:#656B76;font-size:14px;line-height:1.9;">لا حملة تطابق «' + esc(campQ.trim()) + '».<br><span style="color:#656B76;">امسح البحث أو جرّب تبويبًا آخر.</span></div>';
-  return '<div style="padding:44px;text-align:center;color:#656B76;font-size:14px;">لا حملات في هذا التبويب</div>';
+  if (campQ.trim()) {
+    return '<div class="m-empty"><p class="m-empty__t">لا حملة تطابق «' + esc(campQ.trim()) + "»</p>" +
+      '<p class="m-empty__d">امسح البحث أو جرّب تبويبًا آخر.</p></div>';
+  }
+  return '<div class="m-empty"><p class="m-empty__t">لا حملات في هذا التبويب</p>' +
+    '<p class="m-empty__d">جرّب «الكل»، أو أطلق حملة جديدة.</p></div>';
 }
 
 /* --------------------------------- grouping --------------------------------- */
@@ -523,9 +423,9 @@ function crmGroups(withStAll) {
     by[k].push(x);
   });
   /* A group that exists in the vocabulary but holds nothing is a FACT, not an absence: render it
-     empty rather than hiding it, so «تجريبية: 0» is visible instead of silently missing. */
-  /* Only seed an empty group the CURRENT filter could actually contain. Seeding «تجريبية 0» while
-     the فعلية pill reads «تجريبية (1)» puts two different counts of the same thing on one screen. */
+     empty rather than hiding it, so «تجريبية: 0» is visible instead of silently missing.
+     Only seed an empty group the CURRENT filter could actually contain. Seeding «تجريبية 0» while
+     the فعلية tab reads «تجريبية (1)» puts two different counts of the same thing on one screen. */
   if (crmActiveKey() === "class") {
     ["فعلية", "تجريبية"].forEach(function (k) {
       var excluded = (campTab === "real" && k === "تجريبية") || (campTab === "test" && k === "فعلية");
@@ -547,27 +447,30 @@ function crmGroups(withStAll) {
 function crmGroupView(withStAll) {
   var g = crmGroups(withStAll);
   if (g.order.length <= 1) {
-    return '<div class="sparse rise">' + ic("eye", 16, "#2563EB") +
-      '<div>كل الحملات في مجموعة واحدة حسب <b>' + g.def[1] + '</b> — التجميع لا يضيف شيئًا هنا. ' +
-      '<span class="lnk" onclick="crmSetView(&quot;list&quot;)" style="color:#2563EB;font-weight:600;cursor:pointer;">→ عد إلى القائمة</span></div></div>' +
+    return '<div class="m-alert">' + ic("eye", 16) +
+      '<span class="m-alert__d">كل الحملات في مجموعة واحدة حسب <b>' + esc(g.def[1]) + "</b> — التجميع لا يضيف شيئًا هنا.</span>" +
+      '<button type="button" class="m-btn" onclick="crmSetView(&quot;list&quot;)">عد إلى القائمة</button></div>' +
       crmListView(withStAll);
   }
   var h = "";
   g.order.forEach(function (k) {
     var rows = g.by[k].slice(0, LIST_CAP);
     var over = g.by[k].length - rows.length;
-    h += '<div class="tblwrap crmflat rise" style="margin-bottom:14px;">' +
-      '<div style="display:flex;align-items:center;gap:9px;padding:13px 18px;border-bottom:1px solid #ECEEF2;background:#EFF1F5;">' +
-      '<span style="font-size:14px;font-weight:600;color:#14161A;">' + esc(k) + '</span>' +
-      '<span class="cntpill">' + fmtN(g.by[k].length) + '</span>' +
-      '</div>' +
-      '<div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
-      crmHeaderRow(false);
+    h += '<section class="m-card m-card--pad0 cx-tbl"><div class="m-card__h" style="padding:var(--m-4) var(--m-5);margin-block-end:0;border-block-end:1px solid var(--m-line)">' +
+      '<h2 class="m-card__t">' + esc(k) + "</h2>" +
+      '<span class="m-cap">' + mPlOf(g.by[k].length, fmtN(g.by[k].length) + " " + crmNoun(g.by[k].length)) + "</span></div>" +
+      '<div class="m-tablewrap"><table class="m-table">' + crmHeaderRow(false) + "<tbody>";
     rows.forEach(function (x) { h += crmRow(x.c, x.st); });
-    if (!rows.length) h += '<div style="padding:26px;text-align:center;color:#656B76;font-size:12px;">لا حملات في هذه المجموعة</div>';
-    h += '</div></div>';
-    if (over > 0) h += '<div class="tfoot"><span style="color:#7A5600;font-weight:600;">تُعرض ' + fmtN(rows.length) + " من " + fmtN(g.by[k].length) + " في هذه المجموعة.</span></div>";
-    h += '</div>';
+    if (!rows.length) {
+      h += '<tr class="m-table__empty"><td colspan="9"><div class="m-empty">' +
+        '<p class="m-empty__t">لا حملات في هذه المجموعة</p></div></td></tr>';
+    }
+    h += "</tbody></table></div>";
+    if (over > 0) {
+      h += '<div class="m-foot"><span class="m-status m-status--warn">تُعرض ' + mN(rows.length) +
+        " من " + mN(g.by[k].length) + " في هذه المجموعة.</span></div>";
+    }
+    h += "</section>";
   });
   return h;
 }
@@ -578,49 +481,48 @@ function crmKanbanView(withStAll) {
   /* Drag is enabled ONLY on the التصنيف board, because POST /admin/campaign/test is the only write
      that exists for a campaign. A card must never be draggable into a state nothing can persist. */
   var canDrag = crmActiveKey() === "class";
-  var h = '<div class="kboard ms-scroll rise">';
+  var h = '<div class="m-board">';
   g.order.forEach(function (k) {
-    h += '<div class="kcol" data-col="' + esc(k) + '"' +
-      (canDrag ? ' ondragover="crmDragOver(event,this)" ondragleave="crmDragLeave(this)" ondrop="crmDrop(event,&quot;' + (k === "تجريبية" ? "test" : "real") + '&quot;,this)"' : "") + '>' +
-      '<div class="kcolh"><div><div class="lb">' + esc(k) + '</div></div>' +
-      '<span style="flex:1"></span><span class="cntpill">' + fmtN(g.by[k].length) + '</span></div>';
+    h += '<div class="m-col" data-col="' + esc(k) + '"' +
+      (canDrag ? ' ondragover="crmDragOver(event,this)" ondragleave="crmDragLeave(this)" ondrop="crmDrop(event,&quot;' + (k === "تجريبية" ? "test" : "real") + '&quot;,this)"' : "") + ">" +
+      '<div class="m-col__t"><span class="m-col__n">' + esc(k) + "</span>" +
+      '<span class="m-col__c">' + mN(g.by[k].length) + "</span></div>" +
+      '<div class="m-col__b">';
     var rows = g.by[k].slice(0, LIST_CAP);
     rows.forEach(function (x) {
       var st = x.st, c = x.c;
       var ps = campPerfState(c, st);
-      /* Frappe's card rhythm with Massar's honest zones. Its avatar, assignee, relative time and
-         @/note/task/comment footer are all DROPPED — none of those entities exist here, and four
-         permanently-zero counters is exactly the invented-value failure the founder catches.
-         The footer carries campStats, which is real engagement, as label+figure pairs: مشاهدة and
-         ردود have no honest glyph and a wrong icon is worse than a word. */
+      /* The card's footer carries campStats, which is real engagement, as label/figure pairs.
+         Frappe's avatar, assignee, relative time and @/note/task/comment counters are all DROPPED —
+         none of those entities exist here, and four permanently-zero counters is exactly the
+         invented-value failure the founder catches. «مشاهدة» and «ردود» have no honest glyph, and a
+         wrong icon is worse than a word. */
       var foot;
       if (!st.targeted) {
-        foot = '<span class="kl">بلا جمهور</span>';
+        foot = '<span class="kl">' + mNil("بلا جمهور", "none") + "</span>";
       } else {
-        foot = [["الجمهور", fmtN(st.targeted)], ["شوهدت", crmPctD(st.seen, st)],
+        foot = [["الجمهور", mN(st.targeted)], ["شوهدت", crmPctD(st.seen, st)],
                 ["ردّوا", crmPctD(st.replied, st)], ["مهتمة", crmPctD(st.interested, st)]]
-          .map(function (f, i) {
-            return (i ? '<span class="ksep">·</span>' : "") +
-              '<span class="kl">' + f[0] + '</span><span class="kv">' + f[1] + '</span>';
+          .map(function (f) {
+            return '<span class="kl">' + f[0] + '</span><span class="kv">' + f[1] + "</span>";
           }).join("");
         /* a zero failure is a default state, not a vocabulary slot — it renders nothing */
-        if (st.failed > 0) foot += '<span class="ksep">·</span><span class="kl" style="color:#8E2A27;">تعذّر ' + fmtN(st.failed) + '</span>';
+        if (st.failed > 0) foot += '<span class="kb">تعذّر ' + mN(st.failed) + "</span>";
       }
-      h += '<a class="kcard" href="#kmon/' + c.id + '" aria-label="' + esc(c.name) + '"' +
-        (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") + '>' +
-        '<div class="ktitle"><span style="width:8px;height:8px;border-radius:999px;flex:none;background:' + ps.dot + ';"></span>' +
-        '<span class="nm">' + esc(c.name) + '</span></div>' +
-        '<div class="kline">' + esc(c.product || "بلا خدمة") + '</div>' +
-        '<div class="kline">' + fmtD(c.created_at) + '</div>' +
-        '<div class="kfoot">' + foot + '</div>' +
-        '</a>';
+      h += '<a class="m-deal" href="#kmon/' + c.id + '" aria-label="' + esc(c.name) + '"' +
+        (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") + ">" +
+        '<span class="m-deal__n"><span class="cx-dot" style="background:' + ps.dot + '"></span> ' + esc(c.name) + "</span>" +
+        '<span class="m-deal__p">' + (c.product ? esc(c.product) : mNil("بلا خدمة", "unset")) + " · " + fmtD(c.created_at) + "</span>" +
+        '<span class="cx-kf">' + foot + "</span></a>";
     });
-    if (!rows.length) h += '<div class="kdrop">' + (canDrag ? "اسحب حملة هنا لتغيير تصنيفها" : "لا حملات") + '</div>';
-    if (g.by[k].length > rows.length) h += '<div style="font-size:12px;color:#7A5600;font-weight:600;padding:4px;">تُعرض ' + fmtN(rows.length) + " من " + fmtN(g.by[k].length) + '</div>';
-    h += '</div>';
+    if (!rows.length) h += '<div class="m-empty-col">' + (canDrag ? "اسحب حملة هنا لتغيير تصنيفها" : "لا حملات") + "</div>";
+    h += "</div>";
+    if (g.by[k].length > rows.length) {
+      h += '<span class="m-col__v">تُعرض ' + mN(rows.length) + " من " + mN(g.by[k].length) + "</span>";
+    }
+    h += "</div>";
   });
-  h += '</div>';
-  return h;
+  return h + "</div>";
 }
 
 /* -------------------------------- bulk bar -------------------------------- */
@@ -630,28 +532,32 @@ function crmBulkBar() {
   var sel = ids.map(function (i) { return campaigns.find(function (c) { return String(c.id) === String(i); }); }).filter(Boolean);
   var nTest = sel.filter(campIsTest).length, nReal = sel.length - nTest;
   var h = '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + fmtN(sel.length) + ' محدَّدة</span>' +
+    '<span class="cnt">' + fmtN(sel.length) + " محدَّدة</span>" +
     '<button onclick="crmExportSel()">تصدير المحدد CSV</button>';
-  if (nReal) h += '<button onclick="crmBulkClass(true)">نقل إلى التجريبية (' + fmtN(nReal) + ')</button>';
-  if (nTest) h += '<button onclick="crmBulkClass(false)">إعادة إلى الفعلية (' + fmtN(nTest) + ')</button>';
-  h += '<button class="x" aria-label="إلغاء التحديد" onclick="crmClear()">×</button></div></div>';
+  if (nReal) h += '<button onclick="crmBulkClass(true)">نقل إلى التجريبية (' + fmtN(nReal) + ")</button>";
+  if (nTest) h += '<button onclick="crmBulkClass(false)">إعادة إلى الفعلية (' + fmtN(nTest) + ")</button>";
+  h += '<button class="x" aria-label="إلغاء التحديد" onclick="crmClear()">&#215;</button></div></div>';
   return h;
 }
 
 /* ============================== the list screen ============================== */
 function vKmonCrm(d) {
+  crmBind();
   var withStAll = crmFiltered();
-  /* No .ptitle band: the breadcrumb carries the module name and the ONE primary action, Frappe's
-     shape. Reclaims ~158px of vertical space above the list. تصدير CSV moves to the filter row. */
-  var h = "";
+  /* No page title band: the breadcrumb carries the module name and the ONE primary action. */
   setTimeout(crmPaintCrumb, 0);
   if (!campaigns.length) {
-    return h + '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div><div class="t">لا حملات بعد</div><div class="s">أطلق أول حملة من <a href="#aimkt" style="color:#2563EB;font-weight:600;">إنشاء حملة</a> — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</div></div>';
+    /* SMOKE: «لا حملات بعد» is the accepted empty render for #kmon. */
+    return '<div class="ds6"><section class="m-card m-empty"><p class="m-empty__t">لا حملات بعد</p>' +
+      '<p class="m-empty__d">أطلق أول حملة من «إنشاء حملة» — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</p>' +
+      '<p class="m-empty__a"><a class="m-btn m-btn--primary" href="#aimkt">إنشاء حملة</a></p></section></div>';
   }
+  var h = '<div class="ds6"><div class="cx">';
   h += crmControlBar(Math.min(withStAll.length, PAGE_SIZE), withStAll.length);
   if (crmView === "kanban") h += crmKanbanView(withStAll);
   else if (crmView === "group") h += crmGroupView(withStAll);
   else h += crmListView(withStAll);
+  h += "</div></div>";
   h += crmBulkBar();
   return h;
 }
@@ -664,58 +570,63 @@ function crmSpecStrip(camp, st) {
      155-char message fits on one line (scrollHeight 44 == clientHeight 44) and still offered
      «عرض النص كاملًا» — a control that expands nothing. */
   var body = msg
-    ? '<div class="bub2' + (crmMsgOpen ? "" : " clamp") + '" id="crmmsg">' + esc(msg) + '</div>' +
-      '<div id="crmmsgmore" style="margin-top:7px;' + (crmMsgOpen ? "" : "display:none;") + '"><span class="lnk" onclick="crmToggleMsg()" style="color:#2563EB;font-weight:600;font-size:12px;cursor:pointer;">' + (crmMsgOpen ? "طيّ النص" : "عرض النص كاملًا") + '</span></div>'
-    : '<div style="font-size:12px;color:#656B76;padding:8px 2px;">لم يُحفظ نص هذه الحملة.</div>';
-  return '<div class="spec rise">' +
-    '<div class="wa">' + body + '</div>' +
-    '<div class="facts">' +
-      '<div><div class="k">الخدمة</div><div class="v">' + esc(camp.product || "غير محددة") + '</div></div>' +
-      '<div><div class="k">حجم الجمهور</div><div class="v">' + fmtN(st.targeted) + '</div></div>' +
-      '<div><div class="k">التصنيف</div><div class="v">' + (campIsTest(camp) ? "تجريبية" : "فعلية") + '</div></div>' +
-    '</div>' +
-    '<div class="ro">هذا نصّ ما أُرسل فعليًا. لا يقبل التعديل بعد الإطلاق.</div>' +
-  '</div>';
+    ? '<div class="cx-bub' + (crmMsgOpen ? "" : " clamp") + '" id="crmmsg">' + esc(msg) + "</div>" +
+      '<div id="crmmsgmore"' + (crmMsgOpen ? "" : ' style="display:none"') + '><button type="button" class="m-link" onclick="crmToggleMsg()">' +
+      (crmMsgOpen ? "طيّ النص" : "عرض النص كاملًا") + "</button></div>"
+    : '<p class="m-meta">' + mNil("لم يُحفظ نص هذه الحملة", "unset") + "</p>";
+  return '<section class="m-card"><div class="cx-spec">' +
+    '<div class="cx-wa">' + body + "</div>" +
+    '<dl class="m-facts cx-spec__f">' +
+      "<div><dt>الخدمة</dt><dd>" + (camp.product ? esc(camp.product) : mNil("غير محددة", "unset")) + "</dd></div>" +
+      "<div><dt>حجم الجمهور</dt><dd>" + mN(st.targeted) + "</dd></div>" +
+      "<div><dt>التصنيف</dt><dd>" + (campIsTest(camp) ? "تجريبية" : "فعلية") + "</dd></div>" +
+    "</dl></div>" +
+    '<p class="m-meta">هذا نصّ ما أُرسل فعليًا. لا يقبل التعديل بعد الإطلاق.</p></section>';
 }
 
 function crmDetailBulkBar(camp) {
   var ph = crmSelPhones();
   if (!ph.length) return "";
   return '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + fmtN(ph.length) + ' محدَّدة</span>' +
-    '<button class="pri" onclick="crmRetargetSel()">إعادة استهداف المحدد (' + fmtN(ph.length) + ')</button>' +
+    '<span class="cnt">' + fmtN(ph.length) + " محدَّدة</span>" +
+    '<button class="pri" onclick="crmRetargetSel()">إعادة استهداف المحدد (' + fmtN(ph.length) + ")</button>" +
     '<button onclick="crmExportSelTargets()">تصدير المحدد CSV</button>' +
-    '<button class="x" aria-label="إلغاء التحديد" onclick="crmClearD()">×</button></div></div>';
+    '<button class="x" aria-label="إلغاء التحديد" onclick="crmClearD()">&#215;</button></div></div>';
 }
 
 function vKmonDetailCrm(id, d) {
   var camp = campaigns.find(function (x) { return String(x.id) === String(id); });
-  if (!camp) return '<div class="empty"><div class="ic"><span></span></div><div class="t">حملة غير موجودة</div><div class="s"><a href="#kmon" style="color:#2563EB;font-weight:600;">→ كل الحملات</a></div></div>';
+  if (!camp) {
+    return '<div class="ds6"><section class="m-card m-empty"><p class="m-empty__t">حملة غير موجودة</p>' +
+      '<p class="m-empty__a"><a class="m-link" href="#kmon">كل الحملات &#8592;</a></p></section></div>';
+  }
   var st = campStats(camp), cwin = campWin(camp);
   var ps = campPerfState(camp, st);
   var rows = camp.targets.map(function (t) { return { phone: t.phone, name: t.name, contact: contactByPhone(t.phone) }; });
 
-  var h = '<a href="#kmon" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#33373E;text-decoration:none;margin-bottom:14px;">→ كل الحملات</a>' +
-    '<div class="ptitle rise"><div><h1 style="font-size:28px;">' + esc(camp.name) + '</h1>' +
-    '<p>' + (camp.product ? esc(camp.product) + " · " : "") + 'واتساب · ' + fmtD(camp.created_at) + '</p></div>' +
-    '<div class="acts"><span class="chip ' + ps.cls + '">' + ps.label + '</span></div></div>';
+  var h = '<div class="ds6"><div class="cx">';
+  h += '<p class="m-crumb"><a class="m-link" href="#kmon">كل الحملات &#8592;</a></p>';
+  h += '<header class="m-head"><div class="m-section-head__t"><h1 class="m-h1">' + esc(camp.name) + "</h1>" +
+    '<p class="m-meta">' + (camp.product ? esc(camp.product) + " · " : "") + "واتساب · " + fmtD(camp.created_at) + "</p></div>" +
+    '<div class="m-head__a">' + crmChip(ps) + "</div></header>";
 
-  /* حكم الحملة — the verdict hero stays page-level so it is never hidden behind a tab. */
-  var yieldPer100 = crmDeliveryRate(st.interested, st);
-  /* The navy gradient is retired from the product (DESIGN.md invariant 3, V2). This was the last
-     dark surface, and it is what made the record screen read as a different product from the list
-     one click away. Neutral card, quiet label, the verdict as plain text, figures at 18/600. */
-  h += '<div class="card rise" style="display:flex;gap:26px;flex-wrap:wrap;align-items:center;">' +
-    '<div style="flex:1;min-width:240px;"><div style="font-size:12px;color:#656B76;font-weight:450;">حكم الحملة</div>' +
-    '<div style="font-size:14px;font-weight:500;color:#14161A;margin-top:6px;line-height:1.6;">' +
-    crmVerdict(st) + '</div></div>' +
-    '<div style="display:flex;gap:28px;flex-wrap:wrap;">' +
-    [["نسبة المشاهدة", crmDeliveryRate(st.seen, st)], ["نسبة الردود", crmDeliveryRate(st.replied, st)], ["جهات مهتمة لكل 100", yieldPer100]]
+  /* حكم الحملة — the verdict hero stays page-level so it is never hidden behind a tab.
+     SMOKE: «حكم الحملة» is the landmark smoke.py asserts for #kmon/<id>. */
+  h += '<section class="m-card" aria-labelledby="cxVerdict"><div class="m-between" style="flex-wrap:wrap;align-items:flex-start">' +
+    '<div style="flex:1 1 240px;min-inline-size:0"><h2 class="m-label" id="cxVerdict">حكم الحملة</h2>' +
+    '<p class="m-body">' + crmVerdict(st) + "</p></div>" +
+    '<div class="m-stats">' +
+    /* THE UNIT IS STATED ONCE. The third tile was labelled «جهات مهتمة لكل 100» and then rendered
+       its value with «٪» — the same unit twice, in two different systems, on one figure. It is a
+       percentage, so it is named as one and the denominator is spelled out underneath. */
+    [["نسبة المشاهدة", crmDeliveryRate(st.seen, st), "من جهات الاستهداف"],
+     ["نسبة الردود", crmDeliveryRate(st.replied, st), "من جهات الاستهداف"],
+     ["نسبة الجهات المهتمة", crmDeliveryRate(st.interested, st), "من جهات الاستهداف"]]
       .map(function (x) {
-        return '<div><div style="font-size:18px;font-weight:600;color:#14161A;font-variant-numeric:tabular-nums;">' +
-          (x[1] === null ? "—" : fmtN(x[1]) + '<span style="font-size:12px;color:#656B76;">٪</span>') +
-          '</div><div style="font-size:12px;color:#656B76;margin-top:3px;">' + x[0] + '</div></div>';
-      }).join("") + '</div></div>';
+        return '<div><span class="m-stat__v">' + (x[1] === null ? mNil("لم يُقَس", "none") : mPct(x[1])) + "</span>" +
+          '<span class="m-stat__k">' + x[0] + "</span>" +
+          '<span class="m-stat__s">' + (x[1] === null ? "لم تُرسل هذه الحملة بعد" : x[2]) + "</span></div>";
+      }).join("") + "</div></div></section>";
 
   /* ---- the move cards, computed once: the count rides on the tab label ---- */
   var seenSilent = rows.filter(function (r) { return r.contact && atOrAfter((r.contact.statusTimes || {}).read, cwin) && !repliedIn(r.contact, cwin); });
@@ -724,76 +635,88 @@ function vKmonDetailCrm(id, d) {
   var lostHere = rows.map(function (r) { return insCache[r.phone]; }).filter(function (i) { return i && i.deal_state === "lost" && i.loss_cause; });
   var causeTally = {};
   lostHere.forEach(function (i) { causeTally[i.loss_cause] = (causeTally[i.loss_cause] || 0) + 1; });
-  var topCause = Object.keys(causeTally).sort(function (a, b) { return causeTally[b] - causeTally[a]; })[0];
+  var causeKeys = Object.keys(causeTally).sort(function (a, b) { return causeTally[b] - causeTally[a]; });
+  var topCause = causeKeys.length ? causeKeys[0] : "";
+  var topCauseN = topCause ? causeTally[topCause] : 0;
+  /* «أبرز الأسباب» WITH A MINIMUM, and with its count on screen. The mode of a tally of one is not
+     a leading reason, it is the only reason there is — and it used to be printed as the campaign's
+     headline finding with no figure beside it to show how thin it was. Two recorded deals is the
+     floor, and the count and its denominator are printed wherever the cause is. */
+  var hasTopCause = topCauseN >= 2;
+  var causeSaid = hasTopCause
+    ? topCause + " — سُجّل على " + fmtN(topCauseN) + " من " + fmtN(lostHere.length) + " صفقة خاسرة"
+    : "";
   var moves = [];
-  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "#12633F", "#E4F5EC", "interested"]);
-  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (topCause ? " وعالج «" + topCause + "»" : ""), "#7A5600", "#FFF5D6", "silent"]);
-  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "#8E2A27", "#FBE7E6", "failed"]);
-  if (topCause) moves.push(["أبرز أسباب عدم الإغلاق: " + topCause, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "#1E5FCC", "#EAF1FE", ""]);
+  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "var(--m-ok)", "interested"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (hasTopCause ? " وعالج «" + topCause + "»" : ""), "var(--m-warn)", "silent"]);
+  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "var(--m-bad)", "failed"]);
+  if (hasTopCause) moves.push(["أبرز أسباب عدم الإغلاق: " + causeSaid, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "var(--m-ac)", ""]);
 
-  /* S4 — the single highest-value move, surfaced under the verdict so the operator sees the next
-     action without opening a tab. moves is already ordered hot -> seen-silent -> not-delivered ->
+  /* The single highest-value move, surfaced under the verdict so the operator sees the next action
+     without opening a tab. moves is already ordered hot -> seen-silent -> not-delivered ->
      top-cause, which is a value order; this shows moves[0] and invents no score. The fourth kind
      has no filter action, so the strip degrades to the tab link. ZERO moves renders NOTHING — a
      strip announcing an absence is chrome, and the count-less tab plus «لا توصية الآن» carries it. */
   if (moves.length) {
     var m0 = moves[0];
-    h += '<div class="rise" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid #ECEEF2;border-inline-start:3px solid #2563EB;border-radius:10px;padding:12px 16px;margin-bottom:14px;">' +
-      ic("spark", 16, "#2563EB") +
-      '<span style="font-size:14px;font-weight:500;color:#14161A;">' + esc(m0[0]) + '</span>' +
-      '<span style="flex:1;min-width:12px;"></span>' +
-      (m0[4] ? '<button class="btn" style="padding:6px 12px;font-size:12px;border-radius:999px;color:#2563EB;background:#fff;border:1px solid #5B8DEF;font-weight:600;" onclick="crmGoFilter(&quot;' + m0[4] + '&quot;)">افتح هذه الفئة</button>' : "") +
-      '<span class="lnk" onclick="crmSetDetailTab(&quot;next&quot;)" style="color:#33373E;font-weight:600;font-size:12px;cursor:pointer;">كل الخطوات (' + fmtN(moves.length) + ')</span>' +
-      '</div>';
+    h += '<section class="m-card cx-move" style="--tn:' + m0[2] + '"><div class="m-between" style="flex-wrap:wrap">' +
+      '<span class="m-body">' + ic("spark", 16) + " " + esc(m0[0]) + "</span>" +
+      '<span class="m-head__a">' +
+      (m0[3] ? '<button type="button" class="m-btn" onclick="crmGoFilter(&quot;' + m0[3] + '&quot;)">افتح هذه الفئة</button>' : "") +
+      '<button type="button" class="m-link" onclick="crmSetDetailTab(&quot;next&quot;)">كل الخطوات (' + fmtN(moves.length) + ")</button>" +
+      "</span></div></section>";
   }
 
   h += crmSpecStrip(camp, st);
   setTimeout(crmMeasureMsg, 0);
   setTimeout(crmPaintCrumb, 0);
 
-
   /* A «(0)» beside «الخطوة التالية» reads as a broken counter rather than as "nothing to do"; the
      panel itself says so in words. Show the count only when there is one. */
   var tabs = [["targets", "جهات الاستهداف", rows.length], ["perf", "الأداء", null], ["next", "الخطوة التالية", moves.length || null]];
-  h += '<div class="ctabs rise">' + tabs.map(function (t) {
-    return '<button class="' + (crmDetailTab === t[0] ? "on" : "") + '" onclick="crmSetDetailTab(&quot;' + t[0] + '&quot;)">' + t[1] + (t[2] === null ? "" : " (" + fmtN(t[2]) + ")") + '</button>';
-  }).join("") + '</div>';
+  h += '<div class="m-tabs" role="tablist" aria-label="أقسام الحملة">' + tabs.map(function (t) {
+    return '<button type="button" class="m-tab" role="tab" aria-selected="' + (crmDetailTab === t[0]) + '" onclick="crmSetDetailTab(&quot;' + t[0] + '&quot;)">' +
+      t[1] + (t[2] === null ? "" : "<b>" + fmtN(t[2]) + "</b>") + "</button>";
+  }).join("") + "</div>";
 
   if (crmDetailTab === "perf") {
     /* THE ASYMMETRY IS DELIBERATE. أُرسلت and وصلت describe the SEND itself, so «0٪ من جهات
        الاستهداف» on them is an honest statement about a send that did not happen. شوهدت / ردّوا /
        جهات مهتمة describe what the RECIPIENTS did, and those are undefined until something was
-       sent — a 0٪ there asserts that a delivered message went unseen. Flag per card (c[3]). */
-    var cards = [["جهات الاستهداف", st.targeted, "#1E5FCC", false], ["أُرسلت", st.sent, "#1E5FCC", false],
-      ["وصلت", st.delivered, "#5B8DEF", false], ["شوهدت", st.seen, "#5B8DEF", true],
-      ["ردّوا", st.replied, "#1E5FCC", true], ["جهات مهتمة", st.interested, "#1E9E63", true]];
-    h += '<div class="statgrid">' + cards.map(function (c, i) {
-      var r = c[3] ? crmDeliveryRate(c[1], st) : crmRate(c[1], st.targeted);
-      var caption = i === 0 ? "&nbsp;"
-        : r !== null ? fmtN(r) + "٪ من جهات الاستهداف"
+       dispatched — a 0٪ there asserts that a delivered message went unseen. Flag per card (c[3]). */
+    var cards = [["جهات الاستهداف", st.targeted, false], ["أُرسلت", st.sent, false],
+      ["وصلت", st.delivered, false], ["شوهدت", st.seen, true],
+      ["ردّوا", st.replied, true], ["جهات مهتمة", st.interested, true]];
+    h += '<div class="m-kpis">' + cards.map(function (c, i) {
+      var r = c[2] ? crmDeliveryRate(c[1], st) : crmRate(c[1], st.targeted);
+      var caption = i === 0 ? "كل من استهدفتهم الحملة"
+        : r !== null ? mPct(r) + " من جهات الاستهداف"
         : !st.targeted ? "لا جهات استهداف"
         : "لم تُرسل بعد";
-      return '<div class="statc"><div class="l">' + c[0] + '</div><div class="v">' + fmtN(c[1]) + '</div>' +
-        '<div class="p">' + caption + '</div>' +
-        '<div class="mb"><i style="width:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%;background:' + c[2] + ';"></i></div></div>';
-    }).join("") + '</div>' +
-    '<div style="font-size:12px;color:#656B76;margin-top:10px;">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</div>';
+      return '<div class="m-card"><span class="m-stat__k">' + c[0] + "</span>" +
+        '<span class="m-stat__v">' + mN(c[1]) + "</span>" +
+        '<span class="m-stat__s">' + caption + "</span>" +
+        '<span class="m-meter"><i style="--m-pct:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%"></i></span></div>";
+    }).join("") + "</div>" +
+    '<p class="m-meta">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</p>';
     /* BR-MON-004/006: what the campaign led to after «مهتم» (campaign-results-crm). */
     if (typeof crChainCard === "function") h += crChainCard(camp, st);
-    return h;
+    return h + "</div></div>";
   }
 
   if (crmDetailTab === "next") {
-    if (!moves.length) return h + '<div class="empty" style="padding:44px;"><div class="t">لا توصية الآن</div><div class="s">لم يُسجَّل حدث بعد الإطلاق.</div></div>';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">' +
-      moves.map(function (m) {
-        return '<div style="background:#fff;border:1px solid #ECEEF2;border-inline-start:3px solid ' + m[2] + ';border-radius:10px;padding:14px 16px;">' +
-          '<div style="font-size:14px;font-weight:500;color:#14161A;">' + esc(m[0]) + '</div>' +
-          '<div style="font-size:12px;color:#33373E;margin-top:5px;line-height:1.8;">' + esc(m[1]) + '</div>' +
-          (m[4] ? '<div style="margin-top:10px;"><button class="btn" style="padding:6px 12px;font-size:12px;border-radius:999px;color:#2563EB;background:#DCE8FC;border:1px solid #5B8DEF;font-weight:600;" onclick="crmGoFilter(&quot;' + m[4] + '&quot;)">افتح هذه الفئة</button></div>' : "") +
-          '</div>';
-      }).join("") + '</div>';
-    return h;
+    if (!moves.length) {
+      return h + '<section class="m-card m-empty"><p class="m-empty__t">لا توصية الآن</p>' +
+        '<p class="m-empty__d">لم يُسجَّل حدث بعد الإطلاق.</p></section></div></div>';
+    }
+    h += '<div class="cx-moves">' + moves.map(function (m) {
+      return '<section class="m-card cx-move" style="--tn:' + m[2] + '">' +
+        '<h3 class="m-body">' + esc(m[0]) + "</h3>" +
+        '<p class="m-meta">' + esc(m[1]) + "</p>" +
+        (m[3] ? '<div class="m-actions"><button type="button" class="m-btn" onclick="crmGoFilter(&quot;' + m[3] + '&quot;)">افتح هذه الفئة</button></div>' : "") +
+        "</section>";
+    }).join("") + "</div>";
+    return h + "</div></div>";
   }
 
   /* ---- targets tab: the existing six filters + table, now with selection ---- */
@@ -809,68 +732,73 @@ function vKmonDetailCrm(id, d) {
   var q = rQ.trim();
   var shown = rows.filter(active[3]).filter(function (r) { return !q || (r.contact && (r.contact.waName || "").includes(q)) || (r.name || "").includes(q) || r.phone.includes(q); });
   lastDetailCohort = {
-    label: active[1].replace(/[✓⭐]/g, "").trim(), campaign: camp.name,
+    label: active[1].replace(/[\\u2713\\u2b50]/g, "").trim(), campaign: camp.name,
     targets: shown.map(function (r) { return { phone: r.phone, name: (r.contact && r.contact.waName) || r.name || "" }; })
   };
   crmLastShown = shown.map(function (r) { return r.phone; });
+  /* The cohort size is printed on the filter tab AND above the table, so it is bound to the rows
+     the filter actually returned (PORT-SPEC §6). */
+  dsD("cxCohort", function () { return crmLastShown.length; });
 
-  h += '<div class="tblwrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #ECEEF2;background:#fff;">' +
-    '<span style="font-size:14px;font-weight:600;color:#14161A;flex:none;">جهات الاستهداف</span>' +
-    '<span style="font-size:12px;color:#656B76;flex:none;">' + fmtN(shown.length) + ' من ' + fmtN(rows.length) + '</span>' +
-    '<span style="flex:1;"></span>' +
-    (shown.length ? '<button class="btn" style="font-size:12px;border-radius:6px;color:#2563EB;background:#fff;border:1px solid #2563EB;font-weight:500;" onclick="startRetarget()">⟲ إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ')</button>' : "") +
-    filters.map(function (f) {
-      return '<button class="ptab' + (campFilter === f[0] ? " on" : "") + '" onclick="crmSetCampFilter(&quot;' + f[0] + '&quot;)">' + f[1] + ' (' + fmtN(f[2]) + ')</button>';
-    }).join("") +
-    '<input id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" style="font-family:inherit;font-size:12px;border:1px solid #ECEEF2;border-radius:999px;padding:7px 13px;background:#EFF1F5;width:130px;">' +
-    '</div>';
-  h += '<div style="overflow-x:auto;" class="ms-scroll"><div style="min-width:900px;">' +
-    (shown.length ? crmTargetRows(shown, cwin) : '<div style="padding:30px;text-align:center;color:#656B76;font-size:12px;">لا نتائج</div>') +
-    '</div></div></div>';
+  h += '<div class="m-tabs" role="tablist" aria-label="تصفية جهات الاستهداف">' + filters.map(function (f) {
+    return '<button type="button" class="m-tab" role="tab" aria-selected="' + (campFilter === f[0]) + '" onclick="crmSetCampFilter(&quot;' + f[0] + '&quot;)">' +
+      f[1] + "<b>" + fmtN(f[2]) + "</b></button>";
+  }).join("") + "</div>";
+
+  h += '<section class="m-card m-card--pad0 cx-tbl"><div class="m-tools"><div class="m-head__a">' +
+    '<span class="m-cap">' + dsFig("cxCohort", shown.length) + " من " + mN(rows.length) + "</span>" +
+    '<input class="m-input" id="rq" value="' + esc(rQ) + '" oninput="rSearch(this)" placeholder="بحث…" aria-label="بحث في جهات الاستهداف">' +
+    "</div>" +
+    (shown.length ? '<button type="button" class="m-btn" onclick="startRetarget()">إعادة استهداف هذه الفئة (' + fmtN(shown.length) + ")</button>" : "") +
+    "</div>";
+  h += '<div class="m-tablewrap"><table class="m-table m-table--sticky">' + crmTargetHeader(shown) +
+    "<tbody>" + (shown.length
+      ? crmTargetRows(shown, cwin)
+      : '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا نتائج</p>' +
+        '<p class="m-empty__d">امسح البحث أو اختر تصفية أخرى.</p></div></td></tr>') +
+    "</tbody></table></div></section>";
+  h += "</div></div>";
   h += crmDetailBulkBar(camp);
   return h;
 }
 
-/* The existing contactRowsHtml owns the row's visual language and its status/interest logic. We keep
-   it as the single source and only prepend the selection cell, rather than forking that markup. */
-/* The targets table is a LIST, so it uses the same chrome as every other list: a real column
-   header, 40px rows, one grid. The previous version wrapped dashboard.ts's contactRowsHtml in a
-   flex row to bolt a checkbox on, which broke its 6-column grid alignment and left the table with
-   NO header at all — the founder caught both. Interest chips are capped at two with a +N overflow;
-   three stacked chips were what made rows ~90px tall. */
-function crmTargetHeader(allOn) {
-  return '<div class="crow tgtrow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-    '<div class="selcell" style="opacity:1;"><input type="checkbox" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePageD()"></div>' +
-    '<div>العميل</div><div>الحالة</div><div>اهتمام المساعد</div><div>آخر رسالة</div><div>الوقت</div><div></div></div>' +
-    '<div class="thead-narrow"><span>العميل</span><span style="flex:1"></span><span>الحالة</span></div>';
+/* The targets table is a LIST, so it uses the same chrome as every other list. chipRow() and
+   interestChips() come from dashboard.ts and own the status and interest reading; they are called
+   rather than forked, so there is one definition of what a status chip means. They still emit the
+   old .chip markup because that file is under ADR-0001 and is not range-edited from here. */
+function crmTargetHeader(shown) {
+  var allOn = shown.length > 0 && shown.every(function (r) { return crmSelD[r.phone]; });
+  return "<thead><tr>" +
+    '<th class="m-sel"><input type="checkbox" class="m-cb" aria-label="تحديد المعروض"' + (allOn ? " checked" : "") + ' onclick="crmTogglePageD()"></th>' +
+    "<th>العميل</th><th>الحالة</th><th>اهتمام المساعد</th><th>آخر رسالة</th><th>الوقت</th>" +
+    "<th>المحادثة</th></tr></thead>";
 }
 
 function crmTargetRows(shown, cwin) {
-  var allOn = shown.length > 0 && shown.every(function (r) { return crmSelD[r.phone]; });
-  var out = crmTargetHeader(allOn);
+  var out = "";
   shown.forEach(function (r) {
     var c = r.contact || { phone: r.phone, waName: r.name, statusTimes: {}, tags: [], transcript: [] };
-    var nm = c.waName || r.name || "غير معروف";
+    var nm = c.waName || r.name || "";
     var tr = c.transcript || [];
     var last = tr[tr.length - 1];
     var ci = insCache[c.phone] || {};
     var on = !!crmSelD[r.phone];
-    /* cap the interest chips: three stacked chips is what made these rows 90px */
+    /* cap the interest chips: three stacked chips is what made these rows 90px tall */
     var tags = (c.tags || []).slice();
     var chips = interestChips({ tags: tags.slice(0, 2), phone: c.phone });
-    var extra = tags.length > 2 ? '<span style="font-size:12px;color:#656B76;">+' + fmtN(tags.length - 2) + '</span>' : "";
-    out += '<div class="trow km krow crow tgtrow' + (on ? " sel" : "") + '" onclick="location.hash=&quot;customer/' + esc(c.phone) + '&quot;">' +
-      '<div class="selcell"><input type="checkbox" aria-label="تحديد ' + esc(nm) + '"' + (on ? " checked" : "") + ' onclick="event.stopPropagation();crmToggleD(&quot;' + esc(c.phone) + '&quot;)"></div>' +
-      '<div class="c-name" style="display:flex;align-items:center;gap:10px;min-width:0;">' +
-        '<div style="min-width:0;"><div style="font-size:14px;font-weight:500;color:#14161A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(nm) + '</div></div>' +
-        '<span style="font-size:12px;color:#656B76;flex:none;direction:ltr;">' + esc(c.phone) + '</span></div>' +
-      '<div style="display:flex;gap:5px;flex-wrap:wrap;min-width:0;">' + chipRow(c, cwin) + '</div>' +
-      '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;min-width:0;">' + chips + extra + '</div>' +
-      '<div style="font-size:12px;color:#33373E;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">' +
-        (ci.next_action ? '<span style="color:#2563EB;">← ' + esc(ci.next_action) + '</span>' : esc(last ? clip(last.text, 60) : "—")) + '</div>' +
-      '<div style="font-size:12px;color:#656B76;white-space:nowrap;">' + (last ? fmtT(last.ts) : "—") + '</div>' +
-      '<div style="text-align:center;"><span class="lnk" style="font-size:12px;color:#2563EB;font-weight:500;" onclick="event.stopPropagation();openConvo(&quot;' + esc(c.phone) + '&quot;)">المحادثة ←</span></div>' +
-    '</div>';
+    var extra = tags.length > 2 ? '<span class="m-cap">+' + fmtN(tags.length - 2) + "</span>" : "";
+    out += "<tr" + (on ? ' aria-selected="true"' : "") + ">" +
+      '<td class="m-sel"><input type="checkbox" class="m-cb" aria-label="تحديد ' + esc(nm || c.phone) + '"' + (on ? " checked" : "") + ' onclick="crmToggleD(&quot;' + esc(c.phone) + '&quot;)"></td>' +
+      '<td class="m-td-n"><a class="m-link" href="#customer/' + esc(c.phone) + '">' +
+        (nm ? esc(nm) : mNil("بلا اسم مسجّل", "unset")) + "</a>" +
+        '<span class="cx-sub m-meta"><bdi dir="ltr">' + esc(c.phone) + "</bdi></span></td>" +
+      "<td>" + chipRow(c, cwin) + "</td>" +
+      "<td>" + (chips || extra ? chips + extra : mNil("لم يُصنَّف", "unset")) + "</td>" +
+      "<td>" + (ci.next_action
+        ? '<span class="m-link">&#8592; ' + esc(ci.next_action) + "</span>"
+        : last ? '<span class="cx-clip">' + esc(clip(last.text, 60)) + "</span>" : mNil("لا رسالة", "none")) + "</td>" +
+      "<td>" + (last ? fmtT(last.ts) : mNil("لا رسالة", "none")) + "</td>" +
+      '<td><button type="button" class="m-link" onclick="openConvo(&quot;' + esc(c.phone) + '&quot;)">المحادثة &#8592;</button></td></tr>";
   });
   return out;
 }
@@ -887,7 +815,7 @@ function crmPaintCrumb() {
   }
   if (act) {
     act.innerHTML = '<a href="#aimkt" class="btn" style="text-decoration:none;color:#fff;background:#2563EB;">' +
-      ic("send", 15, "#fff") + ' إنشاء حملة</a>';
+      ic("send", 15, "#fff") + " إنشاء حملة</a>";
   }
 }
 
@@ -904,15 +832,11 @@ window.addEventListener("resize", function () {
 });
 try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(crmMeasureMsg); } catch (e) {}
 
-/* Holds the list's shape while data loads. Frappe uses animate-pulse skeletons for this; a
-   centred «جارٍ التحميل» both shifts the layout when rows arrive and tells the operator nothing
-   about what is coming. */
+/* Holds the list's shape while data loads. A centred «جارٍ التحميل» both shifts the layout when
+   rows arrive and tells the operator nothing about what is coming. */
 function crmSkeleton(n) {
-  var h = '<div class="tblwrap crmflat rise" aria-busy="true" aria-live="polite">';
-  for (var i = 0; i < n; i++) {
-    h += '<div class="skel-row"><i style="width:16px;"></i><i></i><i></i><i></i><i></i></div>';
-  }
-  return h + '</div>';
+  return '<div class="ds6"><section class="m-card" aria-busy="true" aria-live="polite">' +
+    moSkeleton(n || 4, ["w40", "w80", "w60"]) + "</section></div>";
 }
 
 /* ============================== the guarded entry ==============================
@@ -927,8 +851,10 @@ function crmBoot() {
   var need = {
     campStats: typeof campStats, campWin: typeof campWin, atOrAfter: typeof atOrAfter,
     seenOf: typeof seenOf, repliedIn: typeof repliedIn, interestedOf: typeof interestedOf,
-    contactByPhone: typeof contactByPhone, contactRowsHtml: typeof contactRowsHtml,
+    contactByPhone: typeof contactByPhone, chipRow: typeof chipRow, interestChips: typeof interestChips,
     campIsTest: typeof campIsTest, fmtN: typeof fmtN, fmtD: typeof fmtD, esc: typeof esc, ic: typeof ic,
+    mN: typeof mN, mNil: typeof mNil, mPct: typeof mPct, dsFig: typeof dsFig, dsD: typeof dsD,
+    dsPageBar: typeof dsPageBar, moSkeleton: typeof moSkeleton,
     vKmon: typeof vKmon, vKmonDetail: typeof vKmonDetail
   };
   var missing = Object.keys(need).filter(function (k) { return need[k] !== "function"; });
@@ -954,8 +880,8 @@ function crmCampaignsHtml(campId) {
          of render() and b.innerHTML is never assigned — a blank screen, which is the exact failure
          ADR-0001 was written after. Say something rather than nothing. */
       try { console.error("campaigns-crm fallback also failed:", e3); } catch (e4) {}
-      return '<div class="empty" style="padding:60px 20px;"><div class="t">تعذّر عرض الحملات</div>' +
-        '<div class="s">أعد تحميل الصفحة. إن تكرر الأمر، فالمشكلة في هذا الإصدار وليست في بياناتك.</div></div>';
+      return '<div class="ds6"><section class="m-card m-empty"><p class="m-empty__t">تعذّر عرض الحملات</p>' +
+        '<p class="m-empty__d">أعد تحميل الصفحة. إن تكرر الأمر، فالمشكلة في هذا الإصدار وليست في بياناتك.</p></section></div>';
     }
   }
 }
@@ -979,7 +905,7 @@ window.crmToggle = function (id) { if (crmSel[id]) delete crmSel[id]; else crmSe
 window.crmToggleD = function (ph) { if (crmSelD[ph]) delete crmSelD[ph]; else crmSelD[ph] = true; render(false); };
 window.crmClear = function () { crmSel = {}; render(false); };
 window.crmClearD = function () { crmSelD = {}; render(false); };
-/* FR-6. Distinct from select-page: this reaches the matches LIST_CAP hides. Named and counted so
+/* Distinct from select-page: this reaches the matches the page slice hides. Named and counted so
    the operator knows the difference between "the 60 I can see" and "the 137 that match". */
 window.crmSelectAllMatching = function () {
   var all = crmFiltered();
@@ -988,7 +914,7 @@ window.crmSelectAllMatching = function () {
   alertBar("حُدِّدت " + fmtN(all.length) + " حملة مطابقة، بما فيها غير المعروضة", false);
 };
 window.crmTogglePage = function () {
-  var shown = crmFiltered().slice(0, LIST_CAP);
+  var shown = pageSlice("kmon", crmFiltered());
   var allOn = shown.length > 0 && shown.every(function (x) { return crmSel[x.c.id]; });
   shown.forEach(function (x) { if (allOn) delete crmSel[x.c.id]; else crmSel[x.c.id] = true; });
   var total = crmFiltered().length;
@@ -1001,7 +927,7 @@ window.crmTogglePageD = function () {
   render(false);
 };
 /* Reclassify each selected campaign through the SAME endpoint the single-row button uses. Partial
-   failure is reported with its count rather than swallowed. NO SEND PATH EXISTS HERE. */
+   failure is reported with its count rather than swallowed. NO DISPATCH PATH EXISTS HERE. */
 var crmBulkBusy = false;
 window.crmBulkClass = async function (test) {
   /* Re-entrancy guard: the bar stays on screen while the requests run, and a second click would
