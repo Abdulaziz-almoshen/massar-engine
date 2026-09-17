@@ -24,6 +24,8 @@ import { REPORTS_CRM_CSS, REPORTS_CRM_JS } from "./reports-crm.js";
 import { EXEC_REPORTS_CSS, EXEC_REPORTS_JS } from "./exec-reports-crm.js";
 import { CRM_PRIMITIVES_CSS } from "./crm-primitives.js";
 import { REVAMP_CSS, HOLD_CSS, HOLD_JS } from "./revamp.js";
+import { MASSAR_DS_CSS } from "./massar-ds-crm.js";
+import { HOME_DS_JS } from "./home-ds-crm.js";
 import { TARGETS_CRM_CSS, TARGETS_CRM_JS } from "./targets-crm.js";
 import { OPPS_CRM_CSS, OPPS_CRM_JS } from "./opps-crm.js";
 import { SALES_CRM_CSS, SALES_CRM_JS } from "./sales-crm.js";
@@ -814,6 +816,9 @@ ${PALETTE_CSS}
 /* LAST. The V3 shell and component language wins on cascade order — see revamp.ts. */
 ${REVAMP_CSS}
 ${HOLD_CSS}
+/* Last, so a ported screen wins over revamp.ts. It can only reach inside .ds6,
+   so the 25 screens that have not been ported are untouched by it. */
+${MASSAR_DS_CSS}
 </style>
 </head>
 <body>
@@ -1859,7 +1864,12 @@ function vHome(d) {
   ]);
   // The deck is full-bleed and sits ABOVE the numbered bands: it is one dark object continuous with
   // the rail, not a section of the page, so it carries its own header and escapes .body's padding.
-  const deck = (typeof vHomeDeck === "function") ? vHomeDeck() : "";
+  // The surface is the new design system (home-ds-crm.ts), scoped to .ds6. It replaces vHomeDeck,
+  // which summed ONE quarter's target and achieved under a «السنة المالية» label and computed a
+  // company attainment percentage while most products carry no target at all. The bands below still
+  // render in the old system until they are ported in turn.
+  const deck = (typeof vHomeDs === "function") ? vHomeDs()
+    : ((typeof vHomeDeck === "function") ? vHomeDeck() : "");
   return deck + ((typeof hdBands === "function") ? hdBands(bands) : bands.map((b) => b[2]).join(""));
 }
 
@@ -5188,6 +5198,7 @@ ${ACCOUNT_DOMAIN_JS}
 ${HOME_DOMAIN_JS}
 ${ACCEPTANCE_DOMAIN_JS}
 ${HOME_CRM_JS}
+${HOME_DS_JS}
 ${ORG_CRM_JS}
 ${YEAR_TARGETS_JS}
 ${KB_HUB_JS}

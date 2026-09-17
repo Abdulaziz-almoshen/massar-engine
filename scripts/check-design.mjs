@@ -143,7 +143,19 @@ const repDrift = Object.entries(repRoot)
   .map(([k, v]) => `${k}: rep-page.ts has ${v}, dashboard.ts has ${shipped[k]}`);
 
 const findings = { textOnForbidden: [], untokenisedText: [], intZIndex: [], offLadderType: [] };
-const LADDER = new Set([12, 14, 16, 18, 22, 28, 40, 44]);
+// The ladder comes from DESIGN.md, not from a copy kept here. A checker that carries its own
+// copy of the rule is a second authority, and this file exists because two authorities drifted.
+// A zero parse is a hard failure for the same reason the token parse above refuses to pass on
+// no data: a guard that finds nothing and says "all green" is worse than no guard.
+const LADDER = (() => {
+  const m = fs.readFileSync(DESIGN_MD, "utf8").match(/--type-ladder:\s*([0-9,\s]+)/);
+  const vals = m ? m[1].split(",").map((x) => Number(x.trim())).filter((n) => n > 0) : [];
+  if (vals.length < 5) {
+    console.log("FAIL DESIGN.md has no --type-ladder line — the type check cannot run");
+    process.exit(1);
+  }
+  return new Set(vals);
+})();
 
 for (const f of files) {
   const src = fs.readFileSync(new URL(f, SRC), "utf8");

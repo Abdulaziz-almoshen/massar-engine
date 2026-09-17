@@ -25,9 +25,13 @@ BASE = os.environ.get("SMOKE_BASE") or os.environ.get("BASE") or "https://massar
 # route → a landmark that must exist if the view actually rendered
 ROUTES = [
     # «مركز القيادة» was the second page title on الرئيسية and was deleted when the screen became
-    # one dashboard instead of two stacked (2026-09-16). The landmark is now the first band's own
-    # heading, which is rendered by vHomeExecBands and cannot be satisfied by the rail or breadcrumb.
-    ("#home", "صحة خط البيع"),
+    # one dashboard instead of two stacked (2026-09-16). «صحة خط البيع» replaced it and was itself
+    # deleted on 2026-09-17, when the screen was rebuilt on the new design system (home-ds-crm.ts).
+    # The landmark is now the revenue card's own label. It is deliberately a string that appears
+    # ONLY after /admin/products/performance resolves: while that read is in flight the surface
+    # renders «جارٍ قراءة الأداء…» instead, so a failed or empty performance read fails this route
+    # rather than passing on a spinner. Not in the rail, not in the breadcrumb.
+    ("#home", "الإيراد المحقق"),
     ("#kmon", "كانبان"),
     # #customers became the العملاء LIST this cycle; the importer moved to #targets, which
     # is why both routes are asserted now — the old landmark would still pass on the wrong screen.
