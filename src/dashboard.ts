@@ -4804,13 +4804,13 @@ function render(fetchNew) {
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
     // was already «جهات الاستهداف». Until this split the sidebar said العملاء and the screen showed
     // the importer, and there was no list to click a customer FROM.
-    b.innerHTML = cur === "aimkt" ? vAimkt()
+    b.innerHTML = cur === "aimkt" ? ('<div class="ds6">' + vAimkt() + "</div>")
       : cur === "targets" ? vTargetsCrm()
       // «المستهدفات» answers the YEAR first (what each product is asked to sell, and how the target
       // was spread over the quarters), then the quarter-at-a-time performance table below it.
       : cur === "perf" ? vYearTargets() + vSalesPerf()
       : cur === "opps" ? vOppsCrm()
-      : cur === "triage" ? vMorningList()
+      : cur === "triage" ? ('<div class="ds6">' + vMorningList() + "</div>")
       : cur === "pipeline" ? vActivityCrm()
       : cur === "tasks" ? vTasksCrm()
       : cur === "notes" ? vNotesCrm()

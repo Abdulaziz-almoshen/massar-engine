@@ -278,24 +278,68 @@ function auLoad(reset) {
 var AU_DETAIL_LABELS = { product: "المنتج", name: "الاسم", stage: "المرحلة", status: "الحالة", decision: "القرار", verdict: "التقييم", week: "الأسبوع", source: "المصدر", kind: "النوع", role: "الدور", result: "النتيجة", title: "العنوان", lost_reason: "سبب الخسارة", outcome: "النتيجة", account_name: "العميل", objective: "الهدف" };
 function vAudit() {
   if (!auData && !auFailed) auLoad(true);
-  var h = '<div class="us">';
-  if (!auData) return h + '<section class="cf-sec"><div class="cf-state"' + (auFailed ? ' role="alert">تعذّر تحميل السجل.<button class="btn btn-ghost" data-au="retry">أعد المحاولة</button>' : ' role="status">جارٍ تحميل السجل…') + "</div></section></div>";
+  if (!auData) {
+    return '<div class="ds6"><div class="m-empty"' + (auFailed
+      ? ' role="alert"><div class="m-empty__t">تعذّر تحميل السجل</div>' +
+        '<div class="m-empty__a"><button class="m-btn" data-au="retry">أعد المحاولة</button></div>'
+      : ' role="status" aria-busy="true"><div class="m-empty__t">جارٍ تحميل السجل…</div>') +
+      "</div></div>";
+  }
   var sel = function (key, label, opts) {
-    return '<select aria-label="' + label + '" data-auset="' + key + '"><option value="">' + label + ": الكل</option>" + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (auF[key] === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>";
+    return '<select class="m-select" aria-label="' + label + '" data-auset="' + key + '">' +
+      '<option value="">' + label + ": الكل</option>" +
+      opts.map(function (o) {
+        return '<option value="' + esc(o[0]) + '"' + (auF[key] === o[0] ? " selected" : "") + ">" +
+          esc(o[1]) + "</option>";
+      }).join("") + "</select>";
   };
-  h += '<section class="cf-sec us-sec"><div class="hd"><h2>سجل التدقيق</h2><span class="s">كل عملية حفظ ناجحة: من، وبأي دور، وماذا، ومتى</span></div>' +
-    '<div class="au-f">' + sel("who", "المستخدم", auData.facets.who.map(function (w) { return [w.key, w.label]; })) + sel("action", "العملية", auData.facets.actions.map(function (a) { return [a, a]; })) + "</div>";
-  if (!auData.rows.length) h += '<div class="cf-state">لا عمليات مسجّلة' + (auF.actor || auF.action ? " لهذه التصفية." : " بعد.") + "</div>";
-  auData.rows.forEach(function (r) {
-    var d = r.detail || {}, chips = Object.keys(d).slice(0, 6).map(function (k) {
-      var v = d[k]; var txt = v && typeof v === "object" && "count" in v ? "العدد " + fmtN(v.count) : String(v);
-      return "<span>" + esc((AU_DETAIL_LABELS[k] || k) + ": " + txt) + "</span>";
-    }).join("");
-    h += '<div class="au-row"><time>' + new Date(r.at).toLocaleString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + "</time>" +
-      '<span class="who">' + esc(r.userId == null ? "مدير النظام" : r.actor) + '<span class="r">' + esc(r.userId == null ? "الرمز الرئيسي" : (ROLE_LABELS[r.role] || r.role)) + "</span></span>" +
-      "<span>" + esc(r.action) + (r.entityId ? ' <span class="cf-sub">· ' + esc(r.entityId) + "</span>" : "") + '</span><span class="dt">' + chips + "</span></div>";
-  });
-  if (auData.next) h += '<div class="ac-more"><button class="btn btn-ghost" data-au="more"' + (auLoading ? " disabled" : "") + ">عرض أقدم</button></div>";
+
+  var h = '<div class="ds6"><section class="m-card m-card--pad0">' +
+    '<div class="m-card__h"><div class="m-section-head__t">' +
+    '<h2 class="m-card__t">سجل التدقيق</h2>' +
+    '<p class="m-meta">كل عملية حفظ ناجحة: من، وبأي دور، وماذا، ومتى</p></div>' +
+    '<div class="m-row">' +
+      sel("who", "المستخدم", auData.facets.who.map(function (w) { return [w.key, w.label]; })) +
+      sel("action", "العملية", auData.facets.actions.map(function (a2) { return [a2, a2]; })) +
+    "</div></div>";
+
+  if (!auData.rows.length) {
+    h += '<div class="m-empty"><div class="m-empty__t">' +
+      (auF.actor || auF.action ? "لا عمليات مطابقة لهذه التصفية" : "لا عمليات مسجّلة بعد") +
+      "</div></div>";
+  } else {
+    h += '<div class="m-tablewrap"><table class="m-table"><thead><tr>' +
+      "<th>الوقت</th><th>المستخدم</th><th>العملية</th><th>التفاصيل</th>" +
+      "</tr></thead><tbody>";
+    auData.rows.forEach(function (r) {
+      var d = r.detail || {};
+      var chips = Object.keys(d).slice(0, 6).map(function (k) {
+        var v = d[k];
+        /* A count inside a detail chip is still a number: it goes through the isolate like any
+           other, or it renders on the wrong side of its label. */
+        var txt = v && typeof v === "object" && "count" in v
+          ? 'العدد <span class="m-n">' + fmtN(v.count) + "</span>"
+          : esc(String(v));
+        return '<span class="m-chip">' + esc(AU_DETAIL_LABELS[k] || k) + ": " + txt + "</span>";
+      }).join(" ");
+      h += '<tr><td class="m-cap"><time>' +
+        esc(new Date(r.at).toLocaleString("ar-SA-u-ca-gregory-nu-latn",
+          { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })) + "</time></td>" +
+        '<td class="m-td-n">' + esc(r.userId == null ? "مدير النظام" : r.actor) +
+          '<span class="m-cap" style="display:block">' +
+          esc(r.userId == null ? "الرمز الرئيسي" : (ROLE_LABELS[r.role] || r.role)) + "</span></td>" +
+        "<td>" + esc(r.action) +
+          (r.entityId ? '<span class="m-cap" style="display:block">' + esc(r.entityId) + "</span>" : "") +
+        "</td>" +
+        "<td>" + (chips || '<span class="m-td-nil m-nil--none">لا تفاصيل</span>') + "</td></tr>";
+    });
+    h += "</tbody></table></div>";
+  }
+
+  if (auData.next) {
+    h += '<div class="m-tools"><button class="m-btn" data-au="more"' +
+      (auLoading ? " disabled" : "") + ">عرض أقدم</button></div>";
+  }
   return h + "</section></div>";
 }
 
