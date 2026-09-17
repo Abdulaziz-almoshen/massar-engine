@@ -155,9 +155,8 @@ export const OPPS_CRM_CSS = `
   .ox-filt { display:flex; align-items:center; gap:var(--s2); flex:1 1 0; min-width:0; flex-wrap:wrap; }
   .ox-filt > * { flex:none; }
   .ox-brk { display:none; }
-  .ox-srch { position:relative; display:inline-flex; align-items:center; flex:0 1 232px; min-width:180px; }
-  .ox-srch .ox-si { position:absolute; inset-inline-start:12px; color:var(--muted); display:flex; pointer-events:none; }
-  .ox-srch .inp { width:100%; min-height:36px; height:36px; padding-inline-start:36px; font-size:var(--t-sm); }
+  /* Wide enough for its own placeholder: at 232px «بحث بالجهة أو المنتج أو المسؤول» was cut mid-word. */
+  .ox-srch { display:flex; align-items:center; flex:1 1 320px; min-width:240px; }
   .ox-f { position:relative; display:inline-flex; align-items:center; }
   .ox-f select { font-family:inherit; appearance:none; -webkit-appearance:none; height:36px; max-width:140px;
     font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
@@ -241,7 +240,7 @@ export const OPPS_CRM_CSS = `
     .ox-tb { gap:var(--s2); }
     /* Phone: two rows. Search + primary; then the filters as a strip that scrolls INSIDE itself
        (a phone has no room to wrap four selects) with the view switch beside it. */
-    .ox-srch { order:1; flex:1 1 150px; }
+    .ox-srch { order:1; flex:1 1 100%; min-width:0; }
     .ox-add { order:2; }
     .ox-brk { display:block; order:3; flex-basis:100%; height:0; }
     .ox-filt { order:4; flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow-x:auto; padding:3px; margin:-3px; scrollbar-width:none; }
@@ -1125,7 +1124,9 @@ function opToolbar() {
     h += '<span class="sp"></span><button class="m-btn ox-add" onclick="opClearSel()">إلغاء التحديد</button>';
     return h + "</div>";
   }
-  h += '<span class="ox-srch m-rel"><span class="ox-si">' + opIco("search") + "</span>" +
+  /* The pill carries its own magnifier, so the toolbar's old absolutely-positioned one is gone; it was
+     sitting behind the new one. */
+  h += '<span class="ox-srch">' +
     mSearch({ id: "opq", value: opQ, placeholder: "بحث بالجهة أو المنتج أو المسؤول", label: "بحث في الفرص", wide: true, attrs: ' oninput="opSearch(this)"' }) + "</span>";
   h += '<span class="ox-filt">';
   h += opSelect("oxf_stg", "المرحلة", opStg,
@@ -1445,6 +1446,13 @@ function opField(l, key, label, type) {
     var bd = opLineBounds(key);
     return field + mNum({ id: id, value: val, label: label, attrs: tail, min: bd.min, max: bd.max, step: bd.step, mode: bd.mode }) + "</div>";
   }
+  /* المسؤول is a choice from the people who already own deals, and still a free name: a new rep is
+     assigned before anyone has typed them anywhere (founder, 2026-09-17). */
+  if (key === "owner") {
+    return field + mCombo({ id: id, value: val, options: opOwners(), placeholder: "بلا مسؤول",
+      label: label, free: true, wide: true,
+      attrs: ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;owner&quot;,this.value)"' }) + "</div>";
+  }
   return field + '<input class="m-input" id="' + id + '" type="text" value="' + esc(val) + '"' + tail + "></div>";
 }
 /* ===== التصعيد وطلب الدعم =====
@@ -1717,8 +1725,7 @@ function opDetailDrawer(l) {
   b += "</section>";
   /* المتابعة */
   b += '<section class="ox-sec" aria-labelledby="oxsec_f"><div class="ox-sech" id="oxsec_f">المتابعة</div>' +
-    opField(l, "next_step", "الخطوة التالية", "text") + opField(l, "owner", "المسؤول", "text") +
-    '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist></section>";
+    opField(l, "next_step", "الخطوة التالية", "text") + opField(l, "owner", "المسؤول", "text") + "</section>";
   /* التفاصيل */
   var srcDD = esc(opSrcLabel(l.source));
   if (l.source === "whatsapp") srcDD = opIco("whatsapp") + " " + srcDD;

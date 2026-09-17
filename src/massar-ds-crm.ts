@@ -1753,7 +1753,7 @@ export const MASSAR_DS_CSS = `
   box-shadow: 0 0 0 1px var(--m-line), 0 8px 24px rgba(0, 0, 0, .06);
   transition: box-shadow var(--m-out) var(--m-ease);
 }
-.ds6 .m-sf--wide{ flex: 1 1 260px; }
+.ds6 .m-sf--wide{ flex: 1 1 300px; min-inline-size: 240px; }
 .ds6 .m-sf:focus-within{ box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line), 0 8px 24px rgba(0, 0, 0, .06); }
 .ds6 .m-sf__i{ inline-size: 16px; block-size: 16px; flex: none; fill: none; stroke: var(--m-mut);
   stroke-width: 1.8; stroke-linecap: round; }
@@ -1767,8 +1767,12 @@ export const MASSAR_DS_CSS = `
   background: transparent;
   box-shadow: none;
   outline: none;
+  /* A placeholder too long for the pill ends in an ellipsis rather than mid-word. */
+  text-overflow: ellipsis;
 }
 /* Safari draws its own decorations inside type=search; they would sit beside ours. */.ds6 .m-sf .m-sf__in::-webkit-search-decoration, .ds6 .m-sf .m-sf__in::-webkit-search-cancel-button, .ds6 .m-sf .m-sf__in::-webkit-search-results-button{ -webkit-appearance: none; appearance: none; }
+/* display:grid would win over the hidden attribute's own display:none — the clear button showed on
+   an empty field until this line was added. */.ds6 .m-sf__x[hidden]{ display: none; }
 .ds6 .m-sf__x{
   flex: none;
   display: grid;
@@ -1787,4 +1791,75 @@ export const MASSAR_DS_CSS = `
   stroke-width: 2; stroke-linecap: round; }
 @media (hover: hover) and (pointer: fine){.ds6 .m-sf__x:hover{ background: var(--m-line-2); color: var(--m-ink); }}
 /* The reference's shortcut chip is not drawn (founder: «remove the / sign in the search»). */.ds6 @media (prefers-reduced-motion: reduce){ .m-sf, .m-sf__x { transition: none; } }
+/* ============================================================================
+   THE COMBOBOX — after Select & Combobox at ui.halaska.com (combobox-crm.ts), measured there: a pill
+   trigger on a soft grey ground with the value at the start and a chevron at the end; on open it turns
+   to paper with a dark border and drops a white popup carrying a filter box above the list, the chosen
+   row on a grey ground with a check at its end. Massar's height (44px) and tokens.
+   ============================================================================ */.ds6 .m-cb{ position: relative; display: inline-flex; min-inline-size: 0; }
+.ds6 .m-cb--wide{ display: flex; inline-size: 100%; }
+.ds6 .m-cb__t{
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--m-2);
+  min-block-size: 44px;
+  min-inline-size: 0;
+  padding-inline: var(--m-3);
+  border: 1px solid transparent;
+  border-radius: var(--m-r-ctl);
+  background: var(--m-sunk);
+  font: inherit;
+  font-size: var(--m-t-body);
+  color: var(--m-ink);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease);
+}
+@media (hover: hover) and (pointer: fine){.ds6 .m-cb__t:hover{ background: var(--m-line); }}
+.ds6 .m-cb__t[aria-expanded="true"]{ background: var(--m-paper); border-color: var(--m-ink-2); }
+.ds6 .m-cb__t:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+.ds6 .m-cb__v{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .m-cb__v.is-ph{ color: var(--m-faint); }
+.ds6 .m-cb__c{ flex: none; inline-size: 16px; block-size: 16px; fill: none; stroke: var(--m-mut);
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ds6 .m-cb__p{
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline: 0;
+  z-index: var(--z-overlay, 300);
+  min-inline-size: 220px;
+  padding: var(--m-1);
+  border-radius: var(--m-r-card);
+  background: var(--m-paper);
+  box-shadow: 0 0 0 1px var(--m-line), var(--m-lift);
+}
+.ds6 .m-cb__p[hidden]{ display: none; }
+.ds6 .m-cb__f{ inline-size: 100%; min-block-size: 38px; margin-block-end: var(--m-1); box-shadow: none;
+  border-block-end: 1px solid var(--m-line); border-radius: 0; background: transparent; }
+/* The popup's own filter row takes an underline, not the app's global 2px focus outline: inside a
+   220px popup that outline drew a box around the row and read as an error state. */.ds6 .m-cb__f:focus, .ds6 .m-cb__f:focus-visible{ box-shadow: none; outline: none;
+  border-block-end-color: var(--m-ac); }
+.ds6 .m-cb__l{ list-style: none; margin: 0; padding: 0; max-block-size: 240px; overflow-y: auto; }
+.ds6 .m-cb__o{
+  display: flex;
+  align-items: center;
+  gap: var(--m-2);
+  min-block-size: 36px;
+  padding-inline: var(--m-2);
+  border-radius: var(--m-r-ctl);
+  font-size: var(--m-t-cap);
+  color: var(--m-ink);
+  cursor: pointer;
+}
+.ds6 .m-cb__o[hidden]{ display: none; }
+.ds6 .m-cb__o.is-hi{ background: var(--m-page); }
+.ds6 .m-cb__o.is-on{ background: var(--m-sunk); font-weight: 600; }
+.ds6 .m-cb__o--free{ color: var(--m-ac-deep); }
+.ds6 .m-cb__k{ margin-inline-start: auto; inline-size: 14px; block-size: 14px; fill: none;
+  stroke: currentColor; stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.ds6 .m-cb__o.is-on .m-cb__k{ opacity: 1; }
+.ds6 .m-cb__e{ padding: var(--m-2); font-size: var(--m-t-cap); color: var(--m-mut); }
+.ds6 .m-cb__e[hidden]{ display: none; }
+@media (prefers-reduced-motion: reduce){.ds6 .m-cb__t{ transition: none; }}
 `;

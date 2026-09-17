@@ -37,6 +37,7 @@ export const OPP_WORK_CRM_CSS = `
 .ds6 .ow-j .m-tl__d { background:var(--tn, var(--m-ac)); }
 .ds6 .ow-js.future .m-tl__d, .ds6 .ow-js.skipped .m-tl__d { background:var(--m-paper); box-shadow:0 0 0 1.5px var(--m-line-2); }
 .ds6 .ow-js .hd { display:flex; align-items:baseline; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .ow-jahead { font-size:var(--m-t-cap); color:var(--m-mut); margin-block-start:var(--m-3); }
 .ds6 .ow-js .who { display:block; margin-block-start:2px; font-size:var(--m-t-micro); color:var(--m-mut); }
 .ds6 .ow-js .hd b { color:var(--m-ink); font-weight:700; }
 .ds6 .ow-js.current .hd b { color:var(--m-ac-deep); }
@@ -274,6 +275,11 @@ function owStamp(ms) {
   if (!ms) return "";
   try { return fmtD(ms); } catch (e) { return ""; }
 }
+/* WHO MOVED IT, as a person. The server stamps the signed-in user's own name on the event
+   (index.ts authorize -> Caller.actor); «اللوحة» is what it stamps when the move was made with the
+   SHARED admin token, which is a credential, not a person. Printing it verbatim asks the reader who
+   «the board» is, so it is named for what it is — the same rule the accounts screen already applies. */
+function owActorName(a) { return !a || a === "اللوحة" ? "مدير النظام" : a; }
 function owJourneySection(l) {
   owLoad(l.id, false);
   var w = owWork[l.id] || {};
@@ -308,7 +314,12 @@ function owJourneySection(l) {
       : '<span class="m-meter" style="--m-pct:' + pct + '%"><i></i></span><span class="v">' + mPct(pct) + "</span>";
     b += "</div>";
   }
-  b += '<ol class="ow-j m-tl">' + steps.map(function (st) {
+  /* A rung the deal has NOT reached is hidden (founder, 2026-09-17: «if stage is not reached hide
+     it»): seven rows of «لم تُسجَّل · بلا تاريخ» pushed the rungs that did happen off the screen. The
+     ones ahead are still counted in one line under the list, so nothing silently disappears. */
+  var shown = steps.filter(function (st) { return st.state !== "future"; });
+  var ahead = steps.length - shown.length;
+  b += '<ol class="ow-j m-tl">' + shown.map(function (st) {
     var stage = typeof opStage === "function" ? opStage(st.key) : { label: st.key };
     var o = st.outcomeKey ? owOutcomeOf(st.outcomeKey) : null;
     var said = st.state === "current" ? "الحالية"
@@ -328,13 +339,17 @@ function owJourneySection(l) {
          only a rung the deal has left can name one. A rung it left with nobody recorded says that —
          a classification nobody made, never a blank (PORT-SPEC §4). */
       (st.state === "done"
-        ? '<span class="who">' + (st.actor ? "نقلها " + esc(st.actor) : opNil("لم يُسجَّل من نقلها", "unset")) + "</span>"
+        ? '<span class="who">' + (st.actor ? "نقلها " + esc(owActorName(st.actor)) : opNil("لم يُسجَّل من نقلها", "unset")) + "</span>"
         : "") +
       "</span>" +
       '<span class="m-tl__t">' + (st.leftAt || st.reachedAt
         ? esc(owStamp(st.leftAt || st.reachedAt))
         : opNil("بلا تاريخ", "unset")) + "</span></li>";
   }).join("") + "</ol>";
+  if (ahead) {
+    b += '<div class="ow-jahead">' + mPl(ahead, "مرحلة واحدة لاحقة", "مرحلتان لاحقتان", "مراحل لاحقة", "مرحلة لاحقة") +
+      " لم يصل إليها البند بعد.</div>";
+  }
   if (!evs.length) {
     b += '<div class="ox-hint2">لا انتقالات مسجّلة لهذا البند بعد — يُسجَّل الانتقال تلقائيًا عند تغيير المرحلة.</div>';
   }
