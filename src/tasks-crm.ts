@@ -169,7 +169,11 @@ function vNotesCrm() {
   var h = '<div class="ds6"><div class="m-task">';
   h += '<div class="m-tools"><div class="m-head__a">' +
     '<input id="nteq" class="m-input" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" aria-label="ابحث في الملاحظات"></div>' +
-    '<span class="m-cap">' + ntePl(rows.length) + "</span></div>";
+    /* The count had no label: a bare «ملاحظة واحدة» floating in a toolbar says what it is only
+       if you already know. Naming the surface also gives smoke a landmark that does not depend
+       on how many rows happen to exist - the counted noun alone reads «ملاحظات» at three rows
+       and «ملاحظة» at one, so an assertion on it passes or fails by row count. */
+    '<span class="m-cap">الملاحظات · ' + ntePl(rows.length) + "</span></div>";
   if (!rows.length) {
     return h + '<div class="m-empty"><div class="m-empty__t">' +
       (nteRows.length ? "لا ملاحظة تطابق البحث" : "لا ملاحظات بعد") + "</div>" +
