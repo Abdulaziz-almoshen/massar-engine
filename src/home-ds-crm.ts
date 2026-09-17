@@ -153,62 +153,137 @@ function hdsIcon(n) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (HDS_ICONS[n] || "") + "</svg>";
 }
 
-/* ---------- the hero: what we made, what we owe, and whether we can tell ---------- */
+/* ---------- the hero: two indicators, equal weight ----------
+   The founder kept two and asked for them to be better (2026-09-17). Each is now the same shape —
+   eyebrow, one figure at one size, a small graphic, and a row of supporting counts — so neither
+   reads as the lesser one, and each graphic is drawn from the same population as its figure.
+
+   REVENUE: won value for the fiscal year, with the year's won / lost / open line counts under it.
+   Won and lost are this fiscal year's closes; open is every open line whatever its age, and the
+   label says «مفتوحة الآن» so the three are not read as one period's split.
+
+   TARGET: the recorded target, with a track of what has been won ON THE TARGETED PRODUCTS, IN THE
+   TARGETED QUARTERS, against it. Not company revenue against it: untargeted revenue in that numerator is exactly the defect
+   that let attainment pass 100٪ with targets unmet. */
+function hdsTargetPeriod(f) {
+  var only = null;
+  f.rows.forEach(function (p) { if (p.annualTarget !== null && p.annualTarget !== undefined) only = only || p; });
+  if (f.withTarget !== 1 || !only) return "";
+  var qs = (only.quarters || []).filter(function (q) { return q.target !== null && q.target !== undefined; });
+  if (qs.length !== 1) return "";
+  var q = Number(qs[0].quarter);
+  var cur = (typeof pcQuarters !== "undefined" && pcQuarters) ? Number(pcQuarters.currentQuarter) : null;
+  if (!cur) return "";
+  if (q < cur) return "انتهى";
+  if (q > cur) return "لم يبدأ بعد";
+  var end = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.periodEnd) ? Date.parse(pcSectors.periodEnd) : NaN;
+  if (isNaN(end)) return "جارٍ";
+  var left = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
+  return left
+    ? ("باقٍ منه " + mPl(left, "يوم واحد", "يومان", "أيام", "يومًا"))
+    : "ينتهي اليوم";
+}
+function hdsHeroStat(label, valueHtml) {
+  return '<div class="hx-kpi"><span class="hx-kpi__k">' + label + '</span>' +
+    '<span class="hx-kpi__v">' + valueHtml + "</span></div>";
+}
 function hdsHero(f, lines) {
-  var h = '<section class="hm-hero" aria-label="الإيراد والمستهدف والحكم على تحقيقه">';
+  var won = 0, lost = 0, tAch = 0;
+  f.rows.forEach(function (p) {
+    won += Number(p.wonLines) || 0;
+    lost += Number(p.lostLines) || 0;
+    /* Only the QUARTERS that carry a target. A product targeted for Q3 alone, measured against its
+       whole year's wins, would count a Q1 close against a Q3 target — the same numerator/denominator
+       mismatch as untargeted revenue, one axis over. */
+    (p.quarters || []).forEach(function (q) {
+      if (q.target !== null && q.target !== undefined) tAch += Number(q.achieved) || 0;
+    });
+  });
+  var closed = won + lost;
 
-  h += '<div class="hm-hero__c">';
-  h += '<h2 class="hm-eyebrow">الإيراد المحقق <span aria-hidden="true">&#183;</span> ' +
-       hdsYearTxt(f.year) + "</h2>";
-  h += '<p class="hm-rev"><span class="m-n">' + fmtN(f.achieved) +
-       ' <span class="hm-cur">ر.س</span></span></p>';
-  h += '<p class="hm-sub">' + (f.achieved
-    ? "من الصفقات الرابحة المسجّلة."
-    : "لم تُغلق أي صفقة رابحة حتى الآن.") + "</p>";
-  h += "</div>";
+  var h = '<section class="hx-hero" aria-label="الإيراد المحقق والمستهدف المسجّل">';
 
-  h += '<div class="hm-hero__c">';
-  if (f.withTarget === 1) {
-    h += '<h2 class="hm-eyebrow">المستهدف الوحيد المسجّل</h2>';
-    h += '<p class="hm-tgt"><span class="m-n">' + fmtN(f.recorded) +
-         ' <span class="hm-cur">ر.س</span></span></p>';
-    h += '<p class="hm-tgt__x">' + esc(f.onlyProduct) + "</p>";
-    if (f.onlyScope) {
-      h += '<p class="hm-tgt__s">' + hdsIcon("target") + esc(f.onlyScope) + "</p>";
-    }
-  } else if (f.withTarget > 1) {
-    h += '<h2 class="hm-eyebrow">المستهدف المسجّل</h2>';
-    h += '<p class="hm-tgt"><span class="m-n">' + fmtN(f.recorded) +
-         ' <span class="hm-cur">ر.س</span></span></p>';
-    h += '<p class="hm-tgt__x">على ' + dsFig("withTarget", f.withTarget) + " من " +
-         dsFig("products", f.products) + " منتجات</p>";
-  } else {
-    h += '<h2 class="hm-eyebrow">المستهدف المسجّل</h2>';
-    h += '<p class="hm-tgt">' + hdsNil("لا مستهدف مسجّل", "owed") + "</p>";
-    h += '<p class="hm-tgt__x">لم يُسجَّل مستهدف على أي منتج في ' + hdsYearTxt(f.year) + ".</p>";
+  /* ---- revenue ---- */
+  h += '<div class="hx-hero__c">';
+  h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">الإيراد المحقق</h2>' +
+       '<span class="hx-tag">السنة المالية <span class="m-n">' + hdsYearTxt(f.year) + "</span></span></div>";
+  h += '<p class="hx-big"><span class="m-n">' + fmtN(f.achieved) +
+       ' <span class="hx-cur">ر.س</span></span></p>';
+  h += '<p class="hx-sub">' + (f.achieved ? "من الصفقات الرابحة المسجّلة هذه السنة."
+                                          : "لم تُغلق أي صفقة رابحة هذه السنة.") + "</p>";
+  /* The close split as a bar: won against everything closed. With nothing closed there is no
+     ratio to draw, so the track is empty and says so, rather than a zero-width fill that reads as
+     «every close was lost». */
+  h += '<div class="hx-split" role="img" aria-label="' + esc(closed
+      ? ("من " + closed + " صفقات مغلقة: " + won + " رابحة و" + lost + " خاسرة")
+      : "لا صفقات مغلقة هذه السنة") + '">';
+  if (closed) {
+    h += '<i class="is-won" style="--hx-v:' + Math.round((won / closed) * 1000) / 10 + '%"></i>' +
+         '<i class="is-lost" style="--hx-v:' + Math.round((lost / closed) * 1000) / 10 + '%"></i>';
   }
   h += "</div>";
+  h += '<div class="hx-kpis">' +
+    hdsHeroStat('<i class="hx-sw is-won" aria-hidden="true"></i>رابحة', hdsN(won)) +
+    hdsHeroStat('<i class="hx-sw is-lost" aria-hidden="true"></i>خاسرة', hdsN(lost)) +
+    hdsHeroStat("مفتوحة الآن", dsFig("nLines", lines.length)) +
+    "</div>";
+  h += "</div>";
 
-  /* No verdict pane (founder, 2026-09-17: «remove this»). The two recorded figures stand on their
-     own; what is missing from them is shown where it lives, on the target and value cards below. */
-  h += "</section>";
+  /* ---- target ---- */
+  h += '<div class="hx-hero__c">';
+  if (f.withTarget) {
+    var pct = f.recorded > 0 ? Math.round((tAch / f.recorded) * 100) : 0;
+    var remain = Math.max(0, f.recorded - tAch);
+    h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">' +
+         (f.withTarget === 1 ? "المستهدف الوحيد المسجّل" : "المستهدف المسجّل") + "</h2>" +
+         '<span class="hx-tag">' + (f.withTarget === 1 ? esc(f.onlyProduct)
+            : (dsFig("withTarget", f.withTarget) + " من " + dsFig("products", f.products) + " منتجات")) +
+         "</span></div>";
+    h += '<p class="hx-big"><span class="m-n">' + fmtN(f.recorded) +
+         ' <span class="hx-cur">ر.س</span></span></p>';
+    var period = hdsTargetPeriod(f);
+    /* The scope names the quarter once and the period says only where that quarter stands:
+       «الربع الثالث فقط · الربع الثالث جارٍ» named it twice on the live page. */
+    h += '<p class="hx-sub">' + hdsIcon("target") +
+         (f.onlyScope ? esc(f.onlyScope) : "على المنتجات ذات المستهدف") +
+         (period ? ' <span aria-hidden="true">&#183;</span> ' + period : "") + "</p>";
+    h += '<div class="hx-track" role="img" aria-label="' +
+         esc("المحقق على المنتجات ذات المستهدف " + tAch + " من " + f.recorded + " ريال") + '">' +
+         '<i style="--hx-v:' + Math.min(100, pct) + '%"></i></div>';
+    h += '<div class="hx-kpis">' +
+      hdsHeroStat("المحقق مقابله", hdsMoney(tAch)) +
+      hdsHeroStat("المتبقي", hdsMoney(remain)) +
+      hdsHeroStat("نسبة الإنجاز", '<span class="m-n">' + fmtN(pct) + "٪</span>") +
+      "</div>";
+  } else {
+    h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">المستهدف المسجّل</h2></div>';
+    h += '<p class="hx-big">' + hdsNil("لا مستهدف مسجّل", "owed") + "</p>";
+    h += '<p class="hx-sub">لم يُسجَّل مستهدف على أي منتج في ' + hdsYearTxt(f.year) + ".</p>";
+    h += '<div class="hx-track" aria-hidden="true"></div>';
+    h += '<div class="hx-kpis">' +
+      hdsHeroStat("المنتجات", dsFig("products", f.products)) +
+      hdsHeroStat("بلا مستهدف", dsFig("noTarget", f.noTarget)) +
+      '<div class="hx-kpi"><a class="hx-link" href="#perf">حدِّد المستهدفات <span aria-hidden="true">&#8592;</span></a></div>' +
+      "</div>";
+  }
+  h += "</div></section>";
   return h;
 }
 
 /* ---------- card chrome ---------- */
 function hdsCard(icon, title, tag, body, footNote, href, linkTxt) {
-  return '<section class="hm-card">' +
-    '<div class="hm-card__h"><h3 class="hm-card__t">' + hdsIcon(icon) + title + "</h3>" +
-      (tag ? '<span class="hm-tag">' + tag + "</span>" : "") + "</div>" +
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">' + hdsIcon(icon) + title + "</h3>" +
+      (tag ? '<span class="hx-tag">' + tag + "</span>" : "") + "</div>" +
     body +
-    '<div class="hm-card__f"><span>' + footNote + "</span>" +
-      '<a class="hm-link" href="' + href + '">' + esc(linkTxt) +
+    '<div class="hx-card__f"><span>' + footNote + "</span>" +
+      '<a class="hx-link" href="' + href + '">' + esc(linkTxt) +
       ' <span aria-hidden="true">&#8592;</span></a></div></section>';
 }
 function hdsFig(v, label, note) {
-  return '<div class="hm-fig"><span class="hm-fig__v">' + v + "</span>" +
-    '<span class="hm-fig__l">' + label + "</span></div>" +
-    (note ? '<p class="hm-note">' + note + "</p>" : "");
+  return '<div class="hx-fig"><span class="hx-fig__v">' + v + "</span>" +
+    '<span class="hx-fig__l">' + label + "</span></div>" +
+    (note ? '<p class="hx-note">' + note + "</p>" : "");
 }
 
 /* ---------- 1. where the open lines sit on the ladder ----------
@@ -239,27 +314,27 @@ function hdsStageCard(lines) {
     : hdsFig(hdsNil("لا بنود مفتوحة", "none"), "",
         "تظهر هنا فور تسجيل أول فرصة في «فرص البيع».");
 
-  body += '<div class="hm-stage">';
+  body += '<div class="hx-stage">';
   occupied.forEach(function (c) {
-    body += '<div class="hm-stage__r">' +
-      '<span class="hm-stage__l" title="' + esc(c.s.label) + '">' + esc(c.s.label) + "</span>" +
-      '<span class="hm-stage__t" aria-hidden="true"><span class="hm-stage__f" style="--hm-v:' +
+    body += '<div class="hx-stage__r">' +
+      '<span class="hx-stage__l" title="' + esc(c.s.label) + '">' + esc(c.s.label) + "</span>" +
+      '<span class="hx-stage__t" aria-hidden="true"><span class="hx-stage__f" style="--hx-v:' +
         Math.round((c.n / top) * 100) + '%"></span></span>' +
-      '<span class="hm-stage__n m-n">' + fmtN(c.n) + "</span></div>";
+      '<span class="hx-stage__n m-n">' + fmtN(c.n) + "</span></div>";
   });
   if (empty.length) {
-    body += '<div class="hm-rungs">' +
-      '<div class="hm-rungs__c">' + hdsPl(empty.length, "مرحلة واحدة", "مرحلتان", "مراحل", "مرحلة") +
+    body += '<div class="hx-rungs">' +
+      '<div class="hx-rungs__c">' + hdsPl(empty.length, "مرحلة واحدة", "مرحلتان", "مراحل", "مرحلة") +
         "<br>" + hdsNil("لا بنود مفتوحة", "none") + "</div>" +
-      '<div class="hm-rungs__g" style="--hm-c:' + empty.length + '" role="list" aria-label="' +
+      '<div class="hx-rungs__g" style="--hx-c:' + empty.length + '" role="list" aria-label="' +
         esc(hdsPl(empty.length, "مرحلة واحدة", "مرحلتان", "مراحل", "مرحلة") + " بلا بنود مفتوحة") + '">' +
       empty.map(function (c) {
-        return '<span class="hm-rung" role="listitem" title="' + esc(c.s.label) + '">' +
+        return '<span class="hx-rung" role="listitem" title="' + esc(c.s.label) + '">' +
           '<span class="m-n">0</span></span>';
       }).join("") + "</div></div>";
   }
   if (offLadder.length) {
-    body += '<p class="hm-note">' + hdsNil(hdsPl(offLadder.length, "بند واحد", "بندان", "بنود", "بندًا") +
+    body += '<p class="hx-note">' + hdsNil(hdsPl(offLadder.length, "بند واحد", "بندان", "بنود", "بندًا") +
       " على مرحلة خارج السلّم", "unset") + "</p>";
   }
   body += "</div>";
@@ -290,22 +365,22 @@ function hdsAgeCard(lines) {
       ? (esc(hdsPl(atMax, "بند واحد", "بندان", "بنود", "بندًا")) + " لم تتغير مرحلتها طوال هذه المدة.")
       : "بند واحد لم تتغير مرحلته طوال هذه المدة.");
 
-  body += '<div class="hm-plot hm-plot--axis" role="img" aria-label="' +
+  body += '<div class="hx-plot hx-plot--axis" role="img" aria-label="' +
     esc(hdsPl(days.length, "بند واحد", "بندان", "بنود", "بندًا") +
         " مستقلة، مرتبة من اليمين: " + days.join("، ") + " يومًا دون تغيير المرحلة") + '">' +
-    '<span class="hm-axis hm-axis--hi" aria-hidden="true"><span class="m-n">' + fmtN(hi) + "</span></span>" +
-    '<span class="hm-axis hm-axis--mid" aria-hidden="true"><span class="m-n">' +
+    '<span class="hx-axis hx-axis--hi" aria-hidden="true"><span class="m-n">' + fmtN(hi) + "</span></span>" +
+    '<span class="hx-axis hx-axis--mid" aria-hidden="true"><span class="m-n">' +
       fmtN(Math.round(hi / 2)) + "</span></span>" +
-    '<span class="hm-axis hm-axis--lo" aria-hidden="true"><span class="m-n">0</span></span>' +
-    '<div class="hm-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
-    '<div class="hm-cols" style="--hm-c:' + days.length + '" aria-hidden="true">' +
+    '<span class="hx-axis hx-axis--lo" aria-hidden="true"><span class="m-n">0</span></span>' +
+    '<div class="hx-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
+    '<div class="hx-cols" style="--hx-c:' + days.length + '" aria-hidden="true">' +
     days.map(function (d) {
-      return '<div class="hm-col' + (d === hi ? " is-max" : "") +
-        '" style="--hm-h:' + Math.round((d / scale) * 1000) / 10 + '%">' +
+      return '<div class="hx-col' + (d === hi ? " is-max" : "") +
+        '" style="--hx-h:' + Math.round((d / scale) * 1000) / 10 + '%">' +
         '<i></i><b class="m-n">' + fmtN(d) + "</b></div>";
     }).join("") + "</div></div>";
-  body += '<p class="hm-cap"><span>كل عمود بند مستقل؛ مرتبة حسب المدة.</span>' +
-    '<span class="hm-legend"><i aria-hidden="true"></i>الأطول</span></p>';
+  body += '<p class="hx-cap"><span>كل عمود بند مستقل؛ مرتبة حسب المدة.</span>' +
+    '<span class="hx-legend"><i aria-hidden="true"></i>الأطول</span></p>';
 
   return hdsCard("clock", "زمن بلا حركة", "تغيير المرحلة", body,
     "أيام في المرحلة، لا عمر الصفقة.", "#board", "لوحة المتابعة");
@@ -357,19 +432,19 @@ function hdsCampaign() {
       ? "وصلت إلى " + mPl(st.interested, "مهتم واحد", "مهتمَّين", "مهتمين", "مهتمًا") + "."
       : "لم يُبدِ أحد اهتمامًا بعد."));
 
-  body += '<div class="hm-plot" role="img" aria-label="' +
+  body += '<div class="hx-plot" role="img" aria-label="' +
     esc("تتابع الحملة من اليمين إلى اليسار: " +
         steps.map(function (s) { return s.k + " " + s.v; }).join("، ")) + '">' +
-    '<div class="hm-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
-    '<div class="hm-cols" style="--hm-c:' + steps.length + '" aria-hidden="true">' +
+    '<div class="hx-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
+    '<div class="hx-cols" style="--hx-c:' + steps.length + '" aria-hidden="true">' +
     steps.map(function (s) {
-      return '<div class="hm-col' + (s.v === 0 ? " is-zero" : "") +
-        '" style="--hm-h:' + Math.round((s.v / top) * 1000) / 10 + '%">' +
+      return '<div class="hx-col' + (s.v === 0 ? " is-zero" : "") +
+        '" style="--hx-h:' + Math.round((s.v / top) * 1000) / 10 + '%">' +
         '<i></i><b class="m-n">' + fmtN(s.v) + "</b></div>";
     }).join("") + "</div></div>";
-  body += '<div class="hm-xlabels" style="--hm-c:' + steps.length + '" aria-hidden="true">' +
+  body += '<div class="hx-xlabels" style="--hx-c:' + steps.length + '" aria-hidden="true">' +
     steps.map(function (s) { return "<span>" + esc(s.k) + "</span>"; }).join("") + "</div>";
-  body += '<p class="hm-cap hm-cap--plain">تتابع المجموعة نفسها ' +
+  body += '<p class="hx-cap hx-cap--plain">تتابع المجموعة نفسها ' +
     '<span aria-hidden="true">&#8592;</span> من الإرسال إلى الفرصة</p>';
 
   /* The card title stays «مسار الحملة» and the campaign's own name goes in the tag: a name in the
@@ -399,12 +474,12 @@ function hdsTargetCard(f) {
             "منتجات لها مستهدف", "منتجًا له مستهدف"),
     "");
 
-  body += '<div class="hm-segs" style="--hm-c:' + Math.max(f.products, 1) + '" aria-hidden="true">' +
+  body += '<div class="hx-segs" style="--hx-c:' + Math.max(f.products, 1) + '" aria-hidden="true">' +
     f.rows.map(function (p) {
       var on = p.annualTarget !== null && p.annualTarget !== undefined;
       return '<i class="' + (on ? "is-on" : "is-off") + '" title="' + esc(p.product) + '"></i>';
     }).join("") + "</div>";
-  body += '<p class="hm-cov"><span>' +
+  body += '<p class="hx-cov"><span>' +
     (f.withTarget === 1 ? esc(f.onlyProduct) + " فقط" : hdsN(f.withTarget) + " من " + hdsN(f.products)) +
     "</span>" +
     (f.noTarget ? hdsNil(hdsPl(f.noTarget, "منتج واحد بلا مستهدف", "منتجان بلا مستهدف",
@@ -424,16 +499,16 @@ function hdsTargetCard(f) {
     return { q: q, t: t };
   });
   var recorded = qs.filter(function (x) { return x.t !== null; }).length;
-  body += '<div class="hm-qhead"><span>سجل الأرباع <span class="m-n">' + hdsYearTxt(f.year) +
+  body += '<div class="hx-qhead"><span>سجل الأرباع <span class="m-n">' + hdsYearTxt(f.year) +
     "</span></span><span>" + hdsPl(recorded, "ربع واحد", "ربعان", "أرباع", "ربعًا") +
     " من أربعة</span></div>";
-  body += '<div class="hm-qs">' + qs.map(function (x) {
-    return '<div class="hm-q' + (x.t !== null ? " is-on" : "") + '">' +
-      '<p class="hm-q__n">' + hdsQName(x.q) + "</p>" +
-      '<div class="hm-q__c">' + (x.t !== null ? hdsMoney(x.t) : hdsNil("بلا مستهدف", "owed")) +
+  body += '<div class="hx-qs">' + qs.map(function (x) {
+    return '<div class="hx-q' + (x.t !== null ? " is-on" : "") + '">' +
+      '<p class="hx-q__n">' + hdsQName(x.q) + "</p>" +
+      '<div class="hx-q__c">' + (x.t !== null ? hdsMoney(x.t) : hdsNil("بلا مستهدف", "owed")) +
       "</div></div>";
   }).join("") + "</div>";
-  body += '<p class="hm-cap hm-cap--plain">التسجيل عبر الأرباع ' +
+  body += '<p class="hx-cap hx-cap--plain">التسجيل عبر الأرباع ' +
     '<span aria-hidden="true">&#8592;</span> المستهدف الغائب ليس صفرًا.</p>';
 
   return hdsCard("target", "تغطية المستهدفات", "اكتمال التسجيل", body,
@@ -452,29 +527,29 @@ function hdsValueCard(f, lines) {
 
   var body = hdsFig(
     priced.length ? '<span class="m-n">' + fmtN(Math.round(pricedValue)) +
-      ' <span class="hm-cur">ر.س</span></span>' : hdsNil("لا بند مسعَّر", "owed"),
+      ' <span class="hx-cur">ر.س</span></span>' : hdsNil("لا بند مسعَّر", "owed"),
     "مسجّلة",
     priced.length === 1 ? "قيمة بند واحد مُسعّر، وليست إيرادًا."
       : "قيمة البنود المسعّرة، وليست إيرادًا.");
 
   if (lines.length) {
-    body += '<div class="hm-segs" style="--hm-c:' + lines.length + '" aria-hidden="true">' +
+    body += '<div class="hx-segs" style="--hx-c:' + lines.length + '" aria-hidden="true">' +
       lines.map(function (l) {
         return '<i class="' + (l.value > 0 ? "is-on" : "is-off") + '"></i>';
       }).join("") + "</div>";
-    body += '<p class="hm-cov"><span>' + dsFig("priced", priced.length) + " من " +
+    body += '<p class="hx-cov"><span>' + dsFig("priced", priced.length) + " من " +
       dsFig("nLines", lines.length) + "</span>" +
       (unpriced ? hdsNil(hdsPl(unpriced, "بند واحد لم يُسعَّر", "بندان لم يُسعَّرا",
         "بنود لم تُسعَّر", "بندًا لم يُسعَّر"), "owed") : "") + "</p>";
     if (unpriced) {
-      body += '<p class="hm-note">إجمالي قيمة الفرص غير معروف حتى يكتمل التسعير.</p>';
+      body += '<p class="hx-note">إجمالي قيمة الفرص غير معروف حتى يكتمل التسعير.</p>';
     }
   }
 
   var secs = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.sectors)
     ? pcSectors.sectors : [];
   if (secs.length) {
-    body += '<dl class="hm-sectors">' + secs.map(function (sc) {
+    body += '<dl class="hx-sectors">' + secs.map(function (sc) {
       return "<div><dt>" + esc(sc.sector) +
         (sc.target > 0 ? '<span role="img" aria-label="قطاع ذو مستهدف مسجّل">' +
           hdsIcon("target") + "</span>" : "") + "</dt><dd>" +
@@ -513,7 +588,7 @@ function hdsReadyCard() {
       a.approved === a.total ? "جميعها معتمدة."
         : (hdsN(a.approved) + " معتمد، والباقي بانتظار الاعتماد."));
     if (a.total) {
-      body += '<div class="hm-dots" style="--hm-c:' + Math.min(a.total, 24) + '" role="img" ' +
+      body += '<div class="hx-dots" style="--hx-c:' + Math.min(a.total, 24) + '" role="img" ' +
         'aria-label="' + esc(a.noOwner
           ? (hdsPl(a.noOwner, "حساب واحد", "حسابان", "حسابات", "حسابًا") + " بلا مسؤول من " + a.total)
           : "لكل حساب مسؤول") + '">' +
@@ -524,7 +599,7 @@ function hdsReadyCard() {
           }
           return out;
         })() + "</div>";
-      body += '<p class="hm-note">' + (a.noOwner === a.total
+      body += '<p class="hx-note">' + (a.noOwner === a.total
         ? hdsNil("لم يُسنَد مسؤول لأي حساب", "unset")
         : (a.noOwner
             ? (dsFig("acNoOwner", a.noOwner) + " بلا مسؤول؛ كل خانة حساب.")
@@ -538,17 +613,17 @@ function hdsReadyCard() {
   var avg = (typeof khAvg === "function") ? khAvg() : null;
   var readyN = (typeof khReadyN === "function") ? khReadyN() : null;
   var prodN = (typeof pcCat !== "undefined" && pcCat) ? pcCat.length : 0;
-  body += '<div class="hm-know">';
+  body += '<div class="hx-know">';
   if (avg === null) {
     body += '<div><h3>جاهزية المعرفة</h3><p>' + hdsNil("لم تُقَس", "unset") + "</p></div>";
   } else {
-    body += '<div class="hm-ring" role="img" aria-label="' +
+    body += '<div class="hx-ring" role="img" aria-label="' +
       esc("متوسط جاهزية المعرفة " + avg + " من 100") + '">' +
       '<svg viewBox="0 0 80 80" aria-hidden="true">' +
-      '<circle class="hm-ring__t" cx="40" cy="40" r="34"/>' +
-      '<circle class="hm-ring__v" cx="40" cy="40" r="34" pathLength="100" style="--hm-v:' +
+      '<circle class="hx-ring__t" cx="40" cy="40" r="34"/>' +
+      '<circle class="hx-ring__v" cx="40" cy="40" r="34" pathLength="100" style="--hx-v:' +
         avg + '"/></svg>' +
-      '<div class="hm-ring__l" aria-hidden="true"><span class="m-n">' + fmtN(avg) +
+      '<div class="hx-ring__l" aria-hidden="true"><span class="m-n">' + fmtN(avg) +
         '</span><small>من <span class="m-n">100</span></small></div></div>';
     body += "<div><h3>جاهزية المعرفة</h3><p>" +
       (readyN !== null && prodN
@@ -580,16 +655,16 @@ function vHomeDs() {
   var f = hdsFacts();
   var linesReady = (typeof oppRows !== "undefined" && oppRows);
   if (!f.loaded || !linesReady) {
-    return '<div class="ds6"><section class="hm-hero"><div class="hm-hero__c">' +
-      '<p class="hm-sub" aria-busy="true">جارٍ قراءة الأداء…</p></div></section></div>';
+    return '<div class="ds6"><section class="hx-hero"><div class="hx-hero__c">' +
+      '<p class="hx-sub" aria-busy="true">جارٍ قراءة الأداء…</p></div></section></div>';
   }
   var lines = hdsLines();
 
   return '<div class="ds6">' +
     hdsHero(f, lines) +
-    '<div class="hm-glabel"><h2>ما وراء الرقم</h2>' +
+    '<div class="hx-glabel"><h2>ما وراء الرقم</h2>' +
       '<p>من السجلات المتاحة <span aria-hidden="true">&#183;</span> بلا توقعات</p></div>' +
-    '<div class="hm-grid">' +
+    '<div class="hx-grid">' +
       hdsStageCard(lines) +
       hdsAgeCard(lines) +
       hdsCampaign() +
@@ -597,7 +672,7 @@ function vHomeDs() {
       hdsValueCard(f, lines) +
       hdsReadyCard() +
     "</div>" +
-    '<p class="hm-foot">المسجّل يظهر بقيمته. ما ينقص التسجيل يبقى ظاهرًا، وما يساوي صفرًا يبقى صفرًا.</p>' +
+    '<p class="hx-foot">المسجّل يظهر بقيمته. ما ينقص التسجيل يبقى ظاهرًا، وما يساوي صفرًا يبقى صفرًا.</p>' +
     "</div>";
 }
 `;
