@@ -676,20 +676,37 @@ export const OPPS_CRM_CSS = `
 
   /* --- the stage stepper: a vertical ladder of real buttons. m-steps is a horizontal wizard rail,
          which cannot carry a per-rung age, an exit criterion or a move action. --- */
-  .ds6 .ox-steps-pill { background:var(--tn-soft); border-inline-start:3px solid var(--tn); }
-  .ds6 .ox-step:not(:last-of-type)::before { background:var(--m-line-2); }
-  .ds6 .ox-step.done::before { background:var(--tn); }
+  /* ONE ACCENT, NOT SIX HUES (founder, 2026-09-17: «change this», on the stepper). Each rung used to
+     wear its stage tone from stage-tone-domain.ts, so a deal half-way up the ladder read as slate,
+     teal, blue, violet and a magenta panel: five colours saying one thing, «passed». Colour here now
+     means progress and nothing else. Passed rungs are the soft accent with a check, the current rung
+     is the solid accent with a halo, later rungs are quiet outlines. The stage tones still exist and
+     still colour the board and the stage chips, where telling stages APART is the point. */
+  .ds6 .ox-steps-pill { background:var(--m-page); border-inline-start:3px solid var(--m-ac);
+    box-shadow:inset 0 0 0 1px var(--m-line); }
+  .ds6 .ox-step:not(:last-of-type)::before { background:var(--m-line); }
+  .ds6 .ox-step.done::before { background:var(--m-ac-line); }
   .ds6 .ox-stb { color:var(--m-ink-2); border-radius:var(--m-r-ctl); }
   @media (hover:hover) and (pointer:fine) { .ds6 .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover { background:var(--m-page); } }
   .ds6 .ox-stb .k { background:var(--m-paper); color:var(--m-mut); box-shadow:inset 0 0 0 1.5px var(--m-line-2); }
   .ds6 .ox-stb .l { font-size:var(--m-t-body); }
   .ds6 .ox-stb .go { font-size:var(--m-t-cap); color:var(--m-ac-deep); }
-  .ds6 .ox-step.done .k, .ds6 .ox-step.current .k { background:var(--tn); color:#FFFFFF; box-shadow:none; }
-  .ds6 .ox-step.current .k { box-shadow:0 0 0 3px var(--m-paper); }
-  .ds6 .ox-step.done .l { color:var(--tn-text); font-weight:500; }
-  .ds6 .ox-step.current .l { color:var(--m-ink); font-weight:600; }
+  .ds6 .ox-step.done .k { background:var(--m-ac-dim); color:var(--m-ac); box-shadow:inset 0 0 0 1px var(--m-ac-line); }
+  .ds6 .ox-step.current .k { background:var(--m-ac); color:#FFFFFF; box-shadow:0 0 0 4px var(--m-ac-dim); }
+  .ds6 .ox-step.done .l { color:var(--m-ink-2); font-weight:500; }
+  .ds6 .ox-step.current .l { color:var(--m-ink); font-weight:700; }
+  .ds6 .ox-step:not(.done):not(.current) .l { color:var(--m-mut); }
   .ds6 .ox-step.paused .l, .ds6 .ox-steps.is-lost .ox-step .l { color:var(--m-faint); }
-  .ds6 .ox-exit { font-size:var(--m-t-cap); color:var(--m-ink-2); }
+  /* A lost deal has no progress to show: its ladder goes neutral, and only the rung it was lost
+     from keeps a mark, in the loss colour, so the reader sees where it stopped. */
+  .ds6 .ox-steps.is-lost .ox-steps-pill { border-inline-start-color:var(--m-bad); }
+  .ds6 .ox-steps.is-lost .ox-step.done .k { background:var(--m-sunk); color:var(--m-mut); box-shadow:none; }
+  .ds6 .ox-steps.is-lost .ox-step.done::before { background:var(--m-line-2); }
+  .ds6 .ox-steps.is-lost .ox-step.current .k { background:var(--m-bad); box-shadow:0 0 0 4px var(--m-bad-dim); }
+  .ds6 .ox-exit { font-size:var(--m-t-cap); color:var(--m-ink-2); gap:var(--m-1);
+    margin-inline-end:var(--m-3); padding-block:var(--m-2) var(--m-3); }
+  .ds6 .ox-exit .m-label { font-size:var(--m-t-micro); line-height:var(--m-leading-meta);
+    font-weight:600; color:var(--m-mut); }
   .ds6 .ox-go { color:var(--m-mut); }
   @media (hover:hover) and (pointer:fine) { .ds6 .ox-go:hover { color:var(--m-ac-deep); background:var(--m-page); } }
 
