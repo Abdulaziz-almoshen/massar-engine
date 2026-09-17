@@ -306,7 +306,12 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-req::after{content:"*";color:var(--m-bad);margin-inline-start:3px}
 .ds6 .m-input, .ds6 .m-select{font:inherit;font-size:var(--m-t-body);color:var(--m-ink);
   background:var(--m-paper);border:0;border-radius:10px;
-  padding:0 11px;block-size:36px;inline-size:100%;
+  padding:0 11px;block-size:36px;
+  /* A control fills its FIELD, not every container it lands in. inline-size:100% is right inside
+     a .m-form cell and wrong in a filter bar, where four controls in a flex row each demanded the
+     full width and the bar stacked into a column. The default is now "as wide as it needs to be,
+     never wider than its parent"; .m-field and .m-form stretch their own children below. */
+  inline-size:auto;max-inline-size:100%;min-inline-size:0;
   box-shadow:0 0 0 1px var(--m-line-2),0 1px 2px rgba(0,0,0,.05),
              inset 0 1px rgba(0,0,0,.04);
   transition:box-shadow 150ms cubic-bezier(.4,0,.2,1)}
@@ -1316,4 +1321,7 @@ export const MASSAR_DS_CSS = `
   font-size: var(--m-t-micro);
   white-space: nowrap;
 }
+.ds6 /* Inside a form cell a control still fills the cell — that is what a form IS. Stated here rather
+   than as the control's default, .ds6 so the same class works in a toolbar without a per-screen undo. */
+.m-field .m-input, .ds6 .m-field .m-select, .ds6 .m-field textarea.m-input, .ds6 .m-form .m-input, .ds6 .m-form .m-select{ inline-size: 100%; }
 `;

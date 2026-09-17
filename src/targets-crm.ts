@@ -38,12 +38,26 @@ export const TARGETS_CRM_CSS = `
    opinion about, and the tag sheet — a panel, not a modal, and the vocabulary's .m-dlg is a
    dialog element this screen does not open as one. */
 .ds6 .tgt-tbl .m-table{min-inline-size:880px}
+/* A FILTER BAR IS A ROW, NOT A STACK. .m-input and .m-select are authored at inline-size:100%
+ for a form field, which is right inside .m-form and wrong inside a filter bar: every control
+ then claims a full line and five filters become five rows. Sized here rather than in the
+ vocabulary because massar-ds-crm.ts is generated. */
+.ds6 .tgt-tools .m-input, .ds6 .tgt-tools .m-select{inline-size:auto;flex:0 1 auto;
+  min-inline-size:168px;max-inline-size:300px}
 .ds6 .tgt-nm{display:flex;align-items:center;gap:var(--m-2);min-inline-size:0}
 /* Two lines, then clamp — an entity name is the only thing identifying its row, and
    «مجمع النور الطبي (مثال — امسح هذا الصف)» was being cut mid-parenthesis. */
 .ds6 .tgt-nm .lb{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   white-space:normal;line-height:1.4}
 .ds6 .tgt-seg{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-inline-size:0}
+/* BRIDGE, not a second vocabulary. The segment chips come from dashboard.ts (prodChips/attrChips)
+   and still emit .chip with the old tokens; that file is under ADR-0001 and is not range-edited
+   from here. Rather than let two chip designs sit in one table, the old class is re-drawn on the
+   new system's tokens INSIDE .ds6 only. It comes out when dashboard.ts is ported. */
+.ds6 .tgt-seg .chip{display:inline-flex;align-items:center;gap:4px;font-size:var(--m-t-micro);
+  font-weight:600;border-radius:var(--m-r-chip);padding-inline:9px;padding-block:2px;
+  background:var(--m-sunk);border:0;color:var(--m-ink-2);white-space:nowrap}
+.ds6 .tgt-seg .chip.c-blue, .ds6 .tgt-seg .chip.c-teal{background:var(--m-ac-dim);color:var(--m-ac-deep)}
 .ds6 .tgt-ltr{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
 .ds6 .tgt-st{display:flex;align-items:center;gap:7px;min-inline-size:0}
 .ds6 .tgt-st .d{inline-size:6px;block-size:6px;border-radius:50%;flex:none}
@@ -138,7 +152,7 @@ function tgtBind() {
    empty dropdown promising one. */
 function tgtFacetBar() {
   var groups = segGroups();
-  var h = '<div class="m-tools"><div class="m-head__a">';
+  var h = '<div class="m-tools tgt-tools"><div class="m-head__a">';
   h += '<input class="m-input" id="tq" value="' + esc(tgtQ) + '" oninput="tgtSearch(this)" ' +
     'placeholder="ابحث بالاسم أو الرقم…" aria-label="بحث في جهات الاستهداف">';
   if (tgtTagProd) h += '<button type="button" class="m-btn" aria-pressed="true" onclick="tgtClearTagProd()" title="إزالة تصفية المنتج">موسومة بـ: ' + esc(tgtTagProd) + " &#215;</button>";
@@ -258,7 +272,7 @@ function vTargetsCrm() {
     /* The importer instructions live HERE, where the screen has nothing else to say, instead of
        above a list of sixteen rows that already proved the format works. */
     return h + (tgtMayEdit()
-      ? '<div class="m-tools"><span></span><div class="m-head__a">' +
+      ? '<div class="m-tools tgt-tools"><span></span><div class="m-head__a">' +
         '<a href="/assets/audience-template.xlsx" download class="m-btn">القالب الجاهز</a>' +
         '<button type="button" class="m-btn m-btn--primary" onclick="entFilePick()">رفع ملف Excel/CSV</button></div></div>'
       : "") +

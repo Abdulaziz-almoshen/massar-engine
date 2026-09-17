@@ -58,7 +58,11 @@ ROUTES = [
     # «نظرة تنفيذية» is the default face of «التقارير» since 2026-09-15; its first card is the landmark.
     ("#reports", "قمع المراحل"),
     ("#tasks", "الأولوية"),
-    ("#notes", "ملاحظة"),
+    # «ملاحظة» only renders when notes EXIST — the empty state says «لا ملاحظات بعد», which
+    # does not contain it. The route passed only because production happened to hold notes;
+    # it would have failed the first time the table was empty. The hint line under the empty
+    # state carries «الملاحظات» and so does the search field, so this holds in both states.
+    ("#notes", "الملاحظات"),
     ("#aimkt", "أي خدمة يبيعها المساعد؟"),
     ("#indicators", "مؤشر"),
     ("#indicator/new", "بيانات العملاء"),

@@ -35,6 +35,9 @@ export const PARTNERS_CRM_CSS = `
 .ds6 .pt{display:flex;flex-direction:column;gap:var(--m-4);container-type:inline-size;container-name:ptw}
 .ds6 .pt-panel{display:flex;flex-direction:column;gap:var(--m-4)}
 .ds6 .pt-bar{display:flex;align-items:center;gap:var(--m-2);flex-wrap:wrap}
+/* A filter bar is a row, not a stack: .m-select is authored at inline-size:100% for a form field,
+   which is right inside .m-form and wrong beside a week stepper. */
+.ds6 .pt-bar .m-select{inline-size:auto;flex:0 1 auto;min-inline-size:176px;max-inline-size:280px}
 /* A name that opens its own tab is a BUTTON wearing the link's type. .m-link is authored for an
    anchor, so the button's own chrome has to be taken off here rather than in the vocabulary. */
 .ds6 button.m-link{font:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:start}
@@ -49,10 +52,13 @@ export const PARTNERS_CRM_CSS = `
 .ds6 .pt-week .cur{color:var(--m-ac-deep)}
 @media (pointer:coarse){.ds6 .pt-week .m-btn{min-block-size:44px}}
 
-/* Five measures read as one sentence, and the first of them leads. */
-.ds6 .pt-kpis{grid-template-columns:1.3fr repeat(4,minmax(0,1fr))}
-@container ptw (max-width: 900px){.ds6 .pt-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@container ptw (max-width: 560px){.ds6 .pt-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Five measures read as one sentence, and the first of them leads.
+   SPECIFICITY. massar-ds-crm.ts is interpolated AFTER every module stylesheet, so a rule
+   that only matches a private class loses to the vocabulary rule it means to override at equal
+   weight. Anything overriding an .m-* declaration is written as .m-x.private, one class heavier. */
+.ds6 .m-kpis.pt-kpis{grid-template-columns:1.3fr repeat(4,minmax(0,1fr))}
+@container ptw (max-width: 900px){.ds6 .m-kpis.pt-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container ptw (max-width: 560px){.ds6 .m-kpis.pt-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .ds6 .pt-tbl .m-table{min-inline-size:880px}
 .ds6 .pt-res-tbl .m-table{min-inline-size:720px}
@@ -75,7 +81,7 @@ export const PARTNERS_CRM_CSS = `
 .ds6 .pt-rs .m-select{min-block-size:36px;font-size:var(--m-t-cap);padding-inline:var(--m-2)}
 .ds6 .pt-arm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:var(--m-t-cap);color:var(--m-ink)}
 .ds6 .pt-arm .m-btn{min-block-size:32px;padding-inline:var(--m-3);font-size:var(--m-t-cap)}
-.ds6 .pt-del--armed{background:var(--m-bad-dim);color:var(--m-bad);border-color:var(--m-bad-line)}
+.ds6 .m-btn.pt-del--armed{background:var(--m-bad-dim);color:var(--m-bad);border-color:var(--m-bad-line)}
 
 /* a radio group, because the three results are one exclusive choice and the keyboard handler
    walks it with the arrow keys. .m-seg is aria-pressed and cannot carry that contract. */
@@ -214,10 +220,11 @@ function ptBind(pid, product) {
   });
 }
 function ptKpis(line) {
+  /* BLOCK children, not spans: .m-stat__k/__v/__s carry type and colour, never layout. */
   var tile = function (k, v, s, lead) {
-    return '<div class="m-card' + (lead ? " m-stat--ac" : "") + '"><span class="m-stat__k">' + k + "</span>" +
-      '<span class="m-stat__v">' + v + "</span>" +
-      '<span class="m-stat__s">' + s + "</span></div>";
+    return '<div class="m-card' + (lead ? " m-stat--ac" : "") + '"><div class="m-stat__k">' + k + "</div>" +
+      '<div class="m-stat__v">' + v + "</div>" +
+      '<div class="m-stat__s">' + s + "</div></div>";
   };
   return '<div class="m-kpis pt-kpis">' +
     tile("المستهدف الأسبوعي", line.target ? mN(line.target) : mNil("لم يُحدَّد", "owed"),

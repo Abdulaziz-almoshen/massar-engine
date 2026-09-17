@@ -121,13 +121,20 @@ function vYearTargets() {
   targeted.forEach(function (r) { target += Number(r.annualTarget) || 0; achieved += Number(r.achieved) || 0; });
   var outsideAch = 0, outside = rows.length - targeted.length;
   rows.forEach(function (r) { if (!ytHasTarget(r)) outsideAch += Number(r.achieved) || 0; });
+  /* A target RECORDED AS ZERO is inside the ratio's population (the row exists) but nothing can be
+     measured against it. It is counted separately so the qualification under the strip can say so
+     rather than claim every product carries a target. */
+  var zeroTarget = targeted.filter(function (r) { return !Number(r.annualTarget); }).length;
   var pct = typeof wholePct === "function" ? wholePct(attainmentPct(achieved, target)) : null;
   var left = Math.max(0, target - achieved);
 
+  /* BLOCK children, not spans: .m-stat__k/__v/__s carry type and colour, never layout, so inline
+     spans run the label, the figure and the caption together on one line. The already-ported
+     screens (accounts-crm) use divs for exactly this reason. */
   var tile = function (cls, k, v, s) {
-    return '<div class="m-card ' + cls + '"><span class="m-stat__k">' + k + "</span>" +
-      '<span class="m-stat__v">' + v + "</span>" +
-      '<span class="m-stat__s">' + s + "</span></div>";
+    return '<div class="m-card ' + cls + '"><div class="m-stat__k">' + k + "</div>" +
+      '<div class="m-stat__v">' + v + "</div>" +
+      '<div class="m-stat__s">' + s + "</div></div>";
   };
   var h = '<div class="ds6"><div class="yt">';
   h += '<p class="m-meta">السنة المالية ' + ytYear(year) + "</p>";
@@ -149,9 +156,17 @@ function vYearTargets() {
     h += '<p class="m-status m-status--warn">النسبة محسوبة على ' +
       dsFig("ytTargeted", targeted.length) + " من " + dsFig("ytProducts", rows.length) +
       " منتجات · " + dsFig("ytNoTarget", outside) + " بلا مستهدف لهذه السنة، ومحققها خارج النسبة.</p>";
+  } else if (zeroTarget) {
+    /* A target ROW of zero is not the same fact as no row at all — annualTarget is 0, not null, so
+       the product is inside the ratio's population while «الإنجاز» beside it correctly reads «بلا
+       مستهدف». Saying «every product carries a recorded target» over that would be a summary the
+       table underneath contradicts, which is the defect class this screen was repaired for. */
+    h += '<p class="m-status m-status--warn">لكل منتج صف مستهدف، لكن ' +
+      mPl(zeroTarget, "منتجًا واحدًا مستهدفه صفر", "منتجين مستهدفهما صفر", "منتجات مستهدفها صفر", "منتجًا مستهدفه صفر") +
+      " — لا يُقاس عليه إنجاز.</p>";
   } else if (rows.length) {
     h += '<p class="m-meta">كل ' + mPl(rows.length, "منتج واحد", "منتجان", "منتجات", "منتجًا") +
-      " يحمل مستهدفًا مسجّلًا لهذه السنة.</p>";
+      " يحمل مستهدفًا موجبًا مسجّلًا لهذه السنة.</p>";
   }
 
   /* Grouped by sector, in the catalogue's order, with anything unmapped last and named as such. */
@@ -210,11 +225,15 @@ function vYearTargets() {
           var cls = (x.quarter === cur ? " cur" : "") + (t > 0 && a >= t ? " over" : "") + (t > 0 ? "" : " none");
           var said = t > 0 ? ytMoney(a) + " من " + ytMoney(t)
             : a ? ytMoney(a) + " بلا مستهدف للربع" : "بلا مستهدف للربع";
-          return '<span class="yt-qc' + cls + '" title="' + esc("الربع " + fmtN(x.quarter)) + '">' +
+          /* The value line reports what was ACHIEVED in the quarter, so nothing achieved is a
+             legitimate nothing and takes the quiet treatment. The missing TARGET is what somebody
+             owes, and it is said once per row — in «الإنجاز» — and drawn here as the hatched
+             track. Four owed markers on one row is how a reader learns to stop seeing them. */
+          return '<span class="yt-qc' + cls + '" title="' + esc("الربع " + fmtN(x.quarter) + ": " + said) + '">' +
             '<span class="k">ر<span class="m-n">' + fmtN(x.quarter) + "</span></span>" +
             '<span class="m-meter" role="img" aria-label="' + esc(said) + '">' +
               '<i style="--m-pct:' + w + '%"></i></span>' +
-            '<span class="v">' + (t > 0 || a ? ytMoney(a) : mNil("بلا مستهدف", "owed")) + "</span></span>";
+            '<span class="v">' + (t > 0 || a ? ytMoney(a) : mNil("لا محقق", "none")) + "</span></span>";
         }).join("") + "</span></td></tr>";
     });
     h += "</tbody></table></div></section>";

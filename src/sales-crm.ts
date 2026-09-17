@@ -44,8 +44,11 @@ export const SALES_CRM_CSS = `
    tick. .m-meter already draws a fill and a mark, so the tick is --m-mark rather than a private
    element; only the table-cell geometry is stated here. The tick is the honest signal on this
    screen — a fill short of it is behind pace, and that reading is POSITIONAL, not chromatic. */
-.ds6 .perf-meter{margin-block:0;min-inline-size:96px}
-.ds6 .perf-meter b{opacity:1;background:var(--m-ink)}
+/* SPECIFICITY. massar-ds-crm.ts is interpolated AFTER every module stylesheet, so a rule that only
+   matches a private class loses to the vocabulary rule it overrides at equal weight. Written one
+   class heavier. */
+.ds6 .m-meter.perf-meter{margin-block:0;min-inline-size:96px}
+.ds6 .m-meter.perf-meter b{opacity:1;background:var(--m-ink)}
 .ds6 .perf-ach{display:flex;align-items:center;gap:var(--m-2);min-inline-size:0}
 .ds6 .perf-tbl .m-table{min-inline-size:960px}
 .ds6 .perf-sub{display:block;font-weight:400;margin-block-start:2px}
@@ -182,10 +185,11 @@ function perfShell(quarter, year) {
  *  «المتوقع من الفرص المفتوحة» is the smoke landmark for #perf and renders on every path. */
 function perfKpis(totT, totA, totW, totCover, totAttain, totOpen, quarter, year) {
   var waiting = mNil("لم تصل بعد", "unset");
+  /* BLOCK children, not spans: .m-stat__k/__v/__s carry type and colour, never layout. */
   var tile = function (cls, k, v, s) {
-    return '<div class="m-card ' + cls + '"><span class="m-stat__k">' + k + "</span>" +
-      '<span class="m-stat__v">' + v + "</span>" +
-      '<span class="m-stat__s">' + s + "</span></div>";
+    return '<div class="m-card ' + cls + '"><div class="m-stat__k">' + k + "</div>" +
+      '<div class="m-stat__v">' + v + "</div>" +
+      '<div class="m-stat__s">' + s + "</div></div>";
   };
   return '<div class="m-kpis">' +
     tile("m-stat--ac", "التغطية",

@@ -110,11 +110,36 @@ export const CAMPAIGNS_CRM_CSS = `
      figure line. */
   .ds6 .cx { display:flex; flex-direction:column; gap:var(--m-4); }
   .ds6 .cx-tbl .m-table { min-inline-size:940px; }
+  /* A FILTER BAR IS A ROW, NOT A STACK. .m-input and .m-select are authored at inline-size:100%
+     for a form field, which is right inside .m-form and wrong inside a filter bar: every control
+     then claims a full line and five filters become five rows. Sized here rather than in the
+     vocabulary because massar-ds-crm.ts is generated. */
+  .ds6 .cx .m-tools .m-input, .ds6 .cx .m-tools .m-select { inline-size:auto; flex:0 1 auto;
+    min-inline-size:176px; max-inline-size:320px; }
+  .ds6 .cx .m-tools .m-head__a { flex:1 1 auto; }
   .ds6 .cx-sub { display:block; font-weight:400; margin-block-start:2px; }
   .ds6 .cx-clip { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-inline-size:30ch; }
   .ds6 .cx-prog { display:flex; align-items:center; gap:var(--m-2); min-inline-size:0; }
   .ds6 .cx-prog .m-meter { margin-block:0; flex:1 1 auto; min-inline-size:56px; }
   .ds6 .cx-dot { inline-size:9px; block-size:9px; border-radius:50%; flex:none; display:inline-block; }
+  /* The board card is an ANCHOR here — the whole card opens the campaign — and .m-deal is authored
+     for the opportunity board's draggable div, so it carries no link reset. Without this every
+     card title renders underlined in the page's default link ink. */
+  .ds6 a.m-deal { text-decoration:none; color:inherit; display:block; }
+  .ds6 .m-deal__n { display:flex; align-items:center; gap:6px; }
+  .ds6 .m-deal__p { display:block; }
+  /* BRIDGE, not a second vocabulary. chipRow() and interestChips() come from dashboard.ts and own
+     the status and interest reading — they are called rather than forked, so there is one
+     definition of what a status chip means — but they still emit .chip with the old tokens, and
+     that file is under ADR-0001. The old class is re-drawn on the new system's tokens INSIDE .ds6
+     only, so one table does not carry two chip designs. It comes out when dashboard.ts is ported. */
+  .ds6 .cx .m-table .chip { display:inline-flex; align-items:center; gap:4px; font-size:var(--m-t-micro);
+    font-weight:600; border-radius:var(--m-r-chip); padding-inline:9px; padding-block:2px;
+    background:var(--m-sunk); border:0; color:var(--m-ink-2); white-space:nowrap; }
+  .ds6 .cx .m-table .chip.c-ok { background:var(--m-ok-dim); color:var(--m-ok); }
+  .ds6 .cx .m-table .chip.c-warn { background:var(--m-warn-dim); color:var(--m-warn); }
+  .ds6 .cx .m-table .chip.c-bad { background:var(--m-bad-dim); color:var(--m-bad); }
+  .ds6 .cx .m-table .chip.c-blue, .ds6 .cx .m-table .chip.c-teal { background:var(--m-ac-dim); color:var(--m-ac-deep); }
 
   /* the message, quoted on WhatsApp's own wallpaper. #54594B clears 4.5 on BOTH grounds — the
      wallpaper at 5.37 and the bubble at 6.29 — and is the one ink allowed on either. */
@@ -136,7 +161,9 @@ export const CAMPAIGNS_CRM_CSS = `
   .ds6 .cx-kf .kb { color:var(--m-bad); font-size:var(--m-t-micro); font-weight:600; }
 
   /* the next-step strip and its cards: a leading rule in the tone of what it is about */
-  .ds6 .cx-move { border-inline-start:3px solid var(--tn, var(--m-ac)); }
+  /* SPECIFICITY. massar-ds-crm.ts is interpolated AFTER every module stylesheet, so a rule that
+     only matches a private class loses to the .m-card rule it overrides at equal weight. */
+  .ds6 .m-card.cx-move { border-inline-start:3px solid var(--tn, var(--m-ac)); }
   .ds6 .cx-moves { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:var(--m-3); }
 
   @media (max-width: 939px) { .ds6 .cx-tbl .m-table { min-inline-size:680px; } }
@@ -458,7 +485,7 @@ function crmGroupView(withStAll) {
     var over = g.by[k].length - rows.length;
     h += '<section class="m-card m-card--pad0 cx-tbl"><div class="m-card__h" style="padding:var(--m-4) var(--m-5);margin-block-end:0;border-block-end:1px solid var(--m-line)">' +
       '<h2 class="m-card__t">' + esc(k) + "</h2>" +
-      '<span class="m-cap">' + mPlOf(g.by[k].length, fmtN(g.by[k].length) + " " + crmNoun(g.by[k].length)) + "</span></div>" +
+      '<span class="m-cap">' + mN(g.by[k].length) + " " + crmNoun(g.by[k].length) + "</span></div>" +
       '<div class="m-tablewrap"><table class="m-table">' + crmHeaderRow(false) + "<tbody>";
     rows.forEach(function (x) { h += crmRow(x.c, x.st); });
     if (!rows.length) {
@@ -511,7 +538,7 @@ function crmKanbanView(withStAll) {
       }
       h += '<a class="m-deal" href="#kmon/' + c.id + '" aria-label="' + esc(c.name) + '"' +
         (canDrag ? ' draggable="true" ondragstart="crmDragStart(event,' + c.id + ')" ondragend="crmDragEnd()"' : "") + ">" +
-        '<span class="m-deal__n"><span class="cx-dot" style="background:' + ps.dot + '"></span> ' + esc(c.name) + "</span>" +
+        '<span class="m-deal__n"><span class="cx-dot" style="background:' + ps.dot + '"></span>' + esc(c.name) + "</span>" +
         '<span class="m-deal__p">' + (c.product ? esc(c.product) : mNil("بلا خدمة", "unset")) + " · " + fmtD(c.created_at) + "</span>" +
         '<span class="cx-kf">' + foot + "</span></a>";
     });
@@ -532,10 +559,10 @@ function crmBulkBar() {
   var sel = ids.map(function (i) { return campaigns.find(function (c) { return String(c.id) === String(i); }); }).filter(Boolean);
   var nTest = sel.filter(campIsTest).length, nReal = sel.length - nTest;
   var h = '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + fmtN(sel.length) + " محدَّدة</span>" +
+    '<span class="cnt">' + mN(sel.length) + " محدَّدة</span>" +
     '<button onclick="crmExportSel()">تصدير المحدد CSV</button>';
-  if (nReal) h += '<button onclick="crmBulkClass(true)">نقل إلى التجريبية (' + fmtN(nReal) + ")</button>";
-  if (nTest) h += '<button onclick="crmBulkClass(false)">إعادة إلى الفعلية (' + fmtN(nTest) + ")</button>";
+  if (nReal) h += '<button onclick="crmBulkClass(true)">نقل إلى التجريبية (' + mN(nReal) + ")</button>";
+  if (nTest) h += '<button onclick="crmBulkClass(false)">إعادة إلى الفعلية (' + mN(nTest) + ")</button>";
   h += '<button class="x" aria-label="إلغاء التحديد" onclick="crmClear()">&#215;</button></div></div>';
   return h;
 }
@@ -557,9 +584,8 @@ function vKmonCrm(d) {
   if (crmView === "kanban") h += crmKanbanView(withStAll);
   else if (crmView === "group") h += crmGroupView(withStAll);
   else h += crmListView(withStAll);
-  h += "</div></div>";
   h += crmBulkBar();
-  return h;
+  return h + "</div></div>";
 }
 
 /* ============================= the record screen ============================= */
@@ -588,8 +614,8 @@ function crmDetailBulkBar(camp) {
   var ph = crmSelPhones();
   if (!ph.length) return "";
   return '<div class="bulkbar"><div>' +
-    '<span class="cnt">' + fmtN(ph.length) + " محدَّدة</span>" +
-    '<button class="pri" onclick="crmRetargetSel()">إعادة استهداف المحدد (' + fmtN(ph.length) + ")</button>" +
+    '<span class="cnt">' + mN(ph.length) + " محدَّدة</span>" +
+    '<button class="pri" onclick="crmRetargetSel()">إعادة استهداف المحدد (' + mN(ph.length) + ")</button>" +
     '<button onclick="crmExportSelTargets()">تصدير المحدد CSV</button>' +
     '<button class="x" aria-label="إلغاء التحديد" onclick="crmClearD()">&#215;</button></div></div>';
 }
@@ -623,9 +649,9 @@ function vKmonDetailCrm(id, d) {
      ["نسبة الردود", crmDeliveryRate(st.replied, st), "من جهات الاستهداف"],
      ["نسبة الجهات المهتمة", crmDeliveryRate(st.interested, st), "من جهات الاستهداف"]]
       .map(function (x) {
-        return '<div><span class="m-stat__v">' + (x[1] === null ? mNil("لم يُقَس", "none") : mPct(x[1])) + "</span>" +
-          '<span class="m-stat__k">' + x[0] + "</span>" +
-          '<span class="m-stat__s">' + (x[1] === null ? "لم تُرسل هذه الحملة بعد" : x[2]) + "</span></div>";
+        return '<div><div class="m-stat__v">' + (x[1] === null ? mNil("لم يُقَس", "none") : mPct(x[1])) + "</div>" +
+          '<div class="m-stat__k">' + x[0] + "</div>" +
+          '<div class="m-stat__s">' + (x[1] === null ? "لم تُرسل هذه الحملة بعد" : x[2]) + "</div></div>";
       }).join("") + "</div></div></section>";
 
   /* ---- the move cards, computed once: the count rides on the tab label ---- */
@@ -644,12 +670,15 @@ function vKmonDetailCrm(id, d) {
      floor, and the count and its denominator are printed wherever the cause is. */
   var hasTopCause = topCauseN >= 2;
   var causeSaid = hasTopCause
-    ? topCause + " — سُجّل على " + fmtN(topCauseN) + " من " + fmtN(lostHere.length) + " صفقة خاسرة"
+    ? topCause + " — سُجّل على " + opPl(topCauseN, "صفقة واحدة", "صفقتين", "صفقات", "صفقة") +
+      " من " + opPl(lostHere.length, "صفقة خاسرة واحدة", "صفقتين خاسرتين", "صفقات خاسرة", "صفقة خاسرة")
     : "";
   var moves = [];
-  if (hotHere.length) moves.push(["ابدأ التواصل مع " + fmtN(hotHere.length) + " جهة تستحق المتابعة", "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "var(--m-ok)", "interested"]);
-  if (seenSilent.length) moves.push(["أعد استهداف " + fmtN(seenSilent.length) + " جهة شاهدت دون ردّ", "الاهتمام قائم، وأثر الرسالة غير واضح" + (hasTopCause ? " وعالج «" + topCause + "»" : ""), "var(--m-warn)", "silent"]);
-  if (notDelivered.length) moves.push([fmtN(notDelivered.length) + " لم تصلهم الرسالة", "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "var(--m-bad)", "failed"]);
+  /* The card esc()s its own title, so these are PLAIN text and the count is four-way through opPl
+     rather than «n + noun» (PORT-SPEC §5). */
+  if (hotHere.length) moves.push(["ابدأ التواصل مع " + opPl(hotHere.length, "جهة واحدة تستحق المتابعة", "جهتين تستحقان المتابعة", "جهات تستحق المتابعة", "جهة تستحق المتابعة"), "وسوم اهتمام مؤكدة، أو نية مرتفعة قرأها المساعد من نص المحادثة ولم تُسجَّل وسمًا بعد", "var(--m-ok)", "interested"]);
+  if (seenSilent.length) moves.push(["أعد استهداف " + opPl(seenSilent.length, "جهة واحدة شاهدت دون ردّ", "جهتين شاهدتا دون ردّ", "جهات شاهدت دون ردّ", "جهة شاهدت دون ردّ"), "الاهتمام قائم، وأثر الرسالة غير واضح" + (hasTopCause ? " وعالج «" + topCause + "»" : ""), "var(--m-warn)", "silent"]);
+  if (notDelivered.length) moves.push([opPl(notDelivered.length, "جهة واحدة لم تصلها الرسالة", "جهتان لم تصلهما الرسالة", "جهات لم تصلها الرسالة", "جهة لم تصلها الرسالة"), "تحقق من الأرقام، ثم أعد المحاولة لاحقًا", "var(--m-bad)", "failed"]);
   if (hasTopCause) moves.push(["أبرز أسباب عدم الإغلاق: " + causeSaid, "عالِج السبب في رسالة الحملة القادمة لهذه الخدمة", "var(--m-ac)", ""]);
 
   /* The single highest-value move, surfaced under the verdict so the operator sees the next action
@@ -693,10 +722,10 @@ function vKmonDetailCrm(id, d) {
         : r !== null ? mPct(r) + " من جهات الاستهداف"
         : !st.targeted ? "لا جهات استهداف"
         : "لم تُرسل بعد";
-      return '<div class="m-card"><span class="m-stat__k">' + c[0] + "</span>" +
-        '<span class="m-stat__v">' + mN(c[1]) + "</span>" +
-        '<span class="m-stat__s">' + caption + "</span>" +
-        '<span class="m-meter"><i style="--m-pct:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%"></i></span></div>";
+      return '<div class="m-card"><div class="m-stat__k">' + c[0] + "</div>" +
+        '<div class="m-stat__v">' + mN(c[1]) + "</div>" +
+        '<div class="m-stat__s">' + caption + "</div>" +
+        '<span class="m-meter"><i style="--m-pct:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%"></i></span></div>';
     }).join("") + "</div>" +
     '<p class="m-meta">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</p>';
     /* BR-MON-004/006: what the campaign led to after «مهتم» (campaign-results-crm). */
@@ -757,9 +786,8 @@ function vKmonDetailCrm(id, d) {
       : '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا نتائج</p>' +
         '<p class="m-empty__d">امسح البحث أو اختر تصفية أخرى.</p></div></td></tr>') +
     "</tbody></table></div></section>";
-  h += "</div></div>";
   h += crmDetailBulkBar(camp);
-  return h;
+  return h + "</div></div>";
 }
 
 /* The targets table is a LIST, so it uses the same chrome as every other list. chipRow() and
@@ -798,7 +826,7 @@ function crmTargetRows(shown, cwin) {
         ? '<span class="m-link">&#8592; ' + esc(ci.next_action) + "</span>"
         : last ? '<span class="cx-clip">' + esc(clip(last.text, 60)) + "</span>" : mNil("لا رسالة", "none")) + "</td>" +
       "<td>" + (last ? fmtT(last.ts) : mNil("لا رسالة", "none")) + "</td>" +
-      '<td><button type="button" class="m-link" onclick="openConvo(&quot;' + esc(c.phone) + '&quot;)">المحادثة &#8592;</button></td></tr>";
+      '<td><button type="button" class="m-link" onclick="openConvo(&quot;' + esc(c.phone) + '&quot;)">المحادثة &#8592;</button></td></tr>';
   });
   return out;
 }
@@ -911,7 +939,7 @@ window.crmSelectAllMatching = function () {
   var all = crmFiltered();
   all.forEach(function (x) { crmSel[x.c.id] = true; });
   render(false);
-  alertBar("حُدِّدت " + fmtN(all.length) + " حملة مطابقة، بما فيها غير المعروضة", false);
+  alertBar("حُدِّدت " + opPl(all.length, "حملة واحدة مطابقة", "حملتان مطابقتان", "حملات مطابقة", "حملة مطابقة") + "، بما فيها غير المعروضة", false);
 };
 window.crmTogglePage = function () {
   var shown = pageSlice("kmon", crmFiltered());
@@ -972,7 +1000,7 @@ window.crmBulkClass = async function (test) {
   failed.forEach(function (id) { crmSel[id] = true; });
   render(false);
   alertBar(fail ? "غُيّر تصنيف " + fmtN(ok) + " وتعذّر " + fmtN(fail) + " — أعد المحاولة"
-                : "غُيّر تصنيف " + fmtN(ok) + " حملة", !!fail);
+                : "غُيّر تصنيف " + opPl(ok, "حملة واحدة", "حملتان", "حملات", "حملة"), !!fail);
 };
 window.crmExportSel = function () {
   var ids = crmSelIds();
@@ -984,7 +1012,7 @@ window.crmExportSel = function () {
     rows.push([c.name, c.product || "", fmtD(c.created_at), st.targeted, st.delivered, st.seen, st.replied, st.interested]);
   });
   crmDownloadCsv(rows, "massar-campaigns-selected.csv");
-  alertBar("صُدّرت " + fmtN(ids.length) + " حملة", false);
+  alertBar("صُدّرت " + opPl(ids.length, "حملة واحدة", "حملتان", "حملات", "حملة"), false);
 };
 window.crmExportSelTargets = function () {
   var ph = crmSelPhones();
@@ -994,7 +1022,7 @@ window.crmExportSelTargets = function () {
     rows.push([p, (c && c.waName) || ""]);
   });
   crmDownloadCsv(rows, "massar-targets-selected.csv");
-  alertBar("صُدّرت " + fmtN(ph.length) + " جهة", false);
+  alertBar("صُدّرت " + opPl(ph.length, "جهة واحدة", "جهتان", "جهات", "جهة"), false);
 };
 function crmDownloadCsv(rows, filename) {
   var safe = function (x) { var v = String(x); if (/^[=+\\-@\\t\\r]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; };
