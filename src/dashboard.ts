@@ -1761,6 +1761,57 @@ function vPending() {
       moSkeleton(5, ["w80", "w60", "w40"]) + "</div>";
 }
 
+/* The campaign indicators, built once and rendered where campaigns live.
+   They were two bands on الرئيسية — a five-tile strip and a two-column analytics block — which
+   made the home page answer «what did marketing do» before it finished answering «are we going to
+   hit the number». Moved to «متابعة الحملات» on the founder's instruction (2026-09-17); الرئيسية
+   keeps the two figures that bear on revenue, and links to the rest.
+   It reads cache and campaigns directly, the same globals vHome reads, so neither caller has
+   to thread state through the other. */
+function vCampaignActivity() {
+  const csAll = ((cache && cache.contacts) || []);
+  const cs = showTest ? csAll : csAll.filter((c) => !c.test);
+  const realCampaigns = campaigns.filter((cp) => !campIsTest(cp));
+  const interestedList = cs.filter((c) => interestedOf(c, 0) || c.outcome === "handoff");
+  const delivered = cs.filter((c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read).length;
+  const replied = cs.filter((c) => (c.statusTimes || {}).replied).length;
+  const KWIN = kpiDays * 864e5;
+  const KWORD = kpiDays === 7 ? "هذا الأسبوع" : "خلال " + fmtN(kpiDays) + " يومًا";
+  const WEEK_AGO = Date.now() - KWIN;
+  const delivTs = (c) => (c.statusTimes || {}).delivered || (c.statusTimes || {}).read || 0;
+  const replTs = (c) => (c.statusTimes || {}).replied || 0;
+  const series = qualSeries(cs, 14);
+  const sDeliv = daySeries(cs, delivTs, 14);
+  const sRepl = daySeries(cs, replTs, 14);
+  const sCamp = daySeries(realCampaigns, (cp) => cp.created_at || 0, 14);
+  const newDeliv = cs.filter((c) => delivTs(c) >= WEEK_AGO).length;
+  const newCamp = realCampaigns.filter((cp) => (cp.created_at || 0) >= WEEK_AGO).length;
+  const kNewQual = cs.filter((c) => interestedOf(c, Date.now() - KWIN)).length;
+  const kNewRepl = cs.filter((c) => replTs(c) >= WEEK_AGO).length;
+  const allFlat = [kNewQual, kNewRepl, newDeliv, newCamp].every((v) => !v);
+  const kd = (n) => (allFlat ? null : n);
+  const strip = '<div class="kstrip">' +
+    kpiCard("جهات مهتمة ومؤهلة", fmtN(interestedList.length), kd(kNewQual), KWORD, series) +
+    kpiCard("ردّوا", fmtN(replied), kd(kNewRepl), KWORD, sRepl) +
+    kpiCard("وصلت الرسائل", fmtN(delivered), kd(newDeliv), KWORD, sDeliv) +
+    kpiCard("الحملات الفعلية", fmtN(realCampaigns.length), kd(newCamp), KWORD, sCamp) +
+    kpiCard("جهات في قوائمك", fmtN(entities.length), null, "", null) +
+    "</div>";
+  return '<div class="ds6"><section class="m-card"><div class="m-card__h">' +
+    '<div class="m-section-head__t"><h2 class="m-card__t">نشاط الحملات</h2>' +
+    '<p class="m-meta">' + (allFlat
+      ? "لا تغيّر خلال " + (kpiDays === 7 ? "آخر 7 أيام" : "آخر " + fmtN(kpiDays) + " يومًا")
+      : "ما تحرّك في الفترة المختارة.") + "</p></div></div>" +
+    strip + "</section>" +
+    '<section class="m-card" style="margin-block-start:var(--m-3)"><div class="m-card__h">' +
+    '<div class="m-section-head__t"><h2 class="m-card__t">التحليلات</h2>' +
+    '<p class="m-meta">أرقام حية من الحملات والمحادثات' +
+      (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط") + "</p></div></div>" +
+    '<div class="hd-split"><div class="hd-col">' + vHomeCharts(cs) + "</div>" +
+    '<div class="hd-col">' + ((typeof winLossBoard === "function") ? winLossBoard() : "") +
+    "</div></div></section></div>";
+}
+
 function vHome(d) {
   // The executive bands lead الرئيسية: DESIGN.md §7.13 asks a page to have a point of view, and the
   // question this screen answers for a founder is «أين نحن من المستهدف», not «من ردّ اليوم». The
@@ -1857,15 +1908,30 @@ function vHome(d) {
   // rather than under it, which is what stopped this page being a 2,554px ribbon.
   const analytics = '<div class="hd-split"><div class="hd-col">' + vHomeCharts(cs) + "</div>" +
     '<div class="hd-col">' + latest + ((typeof winLossBoard === "function") ? winLossBoard() : "") + "</div></div>";
-  const bands = ((typeof vHomeExecBands === "function") ? vHomeExecBands() : []).concat([
+  // خط البيع is a band, not part of the surface, so it shares the three-column grid with the
+  // rest instead of stretching across the page above them.
+  const pipeBand = (typeof hdsPipelineBand === "function") ? hdsPipelineBand() : "";
+  const bands = (pipeBand
+    ? [["خط البيع", "ما يحمل الرقم أعلاه.", pipeBand, '<a class="go" href="#opps">كل الفرص ←</a>']]
+    : []).concat((typeof vHomeExecBands === "function") ? vHomeExecBands() : []).concat([
     // NOT «المستهدفات والأداء ←» — the deck already carries that link, and the audit found the
     // string printed twice on one screen. A second copy of a link is not emphasis, it is a reader
     // checking whether the two go to the same place.
     ["أين نحن من المستهدف", "القطاعات، والمنتجات الأقل إنجازًا، والأرباع الأربعة.",
-      (typeof vExecBand === "function") ? vExecBand() : "", '<a class="go" href="#products">كل المنتجات ←</a>'],
-    ["نشاط الحملات", "ما تحرّك في الفترة المختارة.", kstrip, kctl],
-    ["التحليلات", "أرقام حية من الحملات والمحادثات" + (showTest ? " · تشمل بيانات البيئة التجريبية" : " · بيانات فعلية فقط"),
-      analytics, '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
+      (typeof vExecBand === "function") ? vExecBand() : "",
+      '<a class="go" href="#products">كل المنتجات ←</a>', "", true],
+    // The five-tile strip and the analytics block moved to «متابعة الحملات» (2026-09-17). What
+    // stays is the two figures that bear on the number this page is about: who became interested,
+    // and who replied. Everything else about campaigns is one click away and says so.
+    ["الحملات", "ما أنتجته الحملات في الفترة المختارة.",
+      '<div class="ds6"><div class="m-segs">' +
+        '<div class="m-seg-row"><span class="m-seg-row__t">جهات مهتمة ومؤهلة</span>' +
+          '<span class="m-seg-row__v"><span class="m-n">' + fmtN(interestedList.length) + "</span></span>" +
+          '<span class="m-cap">' + (kNewQual ? "+" + fmtN(kNewQual) + " " + KWORD : "بلا تغيّر") + "</span></div>" +
+        '<div class="m-seg-row"><span class="m-seg-row__t">ردّوا</span>' +
+          '<span class="m-seg-row__v"><span class="m-n">' + fmtN(replied) + "</span></span>" +
+          '<span class="m-cap">' + (kNewRepl ? "+" + fmtN(kNewRepl) + " " + KWORD : "بلا تغيّر") + "</span></div>" +
+      "</div></div>", '<a class="go" href="#kmon">متابعة الحملات ←</a>'],
   ]);
   // The deck is full-bleed and sits ABOVE the numbered bands: it is one dark object continuous with
   // the rail, not a section of the page, so it carries its own header and escapes .body's padding.

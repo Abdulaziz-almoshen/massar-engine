@@ -15,6 +15,7 @@ Run after any change to massar-ds/massar.css:
 """
 import io
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +45,24 @@ def split_rules(s):
     return out
 
 
+COMMENT = re.compile(r"/\*.*?\*/", re.S)
+
+
 def scope_sel(sel):
+    """Scope a selector, leaving any comment that precedes it alone.
+
+    split_rules hands back everything between the previous rule and the brace, so a comment above
+    a rule arrives as part of "sel". Splitting that on commas — which is how a selector list is
+    split — tore a comment containing a comma into fragments and prefixed each one, leaving the
+    real selector UNSCOPED at the end. The result leaked .hds-ind into every screen in the app
+    and was invisible in the source. Comments carry the reasoning, so they are preserved verbatim
+    and only what follows them is treated as a selector.
+    """
+    lead = ""
+    m = list(COMMENT.finditer(sel))
+    if m:
+        cut = m[-1].end()
+        lead, sel = sel[:cut], sel[cut:]
     parts = []
     for p in [x.strip() for x in sel.split(",")]:
         if not p:
@@ -61,7 +79,7 @@ def scope_sel(sel):
             parts.append(p)
         else:
             parts.append(SCOPE + " " + p)
-    return ", ".join(parts)
+    return lead + ", ".join(parts)
 
 
 def scope(css):
@@ -104,6 +122,19 @@ def main():
 
     # The gate forbids a backtick inside a *_CSS literal; a stray one would
     # terminate the string and turn the rest of the file into TypeScript.
+    leaks = []
+    for sel, _body in split_rules(scoped):
+        bare = COMMENT.sub("", sel).strip()
+        if not bare or bare.startswith("@"):
+            continue
+        for part in bare.split(","):
+            part = part.strip()
+            if part and not part.startswith(SCOPE) and part != ":root":
+                leaks.append(part)
+    if leaks:
+        sys.exit("refusing to write: %d rule(s) escaped the %s scope and would paint the whole "
+                 "app: %s" % (len(leaks), SCOPE, ", ".join(leaks[:6])))
+
     if "`" in scoped:
         sys.exit("refusing to write: backtick in the scoped CSS")
     if "${" in scoped:

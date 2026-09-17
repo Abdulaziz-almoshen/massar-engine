@@ -51,7 +51,11 @@ export const HOME_CRM_CSS = `
   .hm-arc { width:88px; height:88px; }
 }
 
-.hd { display:flex; flex-direction:column; gap:var(--m-5); }
+.hd { display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--m-3); align-items:start; }
+.hd > .hd-wide { grid-column:1 / -1; }
+/* Below ~1100px a third of the page is narrower than the figures a band has to hold. */
+@media (max-width:1100px){ .hd { grid-template-columns:minmax(0,1fr); } }
 /* The band shell is m-card now (see hdBands). What is left here is the stacking and the one
    affordance the vocabulary has no name for: the band's trailing link. The ordinal .ix and the
    .hd-sec/.hd-h rules went with the numbering they served. */
@@ -152,7 +156,11 @@ function hdBands(list) {
      follow, and the numbering closed up when a role could not see a band — so two people with
      different permissions saw a different «3». A band is a section, not a step. */
   return '<div class="hd">' + list.filter(function (b) { return b && b[2]; }).map(function (b) {
-    return '<section class="m-card"' + (b[4] ? ' id="' + b[4] + '"' : "") + '>' +
+    /* b[5] marks a band that needs the full row. The exec band is itself three columns and the
+       revenue surface is the page's leading figure; squeezing either into a third would undo
+       the reason they exist. Everything else reads three across. */
+    return '<section class="m-card' + (b[5] ? " hd-wide" : "") + '"' +
+      (b[4] ? ' id="' + b[4] + '"' : "") + '>' +
       '<div class="m-card__h"><div class="m-section-head__t">' +
       '<h2 class="m-card__t">' + b[0] + "</h2>" +
       (b[1] ? '<p class="m-meta">' + b[1] + "</p>" : "") + "</div>" +

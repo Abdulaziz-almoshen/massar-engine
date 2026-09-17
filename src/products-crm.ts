@@ -30,6 +30,114 @@ export const PRODUCTS_CRM_CSS = `
    hierarchy, it has a headline and a footnote. This row builds the MIDDLE tier the page was
    missing — name at --t-sm/700, figure at --t-lg/700, share at --t-xl/800 — so a reader scanning
    the body lands on figures instead of on a wall. */
+/* ===== the executive band, rebuilt =====
+   The old one spread four facts across 1658px of five-column grid, three columns of which printed
+   «—». Density is not decoration here: a row the eye can take in one fixation is a row that gets
+   read. Everything below is a three-track grid with ONE flexible column, so the figures line up
+   in a column down the page instead of drifting with content width. */
+/* THREE COLUMNS. The three sections answer three different questions - which sector, which
+   product, which quarter - so they are read side by side and compared, not scrolled through in
+   sequence. The lede spans all three because it qualifies all of them.
+   A column is ~1/3 of the band, so inside one there is no room for a four-track row: the row
+   grid collapses to label+figure with the track on its own line (see .xb-row below). */
+.ds6 .xb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--m-3);align-items:start}
+.ds6 .xb-lede{grid-column:1 / -1}
+
+/* The one sentence the reader needs before any number. Tinted, because it is context rather than
+   data — the same move the reference makes with its hint panel. */
+.ds6 .xb-lede{display:flex;align-items:flex-start;gap:var(--m-3);
+  padding:var(--m-3) var(--m-4);border-radius:var(--m-r-card);
+  background:var(--m-ac-dim);box-shadow:inset 0 0 0 1px var(--m-ac-line)}
+.ds6 .xb-lede--none{background:var(--m-warn-dim);box-shadow:inset 0 0 0 1px var(--m-warn-line)}
+.ds6 .xb-lede__i{flex:none;inline-size:8px;block-size:8px;border-radius:50%;
+  background:var(--m-ac);margin-block-start:7px}
+.ds6 .xb-lede--none .xb-lede__i{background:var(--m-warn)}
+.ds6 .xb-lede > div{flex:1;min-inline-size:0;max-inline-size:62ch}
+.ds6 .xb-lede b{display:block;inline-size:fit-content;max-inline-size:100%;
+  font-size:var(--m-t-body);font-weight:600;color:var(--m-ink)}
+.ds6 .xb-lede span{display:block;inline-size:fit-content;max-inline-size:100%;
+  font-size:var(--m-t-cap);color:var(--m-ink-2);
+  line-height:var(--m-leading-meta);margin-block-start:2px}
+.ds6 .xb-lede .m-link{flex:none;white-space:nowrap;align-self:center}
+
+.ds6 .xb-sec{background:var(--m-paper);border-radius:var(--m-r-card);
+  box-shadow:inset 0 0 0 1px var(--m-line);overflow:hidden}
+.ds6 .xb-h{display:flex;align-items:baseline;justify-content:space-between;gap:var(--m-3);
+  padding:var(--m-3) var(--m-4);font-size:var(--m-t-cap);font-weight:600;color:var(--m-ink);
+  border-block-end:1px solid var(--m-line)}
+.ds6 .xb-h span{font-weight:400;color:var(--m-faint)}
+
+/* label | track | figure | percent. The track is the only elastic column, so every figure and
+   every percent sits on the same vertical line whatever the label length. */
+.ds6 .xb-row{display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"n p" "t t" "v v";
+  align-items:center;gap:6px var(--m-3);inline-size:100%;
+  padding:10px var(--m-4);font:inherit;text-align:start;background:none;border:0;
+  color:inherit;position:relative;cursor:pointer;
+  border-block-start:1px solid var(--m-line-soft);
+  transition:background var(--m-out) var(--m-ease)}
+.ds6 .xb-sec .xb-row:first-of-type{border-block-start:0}
+.ds6 .xb-row__n{font-size:var(--m-t-cap);font-weight:600;color:var(--m-ink);min-inline-size:0;
+  overflow-wrap:anywhere}
+.ds6 .xb-row__n em{display:block;font-style:normal;font-weight:400;font-size:var(--m-t-micro);
+  color:var(--m-faint);margin-block-start:2px}
+.ds6 .xb-row__n{grid-area:n}
+.ds6 .xb-row__p{grid-area:p}
+.ds6 .xb-row__t{grid-area:t;block-size:8px;border-radius:999px;background:var(--m-sunk);overflow:hidden}
+.ds6 .xb-row__v{grid-area:v}
+.ds6 .xb-row__t i{display:block;block-size:100%;border-radius:999px;background:var(--m-ac);
+  transition:inline-size var(--m-in) var(--m-move)}
+.ds6 .xb-row__v{font-size:var(--m-t-cap);font-weight:600;color:var(--m-ink);white-space:nowrap;
+  text-align:start;display:flex;align-items:baseline;gap:6px}
+.ds6 .xb-row__v em{font-style:normal;font-weight:400;font-size:var(--m-t-micro);
+  color:var(--m-faint)}
+.ds6 .xb-row__p{font-size:var(--m-t-body);font-weight:700;color:var(--m-ink);text-align:end;
+  white-space:nowrap}
+/* Zero is not a failure here, it is an unstarted quarter. Red would say the opposite. */
+.ds6 .xb-row__p.is-nil{font-weight:400}
+
+/* The edge marks the row; the ground only separates it. A pseudo-element with
+   inset-inline-start, never a box-shadow offset — shadow offsets are physical and land on the
+   wrong edge in RTL. */
+.ds6 .xb-row::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;
+  inline-size:3px;background:var(--m-ac);opacity:0;
+  transition:opacity var(--m-out) var(--m-ease)}
+@media (hover:hover) and (pointer:fine){
+  .ds6 .xb-row:hover{background:var(--m-sunk)}
+  .ds6 .xb-row:hover::before{opacity:1}
+}
+.ds6 .xb-row:active{transform:scale(.997)}
+.ds6 .xb-row:focus-visible{outline:none;background:var(--m-ac-dim);box-shadow:var(--m-focus)}
+
+/* Everything unmeasured, on one line. Three identical rows of «—» taught the reader to skip the
+   block; the fact that matters about them is that they are unmeasured, and that is one fact. */
+.ds6 .xb-idle{display:block;padding:10px var(--m-4);background:var(--m-sunk);
+  border-block-start:1px solid var(--m-line);
+  font-size:var(--m-t-micro);color:var(--m-mut);line-height:var(--m-leading-meta)}
+.ds6 .xb-idle b{font-weight:600;color:var(--m-ink-2)}
+.ds6 .xb-idle--q{border-radius:0;background:none;
+  border-block-start:1px solid var(--m-line-soft);color:var(--m-faint)}
+
+.ds6 .xb-qs{display:grid;gap:var(--m-2);padding:var(--m-3) var(--m-4)}
+.ds6 .xb-q{display:grid;grid-template-columns:minmax(0,1fr);gap:5px}
+.ds6 .xb-q__k{font-size:var(--m-t-cap);color:var(--m-ink-2)}
+.ds6 .xb-q.is-cur .xb-q__k{font-weight:600;color:var(--m-ink)}
+.ds6 .xb-q__t{block-size:8px;border-radius:999px;background:var(--m-sunk);overflow:hidden}
+.ds6 .xb-q__t i{display:block;block-size:100%;border-radius:999px;background:var(--m-ac)}
+.ds6 .xb-q__v{font-size:var(--m-t-micro);font-weight:600;color:var(--m-ink);white-space:nowrap}
+.ds6 .xb-q__v em{font-style:normal;font-weight:400;color:var(--m-faint)}
+
+@media (prefers-reduced-motion:reduce){
+  .ds6 .xb-row,.ds6 .xb-row::before,.ds6 .xb-row__t i{transition:none}
+  .ds6 .xb-row:active{transform:none}
+}
+/* Under ~900px the label column stops earning 15rem: the track drops to its own line so the
+   figures keep their alignment instead of crushing to two characters. */
+/* Below ~1100px a third of the band is narrower than the figures it has to hold, so the three
+   columns stack rather than crush. */
+@media (max-width:1100px){ .ds6 .xb{grid-template-columns:minmax(0,1fr)} }
 .ex-rows{background:var(--paper);border-radius:var(--r-win,14px);overflow:hidden}
 .ex-row{display:grid;grid-template-columns:minmax(0,1.3fr) 150px 140px minmax(120px,1fr) 78px;
   align-items:center;gap:var(--s3);width:100%;padding:var(--s3) var(--s4);text-align:start;
@@ -1830,7 +1938,7 @@ function vExecBand() {
         '<div class="sub">' + fmtN(sc.openCount) + ' فرصة مفتوحة</div>' +
         (units.length ? shUnits(units, 40) : "") + '</div>' +
         '<div class="end"><span class="money">' +
-          (sc.target > 0 ? pcMoney(sc.achieved) + ' من ' + pcMoney(sc.target) : pcMoney(sc.weightedOpen) + ' مفتوح') +
+          (sc.target > 0 ? mMoney(sc.achieved) + ' من ' + mMoney(sc.target) : pcMoney(sc.weightedOpen) + ' مفتوح') +
         '</span><span class="crm-st ' + cls + '"><i></i>' +
           (cov === null ? "بلا مستهدف" : fmtN(cov) + "٪") + '</span></div></div>';
     });
@@ -1873,39 +1981,136 @@ function vExecBand() {
   // page-duplication audit found each one printed twice. The chart rows are already buttons to the
   // same drill-down, so the list is gone and its one extra fact, the open count, moved onto the
   // chart row itself.
-  var h = '<div class="pc-g3">';
-  h += '<div class="sh-sec card3"><div class="sh-h">القطاعات</div>' +
-    /* pcSectors is /admin/sales/sectors with no query string, and index.ts defaults that to the
-       CURRENT QUARTER. These are one quarter's figures; the heading called them the year's. */
-      '<div class="sh-hs">المحقق مقابل مستهدف الربع '
-      + fmtN(pcSectors.quarter) + ' · ' + esc(String(pcSectors.year))
-      + '. اضغط قطاعًا للوحته.</div>' +
-    pcSectorRows(secs) + '</div>';
+  /* REDESIGNED 2026-09-17, on the founder's note that the old band was «bad UI».
+     What it was: a five-column grid where three columns printed «—» on almost every row, an empty
+     grey pill on each one, a dark-red «0٪» as the loudest thing on the page, and a four-quarter
+     strip of which three quarters said «بلا مستهدف». The grid existed for data that is not there.
 
-  var targeted = prods.filter(function (p) { return p.annualTarget > 0; });
+     What the records actually say is one sentence: ONE target is recorded — 34,000 on one product,
+     one quarter — and nothing has been won against it. So the band leads with that sentence, gives
+     the one sector that carries the target a real track, collapses the sectors that carry none into
+     a single quiet line instead of a row of dashes each, and shows the quarter that has a target
+     rather than four columns of absence. Nothing is hidden: every count that leaves the foreground
+     is still named. */
+  var targetedSecs = secs.filter(function (x) { return x.target > 0; });
+  var idleSecs = secs.filter(function (x) { return !(x.target > 0); });
+  var targeted = prods.filter(function (p) { return p.annualTarget !== null && p.annualTarget > 0; });
   var untargeted = prods.length - targeted.length;
-  if (targeted.length) {
-    h += '<div class="sh-sec card3"><div class="sh-h">المنتجات حسب الإنجاز</div>' +
-      '<div class="sh-hs">الأقل إنجازًا أولًا' +
-      (untargeted ? ' · ' + pxNProd(untargeted) + ' بلا مستهدف لا تُرتَّب هنا' : '') + '.</div><div class="ex-rows">';
-    targeted.sort(function (a, b) { return a.coveragePct - b.coveragePct; }).slice(0, 5).forEach(function (p) {
-      h += exRow({
-        go: "product", nm: p.product, sub: pcSectorOfProduct(p),
-        fig: p.achieved, of: p.annualTarget, pct: p.coveragePct
-      });
-    });
-    h += '</div></div>';
+
+  /* One line for everything unmeasured. Three identical rows of «—» taught the reader to skip
+     the block, and the fact that matters about them is that they are unmeasured - one fact. */
+  function xbIdleSectors(list) {
+    var open = list.reduce(function (n, x) { return n + (x.openCount || 0); }, 0);
+    return '<div class="xb-idle">' +
+      '<b>' + esc(list.map(function (x) { return x.sector; }).join(" · ")) + '</b>' +
+      '<span> — بلا مستهدف لهذا الربع · ' +
+      mPl(open, "فرصة واحدة", "فرصتان", "فرص", "فرصة") + ' مفتوحة</span></div>';
   }
 
-  /* The accounting-basis caveat («قيمة العقد الكاملة… الأساس المحاسبي لم يُحسم») is OFF the home
-     screen by founder instruction, 2026-09-16. It is not deleted: it belongs where someone is
-     acting on the figure — «التقارير» (rp-basis) and the executive report (rx-basis) both still
-     print it — not on the opening band a founder reads for position. */
-  h += '<div class="sh-sec card3"><div class="sh-h">الإنجاز الربعي · ' + arYear(pcQuarters.year) + '</div>' +
-    pcQuarterChart(pcQuarters) + '</div>';
+  var h = '<div class="xb">';
+
+  /* The state, in one line. An interface that opens on «0٪» tells the reader their performance is
+     bad; the truth is that almost nothing has a target to be measured against, which is a
+     different problem with a different fix. */
+  h += '<div class="xb-lede' + (anyTarget ? "" : " xb-lede--none") + '">' +
+    '<span class="xb-lede__i" aria-hidden="true"></span><div>';
+  if (!anyTarget) {
+    h += '<b>لا مستهدف مسجّل على أي منتج</b>' +
+      '<span>لا يمكن قياس الإنجاز قبل تسجيل مستهدف. اضغط «المستهدفات والأداء» لتحديدها.</span>';
+  } else {
+    h += '<b>' + pxNProdN(targeted.length) + ' يحمل مستهدفًا من ' + mN(prods.length) + '</b>' +
+      '<span>' +
+      (wonTotal
+        ? ('المحقق ' + mMoney(wonTotal) + ' مقابل ' + mMoney(
+            targeted.reduce(function (n, x) { return n + x.annualTarget; }, 0)) + ' مسجّلة.')
+        : 'لا صفقة رابحة بعد، فالمحقق صفر على كل مستهدف مسجّل.') +
+      (untargeted ? ' ' + pxNProdN(untargeted) + ' بلا مستهدف، ومحققها خارج أي نسبة.' : '') +
+      '</span>';
+  }
+  h += '</div><a class="m-link" href="#perf">المستهدفات والأداء &#8592;</a></div>';
+
+  /* The sectors that carry a target get a row each, with a track that shows the gap. The rest get
+     ONE line: three identical rows of «—» taught the reader to skip the block, and the fact that
+     matters about them is that they are unmeasured, which is one fact, not three. */
+  if (targetedSecs.length) {
+    h += '<div class="xb-sec"><div class="xb-h">القطاعات المستهدفة' +
+      '<span>الربع ' + mN(pcSectors.quarter) + ' · ' + arYear(pcSectors.year) + '</span></div>';
+    targetedSecs.forEach(function (sc) {
+      /* ATTAINMENT, not sc.coveragePct. Coverage is (achieved + weightedOpen) / target, so a
+         sector with nothing won and a weighted pipeline printed «10٪» directly beside
+         «0 ر.س من 34,000 ر.س» — two different measures wearing the same clothes, which is the
+         exact defect this band was rebuilt to stop. The product rows below already show
+         achieved/target; both rows mean the same thing now. The pipeline is not lost: the row
+         states how many opportunities are open, and #perf carries the weighted figure. */
+      var pct = sc.target > 0 ? Math.round((sc.achieved / sc.target) * 100) : null;
+      var w = pct === null ? 0 : Math.max(0, Math.min(100, pct));
+      h += '<button type="button" class="xb-row go" data-go="sector" data-nm="' + esc(sc.sector) + '">' +
+        '<span class="xb-row__n">' + esc(sc.sector) +
+          '<em>' + mPl(sc.openCount, "فرصة واحدة", "فرصتان", "فرص", "فرصة") + ' مفتوحة</em></span>' +
+        '<span class="xb-row__t"><i style="inline-size:' + w + '%"></i></span>' +
+        '<span class="xb-row__v">' + mMoney(sc.achieved) +
+          '<em>من ' + mMoney(sc.target) + '</em></span>' +
+        '<span class="xb-row__p' + (pct ? "" : " is-nil") + '">' +
+          (pct === null ? '<span class="m-td-nil m-nil--owed">بلا مستهدف</span>'
+                        : mN(pct) + '٪') + '</span></button>';
+    });
+    if (idleSecs.length) { h += xbIdleSectors(idleSecs); }
+    h += '</div>';
+  } else if (idleSecs.length) {
+    h += '<div class="xb-sec"><div class="xb-h">القطاعات</div>' + xbIdleSectors(idleSecs) + '</div>';
+  }
+
+  /* Products, only the ones that can be ranked. The others are counted in the lede above. */
+  if (targeted.length) {
+    h += '<div class="xb-sec"><div class="xb-h">المنتجات حسب الإنجاز' +
+      '<span>الأقل أولًا</span></div>';
+    targeted.sort(function (x, y) { return (x.coveragePct || 0) - (y.coveragePct || 0); })
+      .slice(0, 5).forEach(function (pr) {
+        var pct = pr.coveragePct, w = pct === null ? 0 : Math.max(0, Math.min(100, pct));
+        h += '<button type="button" class="xb-row go" data-go="product" data-nm="' + esc(pr.product) + '">' +
+          '<span class="xb-row__n">' + esc(pr.product) +
+            '<em>' + esc(pcSectorOfProduct(pr) || "لم يُصنَّف") + '</em></span>' +
+          '<span class="xb-row__t"><i style="inline-size:' + w + '%"></i></span>' +
+          '<span class="xb-row__v">' + mMoney(pr.achieved) +
+            '<em>من ' + mMoney(pr.annualTarget) + '</em></span>' +
+          '<span class="xb-row__p' + (pct ? "" : " is-nil") + '">' +
+            (pct === null ? '<span class="m-td-nil m-nil--owed">بلا مستهدف</span>'
+                          : mN(pct) + '٪') + '</span></button>';
+      });
+    h += '</div>';
+  }
+
+  /* The quarters. Only the ones carrying a target are drawn; the rest become one line, for the
+     same reason the idle sectors did. The current quarter is marked because "where are we" is
+     the question this band answers. */
+  var qs = (pcQuarters.quarters || []);
+  var qTargeted = qs.filter(function (q) { return q.target > 0; });
+  var qIdle = qs.length - qTargeted.length;
+  if (qTargeted.length) {
+    h += '<div class="xb-sec"><div class="xb-h">الأرباع المستهدفة' +
+      '<span>' + arYear(pcQuarters.year) + '</span></div><div class="xb-qs">';
+    qTargeted.forEach(function (q) {
+      var cur = q.quarter === pcQuarters.currentQuarter;
+      var w = q.target > 0 ? Math.max(0, Math.min(100, (q.achieved / q.target) * 100)) : 0;
+      h += '<div class="xb-q' + (cur ? " is-cur" : "") + '">' +
+        '<span class="xb-q__k">الربع ' + mN(q.quarter) + (cur ? " · الحالي" : "") + '</span>' +
+        '<span class="xb-q__t"><i style="inline-size:' + w.toFixed(1) + '%"></i></span>' +
+        '<span class="xb-q__v">' + mMoney(q.achieved) + ' <em>من ' + mMoney(q.target) + '</em></span>' +
+        '</div>';
+    });
+    h += '</div>';
+    if (qIdle) {
+      h += '<div class="xb-idle xb-idle--q">' + mN(qIdle) +
+        ' من أربعة أرباع بلا مستهدف مسجّل</div>';
+    }
+    h += '</div>';
+  }
+
   h += '</div>';
   return h;
 }
+
+
 
 /* THE SECTOR CHART. Replaces a single stacked share bar, which answered «what proportion of the
    book is each sector» and nothing else — at three sectors that is a question nobody asks, and the

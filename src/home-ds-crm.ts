@@ -87,14 +87,6 @@ function hdsPl(n, one, two, few, many) {
   return (typeof opPl === "function") ? opPl(n, one, two, few, many) : (fmtN(n) + " " + many);
 }
 
-/* opStage() resolves a stage KEY against the live, admin-editable ladder. Printing the raw key
-   would show the reader an identifier the admin never chose. */
-function hdsStage(k) {
-  if (typeof opStage !== "function") return String(k || "");
-  var s = opStage(k);
-  return (s && s.label) ? s.label : String(k || "");
-}
-
 function hdsN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
 
 /* Bind the counts this screen prints to the arrays it renders them from. A figure marked here
@@ -174,100 +166,49 @@ function hdsRevenue(f, lines) {
 }
 
 /* ---------- the open lines, as rows or as how long each has stood still ---------- */
-function hdsLedger(lines) {
-  if (!lines.length) {
-    return '<section class="m-card m-card--ledger"><header class="m-section-head">' +
-      '<div class="m-section-head__t"><h2 class="m-h2">فرص البيع المفتوحة</h2>' +
-      '<p class="m-meta">لا بنود مفتوحة. تظهر هنا فور تسجيل أول فرصة.</p></div></header></section>';
-  }
-  var days = lines.map(function (l) { return l.days; });
-  var lo = Math.min.apply(null, days), hi = Math.max.apply(null, days);
-
-  var h = '<section class="m-card m-card--ledger" aria-labelledby="hdsPipe">';
-  h += '<header class="m-section-head"><div class="m-section-head__t">';
-  h += '<h2 class="m-h2" id="hdsPipe">فرص البيع المفتوحة</h2>';
-  h += '<p class="m-meta">' + hdsPl(lines.length, "بند واحد", "بندان", "بنود", "بندًا") +
-     " · بلا حركة منذ " +
-       (lo === hi ? hdsN(lo) : (hdsN(lo) + "&#8211;" + hdsN(hi))) + " يومًا</p></div>";
-  h += '<div class="m-seg" role="group" aria-label="طريقة العرض">' +
-       '<button type="button" data-v="list" aria-pressed="true" onclick="hdsView(&quot;list&quot;)">قائمة</button>' +
-       '<button type="button" data-v="chart" aria-pressed="false" onclick="hdsView(&quot;chart&quot;)">مدة الركود</button>' +
-       "</div></header>";
-
-  h += '<div class="m-view"><div class="m-view__p" id="hdsList"><div class="m-tablewrap">';
-  h += '<table class="m-table m-ledger"><thead><tr><th>العميل</th><th>المنتج</th>' +
-       "<th>المرحلة</th><th>القيمة</th><th>بلا حركة</th></tr></thead><tbody>";
-  h += lines.map(function (l) {
-    return "<tr" + (l.value ? "" : ' class="m-ledger__unpriced"') + ">" +
-      '<td class="m-td-n">' + esc(l.account) + "</td>" +
-      "<td>" + esc(l.product) + "</td>" +
-      '<td><span class="m-chip">' + esc(hdsStage(l.stage)) + "</span></td>" +
-      '<td class="m-td-v">' + (l.value ? hdsN(l.value) : hdsNil("لم يُسعَّر", "owed")) + "</td>" +
-      '<td class="m-td-v">' + hdsN(l.days) + "</td></tr>";
-  }).join("");
-  h += "</tbody></table></div></div>";
-
-  /* The same numbers the table prints, drawn. Not a rate, not an average — so switching the view
-     cannot change what the page claims. */
-  h += '<div class="m-view__p" id="hdsChart" hidden><div class="m-aging">';
-  h += lines.map(function (l) {
-    var pct = hi ? Math.round((l.days / hi) * 100) : 0;
-    return '<div class="m-aging__r"><span class="m-aging__k">' +
-      esc(l.account) + " · " + esc(l.product) + "</span>" +
-      '<span class="m-aging__b"><i style="--m-pct:' + pct + '%"' +
-      (l.value ? ' class="is-priced"' : "") + "></i></span>" +
-      '<span class="m-aging__v">' + hdsN(l.days) + " يومًا</span></div>";
-  }).join("");
-  h += "</div></div></div></section>";
-  return h;
-}
-
-/* One crossfade, both sides symmetric. An asymmetric swap reads as one panel shoving the other
-   out of the way rather than as one surface changing. */
-window.hdsView = function (v) {
-  var wrap = document.querySelector(".ds6 .m-card--ledger");
-  if (!wrap) return;
-  [].forEach.call(wrap.querySelectorAll(".m-seg button"), function (b) {
-    b.setAttribute("aria-pressed", b.getAttribute("data-v") === v ? "true" : "false");
-  });
-  [].forEach.call(wrap.querySelectorAll(".m-view__p"), function (p) {
-    var on = p.id === (v === "list" ? "hdsList" : "hdsChart");
-    if (on) { p.hidden = false; requestAnimationFrame(function () { p.removeAttribute("data-away"); }); }
-    else { p.setAttribute("data-away", ""); setTimeout(function () { p.hidden = true; }, 120); }
-  });
+/* Two indicators, not a table. Each is a fact the revenue figure above depends on, and each
+   opens the screen that owns the records behind it. */
+window.hdsPipelineBand = function () {
+  var f = hdsFacts(), lines = hdsLines();
+  if (!f.loaded) return "";
+  return hdsPipelineIndicators(f, lines);
 };
 
-/* ---------- what is blocking the sale ---------- */
-function hdsDecisions(f, lines) {
-  var items = [];
-  if (f.unpriced) {
-    items.push(["#opps", hdsPl(f.unpriced, "بند واحد", "بندان", "بنود", "بندًا") +
-      " بلا تسعير من " + fmtN(f.openLines || lines.length),
-      "قيمة خط البيع تُقرأ من البنود المسعّرة وحدها. الباقي لا يدخل أي مجموع.", "تسعير البنود"]);
+function hdsPipelineIndicators(f, lines) {
+  if (!lines.length) {
+    return '<div class="ds6"><div class="m-empty"><div class="m-empty__t">' +
+      'لا بنود مفتوحة</div><div class="m-empty__d">' +
+      "تظهر هنا فور تسجيل أول فرصة في «فرص البيع».</div></div></div>";
   }
-  if (f.noTarget) {
-    items.push(["#perf", fmtN(f.noTarget) + " منتجات بلا مستهدف من " + fmtN(f.products),
-      f.onlyProduct
-        ? ("المستهدف الوحيد المسجّل على " + f.onlyProduct + (f.onlyScope ? "، " + f.onlyScope : "") + ".")
-        : "لا يمكن قياس الإنجاز على منتج بلا مستهدف.", "تسجيل المستهدفات"]);
-  }
-  var stale = lines.filter(function (l) { return l.days >= 30; });
-  if (stale.length) {
-    items.push(["#board", hdsPl(stale.length, "بند واحد", "بندان", "بنود", "بندًا") +
-      " بلا حركة منذ 30 يومًا أو أكثر",
-      "لا حركة مسجّلة على هذه البنود منذ آخر تغيّر مرحلة.", "فتح اللوحة"]);
-  }
-  if (!items.length) return "";
-  /* A DIV, not an <aside>. dashboard.ts:240 styles the bare tag as the navigation rail
-     (background #EFF1F5, later the dark --rail-2), and this column rendered dark-on-dark on the
-     first deploy. role gives back the semantics the tag was carrying. */
-  return '<div class="m-home__decisions" role="complementary" aria-labelledby="hdsDec">' +
-    '<h2 class="m-h2" id="hdsDec">ما يعطّل البيع</h2>' +
-    items.map(function (it) {
-      return '<div class="m-decision"><h3 class="m-decision__title">' + esc(it[1]) + "</h3>" +
-        '<p class="m-meta">' + esc(it[2]) + "</p>" +
-        '<a class="m-link" href="' + it[0] + '">' + esc(it[3]) + " &#8592;</a></div>";
-    }).join("") + "</div>";
+  var priced = lines.filter(function (l) { return l.value > 0; });
+  var pricedValue = 0; priced.forEach(function (l) { pricedValue += l.value; });
+  var days = lines.map(function (l) { return l.days; });
+  var lo = Math.min.apply(null, days), hi = Math.max.apply(null, days);
+  var unpriced = lines.length - priced.length;
+
+  var row = function (href, label, value, note, pct, tone) {
+    /* Its own row, not .m-seg-row: that class is a label/bar/value triplet sized for a segment
+       list, and dropping a second line into its label cell ran «مسعّرة» straight into its own
+       note. Three explicit areas instead, so the note has somewhere to live. */
+    return '<a class="hds-ind" href="' + href + '">' +
+      '<span class="hds-ind__k">' + label + "</span>" +
+      '<span class="hds-ind__v">' + value + "</span>" +
+      '<span class="hds-ind__b"><i class="' + (tone || "") +
+        '" style="--m-pct:' + pct + '%"></i></span>' +
+      '<span class="hds-ind__s">' + note + "</span></a>";
+  };
+
+  return '<div class="ds6"><div class="m-segs">' +
+    row("#opps", "مسعّرة",
+        hdsN(pricedValue) + " ر.س",
+        hdsPl(priced.length, "بند واحد", "بندان", "بنود", "بندًا") + " من " + fmtN(lines.length) +
+        (unpriced ? "؛ الباقي لا يدخل أي مجموع" : ""),
+        Math.round((priced.length / lines.length) * 100), "ok") +
+    row("#board", "بلا حركة",
+        hdsN(hi) + " يومًا",
+        lo === hi ? "كل البنود" : ("المدى " + fmtN(lo) + "\u2013" + fmtN(hi) + " يومًا"),
+        100, hi >= 30 ? "low" : "mid") +
+    "</div></div>";
 }
 
 /* ---------- the surface ---------- */
@@ -289,7 +230,12 @@ function vHomeDs() {
     '<p class="m-meta m-home__dateline">السنة المالية <span class="m-n">' +
       hdsYearTxt(f.year) + '</span></p>' +
     hdsRevenue(f, lines) +
-    '<div class="m-home__work">' + hdsLedger(lines) + hdsDecisions(f, lines) + "</div>" +
+    /* The six-row ledger and the blockers list moved to «فرص البيع» (founder, 2026-09-17).
+       الرئيسية answers «are we going to hit the number», and a table of every open line answers
+       a different question — one the screen that owns those records already answers better, with
+       filters, sorting and a board. What stays is the two indicators that bear on the figure
+       above it: how much of the pipeline carries a price, and how long it has stood still. */
+
     "</div>";
 }
 `;

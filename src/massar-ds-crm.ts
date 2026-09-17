@@ -881,13 +881,11 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--m-3)}
 @media (max-width:1100px){.ds6 .m-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.ds6 .m-kpis{grid-template-columns:1fr}}
-.ds6 /* ====================================================== ASTRA
+/* ====================================================== ASTRA
    The revenue-first Home and the vocabulary it needs. Merged INTO
-   this file, .ds6 not layered over it: a second stylesheet that only
+   this file, not layered over it: a second stylesheet that only
    overrides is how revamp.ts got 39 card classes it could never
-   reconcile. One rule per selector, .ds6 here, .ds6 or nowhere. */
-
-.m-h1, .ds6 .m-greet__t{
+   reconcile. One rule per selector, here, or nowhere. */.ds6 .m-h1, .ds6 .m-greet__t{
   margin-block: 0;
   font-size: var(--m-t-display);
   line-height: var(--m-leading-title);
@@ -1226,12 +1224,11 @@ export const MASSAR_DS_CSS = `
   }.ds6 .m-btn:active, .ds6 .m-nav:active, .ds6 .m-side__t:active, .ds6 .m-seg button:active, .ds6 .m-x:active{
     transform: none;
   }}
-.ds6 /* The aging rail. One bar per open line, .ds6 length is days without movement —
-   the same six numbers the table prints, .ds6 drawn. Nothing is averaged into a
-   rate, .ds6 so switching the view cannot change what the page claims. The one
+/* The aging rail. One bar per open line, length is days without movement —
+   the same six numbers the table prints, drawn. Nothing is averaged into a
+   rate, so switching the view cannot change what the page claims. The one
    priced line is the only bar that carries the accent; colour means "this
-   one has a number attached", .ds6 not "this one is healthy". */
-.m-aging{
+   one has a number attached", not "this one is healthy". */.ds6 .m-aging{
   display: grid;
   gap: var(--m-2);
   padding: 0 var(--m-5) var(--m-5);
@@ -1271,34 +1268,31 @@ export const MASSAR_DS_CSS = `
 }
 @media (prefers-reduced-motion: reduce){.ds6 .m-aging__b i{ transition: none; }}
 @media (max-width: 720px){.ds6 .m-aging__r{ grid-template-columns: minmax(0, 1fr) auto; }.ds6 .m-aging__b{ grid-column: 1 / -1; }}
-.ds6 /* The outgoing half of a view swap. Same visual state as [data-enter] — a
-   crossfade has two sides and they must be symmetric, .ds6 or the swap reads as
-   one panel shoving another out of the way. */
-.m-view__p[data-away]{
+/* The outgoing half of a view swap. Same visual state as [data-enter] — a
+   crossfade has two sides and they must be symmetric, or the swap reads as
+   one panel shoving another out of the way. */.ds6 .m-view__p[data-away]{
   opacity: 0;
   transform: translateY(6px);
   filter: blur(3px);
 }
 @media (prefers-reduced-motion: reduce){.ds6 .m-view__p[data-away]{ transform: none; filter: none; }}
 .ds6 .m-home__dateline{ margin-block: calc(-1 * var(--m-3)) var(--m-4); }
-.ds6 /* The readiness meter is one figure among four rows of plain sentences; at
+/* The readiness meter is one figure among four rows of plain sentences; at
    full column width it reads as the panel's subject rather than one line in
-   it. Cap it, .ds6 and let every row's figure column align to the same edge. */
-.m-evidence__row > * + *{ text-align: end; }
+   it. Cap it, and let every row's figure column align to the same edge. */.ds6 .m-evidence__row > * + *{ text-align: end; }
 @media (max-width: 720px){.ds6 .m-evidence__row{ grid-template-columns: minmax(0, 1fr); }.ds6 .m-evidence__row > * + *{ text-align: start; }}
 .ds6 .m-chip{ white-space: nowrap; }
-.ds6 /* ---- the six absences, .ds6 drawn ----
+/* ---- the six absences, drawn ----
    Wording alone does not separate them: at a glance a column of grey text reads as one state
-   repeated. Astra's entry gave each KIND of absence its own treatment, .ds6 so the reader sorts them
-   before reading a word. Three forms, .ds6 by what the absence means:
+   repeated. Astra's entry gave each KIND of absence its own treatment, so the reader sorts them
+   before reading a word. Three forms, by what the absence means:
 
-     a MISSING NUMBER someone owes      dashed, .ds6 accent      لم يُسعَّر · بلا مستهدف
-     a MISSING CLASSIFICATION           dashed, .ds6 neutral     لم يُصنَّف · لم تُسجَّل
-     a LEGITIMATE NOTHING               plain, .ds6 quiet        لا بنود مفتوحة · لا سعر منشور
+     a MISSING NUMBER someone owes      dashed, accent      لم يُسعَّر · بلا مستهدف
+     a MISSING CLASSIFICATION           dashed, neutral     لم يُصنَّف · لم تُسجَّل
+     a LEGITIMATE NOTHING               plain, quiet        لا بنود مفتوحة · لا سعر منشور
 
-   The first is work. The second is data hygiene. The third is not a problem at all, .ds6 and drawing
-   it like one is how a page full of dashes teaches the reader to ignore every dash. */
-.m-nil--owed{
+   The first is work. The second is data hygiene. The third is not a problem at all, and drawing
+   it like one is how a page full of dashes teaches the reader to ignore every dash. */.ds6 .m-nil--owed{
   color: var(--m-bad);
   border: 1px dashed var(--m-bad-line);
   border-radius: 3px;
@@ -1321,7 +1315,38 @@ export const MASSAR_DS_CSS = `
   font-size: var(--m-t-micro);
   white-space: nowrap;
 }
-.ds6 /* Inside a form cell a control still fills the cell — that is what a form IS. Stated here rather
-   than as the control's default, .ds6 so the same class works in a toolbar without a per-screen undo. */
-.m-field .m-input, .ds6 .m-field .m-select, .ds6 .m-field textarea.m-input, .ds6 .m-form .m-input, .ds6 .m-form .m-select{ inline-size: 100%; }
+/* Inside a form cell a control still fills the cell — that is what a form IS. Stated here rather
+   than as the control's default, so the same class works in a toolbar without a per-screen undo. */.ds6 .m-field .m-input, .ds6 .m-field .m-select, .ds6 .m-field textarea.m-input, .ds6 .m-form .m-input, .ds6 .m-form .m-select{ inline-size: 100%; }
+/* A home indicator: one fact, its figure, how far along it is, and what it is measured against.
+   label | figure on the first line, the track under them, the qualifier last — so the qualifier
+   can wrap to two lines without pushing the figure around. */.ds6 .hds-ind{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "k v" "b b" "s s";
+  gap: 4px var(--m-3);
+  align-items: baseline;
+  padding: var(--m-3) var(--m-4);
+  border-block-start: 1px solid var(--m-line-soft);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--m-out) var(--m-ease);
+}
+.ds6 .m-segs > .hds-ind:first-child{ border-block-start: 0; }
+.ds6 .hds-ind__k{ grid-area: k; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
+.ds6 .hds-ind__v{ grid-area: v; font-size: var(--m-t-h); font-weight: 700; color: var(--m-ink);
+  white-space: nowrap; }
+.ds6 .hds-ind__b{ grid-area: b; block-size: 8px; border-radius: 999px;
+  background: var(--m-sunk); overflow: hidden; }
+.ds6 .hds-ind__b i{ display: block; block-size: 100%; inline-size: var(--m-pct, 0%);
+  border-radius: 999px; background: var(--m-ac);
+  transition: inline-size var(--m-in) var(--m-move); }
+.ds6 .hds-ind__b i.ok{ background: var(--m-ok); }
+.ds6 .hds-ind__b i.mid{ background: var(--m-warn); }
+.ds6 .hds-ind__b i.low{ background: var(--m-bad); }
+.ds6 .hds-ind__s{ grid-area: s; font-size: var(--m-t-micro); color: var(--m-faint);
+  line-height: var(--m-leading-meta); }
+@media (hover: hover) and (pointer: fine){.ds6 .hds-ind:hover{ background: var(--m-sunk); }}
+.ds6 .hds-ind:active{ transform: scale(.997); }
+.ds6 .hds-ind:focus-visible{ outline: none; box-shadow: var(--m-focus); border-radius: var(--m-r-ctl); }
+@media (prefers-reduced-motion: reduce){.ds6 .hds-ind, .ds6 .hds-ind__b i{ transition: none; }.ds6 .hds-ind:active{ transform: none; }}
 `;

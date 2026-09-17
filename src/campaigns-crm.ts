@@ -896,7 +896,15 @@ function crmCampaignsHtml(campId) {
        like everything else here, so a fault in the panel cannot take the list down with it. */
     var sg = "";
     if (!campId && typeof sgPanel === "function") { try { sg = '<div style="margin-bottom:var(--s4,24px)">' + sgPanel("kmon") + "</div>"; } catch (e) { sg = ""; } }
-    return campId ? vKmonDetailCrm(campId, cache) : sg + vKmonCrm(cache);
+    /* The campaign indicators live here now, under the list they describe, rather than on
+       الرئيسية where they answered «what did marketing do» before that page had finished
+       answering «are we going to hit the number». Guarded like the panel above: a fault in
+       the indicators must not take the campaign list down with it. */
+    var act = "";
+    if (!campId && typeof vCampaignActivity === "function") {
+      try { act = vCampaignActivity(); } catch (e) { act = ""; }
+    }
+    return campId ? vKmonDetailCrm(campId, cache) : sg + vKmonCrm(cache) + act;
   } catch (e) {
     /* Say it out loud rather than silently serving the old screen: a fallback nobody knows about is
        how a regression lives for a week. */
