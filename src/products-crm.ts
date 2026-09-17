@@ -37,8 +37,25 @@ export const PRODUCTS_CRM_CSS = `
   color:inherit;transition:background 120ms var(--ease-out)}
 .ex-rows > .ex-row:first-child{border-block-start:0}
 .ex-row.go{cursor:pointer}
-@media (hover:hover) and (pointer:fine){.ex-row.go:hover{background:var(--surface)}}
-@media (hover:none){.ex-row.go:hover{background:none}}
+/* This row is 1658px wide on a desktop, and washing all of it in the accent on hover put a slab
+   of colour under the cursor that read as the block jumping. The row is scanned constantly - it
+   is a list you run your eye down - so the hover has to be the quietest thing that still says
+   "this one". A neutral ground plus a 3px accent edge at the inline-start does that: the edge is
+   what the eye catches, and the ground only has to separate the row from its neighbours.
+   The edge is drawn with a box-shadow, not a border or padding, so nothing reflows. */
+.ds6 .ex-row.go{position:relative;transition:background var(--m-out) var(--m-ease)}
+/* The edge is a pseudo-element with inset-inline-start, NOT a box-shadow offset: a shadow's
+   offsets are PHYSICAL, so "3px" would draw on the left and land on the wrong edge in RTL. */
+.ds6 .ex-row.go::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;
+  inline-size:3px;background:var(--m-ac);opacity:0;
+  transition:opacity var(--m-out) var(--m-ease)}
+@media (hover:hover) and (pointer:fine){
+  .ds6 .ex-row.go:hover{background:var(--m-sunk)}
+  .ds6 .ex-row.go:hover::before{opacity:1}
+}
+@media (hover:none){.ds6 .ex-row.go:hover{background:none}}
+@media (prefers-reduced-motion:reduce){
+  .ds6 .ex-row.go,.ds6 .ex-row.go::before{transition:none}}
 .ex-row.go:active{transform:scale(.995)}
 .ex-row:focus-visible{outline:none;background:var(--accent-wash);box-shadow:inset 0 0 0 2px var(--accent)}
 .ex-row .nm{font-size:var(--t-sm);font-weight:700;color:var(--ink);min-width:0;overflow-wrap:anywhere}
