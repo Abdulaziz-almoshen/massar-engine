@@ -5,25 +5,30 @@
 // one place Frappe deliberately breaks its own list chrome).
 //
 // Both read the tasks/notes tables added this cycle. Every column maps to a stored field; nothing
-// is derived, defaulted or inferred. An absent priority renders «—» because the column is nullable
-// ON PURPOSE — a defaulted "medium" would be a value nobody chose.
+// is derived, defaulted or inferred. An absent priority is NOT defaulted to "medium" — a value
+// nobody chose — and it is no longer drawn as a bare dash either: it is «لم تُحدَّد», the
+// vocabulary's "unset" absence, which a reader can tell apart from «غير مرتبطة» at a glance.
 //
-// Shared chrome (.crmbar/.qpill/.crow/.crmflat/.selcell/.cntpill/.thead-narrow/.ptab) comes from
-// CAMPAIGNS_CRM_CSS, injected once globally.
+// PORTED to the new design system (docs/PORT-SPEC.md): one .ds6 wrapper per screen, a real table in
+// .m-tablewrap, .m-tab tabs carrying their counts, .m-chip for status, .m-n around every digit, and
+// the three absence kinds instead of four identical dashes. The old .crmbar/.crow/.crmflat grid
+// chrome is gone from these two screens.
+//
+// NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const TASKS_CRM_CSS = `
-  .tskflat .crow { grid-template-columns: 40px 2.4fr 1fr .9fr 1.1fr 1fr; }
-  @media (max-width: 939px) { .tskflat .crow { grid-template-columns: 40px minmax(0,1fr) auto; } }
-  .tsk-done .tt { color:#656B76; text-decoration:line-through; }
-  /* Frappe's Notes are a card grid (h-48 = 192px), the one place it leaves its list chrome */
-  .ngrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
-  .ncard { border:1px solid #ECEEF2; border-radius:10px; padding:14px 16px; background:#fff;
-    height:192px; display:flex; flex-direction:column; overflow:hidden; cursor:default; }
-  .ncard:hover { border-color:#656B76; }
-  .ncard .t { font-size:14px; font-weight:500; color:#14161A; }
-  .ncard .c { font-size:14px; color:#33373E; line-height:1.8; margin-top:8px; flex:1; overflow:hidden;
-    white-space:pre-wrap; }
-  .ncard .m { font-size:12px; color:#656B76; margin-top:8px; display:flex; gap:10px; align-items:center; }
+/* Only what the vocabulary lacks. The note grid is the one deliberate break from list chrome
+   (Frappe's own), so it is the one layout rule that survives the port. */
+.ds6 .m-task { display: grid; gap: var(--m-4); }
+.ds6 .m-task-table { min-inline-size: 720px; }
+.ds6 .m-task-done .m-td-n { color: var(--m-faint); text-decoration: line-through; }
+.ds6 .m-note-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--m-4); }
+.ds6 .m-note { block-size: 192px; display: flex; flex-direction: column; overflow: hidden; }
+.ds6 .m-note__c { flex: 1 1 auto; overflow: hidden; white-space: pre-wrap; color: var(--m-ink-2);
+  margin-block-start: var(--m-2); line-height: var(--m-leading-body); }
+.ds6 .m-note__m { display: flex; align-items: center; gap: var(--m-3); margin-block-start: var(--m-2); }
+.ds6 .m-due-late { color: var(--m-bad); font-weight: 600; }
+.ds6 .m-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 `;
 
 export const TASKS_CRM_JS = `
@@ -31,9 +36,17 @@ export const TASKS_CRM_JS = `
 var tskRows = null, tskLoading = false, tskTab = "open", tskQ = "", tskGroup = "none";
 var nteRows = null, nteLoading = false, nteQ = "";
 
-var TSK_ST = { backlog:{l:"مؤجلة",d:"#A2A9B4"}, todo:{l:"للتنفيذ",d:"#1E5FCC"},
-  in_progress:{l:"قيد التنفيذ",d:"#7A5600"}, done:{l:"منجزة",d:"#12633F"}, canceled:{l:"ملغاة",d:"#A2A9B4"} };
+/* tone maps a stored status onto the vocabulary's status colours — colour means status here, never
+   decoration, so a cancelled task and a backlogged one share the neutral chip rather than each
+   inventing a grey. */
+var TSK_ST = { backlog:{l:"مؤجلة",t:"plain"}, todo:{l:"للتنفيذ",t:"ac"},
+  in_progress:{l:"قيد التنفيذ",t:"warn"}, done:{l:"منجزة",t:"ok"}, canceled:{l:"ملغاة",t:"plain"} };
 var TSK_PRI = { high:"عالية", medium:"متوسطة", low:"منخفضة" };
+
+function tskNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
+function tskDate(ms) { return '<span class="m-n">' + fmtD(ms) + "</span>"; }
+function tskPl(n) { return typeof opPl === "function" ? opPl(n, "مهمة واحدة", "مهمتان", "مهام", "مهمة") : fmtN(n) + " مهمة"; }
+function ntePl(n) { return typeof opPl === "function" ? opPl(n, "ملاحظة واحدة", "ملاحظتان", "ملاحظات", "ملاحظة") : fmtN(n) + " ملاحظة"; }
 
 function tskLoad(force) {
   if (tskLoading || (tskRows && !force)) return;
@@ -52,45 +65,56 @@ function nteLoad(force) {
     .catch(function () { nteRows = []; nteLoading = false; render(false); });
 }
 
+function tskIsOpen(t) { return t.status !== "done" && t.status !== "canceled"; }
+function tskIsOverdue(t) { return !!(t.due_at && t.due_at < Date.now() && tskIsOpen(t)); }
 function tskFiltered() {
   var q = tskQ.trim();
   return (tskRows || []).filter(function (t) {
-    if (tskTab === "open" && (t.status === "done" || t.status === "canceled")) return false;
+    if (tskTab === "open" && !tskIsOpen(t)) return false;
     if (tskTab === "done" && t.status !== "done") return false;
-    if (tskTab === "overdue" && !(t.due_at && t.due_at < Date.now() && t.status !== "done" && t.status !== "canceled")) return false;
+    if (tskTab === "overdue" && !tskIsOverdue(t)) return false;
     if (!q) return true;
     return (t.title || "").includes(q) || (t.description || "").includes(q) || (t.ref_id || "").includes(q);
   });
 }
 
+/* Every count on these two screens is derived from the SAME array the rows are rendered from, so a
+   tab badge and the list beneath it cannot report different populations of the same word. */
+function tskBind() {
+  dsD("tskAll", function () { return (tskRows || []).length; });
+  dsD("tskOpen", function () { return (tskRows || []).filter(tskIsOpen).length; });
+  dsD("tskOver", function () { return (tskRows || []).filter(tskIsOverdue).length; });
+  dsD("tskDone", function () { return (tskRows || []).filter(function (t) { return t.status === "done"; }).length; });
+}
+
 /* The ref is rendered by resolving it; an unresolvable ref reads «سجل محذوف» rather than showing a
-   bare id or silently hiding the row — the third obligation of a link with no foreign key. */
+   bare id or silently hiding the row — the third obligation of a link with no foreign key. A task
+   attached to nothing is a legitimate nothing, not a gap in the record. */
 function tskRefLabel(t) {
-  if (!t.ref_kind) return '<span style="color:#656B76;">—</span>';
+  if (!t.ref_kind) return tskNil("غير مرتبطة", "none");
   if (t.ref_kind === "contact") {
     var c = contactByPhone(t.ref_id);
-    if (c) return '<a href="#customer/' + esc(t.ref_id) + '" style="color:#2563EB;text-decoration:none;">' + esc(c.waName || t.ref_id) + '</a>';
-    return '<span style="color:#8E2A27;">سجل محذوف</span>';
+    if (c) return '<a class="m-link" href="#customer/' + esc(t.ref_id) + '">' + esc(c.waName || t.ref_id) + "</a>";
+    return '<span class="m-chip m-chip--bad">سجل محذوف</span>';
   }
   var cp = campaigns.find(function (x) { return String(x.id) === String(t.ref_id); });
-  if (cp) return '<a href="#kmon/' + esc(t.ref_id) + '" style="color:#2563EB;text-decoration:none;">' + esc(cp.name) + '</a>';
-  return '<span style="color:#8E2A27;">سجل محذوف</span>';
+  if (cp) return '<a class="m-link" href="#kmon/' + esc(t.ref_id) + '">' + esc(cp.name) + "</a>";
+  return '<span class="m-chip m-chip--bad">سجل محذوف</span>';
 }
 
 function tskRow(t) {
-  var st = TSK_ST[t.status] || { l: t.status, d: "#A2A9B4" };
+  var st = TSK_ST[t.status] || { l: t.status, t: "plain" };
   var done = t.status === "done";
-  var overdue = t.due_at && t.due_at < Date.now() && !done && t.status !== "canceled";
-  return '<div class="trow km krow crow' + (done ? " tsk-done" : "") + '">' +
-    '<div class="selcell"><input type="checkbox" aria-label="إنجاز ' + esc(t.title) + '"' + (done ? " checked" : "") + ' onclick="tskToggle(' + t.id + ',this.checked)"></div>' +
-    '<div class="c-name"><span class="tt" style="font-size:14px;font-weight:450;color:#14161A;">' + esc(t.title) + '</span></div>' +
-    '<div class="c-meta"><div class="c-prod" style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:999px;flex:none;background:' + st.d + ';"></span><span style="font-size:14px;color:#33373E;">' + st.l + '</span></div></div>' +
-    '<div class="c-fig fig"><div class="c-num" style="text-align:start;font-weight:450;font-size:14px;color:#33373E;">' +
-      (t.priority ? TSK_PRI[t.priority] : '<span style="color:#656B76;">—</span>') + '</div></div>' +
-    '<div style="font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + tskRefLabel(t) + '</div>' +
-    '<div style="font-size:12px;color:' + (overdue ? "#8E2A27" : "#656B76") + ';white-space:nowrap;">' +
-      (t.due_at ? fmtD(t.due_at) : "—") + '</div>' +
-  '</div>';
+  var overdue = tskIsOverdue(t);
+  return "<tr" + (done ? ' class="m-task-done"' : "") + ">" +
+    '<td class="m-sel"><input type="checkbox" class="m-cb" aria-label="إنجاز ' + esc(t.title) + '"' + (done ? " checked" : "") + ' onclick="tskToggle(' + t.id + ',this.checked)"></td>' +
+    '<td class="m-td-n"><span class="m-clip">' + esc(t.title) + "</span></td>" +
+    '<td><span class="m-chip m-chip--' + st.t + '">' + esc(st.l) + "</span></td>" +
+    "<td>" + (t.priority ? esc(TSK_PRI[t.priority] || t.priority) : tskNil("لم تُحدَّد", "unset")) + "</td>" +
+    '<td><span class="m-clip">' + tskRefLabel(t) + "</span></td>" +
+    '<td class="m-td-v">' + (t.due_at
+      ? (overdue ? '<span class="m-due-late">' + tskDate(t.due_at) + "</span>" : tskDate(t.due_at))
+      : tskNil("لم يُحدَّد", "unset")) + "</td></tr>";
 }
 
 function vTasksCrm() {
@@ -99,34 +123,38 @@ function vTasksCrm() {
   /* A skeleton, not the word «جارٍ التحميل». Frappe holds the list's SHAPE while it loads so the
      page does not jump when rows arrive; a centred word is a layout shift waiting to happen. */
   if (tskRows === null) return crmSkeleton(6);
+  tskBind();
   var all = tskRows;
-  var open = all.filter(function (t) { return t.status !== "done" && t.status !== "canceled"; }).length;
+  var open = all.filter(tskIsOpen).length;
   var doneN = all.filter(function (t) { return t.status === "done"; }).length;
-  var over = all.filter(function (t) { return t.due_at && t.due_at < Date.now() && t.status !== "done" && t.status !== "canceled"; }).length;
+  var over = all.filter(tskIsOverdue).length;
   var rows = tskFiltered();
 
-  var h = '<div class="crmbar rise">';
-  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
-    '<input id="tskq" class="inp" value="' + esc(tskQ) + '" oninput="tskSearch(this)" placeholder="ابحث في المهام…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
-  h += [["open", "المفتوحة", open], ["overdue", "متأخرة", over], ["done", "منجزة", doneN], ["all", "الكل", all.length]]
-    .map(function (t) { return '<button class="qpill' + (tskTab === t[0] ? " on" : "") + '" onclick="tskSetTab(&quot;' + t[0] + '&quot;)">' + t[1] + " (" + fmtN(t[2]) + ")</button>"; }).join("");
-  h += '<span style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " مهمة</span></div>";
+  var h = '<div class="ds6"><div class="m-task">';
+  h += '<div class="m-tools"><div class="m-head__a">' +
+    '<input id="tskq" class="m-input" value="' + esc(tskQ) + '" oninput="tskSearch(this)" placeholder="ابحث في المهام…" aria-label="ابحث في المهام"></div>' +
+    '<span class="m-cap">' + tskPl(rows.length) + " في هذا التبويب</span></div>";
 
-  h += '<div class="tblwrap crmflat tskflat rise"><div style="overflow-x:auto;" class="ms-scroll"><div class="crmgrid">' +
-    '<div class="crow thead-wide" style="padding:8px 20px 8px 12px;background:#fff;border-bottom:1px solid #ECEEF2;font-size:12px;font-weight:500;color:#656B76;">' +
-      '<div class="selcell"></div><div>المهمة</div>' +
-      '<div class="c-meta"><div>الحالة</div></div>' +
-      '<div class="c-fig fig"><div class="c-num" style="text-align:start;color:#656B76;font-size:12px;">الأولوية</div></div>' +
-      '<div>مرتبطة بـ</div><div>تستحق</div></div>' +
-    '<div class="thead-narrow"><span>المهمة</span><span style="flex:1"></span><span>الحالة</span></div>';
+  h += '<div class="m-tabs" role="tablist" aria-label="حالة المهام">' +
+    [["open", "المفتوحة", open, "tskOpen"], ["overdue", "متأخرة", over, "tskOver"],
+     ["done", "منجزة", doneN, "tskDone"], ["all", "الكل", all.length, "tskAll"]].map(function (t) {
+      var on = tskTab === t[0];
+      return '<button type="button" class="m-tab" role="tab" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '" onclick="tskSetTab(&quot;' + t[0] + '&quot;)">' +
+        t[1] + "<b>" + dsFig(t[3], t[2]) + "</b></button>";
+    }).join("") + "</div>";
+
+  h += '<section class="m-card m-card--pad0"><div class="m-tablewrap"><table class="m-table m-task-table">' +
+    '<thead><tr><th class="m-sel"><span class="m-cap">تم</span></th><th>المهمة</th><th>الحالة</th>' +
+    "<th>الأولوية</th><th>مرتبطة بـ</th><th>تستحق</th></tr></thead><tbody>";
   rows.forEach(function (t) { h += tskRow(t); });
   if (!rows.length) {
-    h += '<div style="padding:44px;text-align:center;color:#656B76;font-size:14px;line-height:1.9;">' +
-      (all.length ? "لا مهام في هذا التبويب." : "لا مهام بعد — أضف مهمة من ملف أي عميل.") + '</div>';
+    h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><div class="m-empty__t">' +
+      (all.length ? "لا مهام في هذا التبويب" : "لا مهام بعد") + "</div>" +
+      (all.length ? "" : '<div class="m-empty__d">تُضاف المهمة من ملف أي عميل، وتظهر هنا مجمّعة.</div>') +
+      "</div></td></tr>";
   }
-  h += '</div></div><div class="tfoot"><span>' + ic("clock", 14) + ' المهام سجلات داخلية. لا تُرسل شيئًا للعميل.</span></div></div>';
-  return h;
+  h += '</tbody></table></div><div class="m-foot"><span class="m-cap">المهام سجلات داخلية. لا تُرسل شيئًا للعميل.</span></div></section>';
+  return h + "</div></div>";
 }
 
 function vNotesCrm() {
@@ -138,26 +166,25 @@ function vNotesCrm() {
     if (!q) return true;
     return (n.title || "").includes(q) || (n.content || "").includes(q);
   });
-  var h = '<div class="crmbar rise">';
-  h += '<span style="position:relative;display:inline-flex;align-items:center;flex:1;min-width:200px;max-width:320px;">' +
-    '<span style="position:absolute;inset-inline-start:13px;color:#656B76;display:flex;">' + ic("search", 17) + '</span>' +
-    '<input id="nteq" class="inp" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" style="width:100%;padding-inline-start:40px;height:38px;border-radius:999px;font-size:12px;"></span>';
-  h += '<span style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " ملاحظة</span></div>";
+  var h = '<div class="ds6"><div class="m-task">';
+  h += '<div class="m-tools"><div class="m-head__a">' +
+    '<input id="nteq" class="m-input" value="' + esc(nteQ) + '" oninput="nteSearch(this)" placeholder="ابحث في الملاحظات…" aria-label="ابحث في الملاحظات"></div>' +
+    '<span class="m-cap">' + ntePl(rows.length) + "</span></div>";
   if (!rows.length) {
-    return h + '<div class="empty" style="padding:60px 20px;"><div class="ic"><span></span></div>' +
-      '<div class="t">' + (nteRows.length ? "لا ملاحظة تطابق البحث" : "لا ملاحظات بعد") + '</div>' +
-      '<div class="s">تُكتب الملاحظات من ملف العميل، وتظهر هنا مجمّعة.</div></div>';
+    return h + '<div class="m-empty"><div class="m-empty__t">' +
+      (nteRows.length ? "لا ملاحظة تطابق البحث" : "لا ملاحظات بعد") + "</div>" +
+      '<div class="m-empty__d">تُكتب الملاحظات من ملف العميل، وتظهر هنا مجمّعة.</div></div></div></div>';
   }
-  h += '<div class="ngrid rise">';
+  h += '<div class="m-note-grid">';
   rows.forEach(function (n) {
-    h += '<div class="ncard">' +
-      (n.title ? '<div class="t">' + esc(n.title) + '</div>' : "") +
-      '<div class="c">' + esc(n.content) + '</div>' +
-      '<div class="m"><span>' + fmtD(n.created_at) + '</span><span style="flex:1"></span>' + tskRefLabel(n) + '</div>' +
-    '</div>';
+    h += '<article class="m-card m-note">' +
+      (n.title ? '<h2 class="m-card__t">' + esc(n.title) + "</h2>" : "") +
+      '<div class="m-note__c">' + esc(n.content) + "</div>" +
+      '<div class="m-note__m"><span class="m-cap">' + tskDate(n.created_at) + '</span><span style="flex:1"></span>' +
+      '<span class="m-cap">' + tskRefLabel(n) + "</span></div></article>";
   });
-  h += '</div>';
-  return h;
+  h += "</div>";
+  return h + "</div></div>";
 }
 
 function tskPaintCrumb() {

@@ -7,76 +7,92 @@
 // approved, so hand-written knowledge passes the same gate an uploaded deck does. The score in the editor is
 // scoreKnowledge on the text being typed, the same function the server scores with.
 //
-// GRAMMAR. The account sheet (.ac-scrim/.ac-modal/.ac-box) for the editor; .px-* for the record. MOTION: the
-// sheet's own 200ms/140ms scale-and-fade; the meter does not animate (it repaints on every keystroke).
+// GRAMMAR. PORTED to the new design system (docs/PORT-SPEC.md): the readiness block and the editor
+// are drawn in the m-* vocabulary inside the record's .ds6 wrapper. The hand-rolled meter, the eight
+// state dots and the sheet chrome this module used to define are vocabulary now (.m-meter, .m-chip,
+// .m-dlg__*), so those rules are gone; what is left is the overlay geometry the vocabulary has no
+// word for, and «دقة الإجابات», which renders in the conversation view and is NOT ported.
+// MOTION: the sheet enters from scale(.97) over --m-in and leaves over --m-out; the meter does not
+// animate (it repaints on every keystroke).
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const KNOWLEDGE_CRM_CSS = `
-.kb-score { display:flex; flex-direction:column; gap:var(--s2); border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3); background:var(--paper); }
-.kb-top { display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
-.kb-meter { display:flex; align-items:center; gap:var(--s2); min-width:220px; flex:1; }
-.kb-meter .v { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; min-width:56px; }
-.kb-meter .track { flex:1; height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; position:relative; }
-.kb-meter .track i { display:block; height:100%; border-radius:inherit; background:var(--accent); }
-.kb-meter .track b { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink-2, #33373E); opacity:.35; }
-.kb-meter.low .track i { background:var(--s-attn-mark); }
-.kb-meter.full .track i { background:var(--s-issued); }
-.kb-top .lbl { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.kb-top .sub { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
-.kb-top .btn { height:36px; display:inline-flex; align-items:center; gap:6px; }
-.kb-secs { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:6px; }
-.kb-sec { display:flex; align-items:center; gap:6px; font-family:inherit; font-size:var(--t-xs); color:var(--ink); background:var(--surface); border:none; border-radius:var(--r-sm);
-  padding:7px 9px; cursor:pointer; text-align:start; min-width:0; }
-button.kb-sec:hover { background:var(--surface-2); }
-/* a role without knowledge.edit reads the same eight sections; they just do not open an editor */
-span.kb-sec { cursor:default; }
-.kb-sec i { width:8px; height:8px; border-radius:var(--r-pill); flex:none; background:var(--s-issued); }
-.kb-sec.short i { background:var(--s-attn-mark); }
-.kb-sec.missing i { background:transparent; box-shadow:inset 0 0 0 1.5px var(--s-off-mark); }
-.kb-sec .n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.kb-sec .w { color:var(--muted); font-variant-numeric:tabular-nums; }
-.kb-gaps { display:flex; flex-direction:column; gap:2px; font-size:var(--t-xs); color:var(--muted); }
-.kb-gaps b { color:var(--ink); font-weight:600; }
-.kb-warn { font-size:var(--t-xs); color:var(--s-attn-text); background:var(--s-attn-soft); border-radius:var(--r-sm); padding:6px 10px; display:flex; gap:6px; align-items:center; }
-.kb-ed .ac-box { max-width:760px; }
-.kb-ed .kb-row { display:flex; flex-direction:column; gap:4px; }
-.kb-ed .kb-row .hd { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-.kb-ed .kb-row label { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.kb-ed .kb-row .w { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
-.kb-ed .kb-row .sp { flex:1; }
-.kb-ed .kb-row .st { font-size:var(--t-xs); font-weight:600; border-radius:var(--r-pill); padding:0 8px; }
-.kb-ed .kb-row .st.done { background:var(--s-issued-soft); color:var(--s-issued-text); }
-.kb-ed .kb-row .st.short { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.kb-ed .kb-row .st.missing { background:var(--surface-2); color:var(--muted); }
-.kb-ed textarea { width:100%; min-height:88px; font-family:inherit; font-size:var(--t-sm); line-height:1.7; padding:var(--s2) var(--s3); border:none; border-radius:var(--r-sm);
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); background:var(--paper); color:var(--ink); resize:vertical; box-sizing:border-box; }
-.kb-ed textarea:focus { outline:2px solid var(--accent); outline-offset:1px; }
-.kb-ed textarea[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.kb-ed .hint { font-size:var(--t-xs); color:var(--muted); }
+/* ---- the readiness block on the record ---- */
+.ds6 .kb-score { display:flex; flex-direction:column; gap:var(--m-3); }
+.ds6 .kb-top { display:flex; align-items:center; gap:var(--m-3); flex-wrap:wrap; }
+.ds6 .kb-top > .kb-hd { flex:1 1 220px; min-inline-size:0; }
+.ds6 .kb-meter { display:flex; align-items:center; gap:var(--m-2); min-inline-size:200px; flex:1 1 200px; }
+.ds6 .kb-meter > .m-n { font-size:var(--m-t-h); font-weight:700; color:var(--m-ink); min-inline-size:56px; }
+.ds6 .kb-meter > .m-meter { flex:1 1 auto; margin-block:0; }
+.ds6 .kb-secs { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:var(--m-1); }
+/* A section chip is a control: the vocabulary gives it its colour, this gives it a button's reset. */
+.ds6 button.kb-sec { font:inherit; border:0; cursor:pointer; text-align:start; justify-content:flex-start;
+  min-inline-size:0; transition:opacity var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+.ds6 button.kb-sec:active { transform:scale(.97); }
+.ds6 .kb-sec > .kb-n { flex:1 1 auto; min-inline-size:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ds6 .kb-gaps { display:flex; flex-direction:column; gap:2px; }
+.ds6 .kb-gaps b { color:var(--m-ink); font-weight:600; }
+
+/* ---- the editor sheet: the overlay geometry a .m-dlg panel needs without a <dialog> ---- */
+.ds6 .kb-scrim { position:fixed; inset:0; z-index:var(--z-modal, 400); background:rgba(11,13,18,.44);
+  opacity:0; transition:opacity var(--m-out) var(--m-ease); }
+.ds6 .kb-scrim.in { opacity:1; }
+.ds6 .kb-wrap { position:fixed; inset:0; z-index:var(--z-modal, 400); display:flex; align-items:flex-start;
+  justify-content:center; padding:6vh var(--m-3) var(--m-3); pointer-events:none; }
+.ds6 .kb-box { pointer-events:auto; inline-size:100%; max-inline-size:760px; display:flex; flex-direction:column;
+  max-block-size:88vh; opacity:0; transform:scale(.97);
+  transition:opacity var(--m-out) var(--m-ease), transform var(--m-out) var(--m-ease); }
+.ds6 .kb-box.in { opacity:1; transform:none; transition-duration:var(--m-in); }
+.ds6 .kb-ed .m-dlg__b { flex:1 1 auto; max-block-size:none; }
+.ds6 .kb-ed textarea.m-input { min-block-size:88px; }
+.ds6 .kb-row { display:flex; flex-direction:column; gap:var(--m-1); margin-block-end:var(--m-4); }
+.ds6 .kb-row .kb-rh { display:flex; align-items:center; gap:var(--m-2); flex-wrap:wrap; }
+.ds6 .kb-row .kb-sp { flex:1 1 auto; }
+/* The live score is announced, not printed twice: the meter beside it already carries the figure. */
+.ds6 .kb-sr { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 /* Pinned over the sheet body's own top padding, so nothing scrolls visibly above it. */
-.kb-live { position:sticky; top:calc(-1 * var(--s3)); margin-top:calc(-1 * var(--s3)); padding-block:var(--s3) var(--s2); background:var(--paper); border-bottom:1px solid var(--line-soft); }
+.ds6 .kb-live { position:sticky; inset-block-start:calc(-1 * var(--m-5)); margin-block-start:calc(-1 * var(--m-5));
+  padding-block:var(--m-4) var(--m-3); background:var(--m-paper); border-block-end:1px solid var(--m-line);
+  margin-block-end:var(--m-4); }
+@media (max-width:720px) { .ds6 .kb-secs { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (prefers-reduced-motion: reduce) {
+  .ds6 .kb-scrim, .ds6 .kb-box { transition:none; }
+  .ds6 .kb-box { transform:none; }
+  .ds6 button.kb-sec:active { transform:none; }
+}
+
+/* ---- «دقة الإجابات» renders inside the conversation view, which is NOT ported: its own rules stay ---- */
 .aq { display:flex; align-items:center; gap:4px; margin-top:4px; font-size:var(--t-xs); color:#656B76; }
 .aq button { font-family:inherit; font-size:var(--t-xs); font-weight:600; min-height:24px; padding:0 8px; border-radius:var(--r-pill); border:none; cursor:pointer; background:rgba(255,255,255,.7); color:#33373E; box-shadow:inset 0 0 0 1px #D8DCE3; }
 .aq button[aria-pressed="true"].ok { background:var(--s-issued-soft); color:var(--s-issued-text); box-shadow:none; }
 .aq button[aria-pressed="true"].no { background:var(--s-fail-soft); color:var(--s-fail-text); box-shadow:none; }
 .aq button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
 @media (pointer:coarse) { .aq button { min-height:36px; } }
-.kb-score .btn:active, button.kb-sec:active { transform:scale(.97); }
-.kb-score .btn, .kb-sec { transition:transform 140ms var(--ease), background var(--fast) var(--ease); }
-.kb-sec:focus-visible, .kb-score .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@media (max-width: 720px) { .kb-secs { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-@media (prefers-reduced-motion: reduce) { .kb-score .btn, .kb-sec { transition:none; } .kb-score .btn:active, .kb-sec:active { transform:none; } }
 `;
 
 export const KNOWLEDGE_CRM_JS = `
 /* ================= «جاهزية المعرفة» and the section editor ================= */
 var kbEd = null;   /* { product, sections, extra, baseMdHash, baseDraftHash, focus, err, field, busy, dirty, shown, confirm, from } */
 
-function kbMeter(score, cls) {
-  var c = score >= 100 ? " full" : score < KB_READY_MIN ? " low" : "";
-  return '<span class="kb-meter' + c + (cls ? " " + cls : "") + '" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + score + '" aria-label="درجة جاهزية المعرفة">' +
-    '<span class="v">' + fmtN(score) + '٪</span><span class="track"><i style="width:' + Math.max(0, Math.min(100, score)) + '%"></i><b style="inset-inline-start:' + KB_READY_MIN + '%" title="حد الجاهزية ' + KB_READY_MIN + '٪"></b></span></span>';
+/* The figure, then the bar, then the threshold mark on it. One .m-n for the digits so the percent
+   sign cannot land on the wrong side of them. */
+function kbMeter(score) {
+  return '<span class="kb-meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + score + '" aria-label="درجة جاهزية المعرفة">' +
+    '<span class="m-n">' + fmtN(score) + '٪</span>' +
+    '<span class="m-meter" style="--m-pct:' + Math.max(0, Math.min(100, score)) + "%;--m-mark:" + KB_READY_MIN +
+    '%" title="حد الجاهزية ' + fmtN(KB_READY_MIN) + '٪"><i></i><b></b></span></span>';
+}
+/* The eight sections, each one a chip whose colour IS its state: complete, short, or not written. */
+function kbSecChip(x, may) {
+  var st = x.state === "done" ? "مكتمل" : x.state === "short" ? "قصير" : "ناقص";
+  var tone = x.state === "done" ? " m-chip--ok" : x.state === "short" ? " m-chip--warn" : "";
+  var body = '<span class="kb-n">' + esc(x.label) + '</span><span class="m-n">' + fmtN(x.weight) + "٪</span>";
+  if (!may) {
+    return '<span class="m-chip kb-sec' + tone + '" title="' + esc(x.label) + ": " + st + '">' + body + "</span>";
+  }
+  return '<button type="button" class="m-chip kb-sec' + tone + '" data-kb="open" data-s="' + x.key + '" id="kbsec_' + x.key +
+    '" aria-label="' + esc(x.label) + ": " + st + " — وزنه " + fmtN(x.weight) + '٪">' + body + "</button>";
 }
 /* The block on the record. It scores what the assistant reads now (or the embedded entry when there is no
    document); a pending draft's score is shown on the draft itself. */
@@ -86,26 +102,24 @@ function kbScoreBlock(p, kn) {
   if (!kn || !kn.score) return "";
   var s = kn.score, hasDoc = !!(kn.md && kn.md.trim());
   if (!hasDoc && !kn.embeddedBasis) {
-    return '<div class="kb-score"><div class="kb-top"><span><span class="lbl">جاهزية المعرفة</span><br><span class="sub">' +
-      (kn.draftMd ? "لا معرفة معتمدة بعد — المسودة أدناه بانتظار الاعتماد." : "لا معرفة مكتوبة لهذا المنتج. اكتبها قسمًا قسمًا، أو ارفع ملفًا يُستخلص منه.") + '</span></span><span class="sp" style="flex:1"></span>' +
-      (kbMayEdit() ? '<button class="btn btn-teal" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "اكتب المعرفة") + "</button>" : "") + "</div></div>";
+    return '<div class="kb-score"><div class="kb-top"><div class="kb-hd">' +
+      '<p class="m-label">جاهزية المعرفة</p><p class="m-meta">' +
+      (kn.draftMd ? "لا معرفة معتمدة بعد — المسودة أدناه بانتظار الاعتماد." : "لا معرفة مكتوبة لهذا المنتج. اكتبها قسمًا قسمًا، أو ارفع ملفًا يُستخلص منه.") + "</p></div>" +
+      (kbMayEdit() ? '<button type="button" class="m-btn m-btn--primary" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "اكتب المعرفة") + "</button>" : "") + "</div></div>";
   }
   var basis = kn.state === "approved" ? "المعرفة المعتمدة" : kn.state === "legacy" ? "النص الحالي (غير معتمد)" : "المعرفة المدمجة في المساعد";
-  var h = '<div class="kb-score"><div class="kb-top"><span><span class="lbl">جاهزية المعرفة</span><br><span class="sub">' + esc(basis) + " · ثمانية أقسام بأوزان · الحد " + fmtN(KB_READY_MIN) + "٪</span></span>" +
-    kbMeter(s.score) + (kbMayEdit() ? '<button class="btn btn-ghost" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "تحرير الأقسام") + "</button>" : "") + "</div>";
-  h += '<div class="kb-secs">' + s.sections.map(function (x) {
-    var st = x.state === "done" ? "مكتمل" : x.state === "short" ? "قصير" : "ناقص";
-    if (!kbMayEdit()) {
-      return '<span class="kb-sec ' + x.state + '" title="' + esc(x.label) + ": " + st + '"><i aria-hidden="true"></i><span class="n">' + esc(x.label) + '</span><span class="w">' + fmtN(x.weight) + "٪</span></span>";
-    }
-    return '<button class="kb-sec ' + x.state + '" data-kb="open" data-s="' + x.key + '" id="kbsec_' + x.key + '" aria-label="' + esc(x.label) + ": " + st + " — وزنه " + fmtN(x.weight) + '٪"><i aria-hidden="true"></i><span class="n">' + esc(x.label) + '</span><span class="w">' + fmtN(x.weight) + "٪</span></button>";
-  }).join("") + "</div>";
+  var h = '<div class="kb-score"><div class="kb-top"><div class="kb-hd">' +
+    '<p class="m-label">جاهزية المعرفة</p><p class="m-meta">' + esc(basis) +
+    ' · ثمانية أقسام بأوزان · الحد <span class="m-n">' + fmtN(KB_READY_MIN) + "٪</span></p></div>" +
+    kbMeter(s.score) + (kbMayEdit() ? '<button type="button" class="m-btn" id="kbopen" data-kb="open"' + (p.archived ? " disabled" : "") + ">" + (kn.draftMd ? "تحرير المسودة" : "تحرير الأقسام") + "</button>" : "") + "</div>";
+  var may = kbMayEdit();
+  h += '<div class="kb-secs">' + s.sections.map(function (x) { return kbSecChip(x, may); }).join("") + "</div>";
   if (s.missing.length) {
     var gaps = s.missing.slice(0, 3).map(function (m) { return "<b>" + esc(m.label) + "</b> " + (m.state === "short" ? "قصير (يُحتسب نصف وزنه)" : "غير مكتوب") + " · إكماله يرفع الدرجة " + kbPoints(m.state === "short" ? m.weight / 2 : m.weight); });
-    h += '<div class="kb-gaps">' + gaps.map(function (g) { return "<span>" + g + "</span>"; }).join("") + (s.missing.length > 3 ? "<span>و" + pluralizeArabic(s.missing.length - 3, "قسم آخر", "قسمان آخران", "أقسام أخرى", "قسمًا آخر", fmtN) + " — انظر المربعات أعلاه.</span>" : "") + "</div>";
+    h += '<div class="kb-gaps m-meta">' + gaps.map(function (g) { return "<span>" + g + "</span>"; }).join("") + (s.missing.length > 3 ? "<span>و" + pluralizeArabic(s.missing.length - 3, "قسم آخر", "قسمان آخران", "أقسام أخرى", "قسمًا آخر", fmtN) + " — انظر الأقسام أعلاه.</span>" : "") + "</div>";
   }
-  if (s.truncated) h += '<div class="kb-warn" role="note">عدد أحرف النص ' + fmtN(s.chars) + "، والمساعد يقرأ أول " + fmtN(KB_PROMPT_CHARS) + " منها فقط — اختصره حتى لا يُقطع آخره.</div>";
-  if (!s.ready && kn.state !== "legacy") h += '<div class="kb-warn" role="note">الدرجة أقل من حد الجاهزية (' + fmtN(KB_READY_MIN) + "٪): أكمل الأقسام الناقصة — ما لم يُكتب لا يعرفه المساعد، وأسئلة العملاء عنه تُحال لموظف حين لا يجد لها مصدرًا.</div>";
+  if (s.truncated) h += '<p class="m-status m-status--warn" role="note">عدد أحرف النص <span class="m-n">' + fmtN(s.chars) + '</span>، والمساعد يقرأ أول <span class="m-n">' + fmtN(KB_PROMPT_CHARS) + "</span> منها فقط — اختصره حتى لا يُقطع آخره.</p>";
+  if (!s.ready && kn.state !== "legacy") h += '<p class="m-status m-status--warn" role="note">الدرجة أقل من حد الجاهزية (<span class="m-n">' + fmtN(KB_READY_MIN) + "٪</span>): أكمل الأقسام الناقصة — ما لم يُكتب لا يعرفه المساعد، وأسئلة العملاء عنه تُحال لموظف حين لا يجد لها مصدرًا.</p>";
   return h + "</div>";
 }
 /* Points carry the noun's agreement; a half weight prints without a decimal. */
@@ -113,7 +127,8 @@ function kbPoints(n) { var v = Math.round(n); return pluralizeArabic(v, "نقط�
 function kbDraftLine(kn) {
   if (!kn || !kn.draftScore) return "";
   var before = kn.score ? kn.score.score : 0, after = kn.draftScore.score;
-  return '<div class="px-note">درجة المسودة ' + fmtN(after) + "٪" + (kn.md ? " · المعتمد " + fmtN(before) + "٪" + (after > before ? " · ترتفع " + kbPoints(after - before) : after < before ? " · تنخفض " + kbPoints(before - after) : "") : "") + "</div>";
+  return '<p class="m-meta">درجة المسودة <span class="m-n">' + fmtN(after) + "٪</span>" +
+    (kn.md ? ' · المعتمد <span class="m-n">' + fmtN(before) + "٪</span>" + (after > before ? " · ترتفع " + kbPoints(after - before) : after < before ? " · تنخفض " + kbPoints(before - after) : "") : "") + "</p>";
 }
 
 /* ---------------- the editor ---------------- */
@@ -130,13 +145,14 @@ function kbClose(force) {
   if (!kbEd) return;
   if (kbEd.dirty && !force) { kbEd.confirm = true; render(false); var k = document.getElementById("kbkeep"); if (k) k.focus(); return; }
   var from = kbEd.from;
-  document.querySelectorAll(".ac-scrim, .ac-box").forEach(function (el) { el.classList.remove("in"); });
+  document.querySelectorAll(".kb-scrim, .kb-box").forEach(function (el) { el.classList.remove("in"); });
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(function () { kbEd = null; render(false); var t = document.getElementById(from) || document.getElementById("kbopen"); if (t) t.focus(); }, reduce ? 0 : 150);
+  setTimeout(function () { kbEd = null; render(false); var t = document.getElementById(from) || document.getElementById("kbopen"); if (t) t.focus(); }, reduce ? 0 : 120);
 }
 function kbLiveHtml(live) {
-  return '<div class="kb-top"><span class="lbl">درجة هذه المسودة</span>' + kbMeter(live.score) + '<span class="sub" role="status" id="kblivest">' + fmtN(live.score) + "٪</span></div>" +
-    (live.truncated ? '<div class="kb-warn">عدد أحرف النص ' + fmtN(live.chars) + " — يقرأ المساعد أول " + fmtN(KB_PROMPT_CHARS) + " منها فقط.</div>" : "");
+  return '<div class="kb-top"><span class="m-label kb-hd">درجة هذه المسودة</span>' + kbMeter(live.score) +
+    '<span class="kb-sr" role="status" id="kblivest">' + fmtN(live.score) + "٪</span></div>" +
+    (live.truncated ? '<p class="m-status m-status--warn">عدد أحرف النص <span class="m-n">' + fmtN(live.chars) + '</span> — يقرأ المساعد أول <span class="m-n">' + fmtN(KB_PROMPT_CHARS) + "</span> منها فقط.</p>" : "");
 }
 /* While typing, only the meter and the section badges change — the sheet is not rebuilt, so the textarea keeps
    its focus, caret and on-screen keyboard (a rebuild dismissed the keyboard on phones). */
@@ -146,8 +162,11 @@ function kbUpdateLive() {
   if (box) box.innerHTML = kbLiveHtml(live);
   live.sections.forEach(function (x) {
     var ta = document.getElementById("kbt_" + x.key); if (!ta) return;
-    var st = ta.parentNode && ta.parentNode.querySelector(".st");
-    if (st) { st.className = "st " + x.state; st.textContent = x.state === "done" ? "مكتمل" : x.state === "short" ? "قصير" : "ناقص"; }
+    var st = ta.parentNode && ta.parentNode.querySelector(".kb-st");
+    if (st) {
+      st.className = "m-chip kb-st" + (x.state === "done" ? " m-chip--ok" : x.state === "short" ? " m-chip--warn" : "");
+      st.textContent = x.state === "done" ? "مكتمل" : x.state === "short" ? "قصير" : "ناقص";
+    }
   });
 }
 function kbLive() {
@@ -157,29 +176,34 @@ function kbLive() {
 function kbEditor() {
   if (!kbEd) return "";
   var e = kbEd, cls = e.shown ? " in" : "", live = kbLive();
-  var h = '<div class="kb-ed"><div class="ac-scrim' + cls + '" data-kb="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="kbmt" aria-describedby="kbms">' +
-    '<div class="mh"><div><h2 id="kbmt">معرفة «' + esc(e.product) + '»</h2><div class="s" id="kbms">تُحفظ مسودةً، ويقرؤها المساعد بعد «اعتماد المعرفة» فقط. اكتب ما يُسمح للمساعد بقوله حرفيًا — لا يضيف إليه شيئًا.</div></div>' +
-    '<span class="sp"></span><button class="ac-x" data-kb="close" aria-label="إغلاق">' + (typeof pxIco === "function" ? pxIco("x") : "×") + "</button></div>";
-  h += '<div class="mb"><div class="kb-live" id="kblive">' + kbLiveHtml(live) + "</div>";
+  var chip = function (state) {
+    return '<span class="m-chip kb-st' + (state === "done" ? " m-chip--ok" : state === "short" ? " m-chip--warn" : "") + '">' +
+      (state === "done" ? "مكتمل" : state === "short" ? "قصير" : "ناقص") + "</span>";
+  };
+  var h = '<div class="kb-ed"><div class="kb-scrim' + cls + '" data-kb="close"></div><div class="kb-wrap"><div class="m-dlg__p kb-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="kbmt" aria-describedby="kbms">' +
+    '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="kbmt">معرفة «' + esc(e.product) + '»</h2><p class="m-meta" id="kbms">تُحفظ مسودةً، ويقرؤها المساعد بعد «اعتماد المعرفة» فقط. اكتب ما يُسمح للمساعد بقوله حرفيًا — لا يضيف إليه شيئًا.</p></div>' +
+    '<button type="button" class="m-x" data-kb="close" aria-label="إغلاق">' + (typeof pxIco === "function" ? pxIco("x") : "×") + "</button></div>";
+  h += '<div class="m-dlg__b"><div class="kb-live" id="kblive">' + kbLiveHtml(live) + "</div>";
   KB_SECTIONS.forEach(function (d) {
     var sec = live.sections.filter(function (x) { return x.key === d.key; })[0];
     var bad = e.field === "sections." + d.key;
-    var st = sec.state === "done" ? "مكتمل" : sec.state === "short" ? "قصير" : "ناقص";
-    h += '<div class="kb-row"><div class="hd"><label for="kbt_' + d.key + '">' + esc(d.label) + '</label><span class="w">وزنه ' + fmtN(d.weight) + '٪</span><span class="sp"></span><span class="st ' + sec.state + '">' + st + "</span></div>" +
-      '<textarea id="kbt_' + d.key + '" data-kbsec="' + d.key + '" dir="auto" maxlength="' + KB_SECTION_MAX + '" aria-describedby="kbh_' + d.key + (bad ? " kberr_" + d.key : "") + '"' + (bad ? ' aria-invalid="true"' : "") + ">" + esc(e.sections[d.key]) + "</textarea>" +
-      '<span class="hint" id="kbh_' + d.key + '">' + esc(d.hint) + (sec.state !== "done" ? " · يُعدّ مكتملًا من " + fmtN(d.min) + " من الأحرف" : "") +
+    h += '<div class="kb-row m-field"><div class="kb-rh"><label class="m-label" for="kbt_' + d.key + '">' + esc(d.label) +
+      '</label><span class="m-meta">وزنه <span class="m-n">' + fmtN(d.weight) + '٪</span></span><span class="kb-sp"></span>' + chip(sec.state) + "</div>" +
+      '<textarea class="m-input" id="kbt_' + d.key + '" data-kbsec="' + d.key + '" dir="auto" maxlength="' + KB_SECTION_MAX + '" aria-describedby="kbh_' + d.key + (bad ? " kberr_" + d.key : "") + '"' + (bad ? ' aria-invalid="true"' : "") + ">" + esc(e.sections[d.key]) + "</textarea>" +
+      '<span class="m-hint" id="kbh_' + d.key + '">' + esc(d.hint) + (sec.state !== "done" ? ' · يُعدّ مكتملًا من <span class="m-n">' + fmtN(d.min) + "</span> من الأحرف" : "") +
         (d.key === "pricing" && kbEd.embedded ? " · تنبيه: السعر الذي يذكره المساعد أولًا لهذا المنتج مثبت في كتالوجه، ولا يغيّره هذا القسم." : "") + "</span>" +
-      (bad ? '<span class="ferr cf-err" id="kberr_' + d.key + '" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
+      (bad ? '<span class="m-err" id="kberr_' + d.key + '" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
   });
   var badX = e.field === "extra";
-  h += '<div class="kb-row"><div class="hd"><label for="kbt_extra">' + esc(KB_EXTRA_LABEL) + '</label><span class="w">لا وزن له</span></div><textarea id="kbt_extra" data-kbsec="__extra" dir="auto" maxlength="' + KB_SECTION_MAX + '"' + (badX ? ' aria-invalid="true"' : "") + ">" + esc(e.extra) + "</textarea>" +
-    '<span class="hint">أرقام ومراجع وشهادات وتكاملات. للعناوين الفرعية استخدم ###.</span>' + (badX ? '<span class="ferr cf-err" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
-  h += '</div><div class="mf">';
+  h += '<div class="kb-row m-field"><div class="kb-rh"><label class="m-label" for="kbt_extra">' + esc(KB_EXTRA_LABEL) + '</label><span class="m-meta">لا وزن له</span></div>' +
+    '<textarea class="m-input" id="kbt_extra" data-kbsec="__extra" dir="auto" maxlength="' + KB_SECTION_MAX + '"' + (badX ? ' aria-invalid="true"' : "") + ">" + esc(e.extra) + "</textarea>" +
+    '<span class="m-hint">أرقام ومراجع وشهادات وتكاملات. للعناوين الفرعية استخدم ###.</span>' + (badX ? '<span class="m-err" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
+  h += '</div><div class="m-dlg__f">';
   if (e.confirm) {
-    h += '<span class="cf-err msg" role="alert">لديك تغييرات لم تُحفظ.</span><button class="btn btn-ghost" id="kbkeep" data-kb="keep">متابعة التحرير</button><button class="btn btn-ghost" data-kb="discard" style="color:var(--s-fail-text)">تجاهل التغييرات</button>';
+    h += '<span class="m-err" role="alert">لديك تغييرات لم تُحفظ.</span><button type="button" class="m-btn" id="kbkeep" data-kb="keep">متابعة التحرير</button><button type="button" class="m-btn" data-kb="discard">تجاهل التغييرات</button>';
   } else {
-    h += '<button class="btn btn-teal" id="kbsave" data-kb="save"' + (e.busy ? ' disabled aria-busy="true"' : "") + ">" + (e.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
-      '<button class="btn btn-ghost" data-kb="close">إلغاء</button>' + (e.err && e.field.indexOf("sections.") !== 0 && e.field !== "extra" ? '<span class="cf-err msg" role="alert">' + esc(e.err) + "</span>" : "");
+    h += '<button type="button" class="m-btn m-btn--primary" id="kbsave" data-kb="save"' + (e.busy ? ' disabled aria-busy="true"' : "") + ">" + (e.busy ? "جارٍ الحفظ…" : "حفظ كمسودة") + "</button>" +
+      '<button type="button" class="m-btn" data-kb="close">إلغاء</button>' + (e.err && e.field.indexOf("sections.") !== 0 && e.field !== "extra" ? '<span class="m-err" role="alert">' + esc(e.err) + "</span>" : "");
   }
   return h + "</div></div></div></div>";
 }
@@ -213,8 +237,8 @@ function kbSave() {
 }
 function kbAfterPaint() {
   if (!kbEd) return;
-  if (!kbEd.shown && document.querySelector(".kb-ed .ac-box")) {
-    requestAnimationFrame(function () { if (!kbEd) return; document.querySelectorAll(".kb-ed .ac-scrim, .kb-ed .ac-box").forEach(function (el) { el.classList.add("in"); }); kbEd.shown = true; });
+  if (!kbEd.shown && document.querySelector(".kb-ed .kb-box")) {
+    requestAnimationFrame(function () { if (!kbEd) return; document.querySelectorAll(".kb-ed .kb-scrim, .kb-ed .kb-box").forEach(function (el) { el.classList.add("in"); }); kbEd.shown = true; });
   }
   if (kbEd.focus) { var el = document.getElementById(kbEd.focus); kbEd.focus = ""; if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (x) {} } }
 }
@@ -245,11 +269,11 @@ document.addEventListener("input", function (ev) {
   window.__kbt = setTimeout(kbUpdateLive, 250);
 });
 document.addEventListener("keydown", function (ev) {
-  if (!kbEd || !document.querySelector(".kb-ed .ac-box")) return;
+  if (!kbEd || !document.querySelector(".kb-ed .kb-box")) return;
   if (ev.key === "Escape") { ev.preventDefault(); if (kbEd.confirm) { kbEd.confirm = false; render(false); var sv = document.getElementById("kbsave"); if (sv) sv.focus(); } else kbClose(false); return; }
   if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); kbSave(); return; }
   if (ev.key !== "Tab") return;
-  var box = document.querySelector(".kb-ed .ac-box");
+  var box = document.querySelector(".kb-ed .kb-box");
   var items = Array.prototype.filter.call(box.querySelectorAll("button, textarea, input, a[href]"), function (el) { return !el.disabled && el.offsetParent !== null; });
   if (!items.length) return;
   var first = items[0], last = items[items.length - 1];

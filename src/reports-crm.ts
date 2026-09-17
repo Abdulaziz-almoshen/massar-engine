@@ -5,55 +5,43 @@
 // state, both from reports-domain.ts, so the screen cannot describe a report differently from the
 // query that answers it.
 //
+// PORTED to the new design system (docs/PORT-SPEC.md). vReportsCrm owns the single .ds6 wrapper for
+// the whole #reports screen, so the three ported faces below return unwrapped markup and nest under
+// one system rather than four. «مؤشرات الأداء» lives in campaign-results-crm.ts and has NOT been
+// ported, so it is rendered outside that wrapper until it is.
+//
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included.
 
 export const REPORTS_CRM_CSS = `
-.rp-tabs{position:relative;display:flex;gap:2px;flex-wrap:wrap;margin-block-end:18px;
-  border-block-end:1px solid var(--line-soft)}
-.rp-tab{appearance:none;background:transparent;border:0;border-radius:0;cursor:pointer;font-family:inherit;
-  font-size:14px;font-weight:450;color:var(--muted,#656B76);letter-spacing:0;padding:8px 11px;
-  border-block-end:2px solid transparent;margin-block-end:-1px;display:inline-flex;align-items:center;gap:7px}
-.rp-tab:hover{color:var(--ink,#14161A)}
-.rp-tab.on{color:var(--ink);font-weight:600}
-/* Same sliding indicator as the door tabs, from the same moveInd helper — one pattern, one
-   implementation. Two strips that slide differently is how a product starts feeling assembled. */
-.rp-tabs .ind{position:absolute;inset-block-end:0;inset-inline-start:0;height:2px;background:var(--blue);
-  border-radius:var(--r-pill) var(--r-pill) 0 0;width:0;transform:translateX(0);
-  transition:transform var(--base) var(--ease),width var(--base) var(--ease);pointer-events:none}
-.rp-tabs .ind.noanim{transition:none}
-.rp-tab .n{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted,#656B76)}
-.rp-tab.on .n{color:var(--teal,#2563EB)}
-.rp-q{font-size:12px;color:var(--ink2,#33373E);margin-block-end:4px}
-.rp-tot{font-size:12px;color:var(--muted,#656B76);margin-block-end:14px;font-variant-numeric:tabular-nums}
-.rp-days{font-variant-numeric:tabular-nums;font-weight:600}
-/* قبول المنتجات — one row per product, worst first */
-/* auto-fit, because the «قليلة البيانات» tile only appears when it has a count — a fixed four-column
-   grid left it orphaned on a row of its own. */
-.ac-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:var(--s3);margin-block-end:var(--s4)}
-.ac-tile{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s4);
-  display:flex;flex-direction:column;gap:4px;border-inline-start:3px solid var(--tn,var(--line))}
-.ac-tile .n{font-size:var(--t-2xl);font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
-.ac-tile .l{font-size:var(--t-xs);color:var(--muted)}
-.ac-tbl{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
-.ac-r{display:grid;grid-template-columns:minmax(0,1.5fr) 150px 64px 64px 64px 118px minmax(0,1.1fr);
-  align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-top:1px solid var(--line-soft);font-size:var(--t-sm)}
-.ac-r:first-of-type{border-top:0}
-.ac-r.hdr{font-size:var(--t-xs);font-weight:600;color:var(--muted);background:var(--surface);border-top:0}
-.ac-r .nm{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
-.ac-r .nm .sub{display:block;font-weight:400;margin-block-start:2px}
-.ac-r .sub{font-size:var(--t-xs);color:var(--muted)}
-.ac-r .num{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:var(--t-xs)}
-.ac-pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-xs);font-weight:500;
-  border-radius:var(--r-pill);padding:3px 10px;background:var(--tn-soft,var(--surface-2));color:var(--tn-text,var(--ink-2))}
-.ac-why{font-size:var(--t-xs);color:var(--ink-2);overflow-wrap:anywhere}
-.ac-why .none{color:var(--muted)}
-@media (max-width:820px){
-  .ac-r{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
-  .ac-r.hdr{display:none}
-  .ac-r .num,.ac-why{grid-column:1 / -1}
-}
-.rp-basis{font-size:12px;color:var(--muted,#656B76);margin-block-start:18px;line-height:1.7;
-  padding-inline-start:9px;border-inline-start:2px solid var(--line2,#D8DCE3);max-width:66ch}
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). The tab rail is now .m-tabs / .m-tab with
+   aria-selected, so the private .rp-tab strip and its hand-rolled sliding indicator are gone — the
+   vocabulary draws the selected tab with a border, and one implementation beats two that slide
+   differently. Tiles are .m-stat__*, the acceptance grid is a real .m-table, and the four report
+   counts are bound with dsD/dsFig because each one is printed on its tab AND above its list.
+
+   What stays: the acceptance table's own column widths, and the basis block's quoting rule. */
+.ds6 .rp-tabs{margin-block-end:var(--m-5)}
+.ds6 .rp-q{margin-block-end:var(--m-2)}
+.ds6 .rp-tot{margin-block-end:var(--m-4)}
+.ds6 .rp-days{font-weight:600}
+
+/* قبول المنتجات — one row per product, worst first. The tone variable colours the pill and the
+   tile's leading rule; it is a CLASSIFICATION, which is why it is allowed to be a colour at all. */
+.ds6 .ac-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:var(--m-3);margin-block-end:var(--m-4)}
+.ds6 .ac-tile{background:var(--m-paper);border:1px solid var(--m-line);border-radius:var(--m-r-card);
+  padding-inline:var(--m-4);padding-block:var(--m-4);display:flex;flex-direction:column;gap:4px;
+  border-inline-start:3px solid var(--tn,var(--m-line))}
+.ds6 .ac-tbl .m-table{min-inline-size:860px}
+.ds6 .ac-pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--m-t-cap);font-weight:600;
+  border-radius:var(--m-r-chip);padding-inline:10px;padding-block:3px;
+  background:var(--tn-soft,var(--m-sunk));color:var(--tn-text,var(--m-ink-2))}
+.ds6 .ac-why{overflow-wrap:anywhere}
+.ds6 .ac-sub{display:block;font-weight:400;margin-block-start:2px}
+
+/* the accounting basis, quoted rather than asserted */
+.ds6 .rp-basis{margin-block-start:var(--m-5);padding-inline-start:9px;
+  border-inline-start:2px solid var(--m-line-2);max-inline-size:66ch}
+.ds6 .rp-sec{margin-block-start:var(--m-5)}
 `;
 
 export const REPORTS_CRM_JS = `
@@ -100,85 +88,115 @@ window.rpOpen = rpOpen;
    have. An unknown key prints itself rather than an empty cell. */
 function rpStage(k) {
   var s = (typeof SALES_STAGES !== "undefined" ? SALES_STAGES : []).filter(function (x) { return x.key === k; })[0];
-  return s ? s.label : String(k || "—");
+  /* An unknown key prints itself rather than an empty cell; a MISSING key is a classification
+     nobody made, which is the «unset» absence, and the caller draws it as one. */
+  return s ? s.label : String(k || "");
 }
 
+/* Days waiting is the only figure on this screen that decides anything, so it carries the state
+   colour. Thresholds are deliberately blunt — two weeks is stale, a month is stuck. */
 function rpAge(d) {
   var n = Number(d) || 0;
-  var cls = n >= 30 ? "crm-bad" : (n >= 14 ? "crm-warn" : "crm-none");
-  return '<span class="crm-st ' + cls + '"><i></i><span class="rp-days">' + fmtN(n) + '</span> يومًا</span>';
+  var cls = n >= 30 ? " m-chip--bad" : (n >= 14 ? " m-chip--warn" : "");
+  return '<span class="m-chip' + cls + '"><span class="m-n rp-days">' + fmtN(n) + "</span> يومًا</span>";
 }
+
+/* A derivation key has to survive as an HTML attribute value; report ids come from the server. */
+function rpKey(id) { return "rp_" + String(id).replace(/[^A-Za-z0-9_-]/g, ""); }
 
 /* «التقارير» has two faces. «نظرة تنفيذية» answers the CPO's questions about the whole pipeline
    (pipeline-report-domain.ts); «تقارير التعثّر» is the original four — which deal is stuck, on whom. */
 var rpMode = "exec";
 window.rpSetMode = function (m) { rpMode = m === "stuck" || m === "kpis" || m === "accept" ? m : "exec"; render(false); };
+/* The four faces of «التقارير», as a tab rail in the vocabulary's own idiom: .m-tabs with
+   aria-selected, and the selected tab drawn by its border rather than by a strip that has to be
+   measured after paint. moveInd and the private .rp-tab are gone with it.
+
+   «مؤشرات الأداء» is NOT yet ported (it lives in campaign-results-crm.ts), so it is rendered
+   OUTSIDE the .ds6 subtree rather than inside it. New tokens under old structure is not a
+   half-finished redesign, it is a broken page — the same reason massar-ds-crm.ts is scoped at all. */
 function vReportsCrm() {
-  var h = '<div class="rp-tabs rp-modes" role="group" aria-label="نوع التقرير">' +
-    '<button class="rp-tab' + (rpMode === "exec" ? " on" : "") + '" aria-pressed="' + (rpMode === "exec") + '" onclick="rpSetMode(&quot;exec&quot;)">نظرة تنفيذية</button>' +
-    '<button class="rp-tab' + (rpMode === "stuck" ? " on" : "") + '" aria-pressed="' + (rpMode === "stuck") + '" onclick="rpSetMode(&quot;stuck&quot;)">تقارير التعثّر</button>' +
-    '<button class="rp-tab' + (rpMode === "accept" ? " on" : "") + '" aria-pressed="' + (rpMode === "accept") + '" onclick="rpSetMode(&quot;accept&quot;)">قبول المنتجات</button>' +
-    '<button class="rp-tab' + (rpMode === "kpis" ? " on" : "") + '" aria-pressed="' + (rpMode === "kpis") + '" onclick="rpSetMode(&quot;kpis&quot;)">مؤشرات الأداء</button>' +
-    '<i class="ind"></i></div>';
-  setTimeout(function () { moveInd(document.querySelector(".rp-modes")); }, 0);
-  return h + (rpMode === "exec" ? vReportsExec()
-    : rpMode === "accept" ? vReportsAccept()
-    : rpMode === "kpis" && typeof vReportsKpis === "function" ? vReportsKpis()
-    : vReportsStuck());
+  var tab = function (key, label) {
+    return '<button type="button" class="m-tab" role="tab" aria-selected="' + (rpMode === key) + '"' +
+      ' onclick="rpSetMode(&quot;' + key + '&quot;)">' + label + "</button>";
+  };
+  var rail = '<div class="m-tabs rp-tabs" role="tablist" aria-label="نوع التقرير">' +
+    tab("exec", "نظرة تنفيذية") + tab("stuck", "تقارير التعثّر") +
+    tab("accept", "قبول المنتجات") + tab("kpis", "مؤشرات الأداء") + "</div>";
+  if (rpMode === "kpis" && typeof vReportsKpis === "function") {
+    return '<div class="ds6">' + rail + "</div>" + vReportsKpis();
+  }
+  return '<div class="ds6">' + rail +
+    (rpMode === "exec" ? vReportsExec()
+      : rpMode === "accept" ? vReportsAccept()
+      : vReportsStuck()) + "</div>";
 }
 
 function vReportsStuck() {
   rpLoad();
   if (!rpList) return moSkeleton(4, ["w40", "w80", "w60"]);
-  if (!rpList.length) return '<div class="crm-empty"><b>لا تقارير</b>لم يُعرَّف أي تقرير.</div>';
+  if (!rpList.length) {
+    return '<div class="m-card m-empty"><p class="m-empty__t">لا تقارير</p>' +
+      '<p class="m-empty__d">لم يُعرَّف أي تقرير.</p></div>';
+  }
 
-  var h = '<div class="rp-tabs">';
+  /* Each report's count is printed TWICE — on its tab and above its list — so both sites are bound
+     to the rows the report actually returned (PORT-SPEC §6). */
+  rpList.forEach(function (r) {
+    dsD(rpKey(r.id), function () {
+      var d = rpData[r.id];
+      return d && d.rows ? d.rows.length : (d ? d.count : null);
+    });
+  });
+
+  var h = '<div class="m-tabs rp-tabs" role="tablist" aria-label="التقارير">';
   rpList.forEach(function (r) {
     var d = rpData[r.id];
-    h += '<button class="rp-tab' + (r.id === rpPick ? " on" : "") + '" onclick="rpOpen(\\'' + r.id + '\\')">' +
-      esc(r.title) + (d ? '<span class="n">' + fmtN(d.count) + '</span>' : '') + '</button>';
+    h += '<button type="button" class="m-tab" role="tab" aria-selected="' + (r.id === rpPick) + '"' +
+      ' onclick="rpOpen(\\'' + r.id + '\\')">' + esc(r.title) +
+      (d ? "<b>" + dsFig(rpKey(r.id), d.count) + "</b>" : "") + "</button>";
   });
-  h += '<i class="ind"></i></div>';
-
-  /* Placed after the strip is in the DOM; render() writes innerHTML, so the measure has to wait a
-     frame or getBoundingClientRect reads zeros. */
-  setTimeout(function () { moveInd(document.querySelector(".rp-tabs:not(.rp-modes)")); }, 0);
+  h += "</div>";
 
   var cur = rpData[rpPick];
   if (!cur) return h + moSkeleton(4, ["w60", "w80", "w40"]);
 
-  h += '<div class="rp-q">' + esc(cur.report.question) + '</div>';
+  h += '<p class="rp-q m-meta">' + esc(cur.report.question) + "</p>";
 
   /* An empty result and a broken query look identical to the reader, so the report says which. */
   if (cur.empty) {
-    h += shEmpty("clock", cur.empty.title, cur.empty.body);
+    h += '<div class="m-card m-empty"><p class="m-empty__t">' + esc(cur.empty.title) + "</p>" +
+      '<p class="m-empty__d">' + esc(cur.empty.body) + "</p></div>";
     return h;
   }
 
-  h += '<div class="rp-tot">' + fmtN(cur.count) + ' فرصة · ' + fmtN(Math.round(cur.totalValue)) + ' ر.س</div>';
-  h += '<div class="sh-cards">';
+  h += '<p class="rp-tot m-meta">' + mPl(cur.count, "فرصة واحدة", "فرصتان", "فرص", "فرصة") +
+    " · " + mMoney(cur.totalValue) + "</p>";
+  h += '<section class="m-card">';
   /* BR-RPT-004: the row IS the deal — «#opps/<id>» is the record's own URL, so a blocked deal opens
      where it can be acted on, and the link is shareable. A row whose opportunity id never arrived
      stays inert rather than linking somewhere plausible. */
   cur.rows.forEach(function (r) {
-    var inner = '<div><div class="nm">' + esc(r.account || "—") + '</div>' +
-      '<div class="sub">' + esc(r.product) + ' · ' + esc(rpStage(r.stage)) +
-        (r.dept ? ' · ' + esc(r.dept) : '') + '</div></div>' +
-      '<div class="end"><span class="money">' + fmtN(Math.round(r.value)) + ' ر.س</span>' +
-      rpAge(r.daysWaiting) + '</div>';
+    var stage = rpStage(r.stage);
+    var inner = '<span class="m-item__b"><span class="m-item__n">' +
+      (r.account ? esc(r.account) : mNil("بلا اسم مسجّل", "unset")) + "</span>" +
+      '<span class="m-item__s">' + esc(r.product) + " · " +
+        (stage ? esc(stage) : mNil("لم تُسجَّل مرحلة", "unset")) +
+        (r.dept ? " · " + esc(r.dept) : "") + "</span></span>" +
+      '<span class="m-item__v">' + mMoney(r.value) + "</span>" + rpAge(r.daysWaiting);
     h += r.oppId
-      ? '<a class="sh-card go" href="#opps/' + fmtId(r.oppId) + '" title="افتح هذه الفرصة">' + inner +
-        '<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">افتح فرصة ' + esc(r.account || r.product) + "</span></a>"
-      : '<div class="sh-card">' + inner + '</div>';
+      ? '<a class="m-item" href="#opps/' + fmtId(r.oppId) + '" title="افتح هذه الفرصة">' + inner +
+        '<span class="rx-say">افتح فرصة ' + esc(r.account || r.product) + "</span></a>"
+      : '<div class="m-item">' + inner + "</div>";
   });
-  h += '</div>';
+  h += "</section>";
 
   h += vReportRollups();
 
   /* Same words as «المنتجات». The accounting basis is undecided and the screen says so rather than
      letting the reader assume one. */
   if (cur.valueBasis) {
-    h += '<div class="rp-basis"><b>' + esc(cur.valueBasis.label) + '</b><br>' + esc(cur.valueBasis.note) + '</div>';
+    h += '<p class="rp-basis m-meta"><b>' + esc(cur.valueBasis.label) + "</b><br>" + esc(cur.valueBasis.note) + "</p>";
   }
   return h;
 }
@@ -189,44 +207,44 @@ function vReportsStuck() {
    for three, and sorting by count buries the row the block exists to surface. */
 function vReportRollups() {
   rpRollLoad();
-  if (!rpRoll || rpRoll === "loading") return '<div class="rp-sec">' + moSkeleton(3, ["w60", "w40"]) + '</div>';
+  if (!rpRoll || rpRoll === "loading") return '<div class="rp-sec">' + moSkeleton(3, ["w60", "w40"]) + "</div>";
 
-  var h = '<div class="rp-sec"><div class="rp-h">أين تتعثّر الصفقات</div>' +
-    '<div class="rp-hs">الإجراءات المفتوحة حسب الإدارة المسؤولة، مرتّبة بالأقدم توقّفًا لا بالأكثر عددًا.</div>';
+  var h = '<section class="m-card rp-sec"><div class="m-card__h"><div>' +
+    '<h3 class="m-card__t">أين تتعثّر الصفقات</h3>' +
+    '<p class="m-meta">الإجراءات المفتوحة حسب الإدارة المسؤولة، مرتّبة بالأقدم توقّفًا لا بالأكثر عددًا.</p>' +
+    "</div></div>";
   if (!rpRoll.byDept.length) {
-    h += shEmpty("clock", rpRoll.empty.dept.title, rpRoll.empty.dept.body);
+    h += '<div class="m-empty"><p class="m-empty__t">' + esc(rpRoll.empty.dept.title) + "</p>" +
+      '<p class="m-empty__d">' + esc(rpRoll.empty.dept.body) + "</p></div>";
   } else {
-    h += '<div class="mo-stagger sh-cards">';
     rpRoll.byDept.forEach(function (d) {
-      h += '<div class="sh-card"><div><div class="nm">' + esc(d.dept) + '</div>' +
-        '<div class="sub">' + fmtN(d.openCount) + ' إجراء مفتوح</div></div>' +
-        '<div class="end"><span class="money">' + fmtN(Math.round(d.value)) + ' ر.س</span>' +
-        rpAge(d.oldestDays) + '</div></div>';
+      h += '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(d.dept) + "</span>" +
+        '<span class="m-item__s">' + mPl(d.openCount, "إجراء واحد مفتوح", "إجراءان مفتوحان", "إجراءات مفتوحة", "إجراءً مفتوحًا") + "</span></span>" +
+        '<span class="m-item__v">' + mMoney(d.value) + "</span>" + rpAge(d.oldestDays) + "</div>";
     });
-    h += '</div>';
   }
-  h += '</div>';
+  h += "</section>";
 
-  h += '<div class="rp-sec"><div class="rp-h">الخسائر حسب السبب</div>' +
-    '<div class="rp-hs">كل صفقة مغلقة خسارةً، حسب النتيجة التي أغلقتها. النتيجة تُقرأ من السجل ومن النشاط معًا: نتيجة تُسجَّل على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل السجل.</div>';
+  h += '<section class="m-card rp-sec"><div class="m-card__h"><div>' +
+    '<h3 class="m-card__t">الخسائر حسب السبب</h3>' +
+    '<p class="m-meta">كل صفقة مغلقة خسارةً، حسب النتيجة التي أغلقتها. النتيجة تُقرأ من السجل ومن النشاط معًا: نتيجة تُسجَّل على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل السجل.</p>' +
+    "</div></div>";
   if (!rpRoll.byReason.length) {
-    h += shEmpty("chart", rpRoll.empty.reason.title, rpRoll.empty.reason.body);
+    h += '<div class="m-empty"><p class="m-empty__t">' + esc(rpRoll.empty.reason.title) + "</p>" +
+      '<p class="m-empty__d">' + esc(rpRoll.empty.reason.body) + "</p></div>";
   } else {
-    var top = rpRoll.byReason[0].value || 1;
-    /* One stacked bar over the reasons, then a card each — the same treatment the sector board
+    /* One stacked bar over the reasons, then a row each — the same treatment the sector board
        gets, because the question is identical in shape: which part is biggest. */
     var COLR = ["#D9534F", "#B37F00", "#1E5FCC", "#767D89", "#5B8DEF"];
     h += shStack(rpRoll.byReason.map(function (r, i) {
       return { n: r.label, v: r.value || 0, c: COLR[i % COLR.length] }; }));
-    h += '<div class="sh-cards" style="margin-block-start:var(--s3)">';
     rpRoll.byReason.forEach(function (r) {
-      h += '<div class="sh-card"><div><div class="nm">' + esc(r.label) + '</div>' +
-        '<div class="sub">' + fmtN(r.count) + ' صفقة</div></div>' +
-        '<div class="end"><span class="money">' + fmtN(Math.round(r.value)) + ' ر.س</span></div></div>';
+      h += '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(r.label) + "</span>" +
+        '<span class="m-item__s">' + mPl(r.count, "صفقة واحدة", "صفقتان", "صفقات", "صفقة") + "</span></span>" +
+        '<span class="m-item__v">' + mMoney(r.value) + "</span></div>";
     });
-    h += '</div>';
   }
-  h += '</div>';
+  h += "</section>";
   return h;
 }
 
@@ -264,10 +282,11 @@ function vReportsAccept() {
   if (typeof opLoad === "function") opLoad(false);
   if (typeof pcLoad === "function") pcLoad(false);
   var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : null;
-  var h = '<div class="rp-q">تقييم المنتجات من ناحية قبول العملاء — يصنّف كل منتج بنتائج صفقاته المحسومة: ما بيع جيدًا، وما تعثّر، وما جرّبه العملاء ورفضوه، وما لم يُحسم فيه شيء بعد.</div>';
+  var h = '<p class="rp-q m-meta">تقييم المنتجات من ناحية قبول العملاء — يصنّف كل منتج بنتائج صفقاته المحسومة: ما بيع جيدًا، وما تعثّر، وما جرّبه العملاء ورفضوه، وما لم يُحسم فيه شيء بعد.</p>';
   if (!rows) {
     return h + (typeof oppFailed !== "undefined" && oppFailed
-      ? '<div class="rp-state" role="alert">تعذّر تحميل الفرص.<button class="btn btn-ghost" onclick="opRetry()">أعد المحاولة</button></div>'
+      ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل الفرص.</span>' +
+        '<button class="m-btn" onclick="opRetry()">أعد المحاولة</button></div>'
       : moSkeleton(4, ["w40", "w80", "w60"]));
   }
   var cat = ((typeof pcCat !== "undefined" && pcCat) || []).filter(function (p) { return !p.archived; }).map(function (p) { return p.product; });
@@ -275,41 +294,57 @@ function vReportsAccept() {
     return { product: l.product, stage: l.stage, lostReason: l.lost_reason };
   }), cat, isWonStage, isLostStage, acAttainOf);
   if (!list.length) {
-    return h + shEmpty("chart", "لا منتجات بعد", "يظهر هذا التقرير حين يُسجَّل أول منتج في «المنتجات».");
+    return h + '<div class="m-card m-empty"><p class="m-empty__t">لا منتجات بعد</p>' +
+      '<p class="m-empty__d">يظهر هذا التقرير حين يُسجَّل أول منتج في «المنتجات».</p></div>';
   }
+  /* The classification tiles and the table below them count the SAME list, so each tile's figure is
+     re-derived from that list on every paint rather than trusted (PORT-SPEC §6). */
   var totals = acceptanceTotals(list);
+  totals.forEach(function (t) {
+    dsD("ac_" + t.key, function () {
+      return acceptanceTotals(list).filter(function (x) { return x.key === t.key; })[0].count;
+    });
+  });
   h += '<div class="ac-tiles">' + totals.filter(function (t) { return t.key !== "thin" || t.count; }).map(function (t) {
-    return '<div class="ac-tile" style="' + (AC_TONE[t.key] || "") + '"><span class="n">' + fmtN(t.count) + "</span>" +
-      '<span class="l">' + esc(t.label) + "</span>" +
-      '<span class="l">' + esc(ACCEPT_HINTS[t.key] || "") + "</span></div>";
+    return '<div class="ac-tile" style="' + (AC_TONE[t.key] || "") + '">' +
+      '<span class="m-stat__v">' + dsFig("ac_" + t.key, t.count) + "</span>" +
+      '<span class="m-stat__k">' + esc(t.label) + "</span>" +
+      '<span class="m-stat__s">' + esc(ACCEPT_HINTS[t.key] || "") + "</span></div>";
   }).join("") + "</div>";
-  h += '<div class="ac-tbl">' +
-    '<div class="ac-r hdr"><span>المنتج</span><span>حالة القبول</span><span>مبيعة</span><span>خاسرة</span><span>مفتوحة</span><span>نسبة الإنجاز</span><span>أبرز سبب عدم القبول</span></div>';
+  h += '<div class="m-card m-card--pad0 ac-tbl"><div class="m-tablewrap"><table class="m-table">' +
+    "<thead><tr><th>المنتج</th><th>حالة القبول</th>" +
+    '<th class="num">مبيعة</th><th class="num">خاسرة</th><th class="num">مفتوحة</th>' +
+    "<th>نسبة الإنجاز</th><th>أبرز سبب عدم القبول</th></tr></thead><tbody>";
   list.forEach(function (r) {
+    /* Three different absences in one column, and they are not the same fact: a reason nobody
+       recorded on a deal that WAS lost is data someone owes; no lost deal at all is a legitimate
+       nothing. Drawing both as a dash is what PORT-SPEC §4 exists to stop. */
     var why = r.topReason
       ? esc((typeof LOSS_REASON_LABELS !== "undefined" && LOSS_REASON_LABELS[r.topReason]) || r.topReason) +
-        (r.topReasonCount > 1 ? ' <span class="none">(' + fmtN(r.topReasonCount) + ")</span>" : "")
-      : r.lost ? '<span class="none">لم يُسجَّل سبب</span>' : '<span class="none">—</span>';
-    h += '<div class="ac-r"><span class="nm">' + esc(r.product) +
-      (r.decided ? '<span class="sub">فوز ' + fmtN(r.winRatePct) + "٪ · " + fmtN(r.won) + " من " + fmtN(r.decided) + " محسومة</span>" : '<span class="sub">لا صفقة محسومة</span>') + "</span>" +
-      '<span><span class="ac-pill" style="' + (AC_TONE[r.state] || "") + '">' + esc(ACCEPT_LABELS[r.state]) + "</span></span>" +
-      '<span class="num">' + fmtN(r.won) + "</span>" +
-      '<span class="num">' + fmtN(r.lost) + "</span>" +
-      '<span class="num">' + fmtN(r.open) + "</span>" +
+        (r.topReasonCount > 1 ? " (" + mN(r.topReasonCount) + ")" : "")
+      : r.lost ? mNil("لم يُسجَّل سبب", "unset") : mNil("لا صفقة خاسرة", "none");
+    h += '<tr><td class="m-td-n">' + esc(r.product) +
+      '<span class="ac-sub m-meta">' + (r.decided
+        ? "فوز " + mPct(r.winRatePct) + " · " + mN(r.won) + " من " + mN(r.decided) + " محسومة"
+        : "لا صفقة محسومة") + "</span></td>" +
+      '<td><span class="ac-pill" style="' + (AC_TONE[r.state] || "") + '">' + esc(ACCEPT_LABELS[r.state]) + "</span></td>" +
+      '<td class="m-td-v">' + mN(r.won) + "</td>" +
+      '<td class="m-td-v">' + mN(r.lost) + "</td>" +
+      '<td class="m-td-v">' + mN(r.open) + "</td>" +
       /* A percentage measured against a partial year cannot be printed bare: it reads as the
          year's. Say what it was measured on, the way the two sibling screens already do. */
-      '<span class="num">' + (r.attainmentPct === null
-        ? '<span class="crm-none">بلا مستهدف</span>'
-        : (fmtN(r.attainmentPct.pct) + "٪" +
+      "<td>" + (r.attainmentPct === null
+        ? mNil("بلا مستهدف", "owed")
+        : (mPct(r.attainmentPct.pct) +
            (r.attainmentPct.partial
-             ? " · مستهدف " + fmtN(r.attainmentPct.quarters) + " من أربعة أرباع"
-             : " من المستهدف"))) + "</span>" +
-      '<span class="ac-why">' + why + "</span></div>";
+             ? ' <span class="m-meta">· مستهدف ' + mN(r.attainmentPct.quarters) + " من أربعة أرباع</span>"
+             : ' <span class="m-meta">من المستهدف</span>'))) + "</td>" +
+      '<td class="ac-why">' + why + "</td></tr>";
   });
-  h += "</div>";
-  h += '<div class="rp-basis"><b>كيف صُنِّف كل منتج؟</b><br>' +
-    "بنسبة الفوز بين الصفقات المحسومة وحدها: " + fmtN(ACCEPT_GOOD_PCT) + "٪ فأكثر «مقبولة»، ودون " + fmtN(ACCEPT_BAD_PCT) + "٪ «غير مقبولة»، وما بينهما «متعثّرة». " +
-    "المنتج الذي لم تُحسم له صفقة «لم يُبع بعد» مهما كثرت فرصه المفتوحة — الفرصة المفتوحة سؤال لا إجابة. وصفقة محسومة واحدة لا تكفي لحكم.</div>";
+  h += "</tbody></table></div></div>";
+  h += '<p class="rp-basis m-meta"><b>كيف صُنِّف كل منتج؟</b><br>' +
+    "بنسبة الفوز بين الصفقات المحسومة وحدها: " + mPct(ACCEPT_GOOD_PCT) + " فأكثر «مقبولة»، ودون " + mPct(ACCEPT_BAD_PCT) + " «غير مقبولة»، وما بينهما «متعثّرة». " +
+    "المنتج الذي لم تُحسم له صفقة «لم يُبع بعد» مهما كثرت فرصه المفتوحة — الفرصة المفتوحة سؤال لا إجابة. وصفقة محسومة واحدة لا تكفي لحكم.</p>";
   return h;
 }
 `;

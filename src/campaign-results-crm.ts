@@ -5,64 +5,49 @@
 // same contact-ledger reading the campaign's six cards and the campaigns list already print. The rest
 // (مؤهلون · فرص · اجتماعات · عروض · مبيعات) comes from /admin/campaigns/:id/results and /admin/kpis, which
 // attribute opportunity lines to campaigns (campaign-results-domain). Rates are funnelRates, the BRD's own
-// definitions, and a rate over nothing is «—».
+// definitions, and a rate over nothing is an absence, never a zero.
+//
+// PORTED to the new design system (docs/PORT-SPEC.md): both surfaces are wrapped in .ds6 and drawn in the
+// m-* vocabulary — m-card for the two objects, a scoped cr-chain the vocabulary does not carry, m-table inside m-tablewrap
+// for the per-campaign results. Every digit goes through .m-n and every missing rate is an absence with a
+// KIND («لا أساس للنسبة» is a legitimate nothing; «لم تُقَس» is a measurement nobody made).
+//
+// THE TARGET TILE'S CAPTION IS LOAD-BEARING and is kept verbatim: the ratio covers only the products that
+// carry a target, and the caption says how many that is and how much revenue sits outside it. A percentage
+// over part of the catalogue reads as the whole one (PORT-SPEC 7).
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const CAMPAIGN_RESULTS_CRM_CSS = `
-.cr-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); margin-top:var(--s3); overflow:hidden; }
-.cr-card .hd { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); }
-.cr-card .hd h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
-.cr-card .hd .s { font-size:var(--t-xs); color:var(--muted); line-height:1.6; flex-basis:100%; }
-.cr-card .bd { padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
-.cr-chain { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:6px; }
-.cr-step { position:relative; display:flex; flex-direction:column; gap:2px; padding:10px 10px 12px; border-radius:var(--r-md); background:var(--surface); min-width:0; }
-.cr-step .l { font-size:var(--t-xs); color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.cr-step .v { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
-.cr-step .r { font-size:var(--t-xs); color:var(--accent-deep); font-variant-numeric:tabular-nums; }
-.cr-step .r.none { color:var(--muted); }
-.cr-step .bar { position:absolute; inset-inline:10px; bottom:6px; height:3px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; }
-.cr-step .bar i { display:block; height:100%; background:var(--accent); border-radius:inherit; }
-.cr-step.won { background:var(--s-issued-soft); }
-.cr-step.won .v, .cr-step.won .l { color:var(--s-issued-text); }
-.cr-step.won .bar i { background:var(--s-issued); }
-.cr-step.after { background:var(--accent-wash); }
-.cr-rates { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:var(--s2); }
-.cr-rate { display:flex; flex-direction:column; gap:2px; padding:8px 0; border-top:1px solid var(--line-soft); }
-.cr-rate .k { font-size:var(--t-xs); color:var(--muted); }
-.cr-rate .v { font-size:var(--t-lg); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
-.cr-rate .d { font-size:var(--t-xs); color:var(--muted); line-height:1.5; }
-.cr-lines { display:flex; flex-direction:column; }
-.cr-line { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto; gap:var(--s2); align-items:center; padding:8px 0; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
-.cr-line a { color:var(--ink); text-decoration:none; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cr-line a:hover { color:var(--accent-deep); text-decoration:underline; text-underline-offset:3px; }
-.cr-line .p { color:var(--muted); font-size:var(--t-xs); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cr-line .v { font-variant-numeric:tabular-nums; white-space:nowrap; }
-.cr-stage { font-size:var(--t-xs); font-weight:600; border-radius:var(--r-pill); padding:2px 9px; background:var(--tn-soft, var(--surface-2)); color:var(--tn-text, var(--muted)); white-space:nowrap; }
-.cr-note { font-size:var(--t-xs); color:var(--muted); line-height:1.7; }
-.cr-state { font-size:var(--t-sm); color:var(--muted); display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-/* «مؤشرات الأداء» */
-.kp { display:flex; flex-direction:column; gap:var(--s3); }
-.kp-grp { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
-.kp-grp > .hd { margin:0; padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); font-size:var(--t-md); font-weight:600; color:var(--ink); }
-.kp-tbl caption { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.kp-tbl:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-.kp-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); }
-.kp-t { display:flex; flex-direction:column; gap:4px; padding:var(--s3) var(--s4); border-inline-start:1px solid var(--line-soft); border-top:1px solid var(--line-soft); margin-top:-1px; margin-inline-start:-1px; }
-.kp-t .k { font-size:var(--t-xs); font-weight:600; color:var(--muted); display:flex; gap:6px; align-items:baseline; flex-wrap:wrap; }
-.kp-t .k .en { font-weight:400; direction:ltr; unicode-bidi:isolate; }
-.kp-t .v { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.15; }
-.kp-t .v.none { color:var(--muted); }
-.kp-t .n { font-size:var(--t-xs); color:var(--ink-2, #33373E); font-variant-numeric:tabular-nums; }
-.kp-t .d { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
-.kp-tbl { overflow-x:auto; }
-.kp-tbl table { width:100%; border-collapse:collapse; font-size:var(--t-sm); min-width:760px; }
-.kp-tbl th { text-align:start; font-size:var(--t-xs); font-weight:600; color:var(--muted); background:var(--surface); padding:8px var(--s3); white-space:nowrap; }
-.kp-tbl td { padding:8px var(--s3); border-top:1px solid var(--line-soft); color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
-.kp-tbl td a { color:var(--ink); text-decoration:none; font-weight:500; }
-.kp-tbl td a:hover { color:var(--accent-deep); text-decoration:underline; text-underline-offset:3px; }
-.kp .cr-card a:focus-visible, .kp-tbl a:focus-visible, .cr-line a:focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--r-sm); }
-@media (max-width: 560px) { .cr-line { grid-template-columns:minmax(0,1fr) auto; } .cr-line .p { grid-column:1 / -1; grid-row:2; } }
+/* Only what the m-* vocabulary genuinely lacks: the chain's own grid, the rate row, the attributed
+   lines, and the KPI tile grid. Everything else is m-card / m-table / m-chip / m-n. */
+.ds6 .cr-chain { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:var(--m-1); }
+.ds6 .cr-step { position:relative; display:flex; flex-direction:column; gap:2px; padding:10px 10px 14px;
+  border-radius:var(--m-r-ctl); background:var(--m-page); min-inline-size:0; }
+.ds6 .cr-step .l { font-size:var(--m-t-cap); color:var(--m-mut); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ds6 .cr-step .v { font-size:var(--m-t-fig); font-weight:700; color:var(--m-ink); line-height:1.15; }
+.ds6 .cr-step .r { font-size:var(--m-t-cap); color:var(--m-ac-deep); }
+.ds6 .cr-step .bar { position:absolute; inset-inline:10px; inset-block-end:6px; block-size:3px;
+  border-radius:var(--m-r-chip); background:var(--m-sunk); overflow:hidden; }
+.ds6 .cr-step .bar i { display:block; block-size:100%; inline-size:var(--m-pct,0%); background:var(--m-ac); border-radius:inherit; }
+.ds6 .cr-step.won { background:var(--m-ok-dim); }
+.ds6 .cr-step.won .v, .ds6 .cr-step.won .l { color:var(--m-ok); }
+.ds6 .cr-step.won .bar i { background:var(--m-ok); }
+.ds6 .cr-step.after { background:var(--m-ac-dim); }
+.ds6 .cr-rates { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:var(--m-2); }
+.ds6 .cr-rate { display:flex; flex-direction:column; gap:2px; padding:var(--m-2) 0; border-block-start:1px solid var(--m-line); }
+.ds6 .cr-lines { display:flex; flex-direction:column; }
+.ds6 .cr-line { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto; gap:var(--m-2);
+  align-items:center; padding:var(--m-2) 0; border-block-start:1px solid var(--m-line); font-size:var(--m-t-cap); }
+.ds6 .cr-line .p { color:var(--m-mut); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ds6 .cr-bd { display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .cr-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:var(--m-4); }
+.ds6 .cr-t { display:flex; flex-direction:column; gap:var(--m-1); min-inline-size:0; }
+.ds6 .cr-t .en { font-weight:400; direction:ltr; unicode-bidi:isolate; color:var(--m-faint); }
+.ds6 .kp { display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .kp-tbl { min-inline-size:760px; }
+.ds6 .kp-tbl caption { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@media (max-width: 560px) { .ds6 .cr-line { grid-template-columns:minmax(0,1fr) auto; } .ds6 .cr-line .p { grid-column:1 / -1; grid-row:2; } }
 `;
 
 export const CAMPAIGN_RESULTS_CRM_JS = `
@@ -73,8 +58,15 @@ var kpData = null, kpFailed = false, kpLoading = false;
    seconds, and the half below it must not sit frozen at the moment the tab was opened. */
 var CR_FRESH_MS = 60000;
 
-function crPct(v) { return v === null || v === undefined ? "—" : fmtN(v) + "٪"; }
+/* Every digit goes through .m-n, and a percent sign that belongs to a number goes INSIDE the span or
+   bidi lands it on the wrong side (PORT-SPEC 3). */
+function crN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+/* kind: owed · unset · none. A rate with no denominator is not zero and not a dash — it is a named
+   absence saying WHICH of the three it is. */
+function crNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
+function crPct(v) { return v === null || v === undefined ? crNil("لا أساس للنسبة", "none") : '<span class="m-n">' + fmtN(v) + "٪</span>"; }
 function crMoney(v) { return typeof opMoney === "function" ? opMoney(v) : fmtN(Math.round(Number(v) || 0)) + " ر.س"; }
+function crMoneyN(v) { return '<span class="m-n">' + crMoney(v) + "</span>"; }
 function crLoad(id, force) {
   var w = crRes[id];
   if (w && (w.loading || (!force && ((w.data && Date.now() - w.at < CR_FRESH_MS) || w.failed)))) return;
@@ -88,22 +80,28 @@ function crLoad(id, force) {
 function crStep(label, n, prev, cls, base) {
   /* Over nothing, or over a smaller count from another population, there is no rate to print. */
   var r = prev > 0 && n <= prev ? Math.round((n / prev) * 100) : null;
-  return '<div class="cr-step' + (cls ? " " + cls : "") + '"><span class="l" title="' + esc(label) + '">' + esc(label) + '</span><span class="v">' + fmtN(n) + "</span>" +
-    '<span class="r' + (r === null ? " none" : "") + '"' + (prev === undefined || r === null ? "" : ' title="' + fmtN(r) + "٪ من " + esc(base || "") + '"') + ">" + (prev === undefined ? "&nbsp;" : r === null ? "—" : fmtN(r) + "٪") + "</span>" +
-    '<span class="bar" aria-hidden="true"><i style="width:' + (prev === undefined ? 100 : r === null ? 0 : r) + '%"></i></span></div>';
+  return '<div class="cr-step' + (cls ? " " + cls : "") + '"><span class="l" title="' + esc(label) + '">' + esc(label) + '</span><span class="v">' + crN(n) + "</span>" +
+    '<span class="r"' + (prev === undefined || r === null ? "" : ' title="' + fmtN(r) + "٪ من " + esc(base || "") + '"') + ">" +
+    (prev === undefined ? "&nbsp;" : r === null ? crNil("لا أساس", "none") : '<span class="m-n">' + fmtN(r) + "٪</span>") + "</span>" +
+    '<span class="bar" aria-hidden="true"><i style="--m-pct:' + (prev === undefined ? 100 : r === null ? 0 : r) + '%"></i></span></div>';
 }
 function crRate(label, v, def) {
-  return '<div class="cr-rate"><span class="k">' + esc(label) + '</span><span class="v">' + v + '</span><span class="d">' + def + "</span></div>";
+  return '<div class="cr-rate"><span class="m-stat__k">' + esc(label) + '</span><span class="m-item__v">' + v + '</span><span class="m-meta">' + def + "</span></div>";
 }
 function crChainCard(camp, st) {
   if (!camp || camp.test) return "";
   crLoad(camp.id, false);
   var w = crRes[camp.id] || {};
-  var h = '<section class="cr-card" aria-labelledby="crh"><div class="hd"><h2 id="crh">سلسلة التحويل</h2>' +
-    '<span class="s">من الإرسال حتى البيع: ما حدث بعد «مهتم». تُنسب الفرصة إلى الحملة إن ذكرتها، أو إن فُتحت عبر واتساب لرقم استهدفته الحملة للمنتج نفسه خلال ' +
-    fmtN(ATTRIBUTION_DAYS) + " يومًا من إطلاقها. النسبة تحت كل خطوة محسوبة على الخطوة التي تُقاس عليها: القراءة والردود على المُرسل، والاهتمام على الردود، والعروض والمبيعات على الفرص.</span></div><div class=\\"bd\\">";
+  /* No .ds6 wrapper here: this card is emitted INSIDE the campaign record, which is already wrapped.
+     Nesting the wrapper would paint the page ground inside a card. */
+  var h = '<section class="m-card" aria-labelledby="crh"><header class="m-card__h"><div>' +
+    '<h2 class="m-card__t" id="crh">سلسلة التحويل</h2>' +
+    '<p class="m-meta">من الإرسال حتى البيع: ما حدث بعد «مهتم». تُنسب الفرصة إلى الحملة إن ذكرتها، أو إن فُتحت عبر واتساب لرقم استهدفته الحملة للمنتج نفسه خلال ' +
+    crN(ATTRIBUTION_DAYS) + " يومًا من إطلاقها. النسبة تحت كل خطوة محسوبة على الخطوة التي تُقاس عليها: القراءة والردود على المُرسل، والاهتمام على الردود، والعروض والمبيعات على الفرص.</p></div></header><div class=\\"cr-bd\\">";
   if (!w.data) {
-    return h + '<div class="cr-state"' + (w.failed ? ' role="alert">تعذّر تحميل ما بعد الاهتمام.<button class="btn btn-ghost" onclick="crLoad(' + camp.id + ', true)">أعد المحاولة</button>' : ' role="status">جارٍ حساب السلسلة…') + "</div></div></section>";
+    return h + '<p class="m-body"' + (w.failed
+      ? ' role="alert">تعذّر تحميل ما بعد الاهتمام. <button class="m-btn" onclick="crLoad(' + camp.id + ', true)">أعد المحاولة</button>'
+      : ' role="status" aria-busy="true">جارٍ حساب السلسلة…') + "</p></div></section>";
   }
   var r = w.data.results;
   h += '<div class="cr-chain">' +
@@ -118,18 +116,18 @@ function crChainCard(camp, st) {
     crRate("نسبة التأهيل", crPct(rates.qualificationRate), "مؤهلون ÷ مهتمون") +
     crRate("التحويل إلى فرص", crPct(rates.opportunityConversion), "فرص ÷ مؤهلون") +
     crRate("نسبة الفوز", crPct(rates.winRate), "بنود رابحة ÷ بنود مغلقة") +
-    crRate("إيراد الحملة", r.revenue || r.wonLines ? crMoney(r.revenue) : "—", "قيمة البنود الرابحة المنسوبة" + (r.openValue ? " · مفتوح: " + crMoney(r.openValue) : "")) + "</div>";
-  if (st.interested < r.qualified) h += '<div class="cr-note">«مؤهلون» أكثر من «مهتمون»، فلا نسبة تأهيل: بعض العملاء بلغوا نية مرتفعة أو فُتحت لهم فرصة دون أن يُسجَّل «مهتم» على ردّهم للحملة.</div>';
+    crRate("إيراد الحملة", r.revenue || r.wonLines ? crMoneyN(r.revenue) : crNil("لا بنود رابحة", "none"), "قيمة البنود الرابحة المنسوبة" + (r.openValue ? " · مفتوح: " + crMoneyN(r.openValue) : "")) + "</div>";
+  if (st.interested < r.qualified) h += '<p class="m-meta">«مؤهلون» أكثر من «مهتمون»، فلا نسبة تأهيل: بعض العملاء بلغوا نية مرتفعة أو فُتحت لهم فرصة دون أن يُسجَّل «مهتم» على ردّهم للحملة.</p>';
   if (w.data.lines.length) {
-    h += '<div><div class="cr-note" style="font-weight:600;color:var(--ink);margin-bottom:2px">البنود المنسوبة إلى هذه الحملة</div><div class="cr-lines">' +
+    h += '<div><h3 class="m-label">البنود المنسوبة إلى هذه الحملة</h3><div class="cr-lines">' +
       w.data.lines.slice(0, 30).map(function (l) {
         var label = typeof opStage === "function" ? opStage(l.stage).label : l.stage;
-        var tone = typeof opToneVars === "function" ? ' style="' + opToneVars(l.stage) + '"' : "";
-        return '<div class="cr-line"><a href="#opps/' + l.id + '">' + esc(l.account) + '</a><span class="p">' + esc(l.product) + "</span>" +
-          '<span class="cr-stage"' + tone + ">" + esc(label) + '</span><span class="v">' + (l.value ? crMoney(l.value) : "—") + "</span></div>";
-      }).join("") + "</div>" + (w.data.lines.length > 30 ? '<div class="cr-note">يُعرض 30 من ' + fmtN(w.data.lines.length) + ".</div>" : "") + "</div>";
+        return '<div class="cr-line"><a class="m-link" href="#opps/' + l.id + '">' + esc(l.account) + '</a><span class="p">' + esc(l.product) + "</span>" +
+          '<span class="m-chip m-chip--plain">' + esc(label) + '</span><span class="m-td-v">' + (l.value ? crMoneyN(l.value) : crNil("لم يُسعَّر", "owed")) + "</span></div>";
+      }).join("") + "</div>" +
+      (w.data.lines.length > 30 ? '<p class="m-meta">يُعرض ' + crN(30) + " من " + crN(w.data.lines.length) + ".</p>" : "") + "</div>";
   } else {
-    h += '<div class="cr-note">لا فرص بيع منسوبة إلى هذه الحملة بعد. تُفتح تلقائيًا عند النية المرتفعة، أو يدويًا من «فرص البيع» مع اختيار الحملة مصدرًا.</div>';
+    h += '<p class="m-meta">لا فرص بيع منسوبة إلى هذه الحملة بعد. تُفتح تلقائيًا عند النية المرتفعة، أو يدويًا من «فرص البيع» مع اختيار الحملة مصدرًا.</p>';
   }
   return h + "</div></section>";
 }
@@ -143,20 +141,23 @@ function kpLoad(force) {
     .then(function () { kpLoading = false; render(false); });
 }
 function kpTile(label, en, value, counts, def) {
-  var none = value === "—";
-  return '<div class="kp-t"><span class="k">' + esc(label) + ' <span class="en">' + esc(en) + '</span></span><span class="v' + (none ? " none" : "") + '">' + value + "</span>" +
-    (counts ? '<span class="n">' + counts + "</span>" : "") + '<span class="d">' + def + "</span></div>";
+  return '<div class="cr-t"><span class="m-stat__k">' + esc(label) + ' <span class="en">' + esc(en) + '</span></span>' +
+    '<span class="m-stat__v">' + value + "</span>" +
+    (counts ? '<span class="m-cap">' + counts + "</span>" : "") + '<span class="m-meta">' + def + "</span></div>";
 }
 function kpDuration(sec) {
-  if (sec === null || sec === undefined) return "—";
-  if (sec < 60) return fmtN(sec) + " ث";
+  if (sec === null || sec === undefined) return crNil("لم تُقَس", "unset");
+  if (sec < 60) return '<span class="m-n">' + fmtN(sec) + "</span> ث";
   var m = Math.round(sec / 60);
-  return m < 60 ? fmtN(m) + " د" : fmtN(Math.round((m / 60) * 10) / 10) + " س";
+  return m < 60 ? '<span class="m-n">' + fmtN(m) + "</span> د"
+                : '<span class="m-n">' + fmtN(Math.round((m / 60) * 10) / 10) + "</span> س";
 }
 function vReportsKpis() {
   kpLoad(false);
   if (!kpData) {
-    return '<div class="kp"><section class="kp-grp"><div class="cf-state"' + (kpFailed ? ' role="alert">تعذّر تحميل المؤشرات.<button class="btn btn-ghost" onclick="kpFailed=false;kpLoad(true)">أعد المحاولة</button>' : ' role="status">جارٍ حساب المؤشرات…') + "</div></section></div>";
+    return '<div class="ds6"><section class="m-card"><p class="m-body"' + (kpFailed
+      ? ' role="alert">تعذّر تحميل المؤشرات. <button class="m-btn" onclick="kpFailed=false;kpLoad(true)">أعد المحاولة</button>'
+      : ' role="status" aria-busy="true">جارٍ حساب المؤشرات…') + "</p></section></div>";
   }
   var d = kpData, t = d.totals;
   /* The top of the funnel, summed from the SAME per-campaign reading the campaign screens print. */
@@ -169,60 +170,69 @@ function vReportsKpis() {
     return { c: c, st: st };
   });
   var rates = funnelRates({ sent: top.sent, read: top.seen, replied: top.replied, interested: top.interested, qualified: t.qualified, opportunities: t.opportunities, wonLines: t.wonLines, closedLines: t.closedLines });
-  var ratio = function (n, dd) { return fmtN(n) + " من " + fmtN(dd); };
-  var h = '<div class="kp">';
-  h += '<section class="kp-grp" aria-labelledby="kph1"><h2 class="hd" id="kph1">الحملات</h2><div class="kp-tiles">' +
+  var ratio = function (n, dd) { return crN(n) + " من " + crN(dd); };
+  var grp = function (id, title, body) {
+    return '<section class="m-card" aria-labelledby="' + id + '"><header class="m-card__h">' +
+      '<h2 class="m-card__t" id="' + id + '">' + title + "</h2></header>" + body + "</section>";
+  };
+  var h = '<div class="ds6"><div class="kp">';
+  h += grp("kph1", "الحملات", '<div class="cr-tiles">' +
     kpTile("نسبة القراءة", "Read Rate", crPct(rates.readRate), ratio(top.seen, top.sent), "المقروء ÷ المرسل") +
     kpTile("نسبة الردود", "Reply Rate", crPct(rates.replyRate), ratio(top.replied, top.sent), "الردود ÷ المرسل") +
-    kpTile("نسبة الاهتمام", "Interest Rate", crPct(rates.interestRate), ratio(top.interested, top.sent), "المهتمون ÷ المرسل") + "</div></section>";
-  h += '<section class="kp-grp" aria-labelledby="kph2"><h2 class="hd" id="kph2">التأهيل والفرص والمبيعات</h2><div class="kp-tiles">' +
+    kpTile("نسبة الاهتمام", "Interest Rate", crPct(rates.interestRate), ratio(top.interested, top.sent), "المهتمون ÷ المرسل") + "</div>");
+  h += grp("kph2", "التأهيل والفرص والمبيعات", '<div class="cr-tiles">' +
     kpTile("نسبة التأهيل", "Qualification Rate", crPct(rates.qualificationRate), ratio(t.qualified, top.interested), "المؤهلون ÷ المهتمين — المؤهل: قراءة نية مرتفعة منسوبة للحملة، أو فرصة بيع منسوبة لها") +
     kpTile("التحويل إلى فرص", "Opportunity Conversion", crPct(rates.opportunityConversion), ratio(t.opportunities, t.qualified), "الفرص الناتجة ÷ المؤهلين") +
     kpTile("نسبة الفوز", "Win Rate", crPct(rates.winRate), ratio(t.wonLines, t.closedLines), "الفرص الفائزة ÷ الفرص المغلقة (المنسوبة إلى حملات)") +
-    kpTile("إيراد الحملات", "Campaign Revenue", t.revenue || t.wonLines ? crMoney(t.revenue) : "—", t.openValue ? "مفتوح: " + crMoney(t.openValue) : "", "قيمة المبيعات المنسوبة للحملات خلال " + fmtN(d.attributionDays) + " يومًا من الإطلاق") + "</div></section>";
-  h += '<section class="kp-grp" aria-labelledby="kph3"><h2 class="hd" id="kph3">المؤشرات والتوصيات والمنتج</h2><div class="kp-tiles">' +
-    kpTile("عائد المؤشرات", "Indicator Opportunity Yield", fmtN(d.indicatorYield.opportunities), "فرص الاستهداف المقترحة الآن: " + fmtN(d.indicatorYield.suggestionsNow) + " · حملات من مؤشرات: " + fmtN(d.indicatorYield.campaigns),
+    kpTile("إيراد الحملات", "Campaign Revenue", t.revenue || t.wonLines ? crMoneyN(t.revenue) : crNil("لا مبيعات منسوبة", "none"), t.openValue ? "مفتوح: " + crMoneyN(t.openValue) : "", "قيمة المبيعات المنسوبة للحملات خلال " + crN(d.attributionDays) + " يومًا من الإطلاق") + "</div>");
+  h += grp("kph3", "المؤشرات والتوصيات والمنتج", '<div class="cr-tiles">' +
+    kpTile("عائد المؤشرات", "Indicator Opportunity Yield", crN(d.indicatorYield.opportunities), "فرص الاستهداف المقترحة الآن: " + crN(d.indicatorYield.suggestionsNow) + " · حملات من مؤشرات: " + crN(d.indicatorYield.campaigns),
       "فرص البيع المنسوبة لحملات بُنيت على مؤشرات الاستخدام") +
-    kpTile("تبنّي التوصيات", "Recommendation Adoption", crPct(d.adoption.pct), ratio(d.adoption.launched, d.adoption.launched + d.adoption.dismissed) + (d.adoption.open ? " · مفتوحة الآن: " + fmtN(d.adoption.open) : ""), "التوصيات التي أُطلقت منها حملة ÷ التوصيات التي حُسم أمرها (أُطلقت أو تُجوهلت). لا يُسجَّل عرض التوصية، فلا تدخل المفتوحة في النسبة") +
-    /* The ratio now covers only the products that have a target; the caption says how many
+    kpTile("تبنّي التوصيات", "Recommendation Adoption", crPct(d.adoption.pct), ratio(d.adoption.launched, d.adoption.launched + d.adoption.dismissed) + (d.adoption.open ? " · مفتوحة الآن: " + crN(d.adoption.open) : ""), "التوصيات التي أُطلقت منها حملة ÷ التوصيات التي حُسم أمرها (أُطلقت أو تُجوهلت). لا يُسجَّل عرض التوصية، فلا تدخل المفتوحة في النسبة") +
+    /* The ratio covers only the products that have a target; the caption says how many
        that is and how much revenue sits outside it, because a percentage over part of the
-       catalogue reads as the whole one. */
+       catalogue reads as the whole one. DO NOT tidy this caption away. */
     kpTile("تحقيق المستهدف", "Target Achievement",
-      (d.target && d.target.target) ? crPct(d.target.pct) : "—",
+      (d.target && d.target.target) ? crPct(d.target.pct) : crNil("بلا مستهدف مسجّل", "owed"),
       d.target
         ? ((d.target.target
-            ? crMoney(d.target.achieved) + " من " + crMoney(d.target.target)
+            ? crMoneyN(d.target.achieved) + " من " + crMoneyN(d.target.target)
             : "لا مستهدف مسجّل") +
-           " · الربع " + d.target.quarter + " من " + d.target.year +
+           " · الربع " + crN(d.target.quarter) + " من " + '<span class="m-n">' + String(d.target.year) + "</span>" +
            (d.target.targetedCount != null && d.target.productCount != null &&
             d.target.targetedCount < d.target.productCount
-             ? " · على " + fmtN(d.target.targetedCount) + " من " + fmtN(d.target.productCount) + " منتجًا" +
+             ? " · على " + crN(d.target.targetedCount) + " من " + crN(d.target.productCount) + " منتجًا" +
                (d.target.untargetedAchieved
-                 ? "، و" + crMoney(d.target.untargetedAchieved) + " خارج النسبة" : "")
+                 ? "، و" + crMoneyN(d.target.untargetedAchieved) + " خارج النسبة" : "")
              : ""))
         : "",
-      "المحقق ÷ المستهدف للربع الحالي، على المنتجات التي لها مستهدف مسجّل وحدها") + "</div></section>";
+      "المحقق ÷ المستهدف للربع الحالي، على المنتجات التي لها مستهدف مسجّل وحدها") + "</div>");
   var ho = d.assistant.handoff;
-  h += '<section class="kp-grp" aria-labelledby="kph4"><h2 class="hd" id="kph4">المساعد الذكي</h2><div class="kp-tiles">' +
+  h += grp("kph4", "المساعد الذكي", '<div class="cr-tiles">' +
     kpTile("الثقة في الإجابات", "Answer Confidence", crPct(d.assistant.answerConfidence ? d.assistant.answerConfidence.pct : null),
-      d.assistant.answerConfidence ? ratio(d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium, d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium + d.assistant.answerConfidence.low) + " · حُوّل لموظف: " + fmtN(d.assistant.answerConfidence.handoffs) : "",
+      d.assistant.answerConfidence ? ratio(d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium, d.assistant.answerConfidence.high + d.assistant.answerConfidence.medium + d.assistant.answerConfidence.low) + " · حُوّل لموظف: " + crN(d.assistant.answerConfidence.handoffs) : "",
       "الإجابات التي قدّر المساعد ثقته فيها مرتفعة أو متوسطة ÷ الإجابات المسجّلة — تقدير المساعد نفسه، آخر 30 يومًا. المنخفضة تُحوَّل لموظف تلقائيًا") +
     kpTile("دقة الإجابات", "Answer Accuracy", crPct(d.assistant.answerAccuracy ? d.assistant.answerAccuracy.pct : null),
       d.assistant.answerAccuracy ? ratio(d.assistant.answerAccuracy.correct, d.assistant.answerAccuracy.correct + d.assistant.answerAccuracy.wrong) : "",
       "الردود التي حكم عليها مراجع بأنها صحيحة ÷ الردود التي راجعها — من «دقة الرد» في نافذة المحادثة، آخر 30 يومًا") +
     kpTile("التحويل لبشر", "Human Handoff Rate", crPct(ho.pct), ratio(ho.handedOff, ho.conversations), "المحادثات المحوّلة الآن لموظف ÷ المحادثات التي كتب فيها العميل — حالة اليوم، لا سجل التحويلات") +
     kpTile("زمن الرد", "Median reply time", kpDuration(d.assistant.medianReplySeconds), "آخر 30 يومًا", "الوسيط بين رسالة العميل وأول رسالة من مسار بعدها (خلال 15 دقيقة)") +
-    kpTile("جاهزية المعرفة", "Knowledge readiness", d.assistant.knowledgeScore && d.assistant.knowledgeScore.avg !== null ? fmtN(d.assistant.knowledgeScore.avg) + "٪" : "—",
-      "يبيعها المساعد: " + fmtN(d.assistant.productsReady.eligible) + " من " + fmtN(d.assistant.productsReady.total) + (d.assistant.knowledgeScore ? " · فوق حد الجاهزية: " + fmtN(d.assistant.knowledgeScore.ready) : ""),
-      "متوسط درجة المعرفة بأقسامها الثمانية الموزونة للمنتجات التي يبيعها المساعد") + "</div></section>";
-  h += '<section class="kp-grp" aria-labelledby="kph5"><h2 class="hd" id="kph5">الحملات واحدة واحدة</h2><div class="kp-tbl" tabindex="0" role="region" aria-labelledby="kph5"><table><caption>نتائج كل حملة فعلية</caption><thead><tr>' +
+    kpTile("جاهزية المعرفة", "Knowledge readiness", d.assistant.knowledgeScore && d.assistant.knowledgeScore.avg !== null ? '<span class="m-n">' + fmtN(d.assistant.knowledgeScore.avg) + "٪</span>" : crNil("لم تُقَس", "unset"),
+      "يبيعها المساعد: " + crN(d.assistant.productsReady.eligible) + " من " + crN(d.assistant.productsReady.total) + (d.assistant.knowledgeScore ? " · فوق حد الجاهزية: " + crN(d.assistant.knowledgeScore.ready) : ""),
+      "متوسط درجة المعرفة بأقسامها الثمانية الموزونة للمنتجات التي يبيعها المساعد") + "</div>");
+  h += grp("kph5", "الحملات واحدة واحدة",
+    '<div class="m-tablewrap" tabindex="0" role="region" aria-labelledby="kph5"><table class="m-table kp-tbl"><caption>نتائج كل حملة فعلية</caption><thead><tr>' +
     '<th scope="col">الحملة</th><th scope="col">المستهدفون</th><th scope="col">أُرسلت</th><th scope="col">ردّوا</th><th scope="col">مهتمون</th><th scope="col">مؤهلون</th><th scope="col">فرص</th><th scope="col">مبيعات</th><th scope="col">الإيراد</th></tr></thead><tbody>' +
     (rows.length ? rows.map(function (x) {
       var r = x.c.results;
-      return '<tr><td><a href="#kmon/' + x.c.id + '">' + esc(clip(x.c.name, 40)) + "</a></td><td>" + fmtN(x.st.targeted) + "</td><td>" + fmtN(x.st.sent) + "</td><td>" + fmtN(x.st.replied) +
-        "</td><td>" + fmtN(x.st.interested) + "</td><td>" + fmtN(r.qualified) + "</td><td>" + fmtN(r.opportunities) + "</td><td>" + fmtN(r.won) + "</td><td>" + (r.revenue || r.wonLines ? crMoney(r.revenue) : "—") + "</td></tr>";
-    }).join("") : '<tr><td colspan="9">لا حملات فعلية بعد.</td></tr>') + "</tbody></table></div></section>";
-  return h + "</div>";
+      return '<tr><td class="m-td-n"><a class="m-link" href="#kmon/' + x.c.id + '">' + esc(clip(x.c.name, 40)) + '</a></td><td class="m-td-v">' + crN(x.st.targeted) +
+        '</td><td class="m-td-v">' + crN(x.st.sent) + '</td><td class="m-td-v">' + crN(x.st.replied) +
+        '</td><td class="m-td-v">' + crN(x.st.interested) + '</td><td class="m-td-v">' + crN(r.qualified) +
+        '</td><td class="m-td-v">' + crN(r.opportunities) + '</td><td class="m-td-v">' + crN(r.won) +
+        '</td><td class="m-td-v">' + (r.revenue || r.wonLines ? crMoneyN(r.revenue) : crNil("لا مبيعات", "none")) + "</td></tr>";
+    }).join("") : '<tr class="m-table__empty"><td colspan="9"><div class="m-empty"><p class="m-empty__t">لا حملات فعلية بعد</p>' +
+      '<p class="m-empty__d">تظهر هنا كل حملة فعلية بنتائجها فور إطلاقها.</p></div></td></tr>') + "</tbody></table></div>");
+  return h + "</div></div>";
 }
 /* ================= end «سلسلة التحويل» and «مؤشرات الأداء» ================= */
 `;

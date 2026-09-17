@@ -6,151 +6,154 @@
 // data, and one next action in words — never a paragraph (the «signals, not text» rule).
 //
 // Stage colours come from stage-tone-domain.ts through opTone() in opps-crm.ts, so a rung is the same
-// colour here as on the board. Money goes through opMoney/opMoneyShort; every number through fmtN.
+// colour here as on the board. Money goes through opMoney/opMoneyShort.
+//
+// PORTED to the new design system (docs/PORT-SPEC.md). The screen body is wrapped in .ds6 by
+// vReportsCrm, which owns the tab rail this view sits under. Every figure goes through .m-n, every
+// empty cell states WHICH KIND of absence it is, and the two counts that appear both in the KPI
+// strip and in a card below it are bound with dsD/dsFig so they cannot drift.
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is spliced into dashboard.ts's template.
 
 export const EXEC_REPORTS_CSS = `
-.rx { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:rxw; }
-.rx-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s3); flex-wrap:wrap; }
-.rx-q { font-size:var(--t-md); font-weight:600; color:var(--ink); line-height:var(--lh-tight); }
-.rx-meta { font-size:var(--t-xs); color:var(--muted); margin-top:2px; display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; }
-.rx-small { display:inline-flex; align-items:center; gap:4px; color:var(--s-attn-text); background:var(--s-attn-soft);
-  border-radius:var(--r-pill); padding:0 8px; line-height:20px; font-weight:500; }
-.rx-seg { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; }
-.rx-seg button { font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--muted-2); background:transparent; border:none;
-  border-radius:var(--r-sm); min-height:30px; padding:0 12px; cursor:pointer; transition:background var(--fast) var(--ease), color var(--fast) var(--ease), transform 160ms var(--ease); }
-.rx-seg button:active { transform:scale(0.97); }
-.rx-seg button.on { background:var(--paper); color:var(--ink); box-shadow:0 0 0 1px var(--line); }
-.rx :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.rx-ref { font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--accent-deep); background:transparent; border:none;
-  cursor:pointer; padding:0 4px; min-height:24px; border-radius:var(--r-sm); }
-.rx-ref:hover { text-decoration:underline; }
-.rx-ref[disabled] { color:var(--s-off-text); cursor:default; text-decoration:none; }
-/* DESIGN.md §3.10: 44px on a coarse pointer, the same floor the board's controls already meet. */
-@media (pointer:coarse) {
-  .rx-seg button, button.rx-act, .rx-ref { min-height:44px; }
-  /* two classes, so the funnel's own 28px row height does not outrank the touch floor */
-  button.rx-row, .rx-fun button.rx-row { min-height:44px; }
-}
+/* PORTED to the m-* vocabulary (docs/PORT-SPEC.md). What survives in this file is chart geometry
+   the vocabulary does not carry: the funnel bands, the velocity tracks with their SLA ticks, the
+   stacked product bars and the weekly movement columns. Everything the vocabulary DOES carry —
+   titles, meta lines, cards, chips, segmented controls, buttons, empty states, numbers and the
+   three kinds of absence — was deleted here and is drawn by massar-ds-crm.ts.
 
-/* KPI strip: one lead figure, the rest support it (DESIGN.md §5 Tile). */
-.rx-kpis { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr)); background:var(--paper);
-  border:1px solid var(--line); border-radius:var(--r-lg); }
-.rx-kpi { padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:2px; min-width:0; }
-.rx-kpi + .rx-kpi { border-inline-start:1px solid var(--line-soft); }
-.rx-kpi .l { font-size:var(--t-xs); color:var(--muted); font-weight:500; }
-.rx-kpi .n { font-size:var(--t-xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); font-variant-numeric:tabular-nums; }
-.rx-kpi.lead .n { font-size:var(--t-2xl); }
-.rx-kpi .n.none { color:var(--muted); font-weight:500; }
-.rx-kpi .s { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
-.rx-kpi.warn .n { color:var(--s-attn-text); }
+   MONEY. opMoney/opMoneyShort stay as the money formatter rather than being re-wrapped in .m-n:
+   they already emit a bdi element, which supplies the bidi isolation .m-n exists to give, and
+   forcing direction:ltr onto an Arabic currency phrase would move the unit to the wrong side.
+   They also carry the counted-noun rule for «ألف/آلاف/مليون/ملايين», which must not be
+   re-implemented per screen. The one property bdi lacks is tabular figures, stated once below.
+   Every other figure on this screen goes through .m-n. */
+.ds6 bdi { font-variant-numeric: lining-nums tabular-nums; }
 
-.rx-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s3); }
-.rx-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4);
-  display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
-.rx-card.wide { grid-column:1 / -1; }
-.rx-card h3 { margin:0; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.rx-card header p { margin:2px 0 0; font-size:var(--t-xs); color:var(--muted); }
-.rx-sig { display:flex; align-items:baseline; gap:var(--s2); flex-wrap:wrap; }
-.rx-sig b { font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); font-variant-numeric:tabular-nums; }
-.rx-sig b.none { color:var(--muted); font-weight:500; }
-.rx-sig span { font-size:var(--t-xs); color:var(--muted); }
-.rx-act { margin-top:auto; font-family:inherit; display:flex; align-items:flex-start; gap:var(--s2); text-align:start; width:100%;
-  font-size:var(--t-xs); line-height:var(--lh-body); color:var(--ink-2); background:var(--surface); border:none;
-  border-radius:var(--r-md); padding:var(--s2) var(--s3); }
-.rx-act .ox-ico { width:14px; height:14px; margin-top:2px; color:var(--accent-deep); }
-button.rx-act { cursor:pointer; transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
-button.rx-act:active { transform:scale(0.98); }
-@media (hover:hover) and (pointer:fine) { button.rx-act:hover { background:var(--accent-bar-hover); } }
-button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--accent-deep); font-weight:500; }
+.ds6 .rx { display:flex; flex-direction:column; gap:var(--m-4); container-type:inline-size; container-name:rxw; }
+.ds6 .rx-head { display:flex; align-items:flex-end; justify-content:space-between; gap:var(--m-4); flex-wrap:wrap; }
+.ds6 .rx-meta { display:flex; gap:var(--m-3); flex-wrap:wrap; align-items:center; margin-block-start:var(--m-1); }
+/* The refresh control is an m-btn; inside a meta line it must not impose the 44px control height
+   on the whole row, so only here it sits down to the text's own rhythm. */
+.ds6 .rx-meta .m-btn { min-block-size:32px; padding-block:3px; }
+@media (pointer:coarse) { .ds6 .rx-meta .m-btn { min-block-size:44px; } }
+
+/* KPI strip: one lead figure, the rest support it. The GRID is bespoke (a wide lead column plus
+   four equal ones); every cell's type is m-stat__k / m-stat__v / m-stat__s. */
+.ds6 .rx-kpis { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(4,minmax(0,1fr));
+  background:var(--m-paper); border:1px solid var(--m-line); border-radius:var(--m-r-card); }
+.ds6 .rx-kpi { padding-inline:var(--m-5); padding-block:var(--m-4); display:flex; flex-direction:column; gap:2px; min-inline-size:0; }
+.ds6 .rx-kpi + .rx-kpi { border-inline-start:1px solid var(--m-line); }
+.ds6 .rx-kpi.lead .m-stat__v { font-size:var(--m-t-display); line-height:var(--m-leading-figure); }
+.ds6 .rx-kpi.warn .m-stat__v { color:var(--m-warn); }
+
+.ds6 .rx-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--m-4); }
+.ds6 .rx-card { display:flex; flex-direction:column; gap:var(--m-4); min-inline-size:0; }
+.ds6 .rx-card.wide { grid-column:1 / -1; }
+.ds6 .rx-sig { display:flex; align-items:baseline; gap:var(--m-2); flex-wrap:wrap; }
+
+/* the next action: one sentence, and where it opens */
+.ds6 .rx-act { margin-block-start:auto; font:inherit; display:flex; align-items:flex-start; gap:var(--m-2);
+  text-align:start; inline-size:100%; font-size:var(--m-t-cap); line-height:var(--m-leading-meta);
+  color:var(--m-ink-2); background:var(--m-sunk); border:0; border-radius:var(--m-r-ctl);
+  padding-inline:var(--m-3); padding-block:var(--m-2); }
+.ds6 .rx-act .ox-ico { inline-size:14px; block-size:14px; margin-block-start:4px; color:var(--m-ac-deep); }
+.ds6 button.rx-act { cursor:pointer; transition:background var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+.ds6 button.rx-act:active { transform:scale(0.97); }
+@media (hover:hover) and (pointer:fine) { .ds6 button.rx-act:hover { background:var(--m-ac-dim); } }
+.ds6 button.rx-act .go { margin-inline-start:auto; flex:none; color:var(--m-ac-deep); font-weight:600; }
 
 /* shared row grammar: a label column, a track, a figure column, and the drill caret (BR-RPT-004 —
    reserved on every row so drillable and inert rows keep one alignment) */
-.rx-row { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px; align-items:center;
-  column-gap:var(--s2); min-height:30px; }
-.rx-open { width:14px; display:flex; align-items:center; justify-content:center; color:var(--accent-deep); }
-.rx-open svg { width:13px; height:13px; }
-button.rx-row { font-family:inherit; width:100%; text-align:start; background:none; border:0; border-radius:var(--r-sm);
+.ds6 .rx-row { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px;
+  align-items:center; column-gap:var(--m-2); min-block-size:30px; }
+.ds6 .rx-open { inline-size:14px; display:flex; align-items:center; justify-content:center; color:var(--m-ac-deep); }
+.ds6 .rx-open svg { inline-size:13px; block-size:13px; }
+.ds6 button.rx-row { font:inherit; inline-size:100%; text-align:start; background:none; border:0; border-radius:var(--m-r-ctl);
   padding:2px 6px; margin-inline:-6px; cursor:pointer; color:inherit;
-  transition:background var(--fast) var(--ease), transform 160ms var(--ease); }
-button.rx-row:active { transform:scale(0.98); }
+  transition:background var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+.ds6 button.rx-row:active { transform:scale(0.97); }
 /* the drill sentence, for a screen reader only: aria-label would REPLACE the row's own figures */
-.rx-say { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-@media (hover:hover) and (pointer:fine) { button.rx-row:hover { background:var(--accent-bar-hover); } }
-.rx-lab { font-size:var(--t-xs); color:var(--ink-2); display:flex; align-items:center; gap:6px; min-width:0; line-height:1.3; }
-.rx-lab .ox-dot { flex:none; }
-.rx-fig { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; text-align:end; white-space:nowrap; }
-.rx-fig b { color:var(--ink); font-weight:600; font-size:var(--t-sm); }
-.rx-track { position:relative; height:12px; background:var(--surface); border-radius:var(--r-pill); }
-.rx-track > i { position:absolute; inset-block:0; inset-inline-start:0; border-radius:var(--r-pill); background:var(--tn, var(--accent));
-  transform-origin:right center; animation:rxGrow 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-[dir="ltr"] .rx-track > i { transform-origin:left center; }
+.ds6 .rx-say { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@media (hover:hover) and (pointer:fine) { .ds6 button.rx-row:hover { background:var(--m-ac-dim); } }
+.ds6 .rx-lab { font-size:var(--m-t-cap); color:var(--m-ink-2); display:flex; align-items:center; gap:6px; min-inline-size:0; line-height:1.3; }
+.ds6 .rx-lab .ox-dot { flex:none; }
+.ds6 .rx-fig { font-size:var(--m-t-cap); color:var(--m-mut); text-align:end; white-space:nowrap; }
+.ds6 .rx-fig b { color:var(--m-ink); font-weight:600; }
+.ds6 .rx-track { position:relative; block-size:12px; background:var(--m-sunk); border-radius:var(--m-r-chip); }
+.ds6 .rx-track > i { position:absolute; inset-block:0; inset-inline-start:0; border-radius:var(--m-r-chip);
+  background:var(--tn, var(--m-ac)); transform-origin:right center; animation:rxGrow var(--m-in) var(--m-ease) both; }
+[dir="ltr"] .ds6 .rx-track > i { transform-origin:left center; }
 @keyframes rxGrow { from { transform:scaleX(0.6); opacity:0; } to { transform:scaleX(1); opacity:1; } }
-@media (prefers-reduced-motion: reduce) { .rx-track > i, .rx-fun i, .rx-wk i { animation:none; } }
+@media (prefers-reduced-motion: reduce) { .ds6 .rx-track > i, .ds6 .rx-fun i, .ds6 .rx-wk i { animation:none; } }
 
-/* funnel: each band centred, so the narrowing between two bands IS the drop (DESIGN.md §6 rule 2) */
-.rx-fun { display:flex; flex-direction:column; }
-.rx-fun .rx-row { min-height:28px; }
-.rx-fun .band { height:20px; display:flex; justify-content:center; }
-.rx-fun i { display:block; height:100%; min-width:3px; border-radius:var(--r-sm); background:var(--tn); animation:rxGrow 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-.rx-conv { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px; column-gap:var(--s2); }
-.rx-conv span { grid-column:2; justify-self:center; font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; line-height:18px; }
-.rx-conv.weak span { color:var(--s-attn-text); background:var(--s-attn-soft); border-radius:var(--r-pill); padding:0 8px; font-weight:500; }
+/* funnel: each band centred, so the narrowing between two bands IS the drop */
+.ds6 .rx-fun { display:flex; flex-direction:column; }
+.ds6 .rx-fun .rx-row { min-block-size:28px; }
+.ds6 .rx-fun .band { block-size:20px; display:flex; justify-content:center; }
+.ds6 .rx-fun i { display:block; block-size:100%; min-inline-size:3px; border-radius:5px; background:var(--tn);
+  animation:rxGrow var(--m-in) var(--m-ease) both; }
+.ds6 .rx-conv { display:grid; grid-template-columns:minmax(96px,132px) minmax(0,1fr) minmax(88px,auto) 14px; column-gap:var(--m-2); }
+.ds6 .rx-conv span { grid-column:2; justify-self:center; font-size:var(--m-t-cap); color:var(--m-mut); line-height:18px; }
+.ds6 .rx-conv.weak span { color:var(--m-warn); background:var(--m-warn-dim); border-radius:var(--m-r-chip);
+  padding-inline:8px; font-weight:600; }
 
 /* velocity: bar = the oldest deal on the rung now; the tick = the rung's SLA */
-.rx-sla { position:absolute; inset-block:-4px; width:2px; background:var(--ink-2); border-radius:var(--r-pill); }
-.rx-over { color:var(--s-attn-text); font-weight:600; }
+.ds6 .rx-sla { position:absolute; inset-block:-4px; inline-size:2px; background:var(--m-ink-2); border-radius:var(--m-r-chip); }
+.ds6 .rx-over { color:var(--m-warn); font-weight:600; }
 
 /* products: one stacked bar per product, segments in stage tones */
-.rx-stack { display:flex; gap:2px; height:12px; border-radius:var(--r-pill); overflow:hidden; background:var(--surface); }
-.rx-stack i { display:block; height:100%; min-width:4px; }
-.rx-legend { display:flex; flex-wrap:wrap; gap:4px var(--s3); font-size:var(--t-xs); color:var(--ink-2); }
-.rx-legend span { display:inline-flex; align-items:center; gap:5px; }
-/* two classes: a product row is a <button> now, and button.rx-row must not outrank its separator */
-.rx-row.rx-prow { grid-template-columns:minmax(120px,1.1fr) minmax(0,1.6fr) minmax(120px,auto) 14px; padding-block:6px; border-top:1px solid var(--line-soft); }
-.rx-row.rx-prow:first-of-type { border-top:none; }
-.rx-pn { display:flex; flex-direction:column; min-width:0; }
-.rx-pn b { font-size:var(--t-sm); font-weight:600; color:var(--ink); line-height:1.35; overflow-wrap:anywhere; }
-.rx-pn span { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
+.ds6 .rx-stack { display:flex; gap:2px; block-size:12px; border-radius:var(--m-r-chip); overflow:hidden; background:var(--m-sunk); }
+.ds6 .rx-stack i { display:block; block-size:100%; min-inline-size:4px; }
+.ds6 .rx-legend { display:flex; flex-wrap:wrap; gap:4px var(--m-4); font-size:var(--m-t-cap); color:var(--m-ink-2); }
+.ds6 .rx-legend span { display:inline-flex; align-items:center; gap:5px; }
+/* two classes: a product row is a button now, and button.rx-row must not outrank its separator */
+.ds6 .rx-row.rx-prow { grid-template-columns:minmax(120px,1.1fr) minmax(0,1.6fr) minmax(120px,auto) 14px;
+  padding-block:6px; border-block-start:1px solid var(--m-line); }
+.ds6 .rx-row.rx-prow:first-of-type { border-block-start:none; }
+.ds6 .rx-pn { display:flex; flex-direction:column; min-inline-size:0; }
+.ds6 .rx-pn b { font-size:var(--m-t-body); font-weight:600; color:var(--m-ink); line-height:1.35; overflow-wrap:anywhere; }
+.ds6 .rx-pn span { font-size:var(--m-t-cap); color:var(--m-mut); }
 
 /* sources: the track is every line, the fill is the share that moved past first contact */
-.rx-src .rx-track { background:var(--accent-tint); }
-.rx-src .rx-track > i { background:var(--accent); }
+.ds6 .rx-src .rx-track { background:var(--m-ac-dim); }
+.ds6 .rx-src .rx-track > i { background:var(--m-ac); }
 
 /* movement: weekly columns, stacked by kind; time runs right to left like the language */
-.rx-wks { display:flex; align-items:flex-end; gap:var(--s2); height:132px; padding-top:var(--s2); }
-.rx-wk { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; height:100%; }
-.rx-wk .col { flex:1; width:100%; max-width:44px; display:flex; flex-direction:column-reverse; gap:2px; justify-content:flex-start; }
-.rx-wk i { display:block; width:100%; border-radius:3px; min-height:3px; transform-origin:bottom center; animation:rxRise 420ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.ds6 .rx-wks { display:flex; align-items:flex-end; gap:var(--m-2); block-size:132px; padding-block-start:var(--m-2); }
+.ds6 .rx-wk { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-inline-size:0; block-size:100%; }
+.ds6 .rx-wk .col { flex:1; inline-size:100%; max-inline-size:44px; display:flex; flex-direction:column-reverse; gap:2px; justify-content:flex-start; }
+.ds6 .rx-wk i { display:block; inline-size:100%; border-radius:3px; min-block-size:3px; transform-origin:bottom center;
+  animation:rxRise var(--m-in) var(--m-ease) both; }
 @keyframes rxRise { from { transform:scaleY(0.4); opacity:0; } to { transform:scaleY(1); opacity:1; } }
-.rx-wk .d { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.rx-wk .t { font-size:var(--t-xs); color:var(--ink-2); font-weight:600; font-variant-numeric:tabular-nums; min-height:16px; }
-.rx-kinds { display:flex; flex-wrap:wrap; gap:var(--s1) var(--s2); }
-.rx-kind { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); color:var(--ink-2); background:var(--surface);
-  border-radius:var(--r-pill); padding:0 10px 0 8px; line-height:26px; }
-.rx-kind b { font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
-.rx-kind.zero, .rx-kind.zero b { color:var(--muted); font-weight:450; }
+.ds6 .rx-wk .d { font-size:var(--m-t-micro); color:var(--m-mut); white-space:nowrap; }
+.ds6 .rx-wk .t { font-size:var(--m-t-micro); color:var(--m-ink-2); font-weight:600; min-block-size:16px; }
+.ds6 .rx-kinds { display:flex; flex-wrap:wrap; gap:var(--m-1) var(--m-2); }
+/* a kind with no events this period stays legible but recedes; it is a real zero, not an absence */
+.ds6 .rx-kind.zero { opacity:.62; }
 
-.rx-basis { font-size:var(--t-xs); color:var(--muted); line-height:var(--lh-body); padding-inline-start:9px;
-  border-inline-start:2px solid var(--line); max-width:80ch; }
-.rx-state { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s4); background:var(--paper);
-  border:1px solid var(--line); border-radius:var(--r-lg); font-size:var(--t-sm); color:var(--ink-2); }
+/* the accounting basis, quoted rather than asserted */
+.ds6 .rx-basis { padding-inline-start:9px; border-inline-start:2px solid var(--m-line-2); max-inline-size:80ch; }
 
 @container rxw (max-width: 900px) {
-  .rx-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .rx-kpi.lead { grid-column:1 / -1; }
-  .rx-kpi + .rx-kpi { border-inline-start:none; }
-  .rx-kpi:nth-child(n+2) { border-top:1px solid var(--line-soft); }
-  .rx-kpi:nth-child(odd):not(.lead) { border-inline-start:1px solid var(--line-soft); }
-  .rx-grid { grid-template-columns:minmax(0,1fr); }
+  .ds6 .rx-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .ds6 .rx-kpi.lead { grid-column:1 / -1; }
+  .ds6 .rx-kpi + .rx-kpi { border-inline-start:none; }
+  .ds6 .rx-kpi:nth-child(n+2) { border-block-start:1px solid var(--m-line); }
+  .ds6 .rx-kpi:nth-child(odd):not(.lead) { border-inline-start:1px solid var(--m-line); }
+  .ds6 .rx-grid { grid-template-columns:minmax(0,1fr); }
 }
 @container rxw (max-width: 520px) {
-  .rx-card { padding:var(--s3); }
-  .rx-row, .rx-conv { grid-template-columns:minmax(84px,104px) minmax(0,1fr) auto 14px; }
-  .rx-row.rx-prow { grid-template-columns:minmax(0,1fr) auto 14px; row-gap:6px; }
-  .rx-prow .rx-stack { grid-column:1 / -1; grid-row:2; }
-  .rx-kpi { padding:var(--s2) var(--s3); }
+  .ds6 .rx-card { padding-inline:var(--m-4); padding-block:var(--m-4); }
+  .ds6 .rx-row, .ds6 .rx-conv { grid-template-columns:minmax(84px,104px) minmax(0,1fr) auto 14px; }
+  .ds6 .rx-row.rx-prow { grid-template-columns:minmax(0,1fr) auto 14px; row-gap:6px; }
+  .ds6 .rx-prow .rx-stack { grid-column:1 / -1; grid-row:2; }
+  .ds6 .rx-kpi { padding-inline:var(--m-3); padding-block:var(--m-2); }
+}
+/* 44px on a coarse pointer, the floor every other control in the system already meets. */
+@media (pointer:coarse) {
+  .ds6 button.rx-act { min-block-size:44px; }
+  .ds6 button.rx-row, .ds6 .rx-fun button.rx-row { min-block-size:44px; }
 }
 `;
 
@@ -219,7 +222,38 @@ function rxRow(cls, inner, drill, label, style) {
     '<span class="rx-say">' + esc(label) + "</span></button>";
 }
 
-function rxPct(p) { return p === null || p === undefined ? "—" : fmtN(p) + "٪"; }
+/* ---- the vocabulary helpers (docs/PORT-SPEC.md §3, §4, §6) ----
+   Declared here and used by the other ported screens too: every *-crm payload is concatenated into
+   ONE classic script, so a function declaration in this module hoists across all of them. One
+   definition means one behaviour, which is the whole point of a vocabulary. */
+function mN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+/* kind: "owed" a number someone owes, "unset" a classification nobody made, "none" a legitimate
+   nothing. Drawing all three the same is how a page of dashes teaches the reader to stop seeing
+   dashes — PORT-SPEC §4, and never a bare em-dash. */
+function mNil(t, kind) {
+  return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>";
+}
+/* The percent sign belongs INSIDE the span: outside it, bidi lands it to the left of the digits. */
+function mPct(p) { return '<span class="m-n">' + fmtN(p) + "٪</span>"; }
+/* Money as a FULL amount: digits inside .m-n, the currency word outside it — the shape the
+   reference screen prints (home-ds-crm.ts). opMoney/opMoneyShort stay in use where a cell is too
+   narrow for the whole figure; they carry their own bdi and their own counted nouns. */
+function mMoney(v) { return '<span class="m-n">' + fmtN(Math.round(Number(v) || 0)) + "</span> ر.س"; }
+
+/* Arabic counts are four-way and .m-n is mandatory, and the two rules meet here. pluralizeArabic
+   spells the count as a WORD for one and two («بند واحد», «بندان») — there are no digits to
+   isolate — and prefixes the formatted number for everything else. So the digits are wrapped by
+   splitting the phrase the domain rule already produced, never by re-implementing it. */
+function mPlOf(n, phrase) {
+  var i = phrase.indexOf(" ");
+  if (Number(n) === 1 || Number(n) === 2 || i < 0) return phrase;
+  return '<span class="m-n">' + phrase.slice(0, i) + "</span>" + phrase.slice(i);
+}
+function mPl(n, one, two, few, many) { return mPlOf(n, opPl(n, one, two, few, many)); }
+
+/* A rate with no denominator is UNMEASURED, not zero and not missing data. It is a legitimate
+   nothing, so it takes the quiet treatment rather than the owed one. */
+function rxPct(p) { return p === null || p === undefined ? mNil("لم يُقَس", "none") : mPct(p); }
 function rxLabel(key) {
   var s = (rxData && rxData.stages || []).filter(function (x) { return x.key === key; })[0];
   return s ? s.label : (typeof opStage === "function" ? opStage(key).label : key);
@@ -238,8 +272,9 @@ function rxColor(key) { return rxToneObj(key).solid; }
 function rxDotFor(key) { return '<i class="ox-dot" style="background:' + rxColor(key) + '"></i>'; }
 
 function rxCard(id, title, question, signal, body, action, wide) {
-  var h = '<section class="rx-card' + (wide ? " wide" : "") + '" aria-labelledby="rx_' + id + '">' +
-    '<header><h3 id="rx_' + id + '">' + title + "</h3><p>" + question + "</p></header>";
+  var h = '<section class="m-card rx-card' + (wide ? " wide" : "") + '" aria-labelledby="rx_' + id + '">' +
+    '<header><h3 class="m-card__t" id="rx_' + id + '">' + title + "</h3>" +
+    '<p class="m-meta">' + question + "</p></header>";
   if (signal) h += '<div class="rx-sig">' + signal + "</div>";
   h += body;
   if (action) {
@@ -248,7 +283,7 @@ function rxCard(id, title, question, signal, body, action, wide) {
       rxActions.push(action);
       /* A drill that carries ids may be capped; the button says so rather than opening «كل الراكد»
          and showing three hundred of a thousand. */
-      var go = action.idsMore ? "افتح أول " + fmtN((action.ids || []).length) : "افتح هذه البنود";
+      var go = action.idsMore ? "افتح أول " + mN((action.ids || []).length) : "افتح هذه البنود";
       h += '<button class="rx-act" onclick="rxGo(' + (rxActions.length - 1) + ')">' + opIco("warn") + "<span>" + esc(action.text) + '</span><span class="go">' + go + '</span></button>';
     } else {
       h += '<div class="rx-act">' + opIco("check") + "<span>" + esc(action.text) + "</span></div>";
@@ -257,73 +292,101 @@ function rxCard(id, title, question, signal, body, action, wide) {
   return h + "</section>";
 }
 
+/* One signal per card: the figure, then the sentence that says what it is measured on. */
+function rxSig(fig, words) {
+  return '<b class="m-stat__v">' + fig + '</b><span class="m-meta">' + words + "</span>";
+}
+
+/* Counts this screen prints in TWO places are bound to the rows they are summed from, so the KPI
+   strip and the card below it cannot drift apart (PORT-SPEC §6). headline.openLines and
+   headline.unpricedOpen are themselves reductions over products.rows in pipeline-report-domain, so
+   the derivation reads the same array both print sites do. */
+function rxBind() {
+  dsD("rxOpenLines", function () {
+    return (rxData.report.products.rows || []).reduce(function (n, r) { return n + r.openLines; }, 0);
+  });
+  dsD("rxUnpriced", function () {
+    return (rxData.report.products.rows || []).reduce(function (n, r) { return n + r.unpricedOpen; }, 0);
+  });
+  dsD("rxOverSla", function () { return rxData.report.velocity.overSla; });
+}
+
 function vReportsExec() {
   rxLoad(false);
   if (rxFailed && !rxData) {
-    return '<div class="rx"><div class="rx-state" role="alert">' + opIco("warn") + "تعذّر تحميل التقارير التنفيذية." +
-      '<button class="btn btn-ghost" onclick="rxRetry()">أعد المحاولة</button></div></div>';
+    return '<div class="rx"><div class="m-alert" role="alert">' + opIco("warn") +
+      '<span class="m-alert__d">تعذّر تحميل التقارير التنفيذية.</span>' +
+      '<button class="m-btn" onclick="rxRetry()">أعد المحاولة</button></div></div>';
   }
   if (!rxData) return '<div class="rx" aria-busy="true">' + moSkeleton(3, ["w40", "w80", "w60"]) + "</div>";
   var r = rxData.report;
   rxActions = [];
+  rxBind();
   var h = '<div class="rx">';
-  h += '<div class="rx-head"><div><div class="rx-q">أين يتسرّب الأنبوب، وما الذي يتحرك؟</div>' +
-    '<div class="rx-meta"><span>محسوب من ' + opNLine(r.lines) + " وسجل انتقالات المراحل</span>" +
-    (rxFailed ? '<span class="rx-small" role="alert">' + opIco("warn") + "تعذّر التحديث — المعروض من آخر قراءة ناجحة</span>" : "") +
+  h += '<div class="rx-head"><div><h2 class="m-h2">أين يتسرّب الأنبوب، وما الذي يتحرك؟</h2>' +
+    '<div class="rx-meta m-meta"><span>محسوب من ' + mPlOf(r.lines, opNLine(r.lines)) + " وسجل انتقالات المراحل</span>" +
+    (rxFailed ? '<span class="m-chip m-chip--warn" role="alert">تعذّر التحديث — المعروض من آخر قراءة ناجحة</span>' : "") +
     '<span>' + (rxLoading ? "جارٍ التحديث…" : "حُدِّث " + new Date(r.generatedAt).toLocaleTimeString("ar-SA-u-nu-latn", { hour: "2-digit", minute: "2-digit" })) + "</span>" +
-    '<button class="rx-ref" onclick="rxRefresh()"' + (rxLoading ? " disabled" : "") + ">تحديث</button>" +
-    (r.smallSample && r.lines ? '<span class="rx-small">' + opIco("warn") + "عيّنة صغيرة — كل نسبة معروضة مع عدد ما قيست عليه</span>" : "") + "</div></div>" +
-    '<div class="rx-seg" role="group" aria-label="مدة الحركة">' +
+    '<button class="m-btn m-btn--quiet" onclick="rxRefresh()"' + (rxLoading ? " disabled" : "") + ">تحديث</button>" +
+    (r.smallSample && r.lines ? '<span class="m-chip m-chip--warn">عيّنة صغيرة — كل نسبة معروضة مع عدد ما قيست عليه</span>' : "") + "</div></div>" +
+    '<div class="m-seg" role="group" aria-label="مدة الحركة">' +
       [30, 90].map(function (d) {
-        return '<button class="' + (rxDays === d ? "on" : "") + '" aria-pressed="' + (rxDays === d) + '" onclick="rxSetDays(' + d + ')">آخر ' + fmtN(d) + " يومًا</button>";
+        return '<button type="button" aria-pressed="' + (rxDays === d) + '" onclick="rxSetDays(' + d + ')">آخر ' + mN(d) + " يومًا</button>";
       }).join("") + "</div></div>";
 
   if (!r.lines) {
-    return h + shEmpty("chart", "لا فرص بعد", "تظهر التقارير التنفيذية حين تُسجَّل أول فرصة في «فرص البيع».") + "</div>";
+    return h + '<div class="m-card m-empty"><p class="m-empty__t">لا فرص بعد</p>' +
+      '<p class="m-empty__d">تظهر التقارير التنفيذية حين تُسجَّل أول فرصة في «فرص البيع».</p></div></div>';
   }
 
   var hd = r.headline;
   var kpi = function (cls, label, value, sub) {
-    return '<div class="rx-kpi ' + cls + '"><span class="l">' + label + "</span>" + value + (sub ? '<span class="s">' + sub + "</span>" : "") + "</div>";
+    return '<div class="rx-kpi ' + cls + '"><span class="m-stat__k">' + label + "</span>" +
+      '<span class="m-stat__v">' + value + "</span>" +
+      (sub ? '<span class="m-stat__s">' + sub + "</span>" : "") + "</div>";
   };
   h += '<div class="rx-kpis">' +
-    kpi("lead", "القيمة المفتوحة", hd.pricedOpen ? '<span class="n">' + opMoney(hd.openValue) + "</span>" : '<span class="n none">—</span>',
+    kpi("lead", "القيمة المفتوحة", hd.pricedOpen ? opMoney(hd.openValue) : mNil("لا بند مسعّر مفتوح", "none"),
+      /* «مرجّحة بوزن المرحلة» — a weighting the ladder stores, never a probability of winning. */
       (hd.weightedValue ? "المرجّحة بأوزان المراحل " + opMoneyShort(hd.weightedValue) : "لا قيمة مرجّحة") +
-      (hd.unpricedOpen ? "، و" + opNLine(hd.unpricedOpen) + " بلا تسعير" : "")) +
-    kpi("", "بنود مفتوحة", '<span class="n">' + fmtN(hd.openLines) + "</span>", "") +
-    kpi("", "نسبة الفوز", '<span class="n' + (hd.winRatePct === null ? " none" : "") + '">' + rxPct(hd.winRatePct) + "</span>",
+      (hd.unpricedOpen ? "، و" + dsFig("rxUnpriced", hd.unpricedOpen) + " بلا تسعير" : "")) +
+    kpi("", "بنود مفتوحة", dsFig("rxOpenLines", hd.openLines), "") +
+    kpi("", "نسبة الفوز", rxPct(hd.winRatePct),
       hd.wonCount + hd.lostCount
-        ? fmtN(hd.wonCount) + " ربح من " + fmtN(hd.wonCount + hd.lostCount) + " محسومة" + (hd.winRateSmall ? " — عيّنة صغيرة" : "")
+        ? mN(hd.wonCount) + " ربح من " + mN(hd.wonCount + hd.lostCount) + " محسومة" + (hd.winRateSmall ? " — عيّنة صغيرة" : "")
         : "لم تُحسم صفقة بعد") +
-    kpi("", "دورة البيع (الوسيط)", hd.medianCycleDays === null ? '<span class="n none">—</span>' : '<span class="n">' + opNDay(hd.medianCycleDays) + "</span>",
-      hd.medianCycleDays === null ? "تُقاس على الصفقات الرابحة" : "من فتح الفرصة إلى الربح، على " + opPl(hd.cycleBasis, "صفقة واحدة", "صفقتين", "صفقات", "صفقة")) +
+    kpi("", "دورة البيع (الوسيط)",
+      hd.medianCycleDays === null ? mNil("لم تُقَس", "none") : mPlOf(hd.medianCycleDays, opNDay(hd.medianCycleDays)),
+      hd.medianCycleDays === null ? "تُقاس على الصفقات الرابحة" : "من فتح الفرصة إلى الربح، على " + mPl(hd.cycleBasis, "صفقة واحدة", "صفقتين", "صفقات", "صفقة")) +
     /* pipeline_stages.sla_days is nullable and only two keys were ever backfilled, so a stage
        with no deadline scored 0 and summed into the headline. A flat «0» then read as "nothing
        is late" when most rungs cannot be judged at all. No stage with a deadline means no
        verdict, and a partial ladder says what it covered. */
     kpi(r.velocity.slaStages && r.velocity.overSla ? "warn" : "", "متأخرة عن المهلة",
       r.velocity.slaStages
-        ? '<span class="n">' + fmtN(r.velocity.overSla) + "</span>"
-        : '<span class="n none">—</span>',
+        ? dsFig("rxOverSla", r.velocity.overSla)
+        : mNil("لا مهلة مسجّلة", "unset"),
       r.velocity.slaStages
         ? (r.velocity.slaStages < r.velocity.openStages
-            ? "على " + fmtN(r.velocity.slaStages) + " من " + fmtN(r.velocity.openStages) + " مرحلة لها مهلة مسجّلة"
+            ? "على " + mN(r.velocity.slaStages) + " من " + mN(r.velocity.openStages) + " مرحلة لها مهلة مسجّلة"
             : (r.movement.quietOpen
-                ? opNLine(r.movement.quietOpen) + " بلا حركة " + fmtN(r.movement.days) + " يومًا"
+                ? mPlOf(r.movement.quietOpen, opNLine(r.movement.quietOpen)) + " بلا حركة " + mN(r.movement.days) + " يومًا"
                 : "كل البنود تحركت"))
         : "لا مهلة مسجّلة على أي مرحلة مفتوحة") +
     "</div>";
 
   h += '<div class="rx-grid">' + rxFunnel(r.funnel) + rxVelocity(r.velocity) + rxProducts(r.products) + rxSources(r.sources) + rxMovement(r.movement) + "</div>";
-  if (rxData.valueBasis) h += '<div class="rx-basis"><b>' + esc(rxData.valueBasis.label) + "</b> — " + esc(rxData.valueBasis.note) + "</div>";
+  if (rxData.valueBasis) {
+    h += '<p class="rx-basis m-meta"><b>' + esc(rxData.valueBasis.label) + "</b> — " + esc(rxData.valueBasis.note) + "</p>";
+  }
   return h + "</div>";
 }
 
 /* The chip between two bands says how many LEFT the rung and how many of them moved on — a rate with
    its own denominator, because «100٪» of one deal and of forty are different findings. */
 function rxConv(st) {
-  if (st.conversionPct === null) return "لم يُحسم بعد";
-  return "انتقل " + rxPct(st.conversionPct) + " · " + fmtN(st.moved) + " من " + fmtN(st.decided);
+  if (st.conversionPct === null) return mNil("لم يُحسم بعد", "none");
+  return "انتقل " + rxPct(st.conversionPct) + " · " + mN(st.moved) + " من " + mN(st.decided);
 }
 function rxFunnel(f) {
   var top = Math.max(1, f.steps.length ? f.steps[0].reached : 0, f.won);
@@ -336,7 +399,7 @@ function rxFunnel(f) {
     }
     body += rxRow("", '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
       '<span class="band"><i style="width:' + Math.round((s.reached / top) * 100) + '%"></i></span>' +
-      '<span class="rx-fig"><b>' + fmtN(s.reached) + "</b> وصلت · " + fmtN(s.now) + " الآن</span>",
+      '<span class="rx-fig"><b>' + mN(s.reached) + "</b> وصلت · " + mN(s.now) + " الآن</span>",
       s.now ? { text: "", stage: s.key } : null,
       "افتح بنود «" + s.label + "» في «فرص البيع» — " + fmtN(s.now) + " الآن", rxTone(s.key));
   });
@@ -345,19 +408,23 @@ function rxFunnel(f) {
   var wonKey = f.wonKey || "won";
   body += rxRow("", '<span class="rx-lab">' + rxDotFor(wonKey) + esc(rxLabel(wonKey)) + "</span>" +
     '<span class="band"><i style="width:' + Math.round((f.won / top) * 100) + '%"></i></span>' +
-    '<span class="rx-fig"><b>' + fmtN(f.won) + "</b> ربح · " + fmtN(f.lost) + " خسارة</span>",
+    '<span class="rx-fig"><b>' + mN(f.won) + "</b> ربح · " + mN(f.lost) + " خسارة</span>",
     f.won ? { text: "", stage: wonKey } : null,
     "افتح الصفقات الرابحة — " + fmtN(f.won), rxTone(wonKey));
   body += "</div>";
+  /* The 100٪ branch CARRIES ITS DENOMINATOR: «100٪ of one decided deal» and «100٪ of forty» are
+     different findings, and a bare 100٪ is the one that gets quoted in a meeting. */
   var sig = f.weakest
-    ? "<b>" + rxPct(f.weakest.conversionPct) + "</b><span>أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " + fmtN(f.weakest.moved) + " من " + fmtN(f.weakest.decided) +
-      (f.lostUnplaced ? "، و" + fmtN(f.lostUnplaced) + " خسارة بلا مرحلة معروفة" : "") + "</span>"
+    ? rxSig(rxPct(f.weakest.conversionPct),
+        "أضعف انتقال: «" + esc(rxLabel(f.weakest.from)) + "» ← «" + esc(rxLabel(f.weakest.to)) + "»، " +
+        mN(f.weakest.moved) + " من " + mN(f.weakest.decided) +
+        (f.lostUnplaced ? "، و" + mN(f.lostUnplaced) + " خسارة بلا مرحلة معروفة" : ""))
     : f.lostUnplaced
-      ? "<b>" + fmtN(f.lostUnplaced) + "</b><span>خسارة بلا مرحلة معروفة، فلا يمكن تحديد موضع تسرّبها</span>"
+      ? rxSig(mN(f.lostUnplaced), "خسارة بلا مرحلة معروفة، فلا يمكن تحديد موضع تسرّبها")
     : f.measured
-      ? "<b>" + rxPct(100) + "</b><span>لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية، على " +
-        opPl(f.decidedTotal, "فرصة واحدة محسومة", "فرصتين محسومتين", "فرص محسومة", "فرصة محسومة") + "</span>"
-      : '<b class="none">—</b><span>لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها</span>';
+      ? rxSig(mPct(100), "لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية، على " +
+          mPl(f.decidedTotal, "فرصة واحدة محسومة", "فرصتين محسومتين", "فرص محسومة", "فرصة محسومة"))
+      : rxSig(mNil("لم يُقَس", "none"), "لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها");
   return rxCard("fun", "قمع المراحل", "كم فرصة وصلت كل مرحلة، وكم ممن غادرها انتقل إلى التالية؟ الفرصة الباقية في مرحلتها لا تُحسب تسرّبًا.", sig, body, f.action, false);
 }
 
@@ -368,10 +435,12 @@ function rxVelocity(v) {
   v.steps.forEach(function (s) {
     var fig;
     if (s.openCount) {
-      fig = "<b>" + fmtN(s.maxOpenDays) + "</b> الأقدم · " + fmtN(s.medianOpenDays) + " الوسيط" +
-        (s.overSla ? ' · <span class="rx-over">' + fmtN(s.overSla) + " متأخرة</span>" : "");
+      fig = "<b>" + mN(s.maxOpenDays) + "</b> الأقدم · " + mN(s.medianOpenDays) + " الوسيط" +
+        (s.overSla ? ' · <span class="rx-over">' + mN(s.overSla) + " متأخرة</span>" : "");
     } else {
-      fig = s.medianDoneDays === null ? "لا بنود الآن" : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : opPl(s.medianDoneDays, "يومًا واحدًا", "يومين", "أيام", "يومًا"));
+      fig = s.medianDoneDays === null
+        ? mNil("لا بنود الآن", "none")
+        : "كانت تستغرق " + (s.medianDoneDays < 1 ? "أقل من يوم" : mPl(s.medianDoneDays, "يومًا واحدًا", "يومين", "أيام", "يومًا"));
     }
     body += rxRow("", '<span class="rx-lab">' + rxDotFor(s.key) + esc(s.label) + "</span>" +
       '<span class="rx-track">' + (s.openCount ? '<i style="width:' + Math.max(2, Math.round(((s.maxOpenDays || 0) / scale) * 100)) + '%"></i>' : "") +
@@ -380,11 +449,16 @@ function rxVelocity(v) {
       s.openCount ? { text: "", stage: s.key } : null,
       "افتح بنود «" + s.label + "» المفتوحة — " + fmtN(s.openCount), rxTone(s.key));
   });
-  body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--ink-2);width:2px;height:12px;border-radius:0"></i>مهلة المرحلة</span><span>الأرقام بالأيام · الشريط = أقدم بند في المرحلة الآن</span></div>';
+  body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--m-ink-2);inline-size:2px;block-size:12px;border-radius:0"></i>مهلة المرحلة</span><span>الأرقام بالأيام · الشريط = أقدم بند في المرحلة الآن</span></div>';
   var bn = v.steps.filter(function (s) { return s.key === v.bottleneck; })[0];
+  /* «متأخرة عن المهلة» reads «—» when no open stage carries an SLA: a flat zero would say nothing
+     is late on a ladder where lateness cannot be judged at all. The KPI strip above states the
+     same fact from the same field, and dsD binds the two so they cannot drift. */
   var sig = v.overSla
-    ? "<b>" + fmtN(v.overSla) + "</b><span>متأخرة عن مهلة مرحلتها — الأكثر في «" + esc(bn ? bn.label : "") + "»</span>"
-    : bn ? "<b>" + opNDay(bn.maxOpenDays || 0) + "</b><span>أطول بقاء الآن — «" + esc(bn.label) + "»</span>" : '<b class="none">—</b><span>لا بنود مفتوحة</span>';
+    ? rxSig(dsFig("rxOverSla", v.overSla), "متأخرة عن مهلة مرحلتها — الأكثر في «" + esc(bn ? bn.label : "") + "»")
+    : bn
+      ? rxSig(mPlOf(bn.maxOpenDays || 0, opNDay(bn.maxOpenDays || 0)), "أطول بقاء الآن — «" + esc(bn.label) + "»")
+      : rxSig(mNil("لا بنود مفتوحة", "none"), "لا مرحلة تحمل بندًا مفتوحًا الآن");
   return rxCard("vel", "زمن المراحل", "كم تبقى الفرصة في كل مرحلة، ومن تجاوز المهلة؟", sig, body, v.action, false);
 }
 
@@ -397,11 +471,13 @@ function rxProducts(p) {
   var body = legend + "<div>";
   p.rows.forEach(function (r) {
     var said = r.byStage.map(function (x) { return rxLabel(x.key) + " " + fmtN(x.n); }).join("، ");
-    body += rxRow("rx-prow", '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + opNLine(r.lines) + " · فوز " + rxPct(r.winRatePct) + (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span></span>" +
+    body += rxRow("rx-prow", '<span class="rx-pn"><b>' + esc(r.product) + "</b><span>" + mPlOf(r.lines, opNLine(r.lines)) + " · فوز " + rxPct(r.winRatePct) + (r.wonCount + r.lostCount ? " (" + mN(r.wonCount) + " من " + mN(r.wonCount + r.lostCount) + ")" : "") + "</span></span>" +
       '<span class="rx-stack" role="img" aria-label="' + esc(said) + '">' + r.byStage.map(function (x) {
         return '<i style="flex:' + x.n + ' 1 0;background:' + rxColor(x.key) + '" title="' + esc(rxLabel(x.key)) + " " + fmtN(x.n) + '"></i>';
       }).join("") + "</span>" +
-      '<span class="rx-fig">' + (r.openLines - r.unpricedOpen > 0 ? "<b>" + opMoneyShort(r.openValue) + "</b> مفتوحة" : r.openLines ? "بلا تسعير" : "لا مفتوح") +
+      '<span class="rx-fig">' + (r.openLines - r.unpricedOpen > 0
+          ? "<b>" + opMoneyShort(r.openValue) + "</b> مفتوحة"
+          : r.openLines ? mNil("لم يُسعَّر", "owed") : mNil("لا بنود مفتوحة", "none")) +
         (r.wonValue ? "<br>" + opMoneyShort(r.wonValue) + " ربح" : "") + "</span>",
       { text: "", stage: null, product: r.product },
       "افتح بنود «" + r.product + "» — " + fmtN(r.lines));
@@ -410,12 +486,15 @@ function rxProducts(p) {
   var top = p.rows[0];
   var openN = 0, unpN = 0;
   p.rows.forEach(function (r) { openN += r.openLines; unpN += r.unpricedOpen; });
-  /* When most open lines have no price, a value share is mostly silence: lead with the gap instead. */
+  /* When most open lines have no price, a value share is mostly silence: lead with the gap instead.
+     Both counts are printed in the KPI strip too, so both go through dsFig. */
   var sig = openN && unpN * 2 >= openN
-    ? "<b>" + fmtN(unpN) + "</b><span>بلا سعر من أصل " + opPl(openN, "بند واحد مفتوح", "بندين مفتوحين", "بنود مفتوحة", "بندًا مفتوحًا") + " — حصص القيمة أدناه لا تشملها</span>"
+    ? rxSig(dsFig("rxUnpriced", unpN),
+        "بلا سعر من أصل " + mPl(openN, "بند واحد مفتوح", "بندين مفتوحين", "بنود مفتوحة", "بندًا مفتوحًا") +
+        " — حصص القيمة أدناه لا تشملها")
     : top && p.topSharePct !== null
-    ? "<b>" + rxPct(p.topSharePct) + "</b><span>من القيمة المفتوحة في «" + esc(top.product) + "»</span>"
-    : "<b>" + fmtN(p.rows.length) + "</b><span>" + (p.rows.length === 1 ? "منتج في الأنبوب" : "منتجات في الأنبوب، ولا قيمة مسعَّرة بعد") + "</span>";
+    ? rxSig(rxPct(p.topSharePct), "من القيمة المفتوحة في «" + esc(top.product) + "»")
+    : rxSig(mN(p.rows.length), p.rows.length === 1 ? "منتج في الأنبوب" : "منتجات في الأنبوب، ولا قيمة مسعَّرة بعد");
   return rxCard("prd", "المنتجات", "أي منتج يحمل الأنبوب، وفي أي مرحلة تقف بنوده؟", sig, body, p.action, true);
 }
 
@@ -427,18 +506,22 @@ function rxSources(s) {
   s.rows.forEach(function (r) {
     body += rxRow("", '<span class="rx-lab">' + opIco(r.source in OPP_ICO ? r.source : "other") + esc(labels[r.source] || r.source) + "</span>" +
       '<span class="rx-track" style="width:' + Math.max(8, Math.round((r.lines / max) * 100)) + '%"><i style="width:' + (r.advancedPct || 0) + '%"></i></span>' +
-      '<span class="rx-fig"><b>' + fmtN(r.lines) + "</b> · تقدّم " + rxPct(r.advancedPct) + " (" + fmtN(r.advanced) + ") · فوز " + rxPct(r.winRatePct) +
-        (r.wonCount + r.lostCount ? " (" + fmtN(r.wonCount) + " من " + fmtN(r.wonCount + r.lostCount) + ")" : "") + "</span>",
+      '<span class="rx-fig"><b>' + mN(r.lines) + "</b> · تقدّم " + rxPct(r.advancedPct) + " (" + mN(r.advanced) + ") · فوز " + rxPct(r.winRatePct) +
+        (r.wonCount + r.lostCount ? " (" + mN(r.wonCount) + " من " + mN(r.wonCount + r.lostCount) + ")" : "") + "</span>",
       { text: "", stage: null, source: r.source },
       "افتح فرص «" + (labels[r.source] || r.source) + "» — " + fmtN(r.lines));
   });
-  body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--accent)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-mark)"></i>لم تتقدّم</span></div>';
+  body += '</div><div class="rx-legend"><span><i class="ox-dot" style="background:var(--m-ac)"></i>تقدّمت بعد التواصل الأولي</span><span><i class="ox-dot" style="background:var(--m-ac-dim);box-shadow:inset 0 0 0 1px var(--m-ac-line)"></i>لم تتقدّم</span></div>';
   var best = s.rows.filter(function (r) { return r.source === s.best; })[0];
   var sig = s.level || s.leadTie
-    ? "<b>" + rxPct(s.topPct) + "</b><span>" + (s.level ? "المصادر المؤهلة متساوية في التقدّم" : "مصدران أو أكثر يتقاسمان أعلى تقدّم") + "</span>"
+    ? rxSig(rxPct(s.topPct), s.level ? "المصادر المؤهلة متساوية في التقدّم" : "مصدران أو أكثر يتقاسمان أعلى تقدّم")
     : best
-    ? "<b>" + rxPct(best.advancedPct) + "</b><span>أعلى تقدّم بين " + opPl(s.eligible, "مصدر واحد", "مصدرين", "مصادر", "مصدرًا") + " لكلٍّ منها بندان أو أكثر — «" + esc(labels[best.source] || best.source) + "»</span>"
-    : '<b class="none">—</b><span>لا ترتيب بعد: يُقارن المصدر حين يملك بندين أو أكثر، ' + (s.eligible ? "ولا يملك ذلك الآن إلا مصدر واحد" : "ولا مصدر يملك ذلك الآن") + "</span>";
+    ? rxSig(rxPct(best.advancedPct),
+        "أعلى تقدّم بين " + mPl(s.eligible, "مصدر واحد", "مصدرين", "مصادر", "مصدرًا") +
+        " لكلٍّ منها بندان أو أكثر — «" + esc(labels[best.source] || best.source) + "»")
+    : rxSig(mNil("لم يُقَس", "none"),
+        "لا ترتيب بعد: يُقارن المصدر حين يملك بندين أو أكثر، " +
+        (s.eligible ? "ولا يملك ذلك الآن إلا مصدر واحد" : "ولا مصدر يملك ذلك الآن"));
   return rxCard("src", "مصادر الفرص", "أي قناة تُنتج فرصًا تتقدّم فعلًا؟", sig, body, s.action, false);
 }
 
@@ -453,7 +536,7 @@ function rxMovement(m) {
   });
   var body = '<div class="rx-kinds">' + RX_KINDS.map(function (k) {
     var n = m.totals[k[0]];
-    return '<span class="rx-kind' + (n ? "" : " zero") + '"><i class="ox-dot" style="background:' + k[2] + '"></i>' + k[1] + " <b>" + fmtN(n) + "</b></span>";
+    return '<span class="m-chip m-chip--plain rx-kind' + (n ? "" : " zero") + '"><i class="ox-dot" style="background:' + k[2] + '"></i>' + k[1] + " <b>" + mN(n) + "</b></span>";
   }).join("") + "</div>";
   body += '<div class="rx-wks" role="img" aria-label="الحركة أسبوعيًا، الأقدم يمينًا">';
   m.weeks.forEach(function (w) {
@@ -463,12 +546,13 @@ function rxMovement(m) {
       if (n) bars += '<i style="height:' + Math.round((n / maxWk) * 100) + '%;background:' + k[2] + '" title="' + k[1] + " " + fmtN(n) + '"></i>';
     });
     var d = new Date(w.endMs).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "numeric" });
-    body += '<div class="rx-wk" title="الأسبوع المنتهي ' + esc(d) + '"><span class="t">' + (t ? fmtN(t) : "") + '</span><span class="col">' + bars + '</span><span class="d">' + esc(d) + "</span></div>";
+    body += '<div class="rx-wk" title="الأسبوع المنتهي ' + esc(d) + '"><span class="t">' + (t ? mN(t) : "") + '</span><span class="col">' + bars + '</span><span class="d"><span class="m-n">' + esc(d) + "</span></span></div>";
   });
   body += "</div>";
   var moved = m.totals.advanced + m.totals.won;
-  var sig = "<b>" + fmtN(moved) + "</b><span>انتقال إلى الأمام أو ربح خلال " + fmtN(m.days) + " يومًا" +
-    (m.wonValue ? "، صفقات رابحة بقيمتها الحالية " + opMoneyShort(m.wonValue) : "") + (m.lostValue ? "، وخاسرة " + opMoneyShort(m.lostValue) : "") + "</span>";
+  var sig = rxSig(mN(moved), "انتقال إلى الأمام أو ربح خلال " + mN(m.days) + " يومًا" +
+    (m.wonValue ? "، صفقات رابحة بقيمتها الحالية " + opMoneyShort(m.wonValue) : "") +
+    (m.lostValue ? "، وخاسرة " + opMoneyShort(m.lostValue) : ""));
   return rxCard("mov", "الحركة", "ماذا تغيّر في الأنبوب خلال الفترة؟", sig, body, m.action, false);
 }
 `;

@@ -9,10 +9,21 @@
 // The rules come from config-domain (serialised into the page), so a control this screen disables
 // and a write the server refuses give the same reason in the same words.
 //
+// PORTED to the new design system (docs/PORT-SPEC.md): the three tables are now real m-table tables
+// inside m-tablewrap (the WRAP scrolls, never the page), the inline editor is an m-form of m-field /
+// m-label / m-input / m-select, state words are m-chip, and every digit goes through .m-n. Every empty
+// cell carries one of the three absence kinds; none is a bare dash.
+//
+// WHAT STAYS. The .cf-sec / .cf-hr / .cf-r / .cf-fl / .cf-pill / .cf-state / .cf-sub grammar below is
+// NOT this screen's private CSS — accounts-crm, indicators-crm, opp-work-crm and knowledge-crm all draw
+// with it and are not ported yet. Deleting it here would blank four screens, so it stays until they
+// are ported in turn. Only the rules this screen ALONE used (.cf-nm, .cf-pos, .cf-dot, .cf-ed and the
+// three grid templates) are gone, replaced by the vocabulary.
+//
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const SETTINGS_CRM_CSS = `
-.cf { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:cfw; }
+/* ---- the shared settings grammar, still read by four unported screens ---- */
 .cf-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
 .cf-h { display:flex; align-items:center; gap:var(--s3); min-height:56px; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); flex-wrap:wrap; }
 .cf-h h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
@@ -24,15 +35,8 @@ export const SETTINGS_CRM_CSS = `
 .cf-r { min-height:56px; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
 .cf-r:hover { background:var(--accent-wash); }
 .cf-r.off { color:var(--muted); }
-.cf-stages .cf-hr, .cf-stages .cf-r { grid-template-columns:44px minmax(0,1.6fr) 92px 104px 128px minmax(0,1fr) auto; }
-.cf-divs .cf-hr, .cf-divs .cf-r { grid-template-columns:minmax(0,1.4fr) minmax(0,1.4fr) 96px 96px 110px auto; }
-.cf-team .cf-hr, .cf-team .cf-r { grid-template-columns:minmax(0,1.2fr) minmax(0,1.6fr) 110px minmax(0,1fr) 110px auto; }
-.cf-nm { font-weight:500; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cf-sub { font-size:var(--t-xs); color:var(--muted); }
 .cf-num { font-variant-numeric:tabular-nums; }
-.cf-pos { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:var(--r-sm);
-  background:var(--surface-2); font-size:var(--t-xs); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; }
-.cf-dot { width:10px; height:10px; border-radius:var(--r-pill); display:inline-block; flex:none; margin-inline-end:8px; vertical-align:middle; }
 .cf-pill { font-size:var(--t-xs); font-weight:600; border-radius:var(--r-pill); padding:3px 10px; display:inline-flex; align-items:center; gap:5px; }
 .cf-pill.on { background:var(--s-issued-wash, #ECFAF3); color:var(--s-issued-text); }
 .cf-pill.off { background:var(--surface-2); color:var(--muted); }
@@ -40,7 +44,6 @@ export const SETTINGS_CRM_CSS = `
 .cf-acts { display:flex; gap:var(--s2); justify-content:flex-end; flex-wrap:wrap; }
 .cf-acts .btn, .cf-acts .rv-hold { height:32px; padding-inline:10px; font-size:var(--t-xs); }
 .cf-acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
-.cf-ed { border-top:1px solid var(--line-soft); background:var(--accent-wash); padding:var(--s3) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
 .cf-g { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:var(--s3); }
 .cf-fl { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .cf-fl label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
@@ -51,15 +54,24 @@ export const SETTINGS_CRM_CSS = `
 .cf-fl .inp:focus, .cf-fl select:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); outline:none; }
 .cf-fl .hint { font-size:var(--t-xs); color:var(--muted); }
 .cf-err { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; }
-.cf-note { font-size:var(--t-xs); color:var(--muted); line-height:1.7; padding:var(--s3) var(--s4); }
 .cf-state { padding:var(--s4); font-size:var(--t-sm); color:var(--muted); display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; }
-.cf :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@container cfw (max-width: 900px) {
-  .cf-stages .cf-hr, .cf-divs .cf-hr, .cf-team .cf-hr { display:none; }
-  .cf-stages .cf-r, .cf-divs .cf-r, .cf-team .cf-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
-  .cf-r > * { min-width:0; }
-  .cf-acts { grid-column:1 / -1; justify-content:flex-start; }
-}
+
+/* ---- what «إعدادات النظام» itself needs beyond the m-* vocabulary ---- */
+.ds6 .cf { display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .cf-tbl { min-inline-size: 760px; }
+.ds6 .cf-tbl th.num, .ds6 .cf-tbl td.num { text-align:end; }
+/* The stage colour the admin chose. A dot, not a chip: it carries no status, it identifies a rung. */
+.ds6 .cf-dot { inline-size:10px; block-size:10px; border-radius:var(--m-r-chip); display:inline-block;
+  flex:none; margin-inline-end:8px; vertical-align:middle; }
+/* The row editor opens INSIDE the table, spanning every column, so it cannot drift away from its row. */
+.ds6 .cf-ed { background:var(--m-ac-dim); padding:var(--m-4); display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .cf-ed .m-form { grid-template-columns:repeat(auto-fit, minmax(170px,1fr)); }
+.ds6 .cf-row-acts { display:flex; gap:var(--m-2); justify-content:flex-end; flex-wrap:wrap; align-items:center; }
+.ds6 .cf-row-acts .m-btn, .ds6 .cf-row-acts .rv-hold { min-block-size:36px; padding-inline:12px; font-size:var(--m-t-cap); }
+.ds6 .cf-row-acts .rv-hold:not(.holding):not(.armed) { background:var(--m-paper); color:var(--m-bad); }
+.ds6 tr.is-off td { color:var(--m-mut); }
+/* A numeric field aligns to the end of its box; the vocabulary's m-input does not say so. */
+.ds6 .m-input.num { text-align:end; }
 `;
 
 export const SETTINGS_CRM_JS = `
@@ -80,6 +92,11 @@ function cfJson(method, url, body) {
 function cfIco(n) { return typeof opIco === "function" ? opIco(n) : ""; }
 function cfToast(m, bad) { if (typeof opToast === "function") opToast(m, bad); else if (typeof moToast === "function") moToast(m); }
 function cfPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
+/* Every digit through .m-n; a unit that belongs to the number goes INSIDE the span (PORT-SPEC 3). */
+function cfN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+/* kind: owed (a number someone owes) · unset (a classification nobody made) · none (a legitimate
+   nothing). «بلا مدة» is a choice the admin made, so it is a none, not an unset. */
+function cfNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
 function cfNOpp(n) { return cfPl(n, "فرصة واحدة", "فرصتان", "فرص", "فرصة"); }
 function cfNProd(n) { return cfPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function cfNMember(n) { return cfPl(n, "عضو واحد", "عضوان", "أعضاء", "عضوًا"); }
@@ -126,16 +143,16 @@ function cfClose() { cfEdit = null; render(false); }
 function cfSet(k, v) { if (cfEdit) { cfEdit.d[k] = v; cfEdit.err = ""; cfEdit.field = ""; } }
 function cfFieldErr(f) { return cfEdit && cfEdit.field === f ? ' aria-invalid="true"' : ""; }
 function cfInput(id, label, value, extra, hint) {
-  return '<div class="cf-fl"><label for="' + id + '">' + label + '</label><input class="inp' + (extra && extra.num ? " num" : "") + '" id="' + id +
+  return '<div class="m-field"><label class="m-label" for="' + id + '">' + label + '</label><input class="m-input' + (extra && extra.num ? " num" : "") + '" id="' + id +
     '" data-cfset="' + (extra && extra.k) + '" value="' + esc(value == null ? "" : String(value)) + '"' +
     (extra && extra.type ? ' type="' + extra.type + '"' : "") + (extra && extra.max ? ' maxlength="' + extra.max + '"' : "") +
     (extra && extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : "") + cfFieldErr(extra && extra.k) + ">" +
-    (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+    (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
 }
 function cfSelect(id, label, k, value, opts, hint) {
-  return '<div class="cf-fl"><label for="' + id + '">' + label + '</label><select id="' + id + '" data-cfset="' + k + '">' +
+  return '<div class="m-field"><label class="m-label" for="' + id + '">' + label + '</label><select class="m-select" id="' + id + '" data-cfset="' + k + '">' +
     opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
-    "</select>" + (hint ? '<span class="hint">' + hint + "</span>" : "") + "</div>";
+    "</select>" + (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
 }
 /* DELETE IS A HOLD, like every other destructive control in this product (DESIGN.md 8.5): one
    click must not remove a stage, a division or a person. And it is only OFFERED where it would
@@ -147,10 +164,10 @@ function cfHold(fn, arg, idle) {
     '<span class="rv-fill"></span><span class="rv-lbl">' + idle + "</span></button>";
 }
 function cfEditorActions(saveLabel) {
-  return '<div class="cf-acts" style="justify-content:flex-start">' +
-    '<button class="btn btn-teal" data-cf="save"' + (cfEdit.busy ? ' disabled aria-busy="true"' : "") + ">" + (cfEdit.busy ? "جارٍ الحفظ…" : saveLabel) + "</button>" +
-    '<button class="btn btn-ghost" data-cf="cancel">إلغاء</button>' +
-    (cfEdit.err ? '<span class="cf-err" role="alert">' + cfIco("warn") + esc(cfEdit.err) + "</span>" : "") + "</div>";
+  return '<div class="m-row">' +
+    '<button class="m-btn m-btn--primary" data-cf="save"' + (cfEdit.busy ? ' disabled aria-busy="true"' : "") + ">" + (cfEdit.busy ? "جارٍ الحفظ…" : saveLabel) + "</button>" +
+    '<button class="m-btn" data-cf="cancel">إلغاء</button>' +
+    (cfEdit.err ? '<span class="m-err" role="alert">' + cfIco("warn") + esc(cfEdit.err) + "</span>" : "") + "</div>";
 }
 
 /* ================= the ladder ================= */
@@ -158,49 +175,62 @@ function cfStageEditor() {
   var d = cfEdit.d, isNew = !cfEdit.id;
   var terminal = !isNew && isTerminalStageKey(cfEdit.id);
   var h = '<div class="cf-ed">';
-  h += '<div class="cf-g">' +
+  h += '<div class="m-form">' +
     cfInput("cf_label", "اسم المرحلة", d.label, { k: "label", max: 40, ph: "مثال: مراجعة قانونية" }) +
     cfInput("cf_weight", "الوزن ٪", d.weightPct, { k: "weightPct", num: true, type: "number" }, terminal ? "وزن مرحلتي الربح والخسارة ثابت" : "احتمال الإغلاق على هذه المرحلة") +
     cfInput("cf_pos", "الترتيب", d.position, { k: "position", num: true, type: "number" }) +
     cfInput("cf_sla", "مدة الالتزام (أيام)", d.slaDays, { k: "slaDays", num: true, type: "number", ph: "بلا مدة" }, "بعدها تُعلَّم الفرصة «متأخرة» — اتركها فارغة بلا التزام") +
     cfSelect("cf_active", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّلة"], ["", "موقوفة"]], terminal ? "لا تُوقف" : "الموقوفة لا تُعرض للاختيار") +
     "</div>";
-  h += '<div class="cf-fl">' + cfInput("cf_exit", "شرط الانتقال منها", d.exitCriterion, { k: "exitCriterion", max: 200, ph: "ما الذي يجب أن يتحقق قبل نقل الفرصة من هنا؟" }) + "</div>";
+  h += '<div class="m-field">' + cfInput("cf_exit", "شرط الانتقال منها", d.exitCriterion, { k: "exitCriterion", max: 200, ph: "ما الذي يجب أن يتحقق قبل نقل الفرصة من هنا؟" }) + "</div>";
   return h + cfEditorActions(isNew ? "أضف المرحلة" : "احفظ التغييرات") + "</div>";
 }
+/* The editor opens as a full-width row inside the table it edits, so it can never drift from the row. */
+function cfEditorRow(cols, inner) { return '<tr><td colspan="' + cols + '" style="padding:0">' + inner + "</td></tr>"; }
+function cfSecHead(title, sub, actions) {
+  return '<header class="m-card__h"><div><h2 class="m-card__t">' + title + "</h2>" +
+    '<p class="m-meta">' + sub + "</p></div>" +
+    '<div class="m-head__a">' + actions + "</div></header>";
+}
 function cfStagesView() {
-  var h = '<section class="cf-sec cf-stages"><div class="cf-h"><div><h2>مراحل البيع</h2>' +
-    '<div class="s">الترتيب والأوزان تُستخدم في اللوحة والتوقعات · «مدة الالتزام» تحدد متى تُعلَّم الفرصة متأخرة</div></div><span class="sp"></span>' +
-    '<button class="px-toggle" aria-pressed="' + cfShowOff + '" data-cf="showoff">' + (cfShowOff ? cfIco("check") : "") + "إظهار الموقوفة</button>" +
-    (cfEdit && cfEdit.kind === "stage" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة مرحلة</button>"
-      : '<button class="btn btn-teal" id="cfaddstage" data-cf="addstage">' + cfIco("plus") + "إضافة مرحلة</button>") + "</div>";
+  var h = '<section class="m-card m-card--pad0"><div style="padding:var(--m-5) var(--m-5) 0">' +
+    cfSecHead("مراحل البيع",
+      "الترتيب والأوزان تُستخدم في اللوحة والتوقعات · «مدة الالتزام» تحدد متى تُعلَّم الفرصة متأخرة",
+      '<span class="m-seg"><button type="button" aria-pressed="' + cfShowOff + '" data-cf="showoff">إظهار الموقوفة</button></span>' +
+      (cfEdit && cfEdit.kind === "stage" && !cfEdit.id ? '<button class="m-btn" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة مرحلة</button>"
+        : '<button class="m-btn m-btn--primary" id="cfaddstage" data-cf="addstage">' + cfIco("plus") + "إضافة مرحلة</button>")) + "</div>";
   if (cfEdit && cfEdit.kind === "stage" && !cfEdit.id) h += cfStageEditor();
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>#</span><span>المرحلة</span><span>الوزن</span><span>مدة الالتزام</span><span>الحالة</span><span>الفرص عليها</span><span></span></div>';
   var rows = (cfStages || []).filter(function (s) { return cfShowOff || s.active || s.openLines; });
-  if (!rows.length) h += '<div class="cf-state">لا مراحل مطابقة.</div>';
+  h += '<div class="m-tablewrap"><table class="m-table cf-tbl"><thead><tr>' +
+    '<th class="num">#</th><th>المرحلة</th><th class="num">الوزن</th><th>مدة الالتزام</th><th>الحالة</th><th>الفرص عليها</th><th></th>' +
+    "</tr></thead><tbody>";
+  if (!rows.length) {
+    h += '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا مراحل مطابقة</p>' +
+      '<p class="m-empty__d">أظهر الموقوفة لرؤية المراحل التي أُوقفت.</p></div></td></tr>';
+  }
   rows.forEach(function (s) {
     var editing = cfEdit && cfEdit.kind === "stage" && cfEdit.id === s.key;
     var terminal = isTerminalStageKey(s.key);
-    h += '<div class="cf-r' + (s.active ? "" : " off") + '" data-cfrow="' + esc(s.key) + '">';
-    h += '<span class="cf-pos">' + fmtN(s.position) + "</span>";
-    h += '<span class="cf-nm"><i class="cf-dot" style="background:' + esc(s.dot || "#A2A9B4") + '"></i>' + esc(s.label) +
-      (s.exitCriterion ? '<span class="cf-sub"> · ' + esc(s.exitCriterion) + "</span>" : "") + "</span>";
-    h += '<span class="cf-num">' + fmtN(s.weightPct) + "٪</span>";
-    h += "<span>" + (s.slaDays ? cfNDay(s.slaDays) : '<span class="cf-sub">بلا مدة</span>') + "</span>";
-    h += "<span>" + (terminal ? '<span class="cf-pill lock">' + cfIco("check") + "أساسية</span>"
-      : s.active ? '<span class="cf-pill on">مفعّلة</span>' : '<span class="cf-pill off">موقوفة</span>') + "</span>";
-    h += '<span class="cf-num">' + (s.openLines ? cfNOpp(s.openLines) : '<span class="cf-sub">لا فرص</span>') + "</span>";
-    h += '<span class="cf-acts">' +
-      '<button class="btn btn-ghost" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
-      (terminal || cfSeeded(s.key) ? '<span class="cf-sub" title="مرحلة أساسية في المحرك — أوقفها بدل حذفها">أساسية</span>'
-        : s.openLines ? '<span class="cf-sub" title="أوقفها بدل حذفها">عليها فرص</span>'
-        : cfHold("cfDeleteStage", s.key, "حذف")) + "</span>";
-    h += "</div>";
-    if (editing) h += cfStageEditor();
+    h += '<tr class="' + (s.active ? "" : "is-off") + '" data-cfrow="' + esc(s.key) + '">';
+    h += '<td class="m-td-v">' + cfN(s.position) + "</td>";
+    h += '<td class="m-td-n"><i class="cf-dot" style="background:' + esc(s.dot || "#A2A9B4") + '"></i>' + esc(s.label) +
+      (s.exitCriterion ? '<span class="m-meta"> · ' + esc(s.exitCriterion) + "</span>" : "") + "</td>";
+    h += '<td class="m-td-v"><span class="m-n">' + fmtN(s.weightPct) + "٪</span></td>";
+    h += "<td>" + (s.slaDays ? cfNDay(s.slaDays) : cfNil("بلا مدة", "none")) + "</td>";
+    h += "<td>" + (terminal ? '<span class="m-chip m-chip--ac">أساسية</span>'
+      : s.active ? '<span class="m-chip m-chip--ok">مفعّلة</span>' : '<span class="m-chip">موقوفة</span>') + "</td>";
+    h += "<td>" + (s.openLines ? cfNOpp(s.openLines) : cfNil("لا فرص", "none")) + "</td>";
+    h += '<td><span class="cf-row-acts">' +
+      '<button class="m-btn" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
+      (terminal || cfSeeded(s.key) ? '<span class="m-meta" title="مرحلة أساسية في المحرك — أوقفها بدل حذفها">أساسية</span>'
+        : s.openLines ? '<span class="m-meta" title="أوقفها بدل حذفها">عليها فرص</span>'
+        : cfHold("cfDeleteStage", s.key, "حذف")) + "</span></td>";
+    h += "</tr>";
+    if (editing) h += cfEditorRow(7, cfStageEditor());
   });
-  h += "</div>";
-  h += '<div class="cf-note">مفتاح المرحلة (' + esc((cfStages || []).map(function (s) { return s.key; }).slice(0, 3).join(" · ")) +
-    ' …) لا يتغيّر بعد إنشائها: الفرص المسجّلة وسجل التحركات تشير إليه. الاسم والوزن والترتيب والمدة والحالة تُعدَّل متى شئت.</div>';
+  h += "</tbody></table></div>";
+  h += '<p class="m-meta" style="padding:var(--m-4) var(--m-5)">مفتاح المرحلة (' + esc((cfStages || []).map(function (s) { return s.key; }).slice(0, 3).join(" · ")) +
+    " …) لا يتغيّر بعد إنشائها: الفرص المسجّلة وسجل التحركات تشير إليه. الاسم والوزن والترتيب والمدة والحالة تُعدَّل متى شئت.</p>";
   return h + "</section>";
 }
 
@@ -208,7 +238,7 @@ function cfStagesView() {
 function cfDivisionEditor() {
   var d = cfEdit.d;
   var owners = [["", "بلا مسؤول"]].concat(cfTeam.filter(function (m) { return m.active; }).map(function (m) { return [String(m.id), m.name + " · " + cfRoleLabel(m.role)]; }));
-  var h = '<div class="cf-ed"><div class="cf-g">' +
+  var h = '<div class="cf-ed"><div class="m-form">' +
     cfInput("cf_dname", "اسم القسم", d.name, { k: "name", max: 60, ph: "مثال: قسم الصحة" }) +
     cfSelect("cf_downer", "مسؤول القسم", "ownerMemberId", d.ownerMemberId == null ? "" : String(d.ownerMemberId), owners, "من سجل الفريق") +
     cfSelect("cf_dactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّل"], ["", "موقوف"]]) +
@@ -216,27 +246,35 @@ function cfDivisionEditor() {
   return h + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف القسم") + "</div>";
 }
 function cfDivisionsView() {
-  var h = '<section class="cf-sec cf-divs"><div class="cf-h"><div><h2>الأقسام</h2>' +
-    '<div class="s">وحدات الشركة — كل منتج يتبع قسمًا، وكل عضو فريق يعمل داخل قسم. غير «القطاع»، الذي يصف سوق المنتج.</div></div><span class="sp"></span>' +
-    (cfEdit && cfEdit.kind === "division" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة قسم</button>"
-      : '<button class="btn btn-teal" id="cfadddiv" data-cf="adddiv">' + cfIco("plus") + "إضافة قسم</button>") + "</div>";
+  var h = '<section class="m-card m-card--pad0"><div style="padding:var(--m-5) var(--m-5) 0">' +
+    cfSecHead("الأقسام",
+      "وحدات الشركة — كل منتج يتبع قسمًا، وكل عضو فريق يعمل داخل قسم. غير «القطاع»، الذي يصف سوق المنتج.",
+      (cfEdit && cfEdit.kind === "division" && !cfEdit.id ? '<button class="m-btn" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة قسم</button>"
+        : '<button class="m-btn m-btn--primary" id="cfadddiv" data-cf="adddiv">' + cfIco("plus") + "إضافة قسم</button>")) + "</div>";
   if (cfEdit && cfEdit.kind === "division" && !cfEdit.id) h += cfDivisionEditor();
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>القسم</span><span>المسؤول</span><span>المنتجات</span><span>الأعضاء</span><span>الحالة</span><span></span></div>';
-  if (!cfDivs.length) h += '<div class="cf-state">لا أقسام بعد.<span class="cf-sub">أضف قسمًا ثم اربط به منتجاته وأعضاءه.</span></div>';
+  h += '<div class="m-tablewrap"><table class="m-table cf-tbl"><thead><tr>' +
+    "<th>القسم</th><th>المسؤول</th><th>المنتجات</th><th>الأعضاء</th><th>الحالة</th><th></th>" +
+    "</tr></thead><tbody>";
+  if (!cfDivs.length) {
+    h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><p class="m-empty__t">لا أقسام بعد</p>' +
+      '<p class="m-empty__d">أضف قسمًا ثم اربط به منتجاته وأعضاءه.</p></div></td></tr>';
+  }
   cfDivs.forEach(function (d) {
     var editing = cfEdit && cfEdit.kind === "division" && cfEdit.id === d.id;
-    h += '<div class="cf-r' + (d.active ? "" : " off") + '" data-cfrow="div' + d.id + '">';
-    h += '<span class="cf-nm">' + esc(d.name) + "</span>";
-    h += "<span>" + (d.ownerName ? esc(d.ownerName) + '<span class="cf-sub"> · <bdi>' + esc(d.ownerEmail || "") + "</bdi></span>" : '<span class="cf-sub">بلا مسؤول</span>') + "</span>";
-    h += '<span class="cf-num">' + (d.products ? cfNProd(d.products) : '<span class="cf-sub">لا منتجات</span>') + "</span>";
-    h += '<span class="cf-num">' + (d.members ? cfNMember(d.members) : '<span class="cf-sub">لا أعضاء</span>') + "</span>";
-    h += "<span>" + (d.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
-    h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editdiv" data-i="' + d.id + '">تعديل</button>' +
-      (d.products || d.members ? '<span class="cf-sub" title="انقل منتجاته وأعضاءه أولًا، أو أوقفه">مرتبط</span>'
-        : cfHold("cfDeleteDivision", d.id, "حذف")) + "</span></div>";
-    if (editing) h += cfDivisionEditor();
+    h += '<tr class="' + (d.active ? "" : "is-off") + '" data-cfrow="div' + d.id + '">';
+    h += '<td class="m-td-n">' + esc(d.name) + "</td>";
+    h += "<td>" + (d.ownerName
+      ? esc(d.ownerName) + (d.ownerEmail ? '<span class="m-meta"> · <bdi>' + esc(d.ownerEmail) + "</bdi></span>" : "")
+      : cfNil("بلا مسؤول", "unset")) + "</td>";
+    h += "<td>" + (d.products ? cfNProd(d.products) : cfNil("لا منتجات", "none")) + "</td>";
+    h += "<td>" + (d.members ? cfNMember(d.members) : cfNil("لا أعضاء", "none")) + "</td>";
+    h += "<td>" + (d.active ? '<span class="m-chip m-chip--ok">مفعّل</span>' : '<span class="m-chip">موقوف</span>') + "</td>";
+    h += '<td><span class="cf-row-acts"><button class="m-btn" data-cf="editdiv" data-i="' + d.id + '">تعديل</button>' +
+      (d.products || d.members ? '<span class="m-meta" title="انقل منتجاته وأعضاءه أولًا، أو أوقفه">مرتبط</span>'
+        : cfHold("cfDeleteDivision", d.id, "حذف")) + "</span></td></tr>";
+    if (editing) h += cfEditorRow(6, cfDivisionEditor());
   });
-  return h + "</div></section>";
+  return h + "</tbody></table></div></section>";
 }
 
 /* ================= the team ================= */
@@ -244,7 +282,7 @@ function cfMemberEditor() {
   var d = cfEdit.d;
   var divs = [["", "بلا قسم"]].concat(cfDivs.map(function (x) { return [String(x.id), x.name]; }));
   var roles = TEAM_ROLES.map(function (r) { return [r, cfRoleLabel(r)]; });
-  var h = '<div class="cf-ed"><div class="cf-g">' +
+  var h = '<div class="cf-ed"><div class="m-form">' +
     cfInput("cf_mname", "الاسم", d.name, { k: "name", max: 60 }) +
     cfInput("cf_memail", "البريد", d.email, { k: "email", max: 120, type: "email", ph: "name@company.com" }, "إليه يذهب التصعيد وطلب الدعم") +
     cfSelect("cf_mrole", "الدور", "role", d.role, roles, "الدعم يستقبل طلبات الدعم · الإدارة تستقبل التصعيد") +
@@ -254,43 +292,49 @@ function cfMemberEditor() {
   return h + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف العضو") + "</div>";
 }
 function cfTeamView() {
-  var h = '<section class="cf-sec cf-team"><div class="cf-h"><div><h2>الفريق</h2>' +
-    '<div class="s">الأشخاص الذين يُصعَّد إليهم ويُطلب منهم الدعم — الاسم والبريد والدور والقسم.</div></div><span class="sp"></span>' +
-    (cfEdit && cfEdit.kind === "member" && !cfEdit.id ? '<button class="btn btn-ghost" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة عضو</button>"
-      : '<button class="btn btn-teal" id="cfaddmember" data-cf="addmember">' + cfIco("plus") + "إضافة عضو</button>") + "</div>";
+  var h = '<section class="m-card m-card--pad0"><div style="padding:var(--m-5) var(--m-5) 0">' +
+    cfSecHead("الفريق",
+      "الأشخاص الذين يُصعَّد إليهم ويُطلب منهم الدعم — الاسم والبريد والدور والقسم.",
+      (cfEdit && cfEdit.kind === "member" && !cfEdit.id ? '<button class="m-btn" aria-disabled="true" tabindex="-1">' + cfIco("plus") + "إضافة عضو</button>"
+        : '<button class="m-btn m-btn--primary" id="cfaddmember" data-cf="addmember">' + cfIco("plus") + "إضافة عضو</button>")) + "</div>";
   if (cfEdit && cfEdit.kind === "member" && !cfEdit.id) h += cfMemberEditor();
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>الاسم</span><span>البريد</span><span>الدور</span><span>القسم</span><span>الحالة</span><span></span></div>';
-  if (!cfTeam.length) h += '<div class="cf-state">لا أعضاء بعد.<span class="cf-sub">التصعيد وطلب الدعم يحتاجان شخصًا مسجّلًا ببريده.</span></div>';
+  h += '<div class="m-tablewrap"><table class="m-table cf-tbl"><thead><tr>' +
+    "<th>الاسم</th><th>البريد</th><th>الدور</th><th>القسم</th><th>الحالة</th><th></th>" +
+    "</tr></thead><tbody>";
+  if (!cfTeam.length) {
+    h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><p class="m-empty__t">لا أعضاء بعد</p>' +
+      '<p class="m-empty__d">التصعيد وطلب الدعم يحتاجان شخصًا مسجّلًا ببريده.</p></div></td></tr>';
+  }
   cfTeam.forEach(function (m) {
     var editing = cfEdit && cfEdit.kind === "member" && cfEdit.id === m.id;
-    h += '<div class="cf-r' + (m.active ? "" : " off") + '" data-cfrow="mem' + m.id + '">';
-    h += '<span class="cf-nm">' + esc(m.name) + "</span>";
-    h += '<span class="cf-nm"><bdi>' + esc(m.email) + "</bdi></span>";
-    h += "<span>" + esc(cfRoleLabel(m.role)) + "</span>";
-    h += "<span>" + (m.division ? esc(m.division) : '<span class="cf-sub">بلا قسم</span>') + "</span>";
-    h += "<span>" + (m.active ? '<span class="cf-pill on">مفعّل</span>' : '<span class="cf-pill off">موقوف</span>') + "</span>";
-    h += '<span class="cf-acts"><button class="btn btn-ghost" data-cf="editmember" data-i="' + m.id + '">تعديل</button>' +
-      (m.escalations ? '<span class="cf-sub" title="عليه تصعيدات مسجّلة — أوقفه بدل حذفه">عليه تصعيدات</span>'
-        : cfHold("cfDeleteMember", m.id, "حذف")) + "</span></div>";
-    if (editing) h += cfMemberEditor();
+    h += '<tr class="' + (m.active ? "" : "is-off") + '" data-cfrow="mem' + m.id + '">';
+    h += '<td class="m-td-n">' + esc(m.name) + "</td>";
+    h += "<td>" + (m.email ? "<bdi>" + esc(m.email) + "</bdi>" : cfNil("لم يُسجَّل بريد", "owed")) + "</td>";
+    h += "<td>" + (m.role ? esc(cfRoleLabel(m.role)) : cfNil("لم يُحدَّد", "unset")) + "</td>";
+    h += "<td>" + (m.division ? esc(m.division) : cfNil("بلا قسم", "unset")) + "</td>";
+    h += "<td>" + (m.active ? '<span class="m-chip m-chip--ok">مفعّل</span>' : '<span class="m-chip">موقوف</span>') + "</td>";
+    h += '<td><span class="cf-row-acts"><button class="m-btn" data-cf="editmember" data-i="' + m.id + '">تعديل</button>' +
+      (m.escalations ? '<span class="m-meta" title="عليه تصعيدات مسجّلة — أوقفه بدل حذفه">عليه تصعيدات</span>'
+        : cfHold("cfDeleteMember", m.id, "حذف")) + "</span></td></tr>";
+    if (editing) h += cfEditorRow(6, cfMemberEditor());
   });
-  return h + "</div></section>";
+  return h + "</tbody></table></div></section>";
 }
 
 function vSettings(which) {
   cfLoad(false);
-  var h = '<div class="cf">';
+  var h = '<div class="ds6"><div class="cf">';
   if (cfStages === null && !cfFailed) {
-    return h + '<section class="cf-sec"><div class="cf-state" aria-busy="true">جارٍ تحميل الإعدادات…</div></section></div>';
+    return h + '<section class="m-card"><p class="m-body" aria-busy="true">جارٍ تحميل الإعدادات…</p></section></div></div>';
   }
   if (cfFailed && cfStages === null) {
-    return h + '<section class="cf-sec"><div class="cf-state" role="alert">تعذّر تحميل الإعدادات.' +
-      '<button class="btn btn-ghost" data-cf="retry">أعد المحاولة</button></div></section></div>';
+    return h + '<section class="m-card"><p class="m-body" role="alert">تعذّر تحميل الإعدادات. ' +
+      '<button class="m-btn" data-cf="retry">أعد المحاولة</button></p></section></div></div>';
   }
-  if (cfFailed) h += '<section class="cf-sec"><div class="cf-state" role="alert">' + cfIco("warn") +
-    'تعذّر التحديث — المعروض آخر نسخة محمّلة.<button class="btn btn-ghost" data-cf="retry">أعد المحاولة</button></div></section>';
+  if (cfFailed) h += '<section class="m-card"><p class="m-body" role="alert">' + cfIco("warn") +
+    'تعذّر التحديث — المعروض آخر نسخة محمّلة. <button class="m-btn" data-cf="retry">أعد المحاولة</button></p></section>';
   h += which === "divisions" ? cfDivisionsView() : which === "team" ? cfTeamView() : cfStagesView();
-  return h + "</div>";
+  return h + "</div></div>";
 }
 
 /* ---- writes ---- */

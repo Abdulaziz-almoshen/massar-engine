@@ -15,12 +15,15 @@
 // ends it. That has happened four times on this project.
 
 export const PRODUCTS_CRM_CSS = `
-/* ---- THE REPORT GRID: three per row ----
-   The house layout for a board of reports. Three at the design target, two at --bp-lg and one at
-   --bp-sm: three columns of Arabic labels below 1280px stops being readable, and a rule that
-   produces an unreadable third column is not a standard, it is a shape. align-items:stretch so the
-   three cards in a row share a baseline and an edge; the content inside each decides its own
-   height. */
+/* ============================================================================
+   NOT PORTED, AND DELIBERATELY SO. Three surfaces this module draws render
+   OUTSIDE the .ds6 subtree and still belong to the old system:
+     · vExecBand()      — a band inside «الرئيسية»'s old numbered sections
+     · pxReadinessBand()— painted into #subnav by dashboard.ts, above #body
+     · pcQuarterChart() — the exec band's own chart
+   Their rules are kept verbatim below. Everything else on this page is the
+   m-* vocabulary, and the rules that used to draw it are gone.
+   ============================================================================ */
 /* ===== THE EXEC ROW =====
    An audit of the live الرئيسية found 108 of its 140 visible strings set at 12px: one 96px figure
    on the deck and then a flat field of identical small text. A page with two type sizes has no
@@ -102,13 +105,6 @@ export const PRODUCTS_CRM_CSS = `
 .pcs-lg i{width:10px;height:10px;border-radius:3px;flex:none}
 .pcs-lg .s-won{background:var(--accent,#2563EB)}
 .pcs-lg .s-open{background:var(--blue-light,#5B8DEF)}
-/* The merged catalogue row: clickable like the cards it replaced, and the price column wraps
-   instead of truncating — a package name you cannot read is a package you did not list. */
-.pcrow{cursor:pointer}
-.pcrow:hover{background:var(--accent-wash,#F2F6FE)}
-.pcrow td b{font-weight:600;color:var(--ink,#14161A)}
-.pcrow .sub{font-size:12px;color:var(--muted,#656B76);margin-block-start:2px}
-.pcprice{font-size:12px;color:var(--muted,#656B76);line-height:1.7;min-width:180px;white-space:normal}
 @media (max-width:560px){ .pcs .r{grid-template-columns:1fr auto;row-gap:6px}
   .pcs .bar{grid-column:1 / 3} }
 
@@ -147,339 +143,15 @@ export const PRODUCTS_CRM_CSS = `
   .pcq{height:132px;gap:var(--s2)}
   .pcq .sub2{display:none}
 }
-.pc-sec{margin-block-end:26px}
-.pc-h{font-size:14px;font-weight:600;color:var(--ink,#14161A);margin-block-end:3px}
-.pc-sub{font-size:12px;color:var(--muted,#656B76);margin-block-end:12px;max-width:70ch;line-height:1.7}
+
 .pc-note{font-size:12px;color:var(--muted,#656B76);margin-block-start:8px;line-height:1.7;
   padding-inline-start:9px;border-inline-start:2px solid var(--line2,#D8DCE3);max-width:66ch}
-.pc-assumed{font-size:12px;font-weight:600;color:#7A5600;margin-inline-start:5px}
-.pc-price{font-size:12px;color:var(--ink2,#33373E);font-variant-numeric:tabular-nums}
-.pc-pkg{font-size:12px;color:var(--muted,#656B76)}
-.pc-q{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.pc-qc{background:var(--strip,#EFF1F5);border-radius:10px;padding:12px 14px}
-.pc-qc .k{font-size:12px;color:var(--muted,#656B76);font-weight:600}
-.pc-qc .v{font-size:16px;font-weight:600;margin-block:4px 2px;font-variant-numeric:tabular-nums}
-.pc-qc .t{font-size:12px;color:var(--muted,#656B76);font-variant-numeric:tabular-nums}
-.pc-qc.now{background:#EAF1FE}
-/* Four quarters at 84px each on a phone is four unreadable columns. Two rows of two. 560 = --bp-sm
-   (DESIGN.md 2); a media query cannot read a custom property. */
-@media (max-width:560px){
-  .pc-q{grid-template-columns:repeat(2,1fr)}
-  .pc-sub,.pc-note{max-width:none}
-}
 
-/* ===================== «المنتجات» V5 — list, record, create ===================== */
-.px { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:pxw; }
-.px :focus { outline:none; }
-.px :focus-visible, .px-dr :focus-visible, .px-modal :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.px .btn-teal:focus-visible, .px-dr .btn-teal:focus-visible, .px-modal .btn-teal:focus-visible {
-  outline:2px solid var(--paper); outline-offset:2px; box-shadow:0 0 0 4px rgba(37,99,235,.35); }
-.px bdi { unicode-bidi:isolate; }
-
-/* readiness: four cells, colour + texture + a word */
 .px-cells { display:inline-flex; gap:2px; flex:none; }
 .px-cells i { display:block; width:16px; height:6px; border-radius:var(--r-sm); background:var(--s-issued); }
 .px-cells i.miss { background-color:var(--surface-2);
   background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
 .px-cells i.pend { background:var(--s-attn-mark); }
-.px-ready { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.px-rw { font-size:var(--t-xs); color:var(--ink-2); line-height:1.35; }
-.px-rw.no { color:var(--s-attn-text); font-weight:500; }
-.px-rw.ok { color:var(--s-issued-text); font-weight:500; }
-
-/* list table */
-.px-t .ox-hr, .px-t .ox-r { grid-template-columns:minmax(200px,1fr) 168px 168px 112px 120px 120px 32px; column-gap:16px; padding-inline:var(--s3); }
-.px-t .ox-r { min-height:56px; padding-block:6px; }
-.px-c-nm { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.px-nm { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-sub { font-size:var(--t-xs); color:var(--muted); display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.px-read { font-size:var(--t-xs); font-weight:500; color:var(--ink-2); border:1px dashed var(--s-off-mark); border-radius:var(--r-pill); padding:0 6px; line-height:18px; flex:none; }
-.px-arch { font-size:var(--t-xs); font-weight:500; color:var(--s-off-text); box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-pill); padding:0 7px; line-height:18px; flex:none; }
-.px-price { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.px-price b { font-size:var(--t-sm); font-weight:600; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.px-price span { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-num { text-align:end; display:flex; flex-direction:column; gap:2px; align-items:flex-end; min-width:0; }
-.px-num b { font-size:var(--t-sm); font-weight:600; color:var(--ink); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.px-num span { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
-.px-num .none { font-size:var(--t-sm); color:var(--muted); font-weight:450; }
-.px-t .ox-hr .px-he { text-align:end; }
-.px-lg-b { display:inline-block; width:10px; height:10px; border-radius:3px; flex:none; }
-.px-actrow { display:flex; align-items:center; gap:var(--s2); min-height:48px; padding:var(--s2) var(--s3); background:var(--accent-bar);
-  color:var(--accent-deep); font-size:var(--t-sm); font-weight:500; border-bottom:1px solid var(--line-soft); }
-.px-actrow .sp { flex:1; }
-.px-actrow a, .px-actrow button.lnk { font-family:inherit; font-size:var(--t-sm); font-weight:600; color:var(--accent-deep);
-  background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--accent-mark); border-radius:var(--r-sm);
-  min-height:32px; padding-inline:12px; display:inline-flex; align-items:center; gap:6px; text-decoration:none; cursor:pointer; }
-.px-actrow .fn { font-size:var(--t-xs); color:var(--accent-deep); opacity:.85; }
-.px-um-h { font-family:inherit; width:100%; border:none; cursor:pointer; text-align:start; }
-.px-um-r { display:grid; grid-template-columns:minmax(0,1.2fr) 110px minmax(0,1fr) auto; gap:var(--s3); align-items:center;
-  min-height:52px; padding:var(--s1) var(--s3); border-bottom:1px solid var(--line-soft); font-size:var(--t-sm); }
-.px-um-r .nm { color:var(--ink); font-weight:500; border-block-end:1px dashed var(--s-off-mark); justify-self:start; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-um-r .k { font-size:var(--t-xs); color:var(--muted); }
-.px-um-r .fn { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-um-r .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-.px-um-r select, .px-sel { font-family:inherit; height:32px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; max-width:190px; }
-.px-um-r .btn { height:32px; padding-inline:10px; font-size:var(--t-xs); }
-.px-toggle { font-family:inherit; height:36px; font-size:var(--t-sm); font-weight:500; color:var(--ink-2); background:var(--paper);
-  border:none; box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-sm); padding-inline:12px; cursor:pointer; flex:none;
-  display:inline-flex; align-items:center; gap:6px; }
-.px-toggle[aria-pressed="true"] { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
-
-@container oxl (max-width: 1099px) {
-  .px-t .ox-hr, .px-t .ox-r { grid-template-columns:minmax(180px,1fr) 150px 150px 128px 120px 32px; }
-  .px-c-tg { display:none !important; }
-  .px-c-ach .px-tgsub { display:inline !important; }
-}
-.px-tgsub { display:none; }
-@container oxl (max-width: 899px) {
-  .px-t .ox-hr { display:none; }
-  .px-t .ox-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
-  .px-t .ox-r .px-c-nm { grid-row:1; grid-column:1; }
-  .px-t .ox-r .px-c-rd { grid-row:2; grid-column:1 / 3; flex-direction:row; align-items:center; gap:var(--s2); }
-  .px-t .ox-r .px-c-pr { grid-row:3; grid-column:1; }
-  .px-t .ox-r .px-c-ach { grid-row:3; grid-column:2; }
-  .px-t .ox-r .px-c-op { grid-row:4; grid-column:2; }
-  .px-t .ox-r .px-c-go { grid-row:1; grid-column:2; justify-self:end; }
-  .px-um-r { grid-template-columns:minmax(0,1fr); }
-}
-
-/* record */
-.px-back { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:600; color:var(--muted);
-  text-decoration:none; border-radius:var(--r-sm); align-self:flex-start; min-height:24px; }
-.px-back:hover { color:var(--accent-deep); }
-/* ===== the record header =====
-   It used to be a form: three bare selects for القطاع/القسم/المسؤول sitting where a title belongs,
-   so the first thing the record said was «fill me in» rather than «this is the product». The facts
-   are now read-only chips; each chip opens «البيانات», the tab that owns that write. */
-.px-rh { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
-  padding:var(--s4); display:flex; align-items:flex-start; gap:var(--s3); flex-wrap:wrap; }
-.px-rh .tt { flex:1 1 320px; min-width:0; display:flex; flex-direction:column; gap:var(--s2); }
-.px-rh h1 { margin:0; font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); letter-spacing:0;
-  display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; overflow-wrap:anywhere; }
-.px-rh .meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.px-chip { font-family:inherit; display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); color:var(--muted);
-  background:var(--surface); border:1px solid var(--line-soft); border-radius:var(--r-pill); padding:4px 11px;
-  min-width:0; max-width:100%; text-align:start;
-  transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease), transform 160ms var(--ease); }
-.px-chip b { font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-chip.none b { font-weight:450; color:var(--muted-2, var(--muted)); }
-button.px-chip { cursor:pointer; }
-@media (hover:hover) and (pointer:fine) { button.px-chip:hover { background:var(--accent-wash); border-color:var(--accent-mark); } }
-button.px-chip:active { transform:scale(0.97); }
-button.px-chip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-.px-rh .end { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; position:relative; }
-.px-rh .end .btn { height:38px; font-size:var(--t-sm); }
-@media (pointer: coarse) { button.px-chip { min-height:36px; } }
-.px-why { font-size:var(--t-xs); color:var(--s-attn-text); max-width:220px; line-height:1.4; }
-.px-menu { position:absolute; inset-block-start:calc(100% + 4px); inset-inline-end:0; z-index:var(--z-dropdown); background:var(--paper);
-  border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); min-width:220px; padding:4px; }
-.px-menu button { font-family:inherit; display:flex; width:100%; min-height:40px; align-items:center; gap:8px; padding-inline:12px; background:transparent;
-  border:none; border-radius:var(--r-sm); font-size:var(--t-sm); color:var(--ink); cursor:pointer; text-align:start; }
-.px-menu button:hover { background:var(--accent-wash); }
-.px-menu button[aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
-.px-menu .why { font-size:var(--t-xs); color:var(--muted); padding:0 12px 8px; line-height:1.5; }
-/* ===== the product record's hero: what this product is asked to sell, and where it stands =====
-   The record opened on three inline editors and a wall of sections; the questions a product manager
-   actually arrives with — «هل نحن على المستهدف؟» and «هل يستطيع المساعد بيعه؟» — were four scrolls
-   apart. The hero answers both in one band, and the switcher moves between products without a trip
-   back to the list (the founder's prototype puts one at the top of every product screen). */
-.px-hero { display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:var(--s3); margin-block:var(--s3); }
-.px-hi { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4);
-  display:flex; flex-direction:column; gap:4px; min-width:0; }
-.px-hi .l { font-size:var(--t-xs); color:var(--muted); }
-.px-hi .n { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2; }
-.px-hi .n.none { color:var(--muted); font-size:var(--t-md); }
-.px-hi .s { font-size:var(--t-xs); color:var(--muted); }
-.px-hi.lead .n { color:var(--accent-deep); }
-.px-hi .meter { height:8px; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden; margin-block-start:6px; }
-.px-hi .meter i { display:block; height:100%; border-radius:var(--r-pill); background:var(--accent);
-  transition:width 320ms cubic-bezier(0.23, 1, 0.32, 1); }
-.px-hi.ok .meter i { background:var(--s-ok-text, #12633F); }
-.px-hi.warn .meter i { background:var(--s-attn-mark, #B37F00); }
-/* the switcher: a scrollable rail of every live product, current one held */
-.px-sw { display:flex; gap:6px; overflow-x:auto; padding-block:var(--s2); scrollbar-width:none; }
-.px-sw::-webkit-scrollbar { display:none; }
-.px-swb { flex:none; font-family:inherit; font-size:var(--t-xs); font-weight:500; color:var(--ink-2);
-  background:var(--paper); border:1px solid var(--line); border-radius:var(--r-pill); padding:7px 14px;
-  cursor:pointer; text-decoration:none; white-space:nowrap;
-  transition:background var(--fast) var(--ease), color var(--fast) var(--ease), border-color var(--fast) var(--ease), transform 160ms var(--ease); }
-@media (hover:hover) and (pointer:fine) { .px-swb:hover { background:var(--surface); } }
-.px-swb:active { transform:scale(0.97); }
-.px-swb[aria-current="page"] { background:var(--accent-tint); color:var(--accent-deep); border-color:var(--accent-mark); font-weight:600; }
-@media (prefers-reduced-motion: reduce) { .px-hi .meter i, .px-swb { transition:none; } }
-@media (pointer: coarse) { .px-swb { min-height:44px; display:inline-flex; align-items:center; } }
-/* ===== the record's own tab rail =====
-   Five sections stacked in one column meant «المعرفة» — the thing that decides whether the assistant
-   can sell the product at all — was the fourth scroll down, and the founder read it as living outside
-   the record. Each section is now a destination with its own name, «معرفة المنتج» among them, and the
-   rail sticks so the record never loses its place. Same gliding-indicator idiom as the deal drawer. */
-.px-tabs { position:sticky; inset-block-start:0; z-index:var(--z-sticky); display:flex; gap:2px; margin-block:var(--s3) 0;
-  padding-block-start:var(--s2); border-block-end:1px solid var(--line); overflow-x:auto; scrollbar-width:none;
-  background:color-mix(in srgb, var(--canvas) 86%, transparent); backdrop-filter:blur(8px); }
-.px-tabs::-webkit-scrollbar { display:none; }
-.px-tab { position:relative; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--muted);
-  background:none; border:0; cursor:pointer; padding:9px 14px 12px; white-space:nowrap; border-radius:var(--r-sm) var(--r-sm) 0 0;
-  display:inline-flex; align-items:center; gap:7px;
-  transition:color var(--fast) var(--ease), background var(--fast) var(--ease); }
-.px-tab .n { font-size:var(--t-xs); font-variant-numeric:tabular-nums; color:var(--muted);
-  background:var(--surface-2); border-radius:var(--r-pill); padding:1px 7px; }
-.px-tab .dot { width:6px; height:6px; border-radius:50%; background:var(--s-attn-mark, #B37F00); flex:none; }
-.px-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.px-tab[aria-selected="true"] { color:var(--accent-deep); font-weight:600; }
-.px-tab[aria-selected="true"] .n { color:var(--accent-deep); background:var(--accent-tint); }
-@media (hover:hover) and (pointer:fine) { .px-tab:not([aria-selected="true"]):hover { color:var(--ink); background:var(--surface); } }
-.px-tab:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-.px-tabs .ind { position:absolute; inset-block-end:-1px; height:2px; background:var(--accent); border-radius:var(--r-pill);
-  transition:transform 240ms cubic-bezier(0.77, 0, 0.175, 1), width 240ms cubic-bezier(0.77, 0, 0.175, 1); }
-.px-tabs .ind.noanim { transition:none; }
-@media (pointer: coarse) { .px-tab { min-height:44px; } }
-/* Entering content, so ease-OUT and a 4px rise — never scale(0): nothing arrives out of nothing. */
-.px-pane { animation:pxPane 200ms cubic-bezier(0.23, 1, 0.32, 1) both; }
-@keyframes pxPane { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
-@media (prefers-reduced-motion: reduce) {
-  .px-tabs .ind { transition:none; }
-  .px-pane { animation:none; }
-}
-/* «البيانات»: the editors the header used to wear, given a form's own shape and labels */
-.px-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:var(--s3); }
-.px-form .px-fl { display:flex; flex-direction:column; gap:5px; min-width:0; }
-.px-form label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-.px-form select, .px-form input { font-family:inherit; height:38px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
-  border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:10px; width:100%; min-width:0; }
-.px-form select:focus, .px-form input:focus { outline:none; box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
-.px-form select:disabled, .px-form input:disabled { background:var(--surface); color:var(--muted); }
-.px-form .row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:18px; }
-.px-rec { display:grid; grid-template-columns:minmax(0,1fr); gap:var(--s3); align-items:start; }
-/* Below the two-column breakpoint the related links come AFTER the open tab. Readiness moved to the
-   band, so the rail is no longer the record's answer — the tab the reader just chose is, and putting
-   the rail first pushed that tab's content off the first screen on a phone. */
-.px-side { display:flex; flex-direction:column; gap:var(--s3); order:1; }
-@container pxw (min-width: 1100px) {
-  .px-rec { grid-template-columns:minmax(0,1fr) 320px; }
-  .px-side { position:sticky; inset-block-start:var(--s3); order:0; }
-}
-/* The shared summary panel narrows on the opportunities container (oxw); this section is its own
-   container (pxw), so the same narrow rules are restated here or the phone summary never stacks. */
-@container pxw (max-width: 760px) {
-  .px .ox-sum { grid-template-columns:minmax(0,1fr); padding:var(--s3); gap:var(--s3); }
-  .px .ox-mets { width:100%; }
-  .px .ox-met { flex:1 1 0; min-width:0; padding:6px var(--s2); }
-  .px .ox-met .n { font-size:var(--t-lg); }
-  .px .ox-met .l { white-space:normal; line-height:1.35; }
-  .px .ox-fig { font-size:var(--t-xl); margin-block:2px var(--s2); }
-  .px .ox-figsub { display:block; margin-inline-start:0; margin-top:2px; }
-  .px .ox-leg { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:2px var(--s2); margin-top:var(--s2); }
-  .px .ox-lg { width:100%; justify-content:flex-start; border-radius:var(--r-sm); min-height:40px; padding:4px 6px; }
-  .px .ox-lg > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-  /* the ZIP file name is a detail; at phone width it broke into a five-line column beside the sentence */
-  .px .px-actrow { flex-wrap:wrap; }
-  .px .px-actrow .fn { display:none; }
-}
-.px-main { display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
-.px-sec { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); min-width:0; scroll-margin-top:var(--s4); }
-.px-sech { display:flex; align-items:center; gap:var(--s2); min-height:48px; padding:0 var(--s4); border-bottom:1px solid var(--line-soft); }
-.px-sech h2 { margin:0; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.px-sech .src { font-size:var(--t-xs); color:var(--muted); }
-.px-sech .sp { flex:1; }
-.px-secb { padding:var(--s3) var(--s4) var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
-.px-fig { font-size:var(--t-2xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); font-variant-numeric:tabular-nums; }
-.px-fig.none { color:var(--muted); font-weight:500; font-size:var(--t-lg); }
-.px-note { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
-.px-stats { display:flex; gap:var(--s4); flex-wrap:wrap; }
-.px-stat { display:flex; flex-direction:column; gap:2px; }
-.px-stat .l { font-size:var(--t-xs); color:var(--muted); }
-.px-stat .v { font-size:var(--t-md); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; }
-.px-qbar { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:var(--s2); }
-.px-qc { display:flex; flex-direction:column; gap:4px; }
-.px-qc .trk { height:8px; border-radius:var(--r-pill); background-color:var(--surface-2); overflow:hidden; }
-.px-qc .trk.not { background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
-.px-qc .trk i { display:block; height:100%; background:var(--accent); border-radius:var(--r-pill); }
-.px-qc .l { font-size:var(--t-xs); color:var(--muted); display:flex; justify-content:space-between; gap:4px; }
-.px-list { display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; }
-.px-li { font-family:inherit; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:var(--s3); align-items:center; min-height:44px;
-  padding:var(--s1) var(--s3); background:transparent; border:none; text-align:start; cursor:pointer; font-size:var(--t-sm); color:var(--ink); text-decoration:none; }
-.px-li + .px-li { border-top:1px solid var(--line-soft); }
-.px-li:hover { background:var(--accent-wash); }
-.px-li .a { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.px-li .s { font-size:var(--t-xs); color:var(--muted); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
-.px-li .v { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
-.px-more { font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); text-decoration:none; align-self:flex-start; min-height:24px; display:inline-flex; align-items:center; }
-
-.px-pk { display:flex; flex-direction:column; border:1px solid var(--line-soft); border-radius:var(--r-md); overflow:hidden; }
-.px-pkh, .px-pkr { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 72px 128px auto; gap:var(--s3); align-items:center; padding:0 var(--s3); }
-.px-pkh { min-height:36px; background:var(--surface); font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-.px-pkr { min-height:48px; border-top:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); }
-.px-pkr .end, .px-pkh .end { text-align:end; font-variant-numeric:tabular-nums; }
-.px-pkr .acts { display:flex; gap:6px; justify-content:flex-end; }
-.px-pkr .acts .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
-.px-pkr.retired { color:var(--muted); }
-.px-pke { border-top:1px solid var(--line-soft); padding:var(--s3); background:var(--accent-wash); display:flex; flex-direction:column; gap:var(--s2); }
-.px-pke .g { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 96px 140px; gap:var(--s2); }
-.px-pke .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-.px-pke .acts .btn { height:34px; font-size:var(--t-sm); }
-.px-fl { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.px-fl label { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
-.px-fl .inp { width:100%; min-height:36px; height:36px; font-size:var(--t-sm); border-radius:var(--r-sm); }
-.px-fl .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
-.px-fl .inp[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.px-err { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; }
-.px-ok { font-size:var(--t-xs); color:var(--s-issued-text); }
-
-.px-q { display:grid; grid-template-columns:72px 176px minmax(0,1fr) 140px; gap:var(--s3); align-items:center; min-height:52px; border-top:1px solid var(--line-soft); }
-.px-q:first-of-type { border-top:none; }
-.px-q .lb { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.px-q .ach { font-size:var(--t-sm); color:var(--ink-2); font-variant-numeric:tabular-nums; }
-.px-q .cov { display:flex; flex-direction:column; gap:3px; }
-.px-q .cov .trk { height:6px; border-radius:var(--r-pill); background-color:var(--surface-2); overflow:hidden; }
-.px-q .cov .trk.not { background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
-.px-q .cov .trk i { display:block; height:100%; background:var(--accent); }
-.px-q .cov span { font-size:var(--t-xs); color:var(--muted); }
-.px-qf { display:flex; flex-direction:column; gap:3px; }
-.px-qf .inp { height:36px; min-height:36px; text-align:end; font-variant-numeric:tabular-nums; font-size:var(--t-sm); width:100%; }
-.px-confirm { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-xs); color:var(--s-attn-text); grid-column:1 / -1; padding-bottom:var(--s2); }
-.px-confirm .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
-.px-yr { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; }
-.px-yr button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--muted-2); background:transparent; border:none; border-radius:var(--r-sm); height:28px; padding-inline:10px; cursor:pointer; }
-.px-yr button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
-
-.px-file { display:grid; grid-template-columns:28px minmax(0,1fr) auto; gap:var(--s3); align-items:center; min-height:64px; border-top:1px solid var(--line-soft); padding-block:var(--s2); }
-.px-file:first-of-type { border-top:none; }
-.px-file .t { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.px-file .d { font-size:var(--t-xs); color:var(--muted); line-height:1.6; overflow-wrap:anywhere; }
-.px-file .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-.px-file .acts .btn, .px-file .acts .rv-hold { height:34px; font-size:var(--t-xs); padding-inline:12px; }
-.px-file .acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
-.px-draft { border:1px solid var(--s-attn-mark); border-radius:var(--r-md); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); background:var(--paper); }
-.px-draft .h { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); font-weight:600; color:var(--s-attn-text); }
-.px-draft .acts { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-.px-draft .acts .btn, .px-draft .acts .rv-hold { height:36px; font-size:var(--t-sm); padding-inline:14px; }
-.px-draft .acts .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
-.px-md { max-height:420px; overflow:auto; border:1px solid var(--line-soft); border-radius:var(--r-md); padding:var(--s3); line-height:var(--lh-loose); background:var(--paper); }
-.px-acc > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--s2); min-height:40px; font-size:var(--t-sm); font-weight:600; color:var(--ink); border-radius:var(--r-sm); }
-.px-acc > summary::-webkit-details-marker { display:none; }
-.px-acc > summary .ox-ico { transition:transform var(--base) var(--ease); }
-.px-acc[open] > summary .ox-ico { transform:rotate(180deg); }
-.px-acc > summary .src { font-size:var(--t-xs); font-weight:450; color:var(--muted); }
-
-.px-rd { display:flex; flex-direction:column; }
-.px-rdr { display:grid; grid-template-columns:16px minmax(0,1fr) auto; gap:var(--s2); align-items:center; min-height:44px; border-top:1px solid var(--line-soft); padding-block:4px; }
-.px-rdr:first-child { border-top:none; }
-.px-rdr i { width:16px; height:6px; border-radius:var(--r-sm); background:var(--s-issued); display:block; }
-.px-rdr i.miss { background-color:var(--surface-2); background-image:repeating-linear-gradient(115deg, var(--s-off-mark) 0 1px, transparent 1px 4px); }
-.px-rdr i.pend { background:var(--s-attn-mark); }
-.px-rdr .n { font-size:var(--t-sm); color:var(--ink); }
-.px-rdr .st { font-size:var(--t-xs); color:var(--muted); line-height:1.4; }
-.px-rdr .go { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:transparent; border:none; cursor:pointer; min-height:28px; padding-inline:6px; border-radius:var(--r-sm); white-space:nowrap; }
-.px-rdf { font-size:var(--t-xs); font-weight:600; padding-top:var(--s2); border-top:1px solid var(--line-soft); }
-.px-rdf.no { color:var(--s-attn-text); } .px-rdf.ok { color:var(--s-issued-text); }
-.px-lk { font-family:inherit; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s2); align-items:center; min-height:44px; width:100%;
-  background:transparent; border:none; border-top:1px solid var(--line-soft); text-align:start; cursor:pointer; font-size:var(--t-sm); color:var(--ink); padding:0; }
-.px-lk:first-child { border-top:none; }
-.px-lk:hover .l { color:var(--accent-deep); }
-.px-lk .v { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; display:inline-flex; gap:6px; align-items:center; font-variant-numeric:tabular-nums; }
-.px-lk .v b { color:var(--ink); font-weight:600; font-size:var(--t-sm); }
-.px-foot { font-size:var(--t-xs); color:var(--muted); padding-inline:var(--s1); }
 
 /* The readiness band, which replaces the tab strip on a product record. It lives inside .subnav
    (36px), so it is one line that scrolls sideways rather than a block that grows the header. */
@@ -496,31 +168,116 @@ button.px-chip:focus-visible { outline:2px solid var(--accent); outline-offset:2
   border:none; cursor:pointer; padding-inline:4px; border-radius:var(--r-sm); min-height:26px; }
 .px-band .go:hover { text-decoration:underline; }
 
-/* drawer + modal (own classes: the opportunities drawer owns .ox-dr and its keyboard handler) */
-.px-dr { position:fixed; inset-block:0; inset-inline-start:0; width:min(520px,100vw); background:var(--paper);
-  border-inline-end:1px solid var(--line); box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); z-index:var(--z-modal);
-  display:flex; flex-direction:column; transform:translateX(100%); opacity:0;
-  transition:transform var(--base) var(--ease), opacity var(--fast) var(--ease); }
-[dir="ltr"] .px-dr { transform:translateX(-100%); }
-.px-dr.in, [dir="ltr"] .px-dr.in { transform:none; opacity:1; }
-.px-modal { position:fixed; inset:0; z-index:var(--z-modal); display:flex; align-items:flex-start; justify-content:center; padding:10vh var(--s3) var(--s3); pointer-events:none; }
-.px-modal .box { pointer-events:auto; width:100%; max-width:480px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
-  box-shadow:var(--sh-2, 0 6px 20px rgba(16,24,40,.10)); padding:var(--s4); display:flex; flex-direction:column; gap:var(--s3); }
-.px-modal h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); }
-.px-modal .acts { display:flex; gap:var(--s2); flex-wrap:wrap; }
-.px-modal .acts .btn { height:38px; font-size:var(--t-sm); }
-@media (prefers-reduced-motion: reduce) { .px-dr { transition:none; } }
-@media (max-width: 560px) {
-  .px-pkh { display:none; }
-  .px-pkr { grid-template-columns:minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s2); }
-  .px-pke .g { grid-template-columns:minmax(0,1fr); }
-  .px-q { grid-template-columns:minmax(0,1fr) minmax(0,1fr); row-gap:6px; padding-block:var(--s2); }
-  .px-q .lb { grid-column:1 / -1; }
-  .px-head .meta input { width:100%; }
-  .px-qbar { grid-template-columns:repeat(2, minmax(0,1fr)); }
+/* ============================================================================
+   THE PORTED SCREENS. Only what the m-* vocabulary genuinely lacks: overlay
+   geometry (a drawer, a modal, a menu), one scrolling rail, and the two or
+   three block/reset rules a vocabulary of text scales cannot supply.
+   ============================================================================ */
+
+/* The readiness cells are shared with the un-ported band, so they keep their
+   markup and take the new palette here rather than growing a second function. */
+.ds6 .px-cells i { background: var(--m-ok); }
+.ds6 .px-cells i.miss { background-color: var(--m-sunk); background-image:
+  repeating-linear-gradient(115deg, var(--m-line-2) 0 1px, transparent 1px 4px); }
+.ds6 .px-cells i.pend { background: var(--m-warn); }
+
+/* .m-meta is a text scale, not a block: a table cell's sub-line needs the line break. */
+.ds6 .m-table .m-meta, .ds6 .m-item .m-meta { display: block; font-weight: 400; }
+/* A chip that is also a control. The vocabulary gives it its colour; this gives it a button reset. */
+.ds6 button.m-chip { font: inherit; border: 0; cursor: pointer; text-align: start;
+  transition: transform var(--m-press) var(--m-ease); }
+.ds6 button.m-chip:active { transform: scale(.97); }
+.ds6 .px-acts { display: flex; align-items: center; gap: var(--m-2); flex-wrap: wrap; }
+.ds6 .px-acts--end { justify-content: flex-end; }
+.ds6 .px-meta { flex-wrap: wrap; }
+/* A label a screen reader needs and a sighted reader already has from the column head. */
+.ds6 .px-sr { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; }
+/* A segmented control that is a set of independent toggles has to be allowed to wrap. */
+.ds6 .px-wrapseg { display: flex; flex-wrap: wrap; }
+/* The toolbar's filters. Each control keeps its own width rather than stretching to the row. */
+.ds6 .px-filters { display: flex; align-items: center; gap: var(--m-2); flex-wrap: wrap; min-inline-size: 0; }
+.ds6 .px-filters .m-input, .ds6 .px-filters .m-select { inline-size: auto; min-inline-size: 148px; }
+/* A card's body: the sections inside a record pane are stacked, never crammed. */
+.ds6 .px-secb { display: flex; flex-direction: column; gap: var(--m-4); min-inline-size: 0; }
+.ds6 .m-dlg__b > * + * { margin-block-start: var(--m-4); }
+/* A related-population row is a control, not a link: same row, a button's reset. */
+.ds6 button.m-item { font: inherit; inline-size: 100%; background: transparent; border: 0;
+  border-block-start: 1px solid var(--m-line); cursor: pointer; text-align: start; color: inherit;
+  transition: background var(--m-out) var(--m-ease); }
+.ds6 button.m-item:first-child { border-block-start: 0; }
+@media (hover: hover) and (pointer: fine) { .ds6 button.m-item:hover { background: var(--m-page); } }
+/* A quarter row carries money, not a two-digit count: the value column is given the room. */
+.ds6 .px-qrow { grid-template-columns: minmax(0, 1fr) 120px minmax(0, auto); }
+/* The tab that needs completing. A dot, because the count beside it is already the figure. */
+.ds6 .px-tab-dot { inline-size: 6px; block-size: 6px; border-radius: 50%; background: var(--m-warn); flex: 0 0 auto; }
+
+/* The switcher rail: every live product, current one held. A horizontal scroller
+   is not a segmented control and not a tab strip — it is its own thing. */
+.ds6 .px-sw { display: flex; gap: var(--m-1); overflow-x: auto; padding-block: var(--m-2);
+  scrollbar-width: none; }
+.ds6 .px-sw::-webkit-scrollbar { display: none; }
+.ds6 .px-sw > .m-btn { flex: 0 0 auto; }
+.ds6 .px-sw > .m-btn[aria-current="page"] { background: var(--m-ac-dim);
+  border-color: var(--m-ac-line); color: var(--m-ac-deep); }
+
+/* The record's tab rail sticks, so the record never loses its place. */
+.ds6 .px-tabs { position: sticky; inset-block-start: 0; z-index: var(--z-sticky, 100);
+  background: var(--m-page); margin-block: var(--m-4) var(--m-5); }
+.ds6 .px-tabs .m-tab .m-chip { pointer-events: none; }
+/* Entering content, so a 4px rise over --m-in — never scale(0): nothing arrives out of nothing. */
+.ds6 .px-pane { animation: pxPane var(--m-in) var(--m-ease) both; }
+@keyframes pxPane { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* The record body: the open tab, with the related-population rail beside it. */
+.ds6 .px-rec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--m-4); align-items: start; }
+.ds6 .px-main { display: flex; flex-direction: column; gap: var(--m-4); min-inline-size: 0; }
+.ds6 .px-side { display: flex; flex-direction: column; gap: var(--m-4); order: 1;
+  background: transparent; color: var(--m-ink-2); }
+@media (min-width: 1100px) {
+  .ds6 .px-rec { grid-template-columns: minmax(0, 1fr) 320px; }
+  .ds6 .px-side { position: sticky; inset-block-start: var(--m-4); order: 0; }
 }
-@media (pointer:coarse) {
-  .px-toggle, .px-sel, .px-um-r select, .px-rdr .go, .px-li, .px-lk { min-height:44px; }
+
+/* The approved / draft knowledge text: a bounded, scrollable reading box. */
+.ds6 .px-md { max-block-size: 420px; overflow: auto; border: 1px solid var(--m-line);
+  border-radius: var(--m-r-ctl); padding: var(--m-4); line-height: 1.9; background: var(--m-paper); }
+
+/* A quarter track that carries «no target» as a texture, not as a zero-width bar. */
+.ds6 .px-nott { background-image:
+  repeating-linear-gradient(115deg, var(--m-line-2) 0 1px, transparent 1px 4px); }
+.ds6 .m-seg-row__b.px-nott i { inline-size: 0; }
+
+/* ---- overlay geometry: a side drawer, a centred modal, an actions menu ---- */
+.ds6 .px-scrim { position: fixed; inset: 0; z-index: var(--z-modal, 400);
+  background: rgba(11,13,18,.44); opacity: 0; transition: opacity var(--m-out) var(--m-ease); }
+.ds6 .px-scrim.in { opacity: 1; }
+.ds6 .px-dr { position: fixed; inset-block: 0; inset-inline-start: 0; inline-size: min(520px, 100vw);
+  z-index: var(--z-modal, 400); background: var(--m-paper); border-inline-end: 1px solid var(--m-line);
+  box-shadow: var(--m-lift); display: flex; flex-direction: column;
+  transform: translateX(100%); opacity: 0;
+  transition: transform var(--m-out) var(--m-ease), opacity var(--m-out) var(--m-ease); }
+[dir="ltr"] .ds6 .px-dr { transform: translateX(-100%); }
+.ds6 .px-dr.in, [dir="ltr"] .ds6 .px-dr.in { transform: none; opacity: 1; transition-duration: var(--m-in); }
+.ds6 .px-dr .m-dlg__b { flex: 1 1 auto; max-block-size: none; }
+.ds6 .px-modal { position: fixed; inset: 0; z-index: var(--z-modal, 400); display: flex;
+  align-items: flex-start; justify-content: center; padding: 10vh var(--m-3) var(--m-3);
+  pointer-events: none; }
+.ds6 .px-modal .box { pointer-events: auto; inline-size: 100%; max-inline-size: 480px; }
+.ds6 .px-menu { position: absolute; inset-block-start: calc(100% + 4px); inset-inline-end: 0;
+  z-index: var(--z-dropdown, 200); background: var(--m-paper); border: 1px solid var(--m-line);
+  border-radius: var(--m-r-ctl); box-shadow: var(--m-lift); min-inline-size: 240px; padding: var(--m-1); }
+.ds6 .px-menu button { font: inherit; display: flex; inline-size: 100%; min-block-size: 44px;
+  align-items: center; gap: var(--m-2); padding-inline: var(--m-3); background: transparent;
+  border: 0; border-radius: var(--m-r-ctl); font-size: 14px; color: var(--m-ink); cursor: pointer;
+  text-align: start; }
+@media (hover: hover) and (pointer: fine) { .ds6 .px-menu button:hover { background: var(--m-page); } }
+.ds6 .px-menu button[aria-disabled="true"] { color: var(--m-faint); cursor: not-allowed; }
+.ds6 .px-rel { position: relative; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds6 .px-dr, .ds6 .px-scrim { transition: none; }
+  .ds6 .px-pane { animation: none; }
 }
 `;
 

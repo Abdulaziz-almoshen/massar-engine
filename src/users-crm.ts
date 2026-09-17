@@ -9,65 +9,72 @@
 // the server keeps only its hash — so the sheet says so and offers a copy button. The audit screen reads the
 // log every successful write leaves.
 //
-// GRAMMAR. Settings table (.cf-sec/.cf-hr/.cf-r), .cf-pill, the account sheet (.ac-scrim/.ac-modal/.ac-box).
+// GRAMMAR. PORTED to the new design system (docs/PORT-SPEC.md): both screens are wrapped in .ds6 and
+// drawn in the m-* vocabulary — m-card objects, real m-table tables inside m-tablewrap, m-chip for role
+// and status, m-btn / m-link for every action, m-field / m-label / m-input / m-select in the sheet, and
+// the sheet panel itself in m-dlg__p / __h / __b / __f. Every digit goes through .m-n.
+//
+// THE ONE PLACE A DASH SURVIVES is the permissions matrix. There the dash IS the value, read down a
+// column against «✓» and «عرض»; replacing it with a worded absence would break the row's grammar. Every
+// other empty cell carries one of the three absence kinds (PORT-SPEC 4).
+//
+// The scrim and its positioning (.ac-scrim/.ac-modal) stay: they are the account sheet's, shared with
+// screens that are not ported, and the vocabulary has no non-<dialog> overlay.
 // MOTION: the sheet's 200ms/140ms; nothing else animates.
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const USERS_CRM_CSS = `
-.us { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:usw; }
-.us-sec .hd { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); }
-.us-sec .hd h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
-.us-sec .hd .s { font-size:var(--t-xs); color:var(--muted); }
-.us-sec .hd .sp { flex:1; }
-.us-sec .hd .btn { height:34px; display:inline-flex; align-items:center; gap:6px; }
-.us-t .cf-hr, .us-t .cf-r { grid-template-columns:minmax(160px,1.4fr) minmax(0,1fr) minmax(0,1fr) 90px 110px minmax(200px,auto); column-gap:var(--s2); }
-.us-t .acts { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
-.us-t .acts .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
-.us-hint { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:var(--t-xs); color:var(--muted); direction:ltr; unicode-bidi:isolate; }
-.cf-pill.rl-admin { background:var(--accent-tint); color:var(--accent-deep); }
-.cf-pill.rl-partner { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.st-disabled { background:var(--surface-2); color:var(--muted); }
-.us-mx { overflow-x:auto; }
-.us-mx table { width:100%; border-collapse:collapse; font-size:var(--t-sm); min-width:620px; }
-.us-mx th { font-size:var(--t-xs); font-weight:600; color:var(--muted); background:var(--surface); padding:8px var(--s3); text-align:center; white-space:nowrap; }
-.us-mx th:first-child, .us-mx td:first-child { text-align:start; }
-.us-mx td { padding:8px var(--s3); border-top:1px solid var(--line-soft); text-align:center; color:var(--ink); }
-.us-mx .full { color:var(--s-issued-text); font-weight:600; }
-.us-mx .view { color:var(--accent-deep); }
-.us-mx .none { color:var(--muted); }
-.us-mx caption { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
-.us-roles { display:flex; flex-direction:column; gap:6px; }
-.us-role { display:flex; gap:var(--s2); align-items:flex-start; text-align:start; font-family:inherit; border:none; border-radius:var(--r-md); padding:10px 12px; cursor:pointer;
-  background:var(--paper); box-shadow:inset 0 0 0 1px var(--line); color:var(--ink); }
-.us-role[aria-checked="true"] { box-shadow:inset 0 0 0 2px var(--accent); background:var(--accent-wash); }
-.us-role .t { font-size:var(--t-sm); font-weight:600; }
-.us-role .d { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
-.us-role i { width:16px; height:16px; flex:none; border-radius:var(--r-pill); box-shadow:inset 0 0 0 1.5px var(--s-off-mark); margin-top:2px; }
-.us-role[aria-checked="true"] i { box-shadow:inset 0 0 0 5px var(--accent); }
-.us-tok { display:flex; flex-direction:column; gap:var(--s2); border-radius:var(--r-md); padding:var(--s3); background:var(--s-attn-soft); color:var(--s-attn-text); }
-.us-tok .v { display:flex; gap:var(--s2); align-items:center; flex-wrap:wrap; }
-.us-tok code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:var(--t-sm); background:var(--paper); color:var(--ink); padding:6px 10px; border-radius:var(--r-sm); direction:ltr; unicode-bidi:isolate; word-break:break-all; }
-.au-f { display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); background:var(--surface); }
-.au-f select { font-family:inherit; height:34px; max-width:240px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; }
-.au-row { display:grid; grid-template-columns:130px minmax(140px,1fr) minmax(180px,1.6fr) minmax(0,1.4fr); gap:var(--s2); padding:10px var(--s4); border-top:1px solid var(--line-soft); font-size:var(--t-sm); align-items:baseline; }
-.au-row time { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
-.au-row .who .r { display:block; font-size:var(--t-xs); color:var(--muted); }
-.au-row .dt { display:flex; gap:4px; flex-wrap:wrap; }
-.au-row .dt span { font-size:var(--t-xs); background:var(--surface); border-radius:var(--r-pill); padding:0 8px; color:var(--ink); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.us-deny { padding:var(--s5, 32px) var(--s4); text-align:center; display:flex; flex-direction:column; gap:var(--s2); align-items:center; }
-.us-deny b { font-size:var(--t-md); color:var(--ink); }
-.us-deny span { font-size:var(--t-sm); color:var(--muted); }
-.us .btn:active, .us-role:active { transform:scale(.97); }
-.us .btn, .us-role { transition:transform 140ms var(--ease), background var(--fast) var(--ease), box-shadow var(--fast) var(--ease); }
-.us button:focus-visible, .us select:focus-visible, .us-role:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@container usw (max-width: 860px) {
-  .us-t .cf-hr { display:none; }
-  .us-t .cf-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
-  .us-t .cf-r > :first-child, .us-t .acts { grid-column:1 / -1; justify-content:flex-start; }
-  .au-row { grid-template-columns:minmax(0,1fr); gap:2px; }
-}
-@media (prefers-reduced-motion: reduce) { .us .btn, .us-role { transition:none; } .us .btn:active, .us-role:active { transform:none; } }
+.ds6 .us { display:flex; flex-direction:column; gap:var(--m-4); container-type:inline-size; container-name:usw; }
+.ds6 .us-tbl { min-inline-size: 760px; }
+/* The last four of a token. Monospace so a hint is comparable character by character. */
+.ds6 .us-hint { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:var(--m-t-cap);
+  color:var(--m-mut); direction:ltr; unicode-bidi:isolate; }
+.ds6 .us-acts { display:flex; gap:var(--m-2); flex-wrap:wrap; justify-content:flex-end; }
+.ds6 .us-acts .m-btn { min-block-size:36px; padding-inline:12px; font-size:var(--m-t-cap); }
+/* The permissions matrix: a grid of marks, centred, read down a column. */
+.ds6 .us-mx { min-inline-size:620px; }
+.ds6 .us-mx th, .ds6 .us-mx td { text-align:center; }
+.ds6 .us-mx th:first-child, .ds6 .us-mx td:first-child { text-align:start; }
+/* The row header names the function; it reads as a row name, not as a column head. */
+.ds6 .us-mx th[scope="row"] { color:var(--m-ink); font-weight:600; background:transparent;
+  border-block-start:1px solid var(--m-line); border-block-end:0; block-size:auto; }
+.ds6 .us-mx td.full { color:var(--m-ok); font-weight:700; }
+.ds6 .us-mx td.view { color:var(--m-ac-deep); }
+.ds6 .us-mx td.none { color:var(--m-faint); }
+.ds6 .us-mx caption { position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+/* A radio LIST, not a chip row: each role carries a sentence saying what it opens. */
+.ds6 .us-roles { display:flex; flex-direction:column; gap:6px; }
+.ds6 .us-role { display:flex; gap:var(--m-2); align-items:flex-start; text-align:start; font:inherit;
+  border:1px solid var(--m-line); border-radius:var(--m-r-ctl); padding:10px 12px; cursor:pointer;
+  background:var(--m-paper); color:var(--m-ink);
+  transition:background var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease),
+             transform var(--m-press) var(--m-ease); }
+.ds6 .us-role[aria-checked="true"] { border-color:var(--m-ac); background:var(--m-ac-dim); }
+.ds6 .us-role .t { font-size:var(--m-t-body); font-weight:600; }
+.ds6 .us-role .d { font-size:var(--m-t-cap); color:var(--m-mut); line-height:1.6; }
+.ds6 .us-role i { inline-size:16px; block-size:16px; flex:none; border-radius:var(--m-r-chip);
+  box-shadow:inset 0 0 0 1.5px var(--m-line-2); margin-block-start:2px; }
+.ds6 .us-role[aria-checked="true"] i { box-shadow:inset 0 0 0 5px var(--m-ac); }
+.ds6 .us-role:active { transform:scale(.97); }
+.ds6 .us-role:focus-visible { outline:none; box-shadow:var(--m-focus); }
+/* The token, shown once. A warning surface, because it cannot be recovered. */
+.ds6 .us-tok { display:flex; flex-direction:column; gap:var(--m-2); border-radius:var(--m-r-ctl);
+  padding:var(--m-3); background:var(--m-warn-dim); color:var(--m-warn);
+  box-shadow:0 0 0 1px var(--m-warn-line); }
+.ds6 .us-tok .v { display:flex; gap:var(--m-2); align-items:center; flex-wrap:wrap; }
+.ds6 .us-tok code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:var(--m-t-body);
+  background:var(--m-paper); color:var(--m-ink); padding:6px 10px; border-radius:var(--m-r-ctl);
+  direction:ltr; unicode-bidi:isolate; word-break:break-all; }
+.ds6 .au-f { display:flex; gap:var(--m-2); flex-wrap:wrap; align-items:center;
+  padding:var(--m-3) var(--m-5); border-block-end:1px solid var(--m-line); }
+.ds6 .au-f .m-select { inline-size:auto; max-inline-size:240px; }
+.ds6 .au-tbl { min-inline-size:720px; }
+.ds6 .au-tbl time { color:var(--m-mut); font-size:var(--m-t-cap); white-space:nowrap; }
+.ds6 .au-tbl .dt { display:flex; gap:4px; flex-wrap:wrap; }
+.ds6 .au-tbl .dt span { font-size:var(--m-t-micro); background:var(--m-sunk); border-radius:var(--m-r-chip);
+  padding:1px 8px; color:var(--m-ink-2); max-inline-size:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (prefers-reduced-motion: reduce) { .ds6 .us-role { transition:none; } .ds6 .us-role:active { transform:none; } }
 `;
 
 export const USERS_CRM_JS = `
@@ -102,9 +109,20 @@ function meDoorTarget(door) {
   for (var i = 0; i < subs.length; i++) if (meCanOpen(subs[i][0])) return subs[i][0];
   return "";
 }
+/* Every digit through .m-n (PORT-SPEC 3). */
+function usN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+/* kind: owed · unset · none. The permissions matrix is the one place a bare dash survives, because
+   there the dash IS the value, read against a column of check marks (PORT-SPEC 4). */
+function usNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
+function usPl(n, one, two, few, many) {
+  return (typeof opPl === "function") ? opPl(n, one, two, few, many) : (fmtN(n) + " " + many);
+}
 function vDenied(route) {
-  return '<div class="us"><section class="cf-sec"><div class="us-deny" role="alert"><b>لا تملك صلاحية فتح هذه الشاشة</b><span>دورك: ' + esc(ME ? ME.roleLabel : "") +
-    ". اطلب الصلاحية من مدير النظام.</span>" + '<a class="btn btn-ghost" href="#' + esc(ME ? ME.home : "home") + '" style="text-decoration:none">العودة إلى شاشتك</a></div></section></div>';
+  return '<div class="ds6"><div class="us"><section class="m-card"><div class="m-empty" role="alert">' +
+    '<p class="m-empty__t">لا تملك صلاحية فتح هذه الشاشة</p>' +
+    '<p class="m-empty__d">دورك: ' + esc(ME ? ME.roleLabel : "") + ". اطلب الصلاحية من مدير النظام.</p>" +
+    '<p class="m-empty__a"><a class="m-btn" href="#' + esc(ME ? ME.home : "home") + '">العودة إلى شاشتك</a></p>' +
+    "</div></section></div></div>";
 }
 
 /* ---------------- users ---------------- */
@@ -115,7 +133,9 @@ function usLoad(force) {
   pxGet("/admin/users").then(function (j) { usData = j; usFailed = false; }).catch(function () { usFailed = true; })
     .then(function () { usLoading = false; render(false); });
 }
-function usWhen(ms) { return ms ? new Date(Number(ms)).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short" }) : "—"; }
+/* A date that was never recorded is not a dash: it is a fact nobody wrote yet. */
+function usWhen(ms) { return ms ? new Date(Number(ms)).toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "short" }) : ""; }
+function usWhenCell(ms, absent) { return ms ? esc(usWhen(ms)) : usNil(absent, "unset"); }
 function vUsers() {
   usLoad(false);
   setTimeout(function () {
@@ -123,36 +143,51 @@ function vUsers() {
     if (act && (location.hash || "").slice(1) === "users" && !document.getElementById("usnewtop"))
       act.innerHTML = '<button class="btn btn-teal ac-newtop" id="usnewtop" data-us="new">' + (typeof opIco === "function" ? opIco("plus") : "") + '<span class="lg">إضافة مستخدم</span><span class="sm">مستخدم</span></button>';
   }, 0);
-  var h = '<div class="us">';
-  if (!usData) return h + '<section class="cf-sec"><div class="cf-state"' + (usFailed ? ' role="alert">تعذّر تحميل المستخدمين.<button class="btn btn-ghost" data-us="retry">أعد المحاولة</button>' : ' role="status">جارٍ تحميل المستخدمين…') + "</div></section></div>" + usModal();
+  var h = '<div class="ds6"><div class="us">';
+  if (!usData) return h + '<section class="m-card"><p class="m-body"' + (usFailed ? ' role="alert">تعذّر تحميل المستخدمين. <button class="m-btn" data-us="retry">أعد المحاولة</button>' : ' role="status" aria-busy="true">جارٍ تحميل المستخدمين…') + "</p></section></div></div>" + usModal();
   var users = usData.users || [];
-  h += '<section class="cf-sec us-sec us-t"><div class="hd"><h2>المستخدمون</h2><span class="s">' + (users.length ? pluralizeArabic(users.length, "مستخدم واحد", "مستخدمان", "مستخدمين", "مستخدمًا", fmtN) : "") +
-    " · يدخل كل مستخدم برمزه، ويبقى الرمز الرئيسي لمدير النظام صالحًا</span></div>";
+  h += '<section class="m-card m-card--pad0"><div style="padding:var(--m-5) var(--m-5) 0">' +
+    '<header class="m-card__h"><div><h2 class="m-card__t">المستخدمون</h2><p class="m-meta">' +
+    (users.length ? usPl(users.length, "مستخدم واحد", "مستخدمان", "مستخدمين", "مستخدمًا") + " · " : "") +
+    "يدخل كل مستخدم برمزه، ويبقى الرمز الرئيسي لمدير النظام صالحًا</p></div></header></div>";
   if (!users.length) {
-    h += '<div class="crm-empty" style="padding:var(--s4)"><b>لا مستخدمون بعد</b>أضف لكل شخص حسابًا بدور من أدوار الوثيقة: تنفيذي، مدير منتج، مبيعات، شريك، مدير نظام. يرى كل دور ما يسمح به فقط.' +
-      '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="usnewempty" data-us="new">إضافة مستخدم</button></div></div>';
+    h += '<div class="m-empty"><p class="m-empty__t">لا مستخدمون بعد</p>' +
+      '<p class="m-empty__d">أضف لكل شخص حسابًا بدور من أدوار الوثيقة: تنفيذي، مدير منتج، مبيعات، شريك، مدير نظام. يرى كل دور ما يسمح به فقط.</p>' +
+      '<p class="m-empty__a"><button class="m-btn m-btn--primary" id="usnewempty" data-us="new">إضافة مستخدم</button></p></div>';
   } else {
-    h += '<div class="cf-t"><div class="cf-hr" role="row"><span>الاسم</span><span>الدور</span><span>الشريك</span><span>الرمز</span><span>آخر نشاط</span><span></span></div>';
+    h += '<div class="m-tablewrap"><table class="m-table us-tbl"><thead><tr>' +
+      "<th>الاسم</th><th>الدور</th><th>الشريك</th><th>الرمز</th><th>آخر نشاط</th><th></th>" +
+      "</tr></thead><tbody>";
     users.forEach(function (u) {
-      h += '<div class="cf-r"><span class="ac-nm"><span class="ac-clip">' + esc(u.name) + '</span><span class="cf-sub">أضافه ' + esc(u.createdBy === "اللوحة" ? "مدير النظام" : (u.createdBy || "—")) + " · " + usWhen(u.createdAt) + "</span></span>" +
-        '<span><span class="cf-pill rl-' + esc(u.role) + '">' + esc(ROLE_LABELS[u.role] || u.role) + "</span>" + (u.status === "disabled" ? ' <span class="cf-pill st-disabled">موقوف</span>' : "") + "</span>" +
-        '<span class="ac-clip">' + (u.partnerName ? esc(u.partnerName) : '<span class="cf-sub">—</span>') + "</span>" +
-        '<span class="us-hint" title="آخر أربعة أحرف من الرمز">…' + esc(u.tokenHint) + "</span>" +
-        '<span class="cf-sub">' + usWhen(u.lastSeenAt) + "</span>" +
-        '<span class="acts"><button class="btn btn-ghost" id="usedit' + u.id + '" data-us="edit" data-i="' + u.id + '">تعديل</button>' +
-        '<button class="btn btn-ghost" id="ustok' + u.id + '" data-us="token" data-i="' + u.id + '">رمز جديد</button></span></div>';
+      h += "<tr>" +
+        '<td class="m-td-n">' + esc(u.name) +
+          '<span class="m-meta" style="display:block">أضافه ' +
+          (u.createdBy === "اللوحة" ? "مدير النظام" : (u.createdBy ? esc(u.createdBy) : usNil("غير معروف", "unset"))) +
+          " · " + usWhenCell(u.createdAt, "بلا تاريخ") + "</span></td>" +
+        '<td><span class="m-chip' + (u.role === "admin" ? " m-chip--ac" : u.role === "partner" ? " m-chip--warn" : "") + '">' + esc(ROLE_LABELS[u.role] || u.role) + "</span>" +
+          (u.status === "disabled" ? ' <span class="m-chip">موقوف</span>' : "") + "</td>" +
+        "<td>" + (u.partnerName ? esc(u.partnerName) : usNil("ليس شريكًا", "none")) + "</td>" +
+        '<td><span class="us-hint" title="آخر أربعة أحرف من الرمز">…' + esc(u.tokenHint) + "</span></td>" +
+        "<td>" + usWhenCell(u.lastSeenAt, "لم يدخل بعد") + "</td>" +
+        '<td><span class="us-acts"><button class="m-btn" id="usedit' + u.id + '" data-us="edit" data-i="' + u.id + '">تعديل</button>' +
+        '<button class="m-btn" id="ustok' + u.id + '" data-us="token" data-i="' + u.id + '">رمز جديد</button></span></td></tr>';
     });
-    h += "</div>";
+    h += "</tbody></table></div>";
   }
   h += "</section>";
-  h += '<section class="cf-sec us-sec"><div class="hd"><h2>مصفوفة الصلاحيات</h2><span class="s">من الوثيقة (§22): ✓ صلاحية كاملة · عرض · — لا وصول</span></div><div class="us-mx"><table><caption>الصلاحيات حسب الدور</caption><thead><tr><th scope="col">الوظيفة</th>' +
+  /* THE MATRIX KEEPS ITS DASH. Here the dash is the value — «لا وصول» read down a column against ✓ and
+     «عرض» — and the legend above says so. This is PORT-SPEC 4's single stated exception. */
+  h += '<section class="m-card m-card--pad0"><div style="padding:var(--m-5) var(--m-5) 0">' +
+    '<header class="m-card__h"><div><h2 class="m-card__t">مصفوفة الصلاحيات</h2>' +
+    '<p class="m-meta">من الوثيقة (§22): ✓ صلاحية كاملة · عرض · — لا وصول</p></div></header></div>' +
+    '<div class="m-tablewrap"><table class="m-table us-mx"><caption>الصلاحيات حسب الدور</caption><thead><tr><th scope="col">الوظيفة</th>' +
     ROLES.map(function (r) { return '<th scope="col">' + esc(ROLE_LABELS[r]) + "</th>"; }).join("") + "</tr></thead><tbody>" +
     MATRIX_ROWS.map(function (row) {
-      return '<tr><th scope="row" style="background:none;font-weight:500;color:var(--ink)">' + esc(row.label) + "</th>" + ROLES.map(function (r) {
+      return '<tr><th scope="row">' + esc(row.label) + "</th>" + ROLES.map(function (r) {
         var c = matrixCell(r, row); return '<td class="' + c + '">' + (c === "full" ? "✓" : c === "view" ? "عرض" : "—") + "</td>";
       }).join("") + "</tr>";
     }).join("") + "</tbody></table></div></section>";
-  return h + "</div>" + usModal();
+  return h + "</div></div>" + usModal();
 }
 function usOpen(mode, id, from) {
   var u = mode === "edit" ? (usData.users || []).filter(function (x) { return x.id === id; })[0] : null;
@@ -173,33 +208,35 @@ function usModal() {
   if (!usSheet) return "";
   var s = usSheet, cls = s.shown ? " in" : "", d = s.d;
   var title = s.token ? "رمز الدخول" : s.mode === "edit" ? "تعديل المستخدم" : "إضافة مستخدم";
-  var h = '<div class="us"><div class="ac-scrim' + cls + '" data-us="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="usmt">' +
-    '<div class="mh"><div><h2 id="usmt">' + title + '</h2></div><span class="sp"></span><button class="ac-x" data-us="close" aria-label="إغلاق">' + (typeof opIco === "function" ? opIco("x") : "×") + '</button></div><div class="mb">';
+  /* The scrim and its positioning stay .ac-*: they are the account sheet's, shared with screens that
+     are not ported, and the vocabulary has no overlay outside a real <dialog>. The PANEL is m-dlg. */
+  var h = '<div class="ds6 us"><div class="ac-scrim' + cls + '" data-us="close"></div><div class="ac-modal"><div class="ac-box m-dlg__p' + cls + '" role="dialog" aria-modal="true" aria-labelledby="usmt">' +
+    '<div class="m-dlg__h"><h2 class="m-dlg__t" id="usmt">' + title + '</h2><button class="m-x" data-us="close" aria-label="إغلاق">' + (typeof opIco === "function" ? opIco("x") : "×") + '</button></div><div class="m-dlg__b">';
   if (s.token) {
     h += '<div class="us-tok" role="alert"><b>انسخ الرمز الآن — لن يظهر مرة أخرى.</b><span>يحفظ مسار بصمته فقط. يدخل به «' + esc(s.tokenFor) + '» من شاشة الدخول. إصدار رمز جديد يُبطل هذا الرمز.</span>' +
-      '<div class="v"><code id="ustokv">' + esc(s.token) + '</code><button class="btn btn-teal" id="uscopy" data-us="copy">' + (s.copied ? "نُسخ" : "نسخ الرمز") + "</button></div></div>";
-    return h + '</div><div class="mf"><button class="btn btn-ghost" data-us="close">تم</button></div></div></div></div>';
+      '<div class="v"><code id="ustokv">' + esc(s.token) + '</code><button class="m-btn m-btn--primary" id="uscopy" data-us="copy">' + (s.copied ? "نُسخ" : "نسخ الرمز") + "</button></div></div>";
+    return h + '</div><div class="m-dlg__f"><button class="m-btn" data-us="close">تم</button></div></div></div></div>';
   }
-  h += '<div class="cf-fl"><label for="usf_name">الاسم <span class="req" aria-hidden="true">*</span></label><input class="inp" id="usf_name" data-usf="name" maxlength="' + USER_NAME_MAX + '" value="' + esc(d.name) + '"' + (s.field === "name" ? ' aria-invalid="true" aria-describedby="usferr"' : "") + ">" + (s.field === "name" ? '<span class="ferr" id="usferr" role="alert">' + esc(s.err) + "</span>" : "") + "</div>";
-  h += '<div class="cf-fl"><span class="cf-sub" id="usrole_l">الدور <span class="req" aria-hidden="true">*</span></span><div class="us-roles" role="radiogroup" aria-labelledby="usrole_l" id="usf_role">' +
+  h += '<div class="m-field"><label class="m-label m-req" for="usf_name">الاسم</label><input class="m-input" id="usf_name" data-usf="name" maxlength="' + USER_NAME_MAX + '" value="' + esc(d.name) + '"' + (s.field === "name" ? ' aria-invalid="true" aria-describedby="usferr"' : "") + ">" + (s.field === "name" ? '<span class="m-err" id="usferr" role="alert">' + esc(s.err) + "</span>" : "") + "</div>";
+  h += '<div class="m-field"><span class="m-label m-req" id="usrole_l">الدور</span><div class="us-roles" role="radiogroup" aria-labelledby="usrole_l" id="usf_role">' +
     ROLES.map(function (r) { return '<button class="us-role" role="radio" aria-checked="' + (d.role === r) + '" tabindex="' + (d.role === r ? 0 : -1) + '" data-us="role" data-v="' + r + '"><i aria-hidden="true"></i><span><span class="t">' + esc(ROLE_LABELS[r]) + '</span><br><span class="d">' + esc(ROLE_DESCRIPTIONS[r]) + "</span></span></button>"; }).join("") + "</div></div>";
   if (d.role === "partner") {
     var ps = usData.partners || [];
-    h += '<div class="cf-fl"><label for="usf_partner">الشريك <span class="req" aria-hidden="true">*</span></label><select id="usf_partner" data-usf="partnerId"' + (s.field === "partnerId" ? ' aria-invalid="true" aria-describedby="usferr"' : "") + '><option value="">— اختر الشريك —</option>' +
+    h += '<div class="m-field"><label class="m-label m-req" for="usf_partner">الشريك</label><select class="m-select" id="usf_partner" data-usf="partnerId"' + (s.field === "partnerId" ? ' aria-invalid="true" aria-describedby="usferr"' : "") + '><option value="">— اختر الشريك —</option>' +
       ps.map(function (p) { return '<option value="' + p.id + '"' + (String(p.id) === d.partnerId ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select>" +
-      (ps.length ? '<span class="hint">يرى هذا المستخدم شريكه فقط، ويسجّل نتائجه.</span>' : '<span class="hint">لا شركاء بعد — أضفهم من <a href="#partners">شركاء المبيعات</a>.</span>') +
-      (s.field === "partnerId" ? '<span class="ferr" id="usferr" role="alert">' + esc(s.err) + "</span>" : "") + "</div>";
+      (ps.length ? '<span class="m-hint">يرى هذا المستخدم شريكه فقط، ويسجّل نتائجه.</span>' : '<span class="m-hint">لا شركاء بعد — أضفهم من <a class="m-link" href="#partners">شركاء المبيعات</a>.</span>') +
+      (s.field === "partnerId" ? '<span class="m-err" id="usferr" role="alert">' + esc(s.err) + "</span>" : "") + "</div>";
   } else if ((usData.members || []).length) {
-    h += '<div class="cf-fl"><label for="usf_member">عضو الفريق (اختياري)</label><select id="usf_member" data-usf="memberId"><option value="">— غير مرتبط —</option>' +
-      usData.members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.memberId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + '</select><span class="hint">يربط الحساب بعضو في «الفريق».</span></div>';
+    h += '<div class="m-field"><label class="m-label" for="usf_member">عضو الفريق (اختياري)</label><select class="m-select" id="usf_member" data-usf="memberId"><option value="">— غير مرتبط —</option>' +
+      usData.members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.memberId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + '</select><span class="m-hint">يربط الحساب بعضو في «الفريق».</span></div>';
   }
   if (s.mode === "edit") {
-    h += '<div class="cf-fl"><span class="cf-sub">الحالة</span><span class="vtog" role="radiogroup" aria-label="حالة المستخدم">' +
-      [["active", "نشط"], ["disabled", "موقوف"]].map(function (x) { return '<button role="radio" aria-checked="' + (d.status === x[0]) + '" class="' + (d.status === x[0] ? "on" : "") + '" data-us="status" data-v="' + x[0] + '">' + x[1] + "</button>"; }).join("") +
-      '</span><span class="hint">الموقوف لا يدخل برمزه حتى يُفعَّل.</span></div>';
+    h += '<div class="m-field"><span class="m-label">الحالة</span><span class="m-seg" role="radiogroup" aria-label="حالة المستخدم">' +
+      [["active", "نشط"], ["disabled", "موقوف"]].map(function (x) { return '<button type="button" role="radio" aria-checked="' + (d.status === x[0]) + '" aria-pressed="' + (d.status === x[0]) + '" data-us="status" data-v="' + x[0] + '">' + x[1] + "</button>"; }).join("") +
+      '</span><span class="m-hint">الموقوف لا يدخل برمزه حتى يُفعَّل.</span></div>';
   }
-  h += '</div><div class="mf"><button class="btn btn-teal" id="ussave" data-us="save"' + (s.busy ? ' disabled aria-busy="true"' : "") + ">" + (s.busy ? "جارٍ الحفظ…" : s.mode === "edit" ? "حفظ" : "إضافة وإصدار الرمز") + "</button>" +
-    '<button class="btn btn-ghost" data-us="close">إلغاء</button>' + (s.err && s.field !== "name" && s.field !== "partnerId" ? '<span class="cf-err msg" role="alert">' + esc(s.err) + "</span>" : "") + "</div></div></div></div>";
+  h += '</div><div class="m-dlg__f"><button class="m-btn m-btn--primary" id="ussave" data-us="save"' + (s.busy ? ' disabled aria-busy="true"' : "") + ">" + (s.busy ? "جارٍ الحفظ…" : s.mode === "edit" ? "حفظ" : "إضافة وإصدار الرمز") + "</button>" +
+    '<button class="m-btn" data-us="close">إلغاء</button>' + (s.err && s.field !== "name" && s.field !== "partnerId" ? '<span class="m-err" role="alert">' + esc(s.err) + "</span>" : "") + "</div></div></div></div>";
   return h;
 }
 function usSave() {

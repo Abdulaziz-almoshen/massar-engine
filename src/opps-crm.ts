@@ -33,6 +33,20 @@
 // Client JS in the dashboard.ts <script> scope (see campaigns-crm.ts for the seam). It borrows
 // esc, fmtN, fmtD, ic, clip, contactByPhone, entities, campaigns, cache, tagList, alertBar,
 // pageSlice, pageBar, PAGE, TOKEN, showTest and render.
+//
+// PORTED to the new design system (docs/PORT-SPEC.md), 2026-09-17. The screen body is wrapped in
+// .ds6 and speaks the m-* vocabulary: m-card, m-table in m-tablewrap, m-board/m-col/m-deal for the
+// kanban, m-chip, m-btn, m-seg, m-tabs, m-field/m-label/m-input/m-select, m-empty, and m-n around
+// EVERY digit. Absences are typed (m-nil--owed a number someone owes, --unset a classification
+// nobody made, --none a legitimate nothing); there is no bare em-dash left on this screen.
+//
+// WHAT COULD NOT BE DELETED. This module's stylesheet is not private: products-crm.ts, and to a
+// lesser extent indicators-crm.ts, revamp.ts and exec-reports-crm.ts, render .ox-sum, .ox-lbl,
+// .ox-fig, .ox-leg, .ox-lg, .ox-met, .ox-tb, .ox-srch, .ox-f, .ox-hr, .ox-r, .ox-state, .ox-fld,
+// .ox-dr, .ox-scrim, .ox-ico and .ox-dot out of THIS file, and products even sits inside .ox-led so
+// it receives the @container oxl rules below. So only rules this screen alone emitted were removed;
+// the rest keep the old look for the unported screens and are overridden, inside .ds6 only, by the
+// block at the end of this stylesheet. They come out when those screens are ported in turn.
 
 export const OPPS_CRM_CSS = `
   /* ===== فرص البيع — V5 ===== */
@@ -158,23 +172,10 @@ export const OPPS_CRM_CSS = `
     display:inline-flex; align-items:center; gap:4px; flex:none; }
   .ox-clear .ox-ico { width:14px; height:14px; }
   .ox-clear:hover { background:var(--accent-wash); }
-  .ox-seg { display:inline-flex; background:var(--surface-2); border-radius:var(--r-md); padding:2px; flex:none; }
-  /* Icon-only, as in the reference tables: the pressed state carries the mode, the accessible name
-     and the tooltip carry the word. Labels cost ~70px that the filters need at 1440. */
-  .ox-seg button { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--muted-2);
-    background:transparent; border:none; border-radius:var(--r-sm); height:32px; width:36px; padding-inline:0; justify-content:center;
-    display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-  .ox-seg button[aria-pressed="true"] { background:var(--paper); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
   /* flex:none + nowrap: beside a crowded filter strip the primary was squeezed until its label
      broke onto two lines. The strip scrolls; the primary action never gives up width. */
   .ox-add.btn { height:36px; padding-inline:14px; font-size:var(--t-sm); gap:6px; flex:none; white-space:nowrap; }
   .ox-add[aria-disabled="true"] { pointer-events:none; }
-  .ox-selc { font-size:var(--t-sm); font-weight:600; color:var(--accent-deep); background:var(--accent-tint);
-    border-radius:var(--r-sm); min-height:36px; padding-inline:12px; display:inline-flex; align-items:center; gap:6px; }
-  .ox-bulk { font-family:inherit; height:36px; font-size:var(--t-sm); color:var(--ink); background:var(--paper);
-    border:none; box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:12px; }
-  .ox-bulk:focus { box-shadow:inset 0 0 0 2px var(--accent), 0 0 0 3px var(--accent-tint); }
-  input.ox-bulk { width:170px; }
 
   /* ---- the WhatsApp action row (Tonomo's action-row component) ---- */
   .ox-wa { border-bottom:1px solid var(--line-soft); }
@@ -210,43 +211,6 @@ export const OPPS_CRM_CSS = `
   .ox-r.is-sel { background:var(--accent-tint); }
   .ox-r.is-open { background:var(--accent-tint); box-shadow:inset -3px 0 0 var(--accent); }
   [dir="ltr"] .ox-r.is-open { box-shadow:inset 3px 0 0 var(--accent); }
-  .ox-c { min-width:0; }
-  .ox-c-chk { display:flex; align-items:center; justify-content:center; }
-  .ox-c-ac { display:flex; align-items:center; gap:6px; min-width:0; }
-  .ox-nm, .ox-c-ac .ox-lnk { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-  .ox-c-ac .ox-lnk:hover { color:var(--accent-deep); }
-  .ox-auto { flex:none; font-size:var(--t-xs); font-weight:500; color:var(--s-attend-text);
-    box-shadow:inset 0 0 0 1px var(--accent-mark); border-radius:var(--r-pill); padding:0 7px; line-height:20px; }
-  .ox-uns { flex:none; color:var(--s-fail-text); display:inline-flex; }
-  .ox-c-pr { display:flex; flex-direction:column; gap:2px; }
-  /* Two lines, not an ellipsis: «تكامل الأنظمة (HIS/ERP)» truncated mid-parenthesis rendered as
-     «…ERP) تكامل الأنظمة», a bidi scramble. A clamp keeps the run whole. */
-  .ox-pn { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2;
-    -webkit-box-orient:vertical; line-height:1.35; overflow-wrap:anywhere; }
-  .ox-srcsub { display:none; font-size:var(--t-xs); color:var(--muted); align-items:center; gap:4px; }
-  .ox-c-st { display:flex; flex-direction:column; gap:3px; }
-  /* The row's stage is a badge in its tone — the list is scanned by stage first, so the stage is the
-     cell a reader's eye should find without reading. */
-  .ox-stg { align-self:flex-start; display:inline-flex; align-items:center; gap:6px; font-size:var(--t-xs); font-weight:500;
-    color:var(--tn-text, var(--ink)); background:var(--tn-soft, transparent); border-radius:var(--r-pill);
-    padding:0 10px 0 8px; line-height:24px; white-space:nowrap; max-width:100%; }
-  .ox-stg > span { overflow:hidden; text-overflow:ellipsis; }
-  .ox-sub { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
-  .ox-warn { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; font-size:var(--t-xs); font-weight:500;
-    color:var(--s-attn-text); box-shadow:inset 0 0 0 1px var(--s-attn-mark); border-radius:var(--r-pill);
-    padding:0 8px; line-height:20px; white-space:nowrap; }
-  .ox-warn .ox-ico { width:12px; height:12px; color:var(--s-attn-mark); }
-  .ox-c-vl { padding-inline-end:16px; text-align:end; font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .ox-c-vl.unp { font-weight:450; color:var(--muted); }
-  .ox-c-src { display:flex; align-items:center; gap:6px; font-size:var(--t-sm); color:var(--ink-2); white-space:nowrap; min-width:0; }
-  .ox-c-src .ox-ico, .ox-srcsub .ox-ico { color:var(--muted); }
-  .ox-c-src .ox-lnk { display:inline-flex; align-items:center; gap:6px; }
-  .ox-c-src .ox-lnk .ox-ico { color:currentColor; }
-  .ox-c-ow { font-size:var(--t-sm); color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ox-none { color:var(--muted); font-weight:450; }
-  .ox-c-nx { font-size:var(--t-sm); color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ox-c-nx .ox-none { border-block-end:1px dashed var(--s-off); }
   .ox-go { font-family:inherit; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
     color:var(--muted); background:transparent; border:none; border-radius:var(--r-sm); cursor:pointer; }
   .ox-r:hover .ox-go, .ox-go:hover { color:var(--accent-deep); background:var(--paper); }
@@ -261,12 +225,6 @@ export const OPPS_CRM_CSS = `
     min-height:56px; padding-inline:var(--s2) var(--s3); border-bottom:1px solid var(--line-soft); }
   .ox-skel i { display:block; height:12px; border-radius:var(--r-sm); background:var(--skeleton); }
   @container oxl (max-width: 1119px) {
-    .ox-hr, .ox-r { grid-template-columns:36px minmax(140px,1.2fr) minmax(150px,1.3fr) 140px 116px 100px minmax(120px,1fr) 32px; }
-    .ox-c-src, .ox-hsrc { display:none; }
-    .ox-srcsub { display:flex; }
-    /* Source sits under the product in this band, so the product gets ONE line — three stacked
-       lines made rows 70px tall and uneven. The full name is on the cell's title. */
-    .ox-pn { -webkit-line-clamp:1; }
     /* Search and the primary action share the first toolbar row; the filter strip goes beneath. */
     .ox-tb { flex-wrap:wrap; }
     .ox-srch { order:1; }
@@ -283,27 +241,14 @@ export const OPPS_CRM_CSS = `
     .ox-add { order:2; }
     .ox-brk { display:block; order:3; flex-basis:100%; height:0; }
     .ox-filt { order:4; flex:1 1 0; min-width:0; flex-wrap:nowrap; overflow-x:auto; padding:3px; margin:-3px; scrollbar-width:none; }
-    .ox-seg { order:5; margin-inline-start:0; }
-    .ox-seg button { width:40px; }
-    .ox-hr { display:none; }
-    .ox-r { grid-template-columns:36px minmax(0,1fr) auto; row-gap:4px; padding-block:var(--s3); }
-    .ox-r .ox-c-chk { grid-row:1 / 5; grid-column:1; align-self:start; padding-top:2px; }
-    .ox-r .ox-c-ac { grid-row:1; grid-column:2; }
-    .ox-r .ox-c-vl { grid-row:1; grid-column:3; }
-    .ox-r .ox-c-pr { grid-row:2; grid-column:2 / 4; }
-    .ox-r .ox-c-st { grid-row:3; grid-column:2 / 4; flex-direction:row; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-    .ox-r .ox-c-ow { grid-row:4; grid-column:2; font-size:var(--t-xs); color:var(--muted); }
-    .ox-r .ox-c-nx { grid-row:4; grid-column:3; font-size:var(--t-xs); max-width:48vw; text-align:end; }
-    .ox-r .ox-c-go { display:none; }
     .ox-wa-r { grid-template-columns:minmax(0,1fr) auto; }
     .ox-wa-r .pr { grid-row:2; grid-column:1; }
     .ox-wa-r .btn { grid-row:1 / 3; grid-column:2; }
   }
   @media (pointer:coarse) {
-    .ox-f select, .ox-seg button, .ox-bulk, .ox-clear, .ox-add.btn { min-height:44px; }
+    .ox-f select, .ox-clear, .ox-add.btn { min-height:44px; }
     .ox-go { width:44px; height:44px; }
     .ox-lg { min-height:44px; }
-    .ox-c-chk input[type="checkbox"] { width:44px; height:44px; }
   }
 
   /* ===================== «بطاقات» — one card per ACCOUNT =====================
@@ -363,38 +308,6 @@ export const OPPS_CRM_CSS = `
   }
   @media (pointer: coarse) { .ox-cli, .ox-cmore { min-height:44px; } }
 
-  /* ---- kanban ---- */
-  .ox-kb { display:flex; gap:var(--s3); padding:var(--s3); overflow-x:auto; align-items:flex-start; }
-  /* width AND min-width: a flex item's automatic minimum is its content, so one long hospital name
-     used to widen its whole column to 520px. */
-  .ox-kcol { flex:0 0 272px; width:272px; min-width:0; background:var(--surface); border-radius:var(--r-lg); padding:var(--s2);
-    display:flex; flex-direction:column; gap:var(--s2); transition:box-shadow var(--fast) var(--ease); }
-  /* Each column is capped in its stage's tone, so the kanban and the ribbon above it name a rung the same way. */
-  .ox-kcol { box-shadow:inset 0 3px 0 var(--tn, transparent); }
-  .ox-kcol.over { box-shadow:inset 0 3px 0 var(--tn, transparent), inset 0 0 0 2px var(--accent-mark); }
-  .ox-kh { padding:var(--s1) var(--s1) var(--s2); }
-  .ox-kh .t { display:flex; align-items:center; gap:7px; font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-  .ox-kh .t .n { margin-inline-start:auto; font-size:var(--t-xs); font-weight:600; color:var(--tn-text, var(--muted)); background:var(--tn-soft, transparent);
-    border-radius:var(--r-pill); padding:0 8px; line-height:20px; font-variant-numeric:tabular-nums; }
-  .ox-kh .v { font-size:var(--t-xs); color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
-  .ox-kc { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); padding:10px 12px;
-    display:flex; flex-direction:column; gap:2px; cursor:pointer;
-    transition:border-color var(--fast) var(--ease), background var(--fast) var(--ease); }
-  .ox-kc:hover { border-color:var(--s-off-mark); }
-  .ox-kc.is-open { border-color:var(--accent); background:var(--accent-wash); }
-  .ox-kc { min-width:0; }
-  .ox-kc .a { font-size:var(--t-sm); font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ox-kc .p { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .ox-kc .m { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); margin-top:4px; }
-  .ox-kc .m b { font-size:var(--t-sm); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .ox-kc .m b.unp { font-weight:450; color:var(--muted); }
-  .ox-kc .o { font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-flex; align-items:center; gap:4px; min-width:0; }
-  .ox-kc .o .ox-ico { width:14px; height:14px; }
-  .ox-kempty { font-size:var(--t-xs); color:var(--muted); text-align:center; padding:var(--s3) var(--s2);
-    border:1px dashed var(--line); border-radius:var(--r-md); }
-  .ox-kmore { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:var(--accent-bar);
-    border:none; border-radius:var(--r-md); min-height:36px; cursor:pointer; }
-
   /* ---- the drawer: detail and create are one component ---- */
   /* ---- the record drawer (beUI Drawer idioms: blurred backdrop, spring-ish slide, scroll lock,
          esc-to-close). The curve is Ionic's iOS drawer easing, 260ms: a panel this size at the
@@ -414,32 +327,6 @@ export const OPPS_CRM_CSS = `
     border-start-end-radius:0; border-end-end-radius:0; border-start-start-radius:var(--r-lg); border-end-start-radius:var(--r-lg); }
   .ox-dr.in, [dir="ltr"] .ox-dr.in { transform:none; opacity:1; }
   @media (prefers-reduced-motion: reduce) { .ox-dr, .ox-scrim { transition:opacity 120ms linear; } }
-  /* the hero: who, what, where it stands and what it is worth — before any scrolling */
-  .ox-hero { display:flex; align-items:flex-start; gap:var(--s3); }
-  .ox-hero .av { width:38px; height:38px; flex:none; border-radius:var(--r-md); background:var(--accent-tint);
-    color:var(--accent-deep); font-weight:600; font-size:var(--t-md); display:flex; align-items:center; justify-content:center; }
-  .ox-hero .tt { flex:1; min-width:0; }
-  .ox-hval { display:flex; align-items:baseline; gap:var(--s3); flex-wrap:wrap; padding:var(--s3) var(--s4) 0; }
-  .ox-hval b { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.2; }
-  .ox-hval b.none { font-size:var(--t-md); color:var(--muted); font-weight:500; }
-  .ox-hval .sub { font-size:var(--t-xs); color:var(--muted); }
-  .ox-hval .stg { font-size:var(--t-xs); font-weight:500; border-radius:var(--r-pill); padding:3px 10px;
-    background:var(--tn-soft); color:var(--tn-text); margin-inline-start:auto; }
-  /* the drawer's own tabs (beUI Tabs: one gliding indicator, no cross-fade of the panel) */
-  .ox-dtabs { flex:none; position:relative; display:flex; gap:2px; padding:var(--s3) var(--s4) 0;
-    border-block-end:1px solid var(--line-soft); overflow-x:auto; scrollbar-width:none; }
-  .ox-dtabs::-webkit-scrollbar { display:none; }
-  .ox-dtab { position:relative; font-family:inherit; font-size:var(--t-sm); font-weight:500; color:var(--muted);
-    background:none; border:0; cursor:pointer; padding:8px 12px 12px; white-space:nowrap; border-radius:var(--r-sm) var(--r-sm) 0 0;
-    transition:color var(--fast) var(--ease), background var(--fast) var(--ease); }
-  .ox-dtab .n { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; margin-inline-start:5px; }
-  .ox-dtab[aria-selected="true"] { color:var(--accent-deep); font-weight:600; }
-  .ox-dtab[aria-selected="true"] .n { color:var(--accent-deep); }
-  @media (hover:hover) and (pointer:fine) { .ox-dtab:not([aria-selected="true"]):hover { color:var(--ink); background:var(--surface); } }
-  .ox-dtabs .ind { position:absolute; inset-block-end:0; height:2px; background:var(--accent); border-radius:var(--r-pill);
-    transition:transform 240ms cubic-bezier(0.77, 0, 0.175, 1), width 240ms cubic-bezier(0.77, 0, 0.175, 1); }
-  @media (prefers-reduced-motion: reduce) { .ox-dtabs .ind { transition:none; } }
-  @media (pointer: coarse) { .ox-dtab { min-height:44px; } }
   .ox-dh { flex:none; display:flex; align-items:flex-start; gap:var(--s3); padding:var(--s3) var(--s4);
     min-height:72px; border-bottom:1px solid var(--line-soft); }
   .ox-dh .tt { flex:1; min-width:0; }
@@ -491,25 +378,13 @@ export const OPPS_CRM_CSS = `
     font-size:var(--t-xs); color:var(--ink-2); line-height:var(--lh-body); position:relative; }
   .ox-strow .ox-won:not([disabled]):hover { color:var(--s-issued-text); }
   .ox-strow .ox-lost:not([disabled]):hover { color:var(--s-fail-text); }
-  .ox-stnow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; font-size:var(--t-sm); color:var(--ink); }
-  .ox-stnow b { font-weight:600; }
-  .ox-stnow .ox-sub { white-space:normal; }
   .ox-strow { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; }
-  .ox-strow .ox-f select { max-width:220px; }
   .ox-strow .btn { height:36px; padding-inline:12px; font-size:var(--t-sm); gap:6px; }
-  .ox-out { display:inline-flex; align-items:center; gap:6px; font-size:var(--t-sm); font-weight:600; border-radius:var(--r-pill);
-    padding:4px 12px; }
-  .ox-out.won { color:var(--s-issued-text); background:var(--s-issued-soft); }
-  .ox-out.lost { color:var(--s-fail-text); background:var(--s-fail-soft); }
-  .ox-vfig { font-size:var(--t-xl); font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; line-height:var(--lh-tight); }
-  .ox-vfig.unp { color:var(--muted); font-weight:500; font-size:var(--t-lg); }
   .ox-form { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
   .ox-g2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); }
   .ox-fld { display:flex; flex-direction:column; gap:6px; min-width:0; }
   .ox-fld > label, .ox-fld > .l { font-size:var(--t-xs); font-weight:600; color:var(--muted); }
   .ox-fld .req { color:var(--s-fail-text); }
-  /* the same value an editor would type, printed for a role that may only read */
-  .ox-ro { font-size:var(--t-sm); color:var(--ink); min-height:38px; display:flex; align-items:center; overflow-wrap:anywhere; }
   .ox-fld .inp, .ox-fld select.inp { width:100%; min-height:38px; height:38px; font-size:var(--t-sm); border-radius:var(--r-sm); }
   .ox-fld .inp.num { text-align:end; font-variant-numeric:tabular-nums; }
   .ox-fld .inp.num:placeholder-shown { text-align:start; }
@@ -568,12 +443,6 @@ export const OPPS_CRM_CSS = `
   .ox-df .rv-hold:not(.holding):not(.armed) { background:var(--surface); color:var(--s-fail-text); }
   .ox-df .rv-hold:hover { background:var(--s-fail-soft); }
   .ox-derr { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:6px; flex:1 0 100%; }
-  .ox-srcs { display:flex; flex-wrap:wrap; gap:6px; }
-  .ox-srcs button { font-family:inherit; font-size:var(--t-sm); color:var(--ink-2); background:var(--paper); border:none;
-    box-shadow:inset 0 0 0 1px var(--line); border-radius:var(--r-pill); min-height:34px; padding-inline:12px;
-    display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
-  .ox-srcs button:hover { box-shadow:inset 0 0 0 1px var(--ink-2); }
-  .ox-srcs button[aria-checked="true"] { background:var(--accent-tint); color:var(--accent-deep); box-shadow:inset 0 0 0 1px var(--accent-mark); }
   .ox-lblk { border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s3); }
   .ox-lblk .hd { display:flex; align-items:center; justify-content:space-between; gap:var(--s2);
     font-size:var(--t-xs); font-weight:600; color:var(--muted); }
@@ -602,6 +471,205 @@ export const OPPS_CRM_CSS = `
     background:transparent; border:1px solid rgba(255,255,255,.45); border-radius:var(--r-sm); min-height:30px;
     padding-inline:10px; cursor:pointer; }
   .ox-toast button.x { border:none; font-size:var(--t-md); padding-inline:6px; }
+
+  /* =========================================================================================
+     THE PORTED LAYER — everything above this line is the old system, kept alive for the four
+     screens that still render these classes out of this file. Everything below applies ONLY
+     inside .ds6, speaks the m-* tokens, and covers the two things the vocabulary genuinely
+     lacks on this screen: a ledger table that stacks on a phone instead of scrolling sideways,
+     and a side drawer (the vocabulary's dialog is centred).
+     Specificity note: this stylesheet is emitted BEFORE massar-ds-crm.ts, so a rule that has to
+     beat an m-* rule on the SAME element carries three classes, never two.
+     ========================================================================================= */
+
+  /* --- summary --- */
+  .ds6 .ox-sum { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--m-5); align-items:start; }
+  .ds6 .ox-fig { font-size:var(--m-t-fig); font-weight:800; color:var(--m-ink); line-height:1.2;
+    letter-spacing:var(--m-tracking-figure); margin-block:var(--m-2) var(--m-4); }
+  .ds6 .ox-figsub { font-size:var(--m-t-cap); color:var(--m-mut); font-weight:500; margin-inline-start:var(--m-2); }
+  .ds6 .ox-bar { display:flex; gap:2px; height:8px; border-radius:var(--m-r-chip); overflow:hidden; background:var(--m-sunk); }
+  .ds6 .ox-bar i { display:block; height:100%; min-width:0; cursor:pointer; position:relative;
+    transition:opacity var(--m-out) var(--m-ease); }
+  .ds6 .ox-leg { display:flex; flex-wrap:wrap; gap:var(--m-2) 20px; margin-block-start:var(--m-4); }
+  .ds6 .ox-lg { font-family:inherit; font-size:var(--m-t-cap); font-weight:500; color:var(--tn-text, var(--m-ink-2));
+    background:var(--tn-soft, transparent); border:1px solid transparent; border-radius:var(--m-r-chip);
+    min-height:32px; padding:2px 12px 2px 10px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+    transition:background var(--m-out) var(--m-ease), color var(--m-out) var(--m-ease), transform var(--m-press) var(--m-ease); }
+  .ds6 .ox-lg + .ox-lg::before { background:var(--m-line-2); }
+  .ds6 .ox-lg.on { background:var(--tn, var(--m-ac)); border-color:var(--tn, var(--m-ac)); color:#FFFFFF; }
+  .ds6 .ox-lg .n { color:var(--m-mut); border-inline-start:1px solid var(--m-line-2); padding-inline-start:6px; }
+  .ds6 .ox-lg.zero:not(.on) { background:transparent; border-color:var(--m-line); color:var(--m-faint); font-weight:400; }
+  .ds6 .ox-mets { display:flex; align-items:stretch; border:1px solid var(--m-line); border-radius:var(--m-r-ctl); }
+  .ds6 .ox-met { font-family:inherit; background:transparent; border:none; cursor:pointer; text-align:start;
+    padding:var(--m-2) var(--m-3); min-width:112px; display:flex; flex-direction:column; gap:2px;
+    transition:background var(--m-out) var(--m-ease); }
+  .ds6 .ox-met + .ox-met { border-inline-start:1px solid var(--m-line); }
+  .ds6 .ox-met .n { font-size:var(--m-t-h); font-weight:700; color:var(--m-ink); line-height:1.2;
+    display:flex; align-items:center; gap:6px; }
+  .ds6 .ox-met .l { font-size:var(--m-t-cap); color:var(--m-mut); display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .ds6 .ox-met.on { background:var(--m-ac-dim); }
+  .ds6 .ox-met.on .l { color:var(--m-ac-deep); }
+  .ds6 .ox-met.warn .n { color:var(--m-warn); }
+  .ds6 .ox-met.zero .n { color:var(--m-faint); font-weight:600; }
+
+  /* --- ledger shell + toolbar --- */
+  .ds6 .ox-led { background:var(--m-paper); border:1px solid var(--m-line); border-radius:var(--m-r-card); }
+  .ds6 .ox-tb { min-height:60px; padding:var(--m-2) var(--m-3); border-bottom:1px solid var(--m-line); gap:var(--m-2); }
+  .ds6 .ox-srch { flex:0 1 240px; min-width:180px; }
+  .ds6 .ox-srch .m-input { padding-inline-start:36px; }
+  .ds6 .ox-srch .ox-si { color:var(--m-faint); }
+  /* An active filter says so on the control itself: the vocabulary has one select, not a filtered one. */
+  .ds6 .m-select.is-on { box-shadow:0 0 0 1px var(--m-ac), 0 1px 2px rgba(0,0,0,.05); color:var(--m-ac-deep); background:var(--m-ac-dim); }
+  .ds6 .ox-tb .m-select { max-width:170px; }
+  .ds6 .ox-clear { color:var(--m-ac-deep); }
+
+  /* --- the WhatsApp action row --- */
+  .ds6 .ox-wa { border-bottom:1px solid var(--m-line); }
+  .ds6 .ox-wa-h { background:var(--m-ac-dim); color:var(--m-ac-deep); }
+  .ds6 .ox-wa-r { border-top:1px solid var(--m-line); }
+  .ds6 .ox-wa-r .nm { font-size:var(--m-t-body); font-weight:600; color:var(--m-ink); }
+  .ds6 .ox-wa-r .pr { font-size:var(--m-t-cap); color:var(--m-mut); }
+  .ds6 .ox-wa-f { border-top:1px solid var(--m-line); }
+
+  /* --- the ledger table: m-table, plus the one thing the vocabulary lacks — stacking on a phone.
+         A table that only scrolls sideways hides the value column, which is the column a rep opens
+         this screen for. --- */
+  .ds6 .ox-t { min-inline-size: 900px; }
+  .ds6 .m-table tbody tr.is-open { background:var(--m-ac-dim); box-shadow:inset -3px 0 0 var(--m-ac); }
+  .ds6 .m-table tbody tr[data-click] { cursor:pointer; }
+  .ds6 .m-table td.ox-sel, .ds6 .m-table th.ox-sel { inline-size:34px; padding-inline:var(--m-3) 0; }
+  .ds6 .m-table td.ox-act { inline-size:40px; padding-inline:0 var(--m-3); }
+  .ds6 .ox-pn { display:block; overflow-wrap:anywhere; line-height:1.4; }
+  .ds6 .ox-stack { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-inline-size:0; }
+  .ds6 .ox-a { color:inherit; font-weight:600; text-decoration:none; }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-a:hover { color:var(--m-ac-deep); text-decoration:underline; text-underline-offset:3px; } }
+  @container oxl (max-width: 899px) {
+    .ds6 .ox-t { min-inline-size:0; }
+    .ds6 .ox-t thead { display:none; }
+    .ds6 .ox-t tbody tr { display:grid; grid-template-columns:34px minmax(0,1fr) auto; align-items:center;
+      column-gap:var(--m-2); row-gap:var(--m-1); padding-block:var(--m-3); border-block-start:1px solid var(--m-line); }
+    .ds6 .ox-t tbody td { display:block; border:0; padding:0; }
+    .ds6 .ox-t tbody td.ox-sel { grid-row:1 / 5; grid-column:1; align-self:start; }
+    .ds6 .ox-t tbody td.ox-ac { grid-row:1; grid-column:2; }
+    .ds6 .ox-t tbody td.ox-vl { grid-row:1; grid-column:3; text-align:end; }
+    .ds6 .ox-t tbody td.ox-pd { grid-row:2; grid-column:2 / 4; }
+    .ds6 .ox-t tbody td.ox-st { grid-row:3; grid-column:2 / 4; }
+    .ds6 .ox-t tbody td.ox-sr { grid-row:4; grid-column:2; font-size:var(--m-t-cap); }
+    .ds6 .ox-t tbody td.ox-ow { grid-row:5; grid-column:2; font-size:var(--m-t-cap); }
+    .ds6 .ox-t tbody td.ox-nx { grid-row:5; grid-column:3; font-size:var(--m-t-cap); text-align:end; }
+    .ds6 .ox-t tbody td.ox-act { display:none; }
+  }
+  .ds6 .ox-foot { min-height:52px; padding:var(--m-3); font-size:var(--m-t-cap); color:var(--m-mut);
+    border-block-start:1px solid var(--m-line); }
+  .ds6 .ox-foot .tot b { color:var(--m-ink); font-weight:600; }
+  .ds6 .ox-skel { grid-template-columns:34px 1.4fr 1fr 176px 124px 1fr; border-bottom:1px solid var(--m-line); }
+  .ds6 .ox-skel i { background:var(--m-sunk); }
+
+  /* --- cards: one per ACCOUNT. The vocabulary has no account card, so this stays, in m tokens. --- */
+  .ds6 .ox-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(336px,1fr)); gap:var(--m-3); padding:var(--m-3); }
+  .ds6 .ox-card { background:var(--m-paper); border:1px solid var(--m-line); border-radius:var(--m-r-card);
+    padding:var(--m-4); display:flex; flex-direction:column; gap:var(--m-3); min-width:0;
+    transition:box-shadow var(--m-in) var(--m-ease), transform var(--m-in) var(--m-ease), border-color var(--m-in) var(--m-ease); }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-card:hover { box-shadow:var(--m-lift); transform:translateY(-2px); border-color:var(--m-ac-line); } }
+  .ds6 .ox-card .who b { display:block; font-size:var(--m-t-body); font-weight:700; color:var(--m-ink); overflow-wrap:anywhere; }
+  .ds6 .ox-card .who span { display:block; font-size:var(--m-t-cap); color:var(--m-mut); margin-block-start:2px; }
+  .ds6 .ox-card .tot b { display:block; font-size:var(--m-t-sub); font-weight:700; color:var(--m-ink); }
+  .ds6 .ox-card .tot span { display:block; font-size:var(--m-t-cap); color:var(--m-mut); }
+  .ds6 .ox-cb .split { font-size:var(--m-t-cap); color:var(--m-mut); }
+  .ds6 .ox-cl { border-block-start:1px solid var(--m-line); }
+  .ds6 .ox-cli { border-block-start:1px solid var(--m-line); font-size:var(--m-t-body); }
+  .ds6 .ox-cli:first-child { border-block-start:0; }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-cli:hover { background:var(--m-page); } }
+  .ds6 .ox-cli .pn { font-weight:500; color:var(--m-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ds6 .ox-cmore { color:var(--m-ac-deep); border-block-start:1px solid var(--m-line); }
+
+  /* --- kanban: m-board / m-col / m-deal, plus the drop target and the per-stage tone cap --- */
+  .ds6 .m-board { padding:var(--m-3); }
+  .ds6 .m-board .m-col { box-shadow:inset 0 3px 0 var(--tn, transparent); }
+  .ds6 .m-board .m-col.over { box-shadow:inset 0 3px 0 var(--tn, transparent), inset 0 0 0 2px var(--m-ac-line); }
+  .ds6 .m-col__c.ox-tone { background:var(--tn-soft); color:var(--tn-text); box-shadow:none; }
+  .ds6 .m-deal.is-open { box-shadow:0 0 0 2px var(--m-ac); }
+  .ds6 .m-deal__o { font-size:var(--m-t-micro); color:var(--m-faint); display:inline-flex; align-items:center; gap:4px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .ds6 .m-deal__o .ox-ico { width:14px; height:14px; }
+  .ds6 .ox-kmore { font-family:inherit; font-size:var(--m-t-cap); font-weight:600; color:var(--m-ac-deep);
+    background:var(--m-ac-dim); border:none; border-radius:var(--m-r-ctl); min-height:36px; cursor:pointer; }
+
+  /* --- the drawer. The vocabulary's dialog is centred; this one is a side sheet, so the frame is
+         local and everything inside it is m-dlg__h / __b / __f. --- */
+  .ds6 .ox-scrim { background:rgba(11,13,18,.44); }
+  .ds6 .ox-dr { background:var(--m-paper); border-inline-end:1px solid var(--m-line);
+    border-start-end-radius:var(--m-r-band); border-end-end-radius:var(--m-r-band); box-shadow:var(--m-lift); }
+  .ds6 .ox-dr .m-dlg__h { align-items:flex-start; min-height:72px; flex:none; }
+  .ds6 .ox-dr .m-dlg__b { flex:1; max-block-size:none; display:flex; flex-direction:column; gap:var(--m-5); }
+  .ds6 .ox-dr .m-dlg__f { flex:none; justify-content:flex-start; align-items:center; flex-wrap:wrap; gap:var(--m-2); }
+  .ds6 .ox-dr .m-tabs { flex:none; padding-inline:var(--m-5); }
+  .ds6 .ox-hd { display:flex; align-items:flex-start; gap:var(--m-3); flex:1; min-width:0; }
+  .ds6 .ox-hd .tt { flex:1; min-width:0; }
+  .ds6 .ox-hd .m-dlg__t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ds6 .ox-hd .m-dlg__t:focus, .ds6 .ox-hd .m-dlg__t:focus-visible { outline:none; }
+  .ds6 .ox-hval { display:flex; align-items:baseline; gap:var(--m-3); flex-wrap:wrap;
+    padding:var(--m-3) var(--m-5) 0; }
+  .ds6 .ox-hval .fig { font-size:var(--m-t-h); font-weight:700; color:var(--m-ink); line-height:1.2; }
+  .ds6 .ox-sec { display:flex; flex-direction:column; gap:var(--m-2); }
+  .ds6 .ox-sec + .ox-sec { padding-block-start:var(--m-5); border-block-start:1px solid var(--m-line); }
+  .ds6 .ox-sech { font-size:var(--m-t-cap); font-weight:700; color:var(--m-mut); }
+  .ds6 .ox-cnt { font-size:var(--m-t-micro); font-weight:700; color:var(--m-warn); margin-inline-start:var(--m-2); }
+  .ds6 .ox-hint2 { font-size:var(--m-t-cap); color:var(--m-mut); line-height:1.7; }
+  .ds6 .ox-form { font-size:var(--m-t-cap); color:var(--m-mut); }
+  .ds6 .ox-dl { display:grid; grid-template-columns:112px minmax(0,1fr); gap:var(--m-2) var(--m-3); margin:0;
+    font-size:var(--m-t-body); }
+  .ds6 .ox-dl dt { color:var(--m-mut); font-size:var(--m-t-cap); font-weight:600; padding-block-start:2px; }
+  .ds6 .ox-dl dd { margin:0; color:var(--m-ink); min-width:0; overflow-wrap:anywhere; }
+  .ds6 .ox-rel { border:1px solid var(--m-line); border-radius:var(--m-r-ctl); overflow:hidden; }
+  .ds6 .ox-relr { border-top:1px solid var(--m-line); font-size:var(--m-t-body); color:var(--m-ink); }
+  .ds6 .ox-relr:first-child { border-top:0; }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-relr:hover { background:var(--m-page); } }
+  .ds6 .ox-lblk { border:1px solid var(--m-line); border-radius:var(--m-r-ctl); padding:var(--m-3); }
+  .ds6 .ox-lblk .hd { font-size:var(--m-t-cap); font-weight:700; color:var(--m-mut); }
+  .ds6 .ox-arow { background:var(--m-ac-dim); color:var(--m-ac-deep); border-radius:var(--m-r-ctl);
+    font-size:var(--m-t-body); }
+  .ds6 .ox-total { display:flex; align-items:baseline; justify-content:space-between; gap:var(--m-3); }
+  .ds6 .ox-total .v { font-size:var(--m-t-h); font-weight:700; color:var(--m-ink); }
+  .ds6 .ox-esclist, .ds6 .ox-escr { font-size:var(--m-t-cap); }
+  .ds6 .ox-escr { border-top:1px solid var(--m-line); color:var(--m-mut); }
+  .ds6 .ox-escr .k { color:var(--m-ac-deep); }
+  .ds6 .ox-escr .t { color:var(--m-ink-2); }
+  .ds6 .ox-escr .t b { color:var(--m-ink); }
+  .ds6 .ox-escr .m .dl { color:var(--m-warn); }
+  .ds6 .ox-escr .ok { color:var(--m-ok); }
+  .ds6 .ox-derr { font-size:var(--m-t-cap); color:var(--m-bad); }
+  .ds6 .ox-fs { font-size:var(--m-t-cap); }
+  .ds6 .ox-fs.pend { color:var(--m-mut); }
+  .ds6 .ox-fs.ok { color:var(--m-ok); }
+  .ds6 .ox-fs.bad { color:var(--m-bad); }
+  .ds6 .ox-fs button { color:var(--m-ac-deep); }
+  .ds6 .ox-hint { font-size:var(--m-t-cap); color:var(--m-warn); }
+  .ds6 .ox-hint .ox-ico { color:var(--m-warn); }
+
+  /* --- the stage stepper: a vertical ladder of real buttons. m-steps is a horizontal wizard rail,
+         which cannot carry a per-rung age, an exit criterion or a move action. --- */
+  .ds6 .ox-steps-pill { background:var(--tn-soft); border-inline-start:3px solid var(--tn); }
+  .ds6 .ox-step:not(:last-of-type)::before { background:var(--m-line-2); }
+  .ds6 .ox-step.done::before { background:var(--tn); }
+  .ds6 .ox-stb { color:var(--m-ink-2); border-radius:var(--m-r-ctl); }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-step:not(.current) .ox-stb:not([aria-disabled="true"]):hover { background:var(--m-page); } }
+  .ds6 .ox-stb .k { background:var(--m-paper); color:var(--m-mut); box-shadow:inset 0 0 0 1.5px var(--m-line-2); }
+  .ds6 .ox-stb .l { font-size:var(--m-t-body); }
+  .ds6 .ox-stb .go { font-size:var(--m-t-cap); color:var(--m-ac-deep); }
+  .ds6 .ox-step.done .k, .ds6 .ox-step.current .k { background:var(--tn); color:#FFFFFF; box-shadow:none; }
+  .ds6 .ox-step.current .k { box-shadow:0 0 0 3px var(--m-paper); }
+  .ds6 .ox-step.done .l { color:var(--tn-text); font-weight:500; }
+  .ds6 .ox-step.current .l { color:var(--m-ink); font-weight:600; }
+  .ds6 .ox-step.paused .l, .ds6 .ox-steps.is-lost .ox-step .l { color:var(--m-faint); }
+  .ds6 .ox-exit { font-size:var(--m-t-cap); color:var(--m-ink-2); }
+  .ds6 .ox-go { color:var(--m-mut); }
+  @media (hover:hover) and (pointer:fine) { .ds6 .ox-go:hover { color:var(--m-ac-deep); background:var(--m-page); } }
+
+  /* --- a chip that wears a stage's tone. The tone is data (stage-tone-domain.ts), so it arrives as
+         custom properties and this rule decides where they land. --- */
+  .ds6 .m-chip.ox-tone { background:var(--tn-soft); color:var(--tn-text); }
+  .ds6 .m-chip.ox-tone::before { background:var(--tn); }
 `;
 
 export const OPPS_CRM_JS = `
@@ -652,6 +720,25 @@ var OPP_KCAP = 50;
 
 /* ARABIC COUNTS ARE NOT «n + noun» — four-way, via the business tier's pluralizeArabic. */
 function opPl(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, fmtN); }
+/* The same four-way rule, with the NUMERAL bound to a derivation (PORT-SPEC §6) so a count printed
+   in two places cannot drift. One and two carry no numeral in Arabic, so there is nothing to bind
+   there and the plain words are returned — which is also why the binding is per-site, not global. */
+function opPlFig(key, n, one, two, few, many) {
+  n = Number(n) || 0;
+  if (n === 1) return one;
+  if (n === 2) return two;
+  return dsFig(key, n) + " " + (n >= 3 && n <= 10 ? few : many);
+}
+/* The counts this screen prints in more than one place, derived ONCE from the arrays the screen
+   renders. dsVerify re-runs them on every paint and outlines any figure that disagrees. */
+dsD("opOpen", function () { return opBaseRows().filter(opIsOpen).length; });
+dsD("opStalled", function () { return opBaseRows().filter(opStalled).length; });
+dsD("opUnpriced", function () { return opBaseRows().filter(function (l) { return opIsOpen(l) && !opPriced(l); }).length; });
+dsD("opMatch", function () { return opLines().length; });
+/* The drawer's three tab counts, printed on the tab AND on the section heading inside it. */
+dsD("owActs", function () { var w = owWork[opOpen]; return w && w.data ? (w.data.activities || []).length : 0; });
+dsD("owQuotes", function () { var w = owWork[opOpen]; return w && w.data ? (w.data.quotes || []).length : 0; });
+dsD("owEsc", function () { return (opEscRows[opOpen] || []).filter(function (r) { return !r.resolvedAt; }).length; });
 function opNProd(n) { return opPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 function opNLine(n) { return opPl(n, "بند واحد", "بندان", "بنود", "بندًا"); }
 /* opNOpp is read by sales-crm.ts («المستهدفات والأداء»), not by this page. The V5 rewrite dropped it and
@@ -660,6 +747,15 @@ function opNOpp(n) { return opPl(n, "فرصة واحدة", "فرصتان", "فر
 function opNEnt(n) { return opPl(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
 function opNDay(n) { return opPl(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
 function opNYear(n) { return opPl(n, "سنة واحدة", "سنتان", "سنوات", "سنة"); }
+/* The same four-way rule for MARKUP, with the numeral inside .m-n. opPl stays plain because
+   opToast writes through textContent and an aria-label is not parsed as HTML — a span there would
+   print as literal angle brackets or be read out as markup. */
+function opPlN(n, one, two, few, many) { return pluralizeArabic(n, one, two, few, many, opN); }
+function opNLineN(n) { return opPlN(n, "بند واحد", "بندان", "بنود", "بندًا"); }
+function opNEntN(n) { return opPlN(n, "جهة واحدة", "جهتان", "جهات", "جهة"); }
+function opNDayN(n) { return opPlN(n, "يوم واحد", "يومان", "أيام", "يومًا"); }
+function opNYearN(n) { return opPlN(n, "سنة واحدة", "سنتان", "سنوات", "سنة"); }
+function opNProdN(n) { return opPlN(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
 
 function opStage(k) {
   for (var i = 0; i < OPP_ST.length; i++) if (OPP_ST[i].key === k) return OPP_ST[i];
@@ -717,22 +813,33 @@ function opSumLive(ls) { return sumLiveValue(ls.map(opFacts)); }
 function opHasLost(ls) { return hasLostLine(ls.map(opFacts)); }
 function opKey(o) { return accountKey(o.account_name, o.phone); }
 var OPP_UNPRICED = "لم تُسعَّر";
+/* A price nobody has entered is a number someone OWES, not a legitimate nothing — it is the one
+   absence on this screen that is work outstanding, and it is drawn as such. */
+function opUnpricedNil() { return opNil(OPP_UNPRICED, "owed"); }
 
+/* EVERY DIGIT GOES THROUGH .m-n (PORT-SPEC §3): it sets direction:ltr, unicode-bidi:isolate and
+   tabular figures, and the unit rides INSIDE the span or the bidi algorithm puts «ر.س» on the wrong
+   side of the amount. It replaces the bare <bdi> this screen used to wrap money in. */
+function opN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+function opNU(v, unit) { return '<span class="m-n">' + fmtN(v) + " " + unit + "</span>"; }
+/* Three kinds of absence, drawn three ways (PORT-SPEC §4): owed = a number someone owes,
+   unset = a classification nobody made, none = a legitimate nothing. Never a bare em-dash. */
+function opNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
 /* A ROW SHOWS THE WHOLE FIGURE. «4 ألف ر.س» was both rounded (the line is 4٬200) and a counted-noun
    error (3–10 take آلاف). Full amounts in rows and the drawer; the compact form only where space
    genuinely forbids it (kanban headers, legend), and with the right noun. */
-function opMoney(v) { return "<bdi>" + fmtN(Math.round(Number(v || 0))) + " ر.س</bdi>"; }
+function opMoney(v) { return opNU(Math.round(Number(v || 0)), "ر.س"); }
 function opMoneyShort(v) {
   v = Number(v || 0);
   if (v >= 1e6) {
     var m = Math.round(v / 1e5) / 10;
     var mNoun = m >= 3 && m <= 10 && m === Math.floor(m) ? "ملايين" : "مليون";
-    return "<bdi>" + fmtN(m) + " " + mNoun + " ر.س</bdi>";
+    return opNU(m, mNoun + " ر.س");
   }
   if (v >= 1e4) {
     var k = Math.round(v / 1000);
     var kNoun = k >= 3 && k <= 10 ? "آلاف" : "ألف";
-    return "<bdi>" + fmtN(k) + " " + kNoun + " ر.س</bdi>";
+    return opNU(k, kNoun + " ر.س");
   }
   return opMoney(v);
 }
@@ -740,6 +847,11 @@ function opAgo(o) {
   var d = opDays(o);
   /* «منذ» governs the genitive: «منذ يومين», not «منذ يومان» (GPT review, 2026-09-15). */
   return d <= 0 ? "منذ اليوم" : "منذ " + opPl(d, "يوم واحد", "يومين", "أيام", "يومًا");
+}
+/* opAgo stays plain: owJourneySection runs it through esc(). This is the markup form. */
+function opAgoN(o) {
+  var d = opDays(o);
+  return d <= 0 ? "منذ اليوم" : "منذ " + opPlN(d, "يوم واحد", "يومين", "أيام", "يومًا");
 }
 
 /* ---- icons: 16px, stroke 1.5, currentColor (DESIGN.md §5 Icon) ---- */
@@ -889,12 +1001,13 @@ function opSummary() {
     var ls = open.filter(function (l) { return l.stage === st.key; });
     return { st: st, n: ls.length, v: ls.reduce(function (a, l) { return a + opValue(l); }, 0) };
   });
-  var h = '<section class="ox-sum" aria-label="ملخص الفرص"><div>';
-  h += '<div class="ox-lbl">القيمة المفتوحة</div>';
+  var h = '<section class="m-card ox-sum" aria-label="ملخص الفرص"><div>';
+  h += '<h2 class="m-label">القيمة المفتوحة</h2>';
   h += openVal
     ? '<div class="ox-fig">' + opMoney(openVal) +
-      (unpriced ? '<span class="ox-figsub">خارجها: ' + opNLine(unpriced) + " بلا تسعير</span>" : "") + "</div>"
-    : '<div class="ox-fig none">—<span class="ox-figsub">' + (open.length ? "لا بند مفتوح مسعَّر بعد" : "لا بنود مفتوحة") + "</span></div>";
+      (unpriced ? '<span class="ox-figsub">خارجها: ' +
+        opPlFig("opUnpriced", unpriced, "بند واحد", "بندان", "بنود", "بندًا") + " بلا تسعير</span>" : "") + "</div>"
+    : '<div class="ox-fig">' + opNil(open.length ? "لا بند مفتوح مسعَّر بعد" : "لا بنود مفتوحة", "none") + "</div>";
   /* The bar's geometry IS the priced open value per stage. It is a pointer shortcut; the legend
      below it is the operable, readable form, so zero and hair-thin stages never need a target. */
   h += '<div class="ox-bar" aria-hidden="true">';
@@ -914,29 +1027,31 @@ function opSummary() {
       ' style="' + opToneVars(s.st.key) + '" onclick="opSetStg(&quot;' + s.st.key + '&quot;)">' + opDot(s.st.key) +
       "<span>" + esc(s.st.label) + "</span>" +
       (s.v ? "<b>" + opMoneyShort(s.v) + "</b>" : "") +
-      '<span class="n" title="عدد البنود">' + fmtN(s.n) + "</span></button>";
+      '<span class="n" title="عدد البنود">' + opN(s.n) + "</span></button>";
   }).join("") + "</div>";
   h += "</div>";
-  var met = function (key, n, label, warn) {
+  var met = function (key, n, label, warn, fig) {
     var on = opShort === key;
     return '<button class="ox-met' + (on ? " on" : "") + (warn && n ? " warn" : "") + (n ? "" : " zero") + '" aria-pressed="' + on + '"' +
       ' onclick="opSetShort(&quot;' + key + '&quot;)">' +
-      '<span class="n">' + (warn && n ? opIco("warn") : "") + fmtN(n) + "</span>" +
+      '<span class="n">' + (warn && n ? opIco("warn") : "") + dsFig(fig, n) + "</span>" +
       '<span class="l">' + (on ? opIco("check") : "") + label + "</span></button>";
   };
   h += '<div class="ox-mets" role="group" aria-label="اختصارات">' +
-    met("open", open.length, "بنود مفتوحة", false) +
-    met("stalled", stalled, "متوقفة", true) +
-    met("unpriced", unpriced, "لم تُسعَّر", false) + "</div>";
+    met("open", open.length, "بنود مفتوحة", false, "opOpen") +
+    met("stalled", stalled, "متوقفة", true, "opStalled") +
+    met("unpriced", unpriced, "لم تُسعَّر", false, "opUnpriced") + "</div>";
   return h + "</section>";
 }
 
 /* ================================ TOOLBAR ================================ */
+/* One m-select, no custom chevron: the vocabulary's select draws its own. A filter that is ACTIVE
+   still has to say so, which the vocabulary does not cover, so is-on is the one local addition. */
 function opSelect(id, label, value, opts, on, handler) {
-  return '<span class="ox-f' + (on ? " on" : "") + '"><select id="' + id + '" aria-label="' + label + '" onchange="' + handler + '(this.value)">' +
+  return '<select class="m-select' + (on ? " is-on" : "") + '" id="' + id + '" aria-label="' + label + '" onchange="' + handler + '(this.value)">' +
     opts.map(function (o) {
       return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>";
-    }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
+    }).join("") + "</select>";
 }
 /* The selection bar takes the resting toolbar's MEASURED height. When the filters wrap to a second
    row the resting bar is taller than the one-row selection bar, and selecting a row made the whole
@@ -946,9 +1061,9 @@ var opTbH = 0;
    the compiled fallback and should say so rather than quietly mislabelling a custom rung. */
 function opLadderNotice() {
   if (typeof cfFailed === "undefined" || !cfFailed) return "";
-  return '<div class="ox-state" role="alert" style="padding:var(--s2);">' + opIco("warn") +
-    "تعذّر تحميل مراحل البيع — المعروض المراحل الأساسية، وقد تظهر مرحلة مخصصة باسمها البرمجي." +
-    '<button class="btn btn-ghost" data-op="ladderretry">أعد المحاولة</button></div>';
+  return '<div class="m-alert" role="alert">' + opIco("warn") +
+    '<span class="m-alert__d">تعذّر تحميل مراحل البيع — المعروض المراحل الأساسية، وقد تظهر مرحلة مخصصة باسمها البرمجي.</span>' +
+    '<button class="m-btn" data-op="ladderretry">أعد المحاولة</button></div>';
 }
 function opToolbar() {
   /* Selection exists to drive the bulk stage move and owner assign — both writes. A role that may
@@ -957,21 +1072,21 @@ function opToolbar() {
   var h = '<div class="ox-tb" role="toolbar" aria-label="أدوات الفرص"' + (sel.length && opTbH ? ' style="min-height:' + opTbH + 'px"' : "") + ">";
   if (sel.length) {
     var all = opLines();
-    h += '<span class="ox-selc">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
-    h += '<span class="ox-f"><select id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
+    h += '<span class="m-chip m-chip--ac m-chip--plain">' + opIco("check") + opNLine(sel.length) + " محدّد</span>";
+    h += '<select class="m-select" id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
       '<option value="">نقل إلى مرحلة…</option>' +
-      opSelectableStages().map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + '</select><span class="ox-chev">' + opIco("chevD") + "</span></span>";
-    h += '<input class="ox-bulk" id="oxb_owner" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
+      opSelectableStages().map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + "</select>";
+    h += '<input class="m-input" id="oxb_owner" style="max-inline-size:170px" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
     h += '<datalist id="oxowners">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
     var pg = pageSlice("opps", opSorted());
     if (sel.length < all.length && pg.length && pg.every(function (l) { return opSel[l.id]; })) {
-      h += '<button class="ox-clear" onclick="opSelectAll()">تحديد كل المطابِق (' + fmtN(all.length) + ")</button>";
+      h += '<button class="m-btn m-btn--quiet" onclick="opSelectAll()">تحديد كل المطابِق (' + dsFig("opMatch", all.length) + ")</button>";
     }
-    h += '<span class="sp"></span><button class="btn btn-ghost ox-add" onclick="opClearSel()">إلغاء التحديد</button>';
+    h += '<span class="sp"></span><button class="m-btn ox-add" onclick="opClearSel()">إلغاء التحديد</button>';
     return h + "</div>";
   }
-  h += '<span class="ox-srch"><span class="ox-si">' + opIco("search") + "</span>" +
-    '<input id="opq" class="inp" type="search" value="' + esc(opQ) + '" oninput="opSearch(this)" aria-label="بحث في الفرص" placeholder="بحث بالجهة أو المنتج أو المسؤول"></span>';
+  h += '<span class="ox-srch m-rel"><span class="ox-si">' + opIco("search") + "</span>" +
+    '<input id="opq" class="m-input" type="search" value="' + esc(opQ) + '" oninput="opSearch(this)" aria-label="بحث في الفرص" placeholder="بحث بالجهة أو المنتج أو المسؤول"></span>';
   h += '<span class="ox-filt">';
   h += opSelect("oxf_stg", "المرحلة", opStg,
     [["all", "كل المراحل"]].concat(OPP_ST.map(function (s) { return [s.key, s.label]; })), opStg !== "all", "opSetStg");
@@ -984,23 +1099,23 @@ function opToolbar() {
     h += opSelect("oxf_sort", opMode === "kanban" ? "ترتيب البطاقات داخل كل مرحلة" : "ترتيب", opSort,
       [["value", "الأعلى قيمة"], ["recent", "الأحدث حركة"], ["stage", "حسب المرحلة"], ["account", "حسب الجهة"]], false, "opSetSort");
   }
-  if (opProd) h += '<button class="px-toggle" aria-pressed="true" onclick="opClearProd()" title="إزالة تصفية المنتج">المنتج: ' + esc(opProd) + " " + opIco("x") + "</button>";
+  if (opProd) h += '<button class="m-btn m-btn--quiet" aria-pressed="true" onclick="opClearProd()" title="إزالة تصفية المنتج">المنتج: ' + esc(opProd) + " " + opIco("x") + "</button>";
   /* A drill from «التقارير» is a filter like any other, and it says so — landing on a shortened list
      with no visible reason is how a reader concludes the board lost their deals. */
-  if (opIds) h += '<button class="px-toggle" aria-pressed="true" onclick="opClearIds()" title="إزالة تصفية التقرير">من التقرير: ' + esc(opIdsLabel || "بنود محدّدة") + " " + opIco("x") + "</button>";
-  if (opFiltered()) h += '<button class="ox-clear" onclick="opClearFilters()" aria-label="مسح التصفية" title="مسح التصفية">' + opIco("x") + "مسح</button>";
+  if (opIds) h += '<button class="m-btn m-btn--quiet" aria-pressed="true" onclick="opClearIds()" title="إزالة تصفية التقرير">من التقرير: ' + esc(opIdsLabel || "بنود محدّدة") + " " + opIco("x") + "</button>";
+  if (opFiltered()) h += '<button class="m-btn m-btn--quiet ox-clear" onclick="opClearFilters()" aria-label="مسح التصفية" title="مسح التصفية">' + opIco("x") + "مسح</button>";
   h += "</span>";
   /* The view switch sits OUTSIDE the scrolling filter strip, so it can never be scrolled out of
      sight. */
-  h += '<span class="ox-seg" role="group" aria-label="طريقة العرض">' +
-    '<button aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
-    '<button aria-pressed="' + (opMode === "cards") + '" aria-label="عرض البطاقات" title="بطاقات — بطاقة لكل عميل" onclick="opSetMode(&quot;cards&quot;)">' + opIco("cards") + "</button>" +
-    '<button aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
+  h += '<span class="m-seg" role="group" aria-label="طريقة العرض">' +
+    '<button type="button" aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
+    '<button type="button" aria-pressed="' + (opMode === "cards") + '" aria-label="عرض البطاقات" title="بطاقات — بطاقة لكل عميل" onclick="opSetMode(&quot;cards&quot;)">' + opIco("cards") + "</button>" +
+    '<button type="button" aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
   h += !opMayEdit() ? ""
     : opSheet
-    ? '<button class="btn btn-ghost ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
-    : '<button class="btn btn-teal ox-add" id="oxadd" onclick="opOpenSheet(this.id)">' + opIco("plus") + "إضافة فرصة</button>";
+    ? '<button class="m-btn ox-add" aria-disabled="true" tabindex="-1">' + opIco("plus") + "إضافة فرصة</button>"
+    : '<button class="m-btn m-btn--primary ox-add" id="oxadd" onclick="opOpenSheet(this.id)">' + opIco("plus") + "إضافة فرصة</button>";
   h += '<span class="ox-brk" aria-hidden="true"></span>';
   return h + "</div>";
 }
@@ -1018,55 +1133,69 @@ function opWaRow() {
     h += '<div id="oxwa">' + shown.map(function (c) {
       var pr = opReadProduct(c);
       return '<div class="ox-wa-r"><span class="nm">' + esc(c.waName || c.phone) + "</span>" +
-        '<span class="pr">' + (pr ? "سأل عن " + esc(pr) : "لم تُقرأ خدمة بعد") + "</span>" +
+        '<span class="pr">' + (pr ? "سأل عن " + esc(pr) : opNil("لم تُقرأ خدمة بعد", "unset")) + "</span>" +
         (opMayEdit()
-          ? '<button class="btn btn-ghost" id="oxwa_' + esc(c.phone) + '" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;,this.id)">فتح فرصة</button>'
-          : '<a class="ox-lnk" href="#customer/' + esc(c.phone) + '">افتح المحادثة</a>') + "</div>";
+          ? '<button class="m-btn" id="oxwa_' + esc(c.phone) + '" onclick="opFromContact(&quot;' + esc(c.phone) + '&quot;,this.id)">فتح فرصة</button>'
+          : '<a class="m-link" href="#customer/' + esc(c.phone) + '">افتح المحادثة</a>') + "</div>";
     }).join("") +
-    '<div class="ox-wa-f"><a class="ox-lnk" href="#triage">' + (un.length > shown.length ? "و" + opNEnt(un.length - shown.length) + " أخرى · " : "") +
+    '<div class="ox-wa-f"><a class="m-link" href="#triage">' + (un.length > shown.length ? "و" + opNEnt(un.length - shown.length) + " أخرى · " : "") +
       "كل الردود في «فرز الردود» ←</a></div></div>";
   }
   return h + "</div>";
 }
 
 /* ================================ LIST ================================ */
+/* The stage is a toned chip: colour carries the rung, the label always beside it (DESIGN.md §3.0b).
+   m-chip draws its own dot from currentColor, so opDot is no longer needed in the list. */
 function opStageCell(l) {
   var st = opStage(l.stage);
-  var h = '<span class="ox-stg" style="' + opToneVars(l.stage) + '">' + opDot(l.stage) + "<span>" + esc(st.label) + "</span></span>";
-  if (opStalled(l)) h += '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>";
-  else h += '<span class="ox-sub">' + opAgo(l) + "</span>";
+  var h = '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>";
+  if (opStalled(l)) h += '<span class="m-chip m-chip--warn">متوقفة منذ ' + opNDayN(opDays(l)) + "</span>";
+  else h += '<span class="m-meta">' + opAgoN(l) + "</span>";
   return h;
 }
 function opSrcCell(l) {
   var lbl = esc(opSrcLabel(l.source));
   if (l.source === "whatsapp" && l.phone) {
-    return '<a class="ox-lnk" href="#customer/' + esc(l.phone) + '" title="فتح المحادثة" onclick="event.stopPropagation()">' + opIco("whatsapp") + lbl + "</a>";
+    return '<a class="ox-a ox-stack" href="#customer/' + esc(l.phone) + '" title="فتح المحادثة" onclick="event.stopPropagation()">' + opIco("whatsapp") + lbl + "</a>";
   }
-  return opIco(l.source in OPP_ICO ? l.source : "other") + "<span>" + lbl + "</span>";
+  return '<span class="ox-stack">' + opIco(l.source in OPP_ICO ? l.source : "other") + "<span>" + lbl + "</span></span>";
 }
 function opRowHtml(l) {
   var nm = esc(l.account_name);
-  var h = '<div class="ox-r' + (opSel[l.id] ? " is-sel" : "") + (opOpen === l.id && !opSheet ? " is-open" : "") + '" role="row" onclick="opRowClick(event,' + l.id + ')">';
-  h += '<div class="ox-c ox-c-chk" role="cell">' + (opMayEdit()
-    ? '<input type="checkbox" id="oxs_' + l.id + '"' + (opSel[l.id] ? " checked" : "") +
+  var h = "<tr" + (opOpen === l.id && !opSheet ? ' class="is-open"' : "") +
+    (opSel[l.id] ? ' aria-selected="true"' : "") + ' data-click="1" onclick="opRowClick(event,' + l.id + ')">';
+  h += '<td class="ox-sel">' + (opMayEdit()
+    ? '<input class="m-cb" type="checkbox" id="oxs_' + l.id + '"' + (opSel[l.id] ? " checked" : "") +
       ' aria-label="تحديد ' + nm + " — " + esc(l.product) + '" onclick="event.stopPropagation();opToggleSel(' + l.id + ')">'
-    : "") + "</div>";
-  h += '<div class="ox-c ox-c-ac" role="cell">' +
-    (l.phone ? '<a class="ox-lnk" href="#customer/' + esc(l.phone) + '" title="ملف العميل" onclick="event.stopPropagation()">' + nm + "</a>"
-             : '<span class="ox-nm">' + nm + "</span>") +
-    (l.created_by === "المساعد" ? '<span class="ox-auto" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
-    (opUnsaved(l.id) ? '<span class="ox-uns" title="تعديل لم يُحفظ">' + opIco("warn") + "</span>" : "") + "</div>";
-  h += '<div class="ox-c ox-c-pr" role="cell"><span class="ox-pn" title="' + esc(l.product) + '">' + esc(l.product) + "</span>" +
-    '<span class="ox-srcsub">' + opIco(l.source in OPP_ICO ? l.source : "other") + esc(opSrcLabel(l.source)) + "</span></div>";
-  h += '<div class="ox-c ox-c-st" role="cell">' + opStageCell(l) + "</div>";
-  h += '<div class="ox-c ox-c-vl' + (opPriced(l) ? "" : " unp") + '" role="cell">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</div>";
-  h += '<div class="ox-c ox-c-src" role="cell">' + opSrcCell(l) + "</div>";
-  h += '<div class="ox-c ox-c-ow" role="cell">' + (String(l.owner || "").trim() ? esc(l.owner) : '<span class="ox-none">بلا مسؤول</span>') + "</div>";
-  h += '<div class="ox-c ox-c-nx" role="cell" title="' + esc(l.next_step || "") + '">' +
-    (String(l.next_step || "").trim() ? esc(l.next_step) : '<span class="ox-none">لم تُحدَّد</span>') + "</div>";
-  h += '<div class="ox-c ox-c-go" role="cell"><button class="ox-go" id="oxt_' + l.id + '" aria-label="فتح تفاصيل ' + nm + " — " + esc(l.product) + '"' +
-    ' onclick="event.stopPropagation();opOpenLine(' + l.id + ',this.id)">' + opIco("chevS") + "</button></div>";
-  return h + "</div>";
+    : "") + "</td>";
+  h += '<td class="m-td-n ox-ac"><span class="ox-stack">' +
+    (l.phone ? '<a class="ox-a" href="#customer/' + esc(l.phone) + '" title="ملف العميل" onclick="event.stopPropagation()">' + nm + "</a>" : nm) +
+    (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
+    (opUnsaved(l.id) ? '<span class="m-chip m-chip--bad" title="تعديل لم يُحفظ">لم يُحفظ</span>' : "") + "</span></td>";
+  h += '<td class="ox-pd"><span class="ox-pn" title="' + esc(l.product) + '">' + esc(l.product) + "</span></td>";
+  h += '<td class="ox-st"><span class="ox-stack">' + opStageCell(l) + "</span></td>";
+  h += '<td class="m-td-v ox-vl">' + (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</td>";
+  h += '<td class="ox-sr">' + opSrcCell(l) + "</td>";
+  h += '<td class="ox-ow">' + (String(l.owner || "").trim() ? esc(l.owner) : opNil("بلا مسؤول", "unset")) + "</td>";
+  h += '<td class="ox-nx" title="' + esc(l.next_step || "") + '">' +
+    (String(l.next_step || "").trim() ? esc(l.next_step) : opNil("لم تُحدَّد", "unset")) + "</td>";
+  h += '<td class="ox-act"><button class="ox-go" id="oxt_' + l.id + '" aria-label="فتح تفاصيل ' + nm + " — " + esc(l.product) + '"' +
+    ' onclick="event.stopPropagation();opOpenLine(' + l.id + ',this.id)">' + opIco("chevS") + "</button></td>";
+  return h + "</tr>";
+}
+/* One empty state, three views. m-empty says WHICH nothing this is: a filter that matched nothing
+   is not the same as a ledger with no deals in it, and the second one needs the sentence that says
+   where a deal comes from. */
+function opEmpty() {
+  if (oppRows && oppRows.length) {
+    return '<div class="m-empty"><p class="m-empty__t">لا بند يطابق التصفية.</p>' +
+      '<p class="m-empty__d">التصفية الحالية لا تطابق أي بند في السجل.</p>' +
+      '<div class="m-empty__a"><button class="m-btn" onclick="opClearFilters()">مسح التصفية</button></div></div>';
+  }
+  return '<div class="m-empty"><p class="m-empty__t">لا فرص مسجّلة بعد.</p>' +
+    '<p class="m-empty__d">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. ' +
+    "النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا.</p></div>";
 }
 function opSkeleton(n) {
   var h = '<div aria-busy="true" aria-live="polite">';
@@ -1112,69 +1241,65 @@ function opCardsView() {
   var esc2 = typeof hmOpenEscIds === "function" ? hmOpenEscIds() : {};
   var groups = opAccountGroups(opLines());
   var page = pageSlice("opps", groups);
-  if (!page.length) {
-    return '<div class="ox-t"><div class="ox-state">' + (oppRows && oppRows.length
-      ? "لا بند يطابق التصفية." + '<button class="btn btn-ghost" onclick="opClearFilters()">مسح التصفية</button>'
-      : "لا فرص مسجّلة بعد." + '<span class="s">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة.</span>') + "</div></div>";
-  }
+  if (!page.length) return opEmpty();
   var h = '<div class="ox-cards">';
   page.forEach(function (g) {
     var openEsc = g.open.some(function (l) { return !!esc2[l.id]; });
     var shown = opCardOpen[g.key] ? g.lines : g.lines.slice(0, OP_CARD_LINES);
     var rest = g.lines.length - shown.length;
     h += '<article class="ox-card">' +
-      '<div class="top"><span class="av" aria-hidden="true">' + esc(String(g.name || "؟").trim().charAt(0)) + "</span>" +
-      '<span class="who"><b>' + esc(g.name) + "</b><span>" + opNProd(g.lines.length) +
-        (g.owner ? " · " + esc(g.owner) : " · بلا مسؤول") + "</span></span>" +
-      '<span class="tot">' + (g.priced ? "<b>" + opMoneyShort(g.value) + "</b>" : '<b class="ox-none">' + OPP_UNPRICED + "</b>") +
+      '<div class="top"><span class="m-av m-av--sq" aria-hidden="true">' + esc(String(g.name || "؟").trim().charAt(0)) + "</span>" +
+      '<span class="who"><b>' + esc(g.name) + "</b><span>" + opNProdN(g.lines.length) +
+        (g.owner ? " · " + esc(g.owner) : " · " + opNil("بلا مسؤول", "unset")) + "</span></span>" +
+      '<span class="tot">' + (g.priced ? "<b>" + opMoneyShort(g.value) + "</b>" : "<b>" + opUnpricedNil() + "</b>") +
       "<span>قيمة قائمة</span></span></div>";
     /* the health of THIS account, said once */
     h += '<div class="ox-cb">' +
-      (g.open.length ? '<b style="--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"><i></i>قائمة</b>' : "") +
-      (g.stalled ? '<b style="--tn-soft:#FBF2DC;--tn-text:#7A5600"><i></i>متوقّف</b>' : "") +
-      (openEsc ? '<b style="--tn-soft:var(--accent-tint);--tn-text:var(--accent-deep)"><i></i>دعم</b>' : "") +
-      '<span class="split">' + ["قائمة " + fmtN(g.open.length), g.won.length ? "ربح " + fmtN(g.won.length) : "", g.lost.length ? "خسارة " + fmtN(g.lost.length) : ""]
+      (g.open.length ? '<span class="m-chip m-chip--ac">قائمة</span>' : "") +
+      (g.stalled ? '<span class="m-chip m-chip--warn">متوقّف</span>' : "") +
+      (openEsc ? '<span class="m-chip m-chip--ac">دعم</span>' : "") +
+      '<span class="split">' + ["قائمة " + opN(g.open.length), g.won.length ? "ربح " + opN(g.won.length) : "", g.lost.length ? "خسارة " + opN(g.lost.length) : ""]
         .filter(Boolean).join(" · ") + "</span></div>";
     h += '<div class="ox-cl">' + shown.map(function (l, i) {
       var st = opStage(l.stage);
       return '<button type="button" class="ox-cli' + (opCardOpen[g.key] && i >= OP_CARD_LINES ? " mor" : "") + '" id="oxc_' + l.id + '"' +
         ' onclick="opOpenLine(' + l.id + ',this.id)" aria-label="' + esc(l.product) + " — " + esc(st.label) + '">' +
         '<span class="pn">' + esc(l.product) + "</span>" +
-        '<span class="st" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>" +
-        '<span class="vl' + (opPriced(l) ? "" : " unp") + '">' + (opPriced(l) ? opMoneyShort(opValue(l)) : OPP_UNPRICED) + "</span></button>";
+        '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>" +
+        '<span class="m-td-v">' + (opPriced(l) ? opMoneyShort(opValue(l)) : opUnpricedNil()) + "</span></button>";
     }).join("") +
-      (rest > 0 ? '<button type="button" class="ox-cmore" onclick="opCardMore(&quot;' + esc(g.key) + '&quot;)">و' + opNLine(rest) + " أخرى ↓</button>"
+      (rest > 0 ? '<button type="button" class="ox-cmore" onclick="opCardMore(&quot;' + esc(g.key) + '&quot;)">و' + opNLineN(rest) + " أخرى ↓</button>"
         : g.lines.length > OP_CARD_LINES ? '<button type="button" class="ox-cmore" onclick="opCardMore(&quot;' + esc(g.key) + '&quot;)">طيّ ↑</button>' : "") +
       "</div></article>";
   });
   return h + "</div>";
 }
 
+/* A REAL TABLE, inside m-tablewrap — the wrap is what scrolls, never the page (PORT-SPEC §2). The
+   grid of divs this replaced could not carry m-td-n / m-td-v / m-th and had to restate every cell
+   style; what it bought was the phone layout, which the stacking rules at the end of this module's
+   stylesheet give back. */
 function opListView() {
   var rows = opSorted();
   var page = pageSlice("opps", rows);
   var allOn = page.length > 0 && page.every(function (l) { return opSel[l.id]; });
-  var h = '<div class="ox-t" role="table" aria-label="بنود الفرص">';
-  h += '<div class="ox-hr" role="row">' +
-    '<div class="ox-c ox-c-chk" role="columnheader">' + (opMayEdit()
-      ? '<input type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()">' : "") + "</div>" +
-    '<div role="columnheader">الجهة</div><div role="columnheader">المنتج</div><div role="columnheader">المرحلة</div>' +
-    '<div class="ox-hv" role="columnheader">القيمة</div><div class="ox-hsrc" role="columnheader">المصدر</div>' +
-    '<div role="columnheader">المسؤول</div><div role="columnheader">الخطوة التالية</div><div role="columnheader"><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">تفاصيل</span></div></div>';
-  if (!page.length) {
-    h += '<div class="ox-state">' + (oppRows && oppRows.length
-      ? "لا بند يطابق التصفية." + '<button class="btn btn-ghost" onclick="opClearFilters()">مسح التصفية</button>'
-      : "لا فرص مسجّلة بعد." + '<span class="s">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا.</span>') + "</div>";
-  }
+  var h = '<div class="m-tablewrap"><table class="m-table ox-t"><thead><tr>' +
+    '<th class="ox-sel" scope="col">' + (opMayEdit()
+      ? '<input class="m-cb" type="checkbox" id="oxs_all" aria-label="تحديد الصفحة المعروضة"' + (allOn ? " checked" : "") + ' onclick="opTogglePage()">' : "") + "</th>" +
+    '<th scope="col">الجهة</th><th scope="col">المنتج</th><th scope="col">المرحلة</th>' +
+    '<th class="num" scope="col">القيمة</th><th scope="col">المصدر</th>' +
+    '<th scope="col">المسؤول</th><th scope="col">الخطوة التالية</th>' +
+    '<th class="ox-act" scope="col"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">تفاصيل</span></th></tr></thead><tbody>';
+  if (!page.length) h += '<tr class="m-table__empty"><td colspan="9">' + opEmpty() + "</td></tr>";
   page.forEach(function (l) { h += opRowHtml(l); });
-  h += "</div>";
+  h += "</tbody></table></div>";
   if (rows.length) {
     var live = opSumLive(rows);
     var unp = rows.filter(function (l) { return !opPriced(l); }).length;
     var unit = rows.length >= 3 && rows.length <= 10 ? "بنود" : rows.length >= 11 ? "بندًا" : "بند";
     h += '<div class="ox-foot">' + pageBar("opps", rows.length, unit) +
-      '<span class="tot">' + (live ? "قيمة المطابِق <b>" + opMoney(live) + "</b>" + (opHasLost(rows) ? " · دون الخسارة" : "") : "لا قيمة مسعَّرة في المطابِق") +
-      (unp ? "، " + opNLine(unp) + " بلا تسعير" : "") + "</span></div>";
+      '<span class="tot">' + (live ? "قيمة المطابِق <b>" + opMoney(live) + "</b>" + (opHasLost(rows) ? " · دون الخسارة" : "") : opNil("لا قيمة مسعَّرة في المطابِق", "none")) +
+      (unp ? "، " + opNLineN(unp) + " بلا تسعير" : "") + "</span></div>";
   }
   return h;
 }
@@ -1182,7 +1307,7 @@ function opListView() {
 /* ================================ KANBAN ================================ */
 function opKanbanView() {
   var rows = opLines();
-  var h = '<div class="ox-kb" role="list" aria-label="لوحة المراحل">';
+  var h = '<div class="m-board" role="list" aria-label="لوحة المراحل">';
   var withLines = {};
   (oppRows || []).forEach(function (o) { withLines[o.stage] = 1; });
   /* A stage the ladder does not carry AT ALL — a custom rung whose config read failed — still has
@@ -1200,28 +1325,33 @@ function opKanbanView() {
     var val = cards.reduce(function (a, l) { return a + opValue(l); }, 0);
     var unp = cards.filter(function (l) { return !opPriced(l); }).length;
     var cap = opKCap[st.key] || OPP_KCAP;
-    h += '<div class="ox-kcol" role="listitem" style="' + opToneVars(st.key) + '" data-col="' + esc(st.key) + '"' +
+    h += '<div class="m-col" role="listitem" style="' + opToneVars(st.key) + ";--m-tone:" + opColor(st.key) + '" data-col="' + esc(st.key) + '"' +
       (opMayEdit() ? ' ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)"' : "") + ">";
-    h += '<div class="ox-kh"><div class="t">' + opDot(st.key) + "<span>" + esc(st.label) + '</span><span class="n">' + fmtN(cards.length) + "</span></div>" +
-      '<div class="v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLine(unp) + " بلا تسعير" : "")
-        : unp ? opNLine(unp) + " بلا تسعير" : "بلا قيمة مسعَّرة") + "</div></div>";
+    h += '<div class="m-col__t"><i class="m-col__dot"></i><span class="m-col__n">' + esc(st.label) + "</span>" +
+      '<span class="m-col__c ox-tone">' + opN(cards.length) + "</span></div>" +
+      '<div class="m-col__v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLineN(unp) + " بلا تسعير" : "")
+        : unp ? opNLineN(unp) + " بلا تسعير" : opNil("بلا قيمة مسعَّرة", "none")) + "</div>";
+    h += '<div class="m-col__b">';
     cards.slice(0, cap).forEach(function (l) {
       /* Dragging a card IS a stage change, so a read-only role gets a card that opens and does not move. */
-      h += '<div class="ox-kc' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="' + (opMayEdit() ? "true" : "false") + '"' +
+      h += '<div class="m-deal' + (opOpen === l.id && !opSheet ? " is-open" : "") + '" id="oxk_' + l.id + '" tabindex="0" role="button" draggable="' + (opMayEdit() ? "true" : "false") + '"' +
         ' aria-label="' + esc(l.account_name) + " — " + esc(l.product) + '"' +
         (opMayEdit() ? ' ondragstart="opDragStart(event,' + l.id + ')" ondragend="opDragEnd()"' : "") +
         ' onclick="opOpenLine(' + l.id + ',this.id)" onkeydown="opCardKey(event,' + l.id + ',this.id)">' +
-        '<span class="a">' + esc(l.account_name) + "</span>" +
-        '<span class="p">' + esc(l.product) + (l.created_by === "المساعد" ? ' <span class="ox-auto">تلقائي</span>' : "") + "</span>" +
-        '<span class="m"><b class="' + (opPriced(l) ? "" : "unp") + '">' + (opPriced(l) ? opMoney(opValue(l)) : OPP_UNPRICED) + "</b>" +
-        '<span class="o">' + opIco(l.source in OPP_ICO ? l.source : "other") + " " + (String(l.owner || "").trim() ? esc(l.owner) : "بلا مسؤول") + "</span></span>" +
-        (opStalled(l) ? '<span class="ox-warn">' + opIco("warn") + "متوقفة منذ " + opNDay(opDays(l)) + "</span>" : "") + "</div>";
+        '<span class="m-deal__n">' + esc(l.account_name) +
+        (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac">تلقائي</span>' : "") + "</span>" +
+        '<span class="m-deal__p">' + esc(l.product) + "</span>" +
+        '<span class="m-deal__f"><span class="' + (opPriced(l) ? "m-deal__v" : "m-deal__v--nil") + '">' +
+        (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</span>" +
+        '<span class="m-deal__o">' + opIco(l.source in OPP_ICO ? l.source : "other") + " " +
+        (String(l.owner || "").trim() ? esc(l.owner) : opNil("بلا مسؤول", "unset")) + "</span></span>" +
+        (opStalled(l) ? '<span class="m-deal__age m-deal__age--old">متوقفة منذ ' + opNDayN(opDays(l)) + "</span>" : "") + "</div>";
     });
-    if (!cards.length) h += '<div class="ox-kempty">لا بنود</div>';
+    if (!cards.length) h += '<div class="m-empty-col">' + opNil("لا بنود في هذه المرحلة", "none") + "</div>";
     if (cards.length > cap) {
-      h += '<button class="ox-kmore" onclick="opKMore(&quot;' + st.key + '&quot;)">تُعرض ' + fmtN(cap) + " من " + fmtN(cards.length) + " — عرض " + fmtN(Math.min(OPP_KCAP, cards.length - cap)) + " أخرى</button>";
+      h += '<button class="ox-kmore" onclick="opKMore(&quot;' + st.key + '&quot;)">تُعرض ' + opN(cap) + " من " + opN(cards.length) + " — عرض " + opN(Math.min(OPP_KCAP, cards.length - cap)) + " أخرى</button>";
     }
-    h += "</div>";
+    h += "</div></div>";
   });
   return h + "</div>";
 }
@@ -1248,6 +1378,8 @@ function opFieldStatus(sk, id) {
     '<button onclick="opRetryField(' + p[0] + ',&quot;' + p[1] + '&quot;)">أعد المحاولة</button>' +
     '<button onclick="opDiscardField(' + p[0] + ',&quot;' + p[1] + '&quot;)">تجاهل</button></span>';
 }
+/* Which stored fields on a line are quantities, so a read-only render can put them through .m-n. */
+function opIsNumField(key) { return key === "sale_price" || key === "years" || key === "qty" || key === "discount"; }
 function opField(l, key, label, type) {
   var id = "oxd_" + key + "_" + l.id, sk = l.id + ":" + key, st = opFState[sk];
   var cur = l[key] == null ? "" : l[key];
@@ -1255,14 +1387,17 @@ function opField(l, key, label, type) {
   /* Read-only role: the same fact, printed. An input the reader can type into and never save is a
      promise the screen cannot keep. */
   if (!opMayEdit()) {
-    return '<div class="ox-fld"><div class="ox-lr"><span class="ox-lbl">' + label + "</span></div>" +
-      '<div class="ox-ro">' + (String(cur) === "" ? "—" : esc(String(cur))) + "</div></div>";
+    /* A role that may only read gets the same fact, printed — and a value nobody has entered says
+       so as an absence, never as a dash. */
+    return '<div class="m-field"><div class="ox-lr"><span class="m-label">' + label + "</span></div>" +
+      '<div class="ox-ro">' + (String(cur) === "" ? opNil("لم يُحدَّد", "unset") :
+        (opIsNumField(key) ? opN(Number(cur)) : esc(String(cur)))) + "</div></div>";
   }
   var val = st && st.s !== "saved" ? st.v : cur;
   var num = type === "number";
   var rng = key === "years" ? ' min="1" max="20" step="1"' : key === "discount" ? ' min="0" max="100"' : key === "qty" ? ' min="1" step="1"' : key === "sale_price" ? ' min="0"' : "";
-  return '<div class="ox-fld"><div class="ox-lr"><label for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>" +
-    '<input class="inp' + (num ? " num" : "") + '" id="' + id + '" type="' + (num ? "number" : "text") + '"' + rng +
+  return '<div class="m-field"><div class="ox-lr"><label class="m-label" for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>" +
+    '<input class="m-input' + (num ? " num" : "") + '" id="' + id + '" type="' + (num ? "number" : "text") + '"' + rng +
     (num ? ' inputmode="decimal"' : "") +
     (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="ما الذي يجب فعله بعد؟"' : "") +
     ' value="' + esc(val) + '"' + (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
@@ -1304,24 +1439,24 @@ function opEscSection(l) {
   var open = rows.filter(function (r) { return !r.resolvedAt; });
   var failed = !!opEscFailed[l.id] && !opEscRows[l.id];
   var b = '<section class="ox-sec" aria-labelledby="oxsec_e"><div class="ox-sech" id="oxsec_e">التصعيد والدعم' +
-    (open.length ? '<span class="ox-cnt">' + fmtN(open.length) + " مفتوح</span>" : "") + "</div>";
+    (open.length ? '<span class="ox-cnt">' + dsFig("owEsc", open.length) + " مفتوح</span>" : "") + "</div>";
   if (!opMayEdit()) {
     /* Recording an escalation writes to the opportunity, so a read-only role reads the log and adds
        nothing to it. */
-    b += rows.length ? "" : '<div class="ox-hint2">لا تصعيد مسجّل على هذه الفرصة.</div>';
+    b += rows.length ? "" : '<div class="ox-hint2">' + opNil("لا تصعيد مسجّل على هذه الفرصة", "none") + "</div>";
   } else if (!opEsc || opEsc.oppId !== l.id) {
     b += '<div class="ox-escacts">' +
-      '<button class="btn btn-ghost" data-op="escalate" data-i="' + l.id + '">' + opIco("up") + "تصعيد</button>" +
-      '<button class="btn btn-ghost" data-op="support" data-i="' + l.id + '">' + opIco("help") + "طلب دعم</button>" +
+      '<button class="m-btn" data-op="escalate" data-i="' + l.id + '">' + opIco("up") + "تصعيد</button>" +
+      '<button class="m-btn" data-op="support" data-i="' + l.id + '">' + opIco("help") + "طلب دعم</button>" +
       '<span class="ox-hint2">يُسجَّل على الفرصة باسم من اخترته — لا بريد بعد، ولا يُرسل شيء للعميل.</span></div>';
   } else {
     var cands = opEscCandidates(opEsc.kind);
     b += '<div class="ox-escform">';
-    b += '<div class="ox-fld"><label for="opesc_to">' + (opEsc.kind === "support" ? "إلى مسؤول الدعم" : "تصعيد إلى") + "</label>";
+    b += '<div class="m-field"><label class="m-label" for="opesc_to">' + (opEsc.kind === "support" ? "إلى مسؤول الدعم" : "تصعيد إلى") + "</label>";
     if (!cands.length) {
-      b += '<div class="ox-hint2">لا أحد مسجّل لهذا الدور — أضِفه في <a class="ox-lnk" href="#team">إعدادات النظام · الفريق</a>.</div>';
+      b += '<div class="ox-hint2">لا أحد مسجّل لهذا الدور — أضِفه في <a class="m-link" href="#team">إعدادات النظام · الفريق</a>.</div>';
     } else {
-      b += '<select id="opesc_to" data-opesc="memberId"><option value="">اختر الشخص…</option>' +
+      b += '<select class="m-select" id="opesc_to" data-opesc="memberId"><option value="">اختر الشخص…</option>' +
         cands.map(function (m) {
           return '<option value="' + m.id + '"' + (String(opEsc.memberId) === String(m.id) ? " selected" : "") + ">" +
             esc(m.name) + " · " + esc(TEAM_ROLE_LABELS[m.role] || m.role) + (m.division ? " · " + esc(m.division) : "") + "</option>";

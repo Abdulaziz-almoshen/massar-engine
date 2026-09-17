@@ -3,156 +3,71 @@
 // الكل / معتمدون / مقترحون tabs, the «إضافة عميل جديد» sheet with repeatable contacts, and the account
 // record (#account/<id>) that opens for a customer who has never written to us.
 //
-// GRAMMAR. The table is the settings table (.cf-sec/.cf-hr/.cf-r), tiles are .crm-kpi, pills .cf-pill,
-// segmented tabs .vtog, fields .cf-fl. Rules come from account-domain (ACCOUNT_DOMAIN_JS): the sheet and
-// the server refuse the same input with the same sentence.
+// PORTED to the new design system (docs/PORT-SPEC.md). Both screens and the sheet are inside .ds6 and
+// speak the m-* vocabulary: the list is a real table in .m-tablewrap rather than the settings grid,
+// the record is .m-grid--main over .m-card, the activity log is .m-tl, the sheet's fields are
+// .m-field/.m-label/.m-input, and every digit goes through .m-n.
+//
+// THE DEFECT THIS PORT FIXES. The record's «فرص العميل» card filtered out LOST lines and kept WON
+// ones, then printed the sum as if it were open pipeline — so a customer with one won deal read as
+// having that much still in play. The list KPI had it right («قائمة: X · رابحة: Y»); the record did
+// not. The card now separates open from won the way the list does, and NAMES the unpriced open lines
+// instead of silently adding them in as zero.
+//
+// ABSENCES. Six blanks used to render as one grey dash each, which teaches a reader to stop seeing
+// dashes. They are now three kinds: a number someone owes (لم تُسعَّر), a classification nobody made
+// (لم تُسجَّل · لم يُصنَّف · لم يُسجَّل — an account with no owner is UNSET, not owed), and a legitimate
+// nothing (لا فرص).
 //
 // MOTION (emil-design-eng). The sheet enters from 0.96 scale + opacity over 200ms with a strong ease-out
 // and leaves faster (140ms); it is a modal, so it scales from the centre. Buttons press to 0.97. Nothing
-// animates on keyboard actions or on repaint, and reduced motion keeps only the opacity fade.
+// animates on keyboard actions or on repaint, and reduced motion keeps only the opacity fade. The sheet
+// keeps its own .ac-scrim/.ac-box mechanics rather than taking .m-dlg__p, whose CSS animation would
+// replay on every keystroke — render() rebuilds the sheet's markup on each paint.
 //
 // NO BACKTICKS ANYWHERE IN THIS FILE, comments included: it is one template literal.
 
 export const ACCOUNTS_CRM_CSS = `
-.ac { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:acw; }
-.ac .crm-kpis { margin-block-end:0; }
-.ac .crm-kpi.crm-click { cursor:pointer; text-align:start; font-family:inherit; border:none; }
-.ac-bar { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); }
-.ac-bar .sp { flex:1; }
-.ac-f { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s2) var(--s4); border-bottom:1px solid var(--line-soft); background:var(--surface); }
-.ac-f select { font-family:inherit; height:34px; max-width:180px; font-size:var(--t-xs); color:var(--ink); background:var(--paper); border:none;
-  box-shadow:inset 0 0 0 1px var(--s-off-mark); border-radius:var(--r-sm); padding-inline:8px; }
-.ac-f select.on { box-shadow:inset 0 0 0 1px var(--accent-mark); background:var(--accent-tint); color:var(--accent-deep); }
-.ac-f .lnk { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:none; border:none; padding:0 4px; cursor:pointer; min-height:28px; border-radius:var(--r-sm); }
-.ac-pend { font-size:var(--t-xs); font-weight:600; color:var(--s-attn-text); background:var(--s-attn-soft); border-radius:var(--r-pill); padding:4px 12px; font-variant-numeric:tabular-nums; }
-.ac-t .cf-hr, .ac-t .cf-r { grid-template-columns:minmax(200px,2.2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) 124px 44px 100px; column-gap:var(--s2); }
-.ac-who { display:flex; align-items:center; gap:var(--s2); min-width:0; }
-.ac-av { width:34px; height:34px; flex:none; border-radius:var(--r-pill); background:var(--accent-tint); color:var(--accent-deep); font-weight:600; font-size:var(--t-sm);
-  display:flex; align-items:center; justify-content:center; }
-.ac-av.lg { width:52px; height:52px; font-size:var(--t-lg); }
-.ac-nm { display:flex; flex-direction:column; gap:2px; min-width:0; }
-.ac-nm .top { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-width:0; }
-.ac-nm .cf-sub .cf-pill { padding:0 7px; font-size:var(--t-xs); margin-inline-end:2px; }
-.ac-hd h1:focus { outline:none; }
-.ac-clip { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.ac-num { font-variant-numeric:tabular-nums; }
-.ac-lbl { display:none; font-size:var(--t-xs); color:var(--muted); }
-.cf-pill.imp-high { background:var(--s-fail-soft); color:var(--s-fail-text); }
-.cf-pill.imp-medium { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.imp-low { background:var(--surface-2); color:var(--muted); }
-.cf-pill.ap-proposed { background:var(--s-attn-soft); color:var(--s-attn-text); }
-.cf-pill.ap-approved { background:var(--accent-tint); color:var(--accent-deep); }
-.cf-pill.ap-rejected { background:var(--surface-2); color:var(--muted); }
-.ac-dec { display:flex; gap:6px; }
-.ac-dec .btn { height:30px; padding-inline:10px; font-size:var(--t-xs); }
-.ac-dec .ok { background:var(--accent-tint); color:var(--accent-deep); }
-.ac-dec .no { background:var(--paper); color:var(--s-fail-text); box-shadow:inset 0 0 0 1px var(--s-fail-soft); }
-.ac-newtop { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 12px; border-radius:var(--r-sm); font-size:var(--t-sm); white-space:nowrap; }
-.ac-newtop .sm { display:none; }
-@media (max-width: 560px) { .ac-newtop .lg { display:none; } .ac-newtop .sm { display:inline; } }
-.ac-num, .ac-li .val { white-space:nowrap; }
-.ac-more { display:flex; justify-content:center; padding:var(--s3); border-top:1px solid var(--line-soft); }
-.ac .btn, .ac-modal .btn { transition:transform 140ms var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease); }
-.ac .btn:active, .ac-modal .btn:active, .ac-f .lnk:active { transform:scale(.97); }
-.ac a:focus-visible, .ac button:focus-visible, .ac select:focus-visible, .ac-modal button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-
-/* ---- the account record ---- */
-.ac-back { align-self:flex-start; font-size:var(--t-sm); font-weight:500; color:var(--accent-deep); text-decoration:none; padding:4px 0; }
-.ac-hd { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4); display:flex; gap:var(--s3); flex-wrap:wrap; align-items:flex-start; }
-.ac-hd .main { flex:1; min-width:240px; display:flex; flex-direction:column; gap:6px; }
-.ac-hd h1 { margin:0; font-size:var(--t-xl); font-weight:600; color:var(--ink); line-height:var(--lh-tight); }
-.ac-hd .meta { font-size:var(--t-xs); color:var(--muted); line-height:1.8; }
-.ac-hd .acts { display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; }
-.ac-hd .acts .btn { height:36px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
-.ac-banner { display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; border-radius:var(--r-md); padding:var(--s3) var(--s4); font-size:var(--t-sm); line-height:1.7;
-  background:var(--s-attn-soft); color:var(--s-attn-text); }
-.ac-banner.rej { background:var(--surface-2); color:var(--ink); }
-.ac-banner .tx { flex:1; min-width:220px; }
-.ac-banner .btn { height:34px; }
-.ac-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(0,1fr); gap:var(--s3); align-items:start; }
-.ac-col { display:flex; flex-direction:column; gap:var(--s3); min-width:0; }
-.ac-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; }
-.ac-card .hd { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s3) var(--s4); border-bottom:1px solid var(--line-soft); }
-.ac-card .hd h2 { margin:0; font-size:var(--t-md); font-weight:600; color:var(--ink); }
-.ac-card .hd .s { font-size:var(--t-xs); color:var(--muted); font-variant-numeric:tabular-nums; }
-.ac-card .hd .sp { flex:1; }
-.ac-card .hd a, .ac-card .hd .lnk { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:none; border:none; cursor:pointer; text-decoration:none; padding:0; }
-.ac-card .bd { padding:var(--s2) var(--s4); }
-.ac-card .empty { padding:var(--s3) 0; font-size:var(--t-sm); color:var(--muted); line-height:1.7; }
-.ac-li { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:10px 0; border-bottom:1px solid var(--line-soft); font-size:var(--t-sm); color:var(--ink); min-width:0; }
-.ac-li:last-child { border-bottom:none; }
-.ac-li .grow { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-.ac-li .sub { font-size:var(--t-xs); color:var(--muted); line-height:1.6; }
-.ac-li .val { font-variant-numeric:tabular-nums; font-weight:600; }
-.ac-li a { color:var(--ink); text-decoration:none; font-weight:500; }
-.ac-li a:hover { color:var(--accent-deep); text-decoration:underline; text-underline-offset:3px; }
-.ac-stage { font-size:var(--t-xs); font-weight:600; border-radius:var(--r-pill); padding:2px 9px; background:var(--tn-soft); color:var(--tn-text); white-space:nowrap; }
-.ac-person .ac-av { width:36px; height:36px; }
-.ac-person .reach { display:flex; gap:4px 12px; flex-wrap:wrap; font-size:var(--t-xs); color:var(--muted); }
-.ac-person .reach a { color:var(--accent-deep); font-weight:400; }
-.ac-owner { display:flex; align-items:center; gap:var(--s2); padding:var(--s3) var(--s4); }
-.ac-owner .nm { font-size:var(--t-sm); font-weight:600; color:var(--ink); }
-.ac-owner .rl { font-size:var(--t-xs); color:var(--muted); }
-.ac-ev { display:grid; grid-template-columns:10px minmax(0,1fr) auto; gap:var(--s2); align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line-soft); font-size:var(--t-sm); }
-.ac-ev:last-child { border-bottom:none; }
-.ac-ev i { width:8px; height:8px; border-radius:var(--r-pill); background:var(--s-off-mark); display:block; transform:translateY(1px); }
-.ac-ev i.c { background:var(--accent); } .ac-ev i.t { background:var(--s-attn-mark); } .ac-ev i.n { background:var(--s-issued-mark, var(--accent-mark)); }
-.ac-ev .tx { min-width:0; color:var(--ink); line-height:1.6; }
-.ac-ev .tx .sub { display:block; font-size:var(--t-xs); color:var(--muted); }
-.ac-ev time { font-size:var(--t-xs); color:var(--muted); white-space:nowrap; }
+/* Only what the vocabulary genuinely lacks. Everything the old sheet declared for tables, pills,
+   tiles, fields and buttons is gone: .m-table, .m-chip, .m-kpis, .m-field and .m-btn carry it. */
+.ds6 .m-acc { display: grid; gap: var(--m-4); }
+.ds6 .m-acc-table { min-inline-size: 1040px; }
+.ds6 .m-acc-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 26ch; }
+.ds6 .m-acc-sub { display: block; font-size: var(--m-t-micro); color: var(--m-faint); line-height: 20px; }
+.ds6 .m-acc-ltr { direction: ltr; unicode-bidi: isolate; }
+.ds6 .m-av--lg { inline-size: 52px; block-size: 52px; font-size: var(--m-t-h); }
+.ds6 .m-acc-hd { display: flex; gap: var(--m-4); flex-wrap: wrap; align-items: flex-start; }
+.ds6 .m-acc-hd__m { flex: 1 1 260px; min-inline-size: 0; display: grid; gap: var(--m-2); }
+.ds6 .m-acc-row { display: flex; align-items: center; gap: var(--m-2); flex-wrap: wrap; }
+/* The stage keeps the ladder's own tone (opToneVars), because the admin owns the ladder and a
+   stage's colour is its identity on every other screen. */
+.ds6 .m-acc-stage { background: var(--tn-soft, var(--m-idle-dim)); color: var(--tn-text, var(--m-idle)); }
+.ds6 .m-acc-card { display: grid; gap: 0; }
+.ds6 .m-acc-b { padding: 0 var(--m-5) var(--m-4); }
+.ds6 .m-acc-b .m-item:first-child { border-block-start: 0; }
+.ds6 .m-kpi { text-align: start; font: inherit; display: block; inline-size: 100%; }
+.ds6 button.m-kpi { cursor: pointer; }
+.ds6 .m-kpi[data-lead] { background: var(--m-ac-dim); box-shadow: 0 0 0 1px var(--m-ac-line); }
 
 /* ---- the add / edit sheet (a modal: it scales from the centre) ---- */
-.ac-scrim { position:fixed; inset:0; background:rgba(16,24,40,.42); z-index:var(--z-overlay); opacity:0; transition:opacity 140ms var(--ease); }
+.ac-scrim { position:fixed; inset:0; background:rgba(11,13,18,.44); z-index:var(--z-overlay); opacity:0; transition:opacity 140ms cubic-bezier(.16,1,.3,1); }
 .ac-scrim.in { opacity:1; transition-duration:200ms; }
-.ac-modal { position:fixed; inset:0; z-index:var(--z-modal); display:flex; align-items:flex-start; justify-content:center; padding:6vh var(--s3) var(--s3); pointer-events:none; overflow:auto; }
-.ac-box { pointer-events:auto; width:100%; max-width:680px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg);
-  box-shadow:0 24px 60px rgba(16,24,40,.22); display:flex; flex-direction:column; max-height:88vh; opacity:0; transform:scale(.96);
-  transition:opacity 140ms cubic-bezier(.23,1,.32,1), transform 140ms cubic-bezier(.23,1,.32,1); }
-.ac-box.in { opacity:1; transform:none; transition-duration:200ms; }
-.ac-box .mh { display:flex; align-items:flex-start; gap:var(--s2); padding:var(--s4) var(--s4) var(--s3); border-bottom:1px solid var(--line-soft); }
-.ac-box .mh h2 { margin:0; font-size:var(--t-lg); font-weight:600; color:var(--ink); }
-.ac-box .mh .s { font-size:var(--t-xs); color:var(--muted); line-height:1.6; margin-top:2px; }
-.ac-box .mh .sp { flex:1; }
-.ac-x { width:36px; height:36px; flex:none; border-radius:var(--r-sm); border:none; background:none; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; }
-.ac-x:hover { background:var(--surface); color:var(--ink); }
-.ac-box .mb { padding:var(--s3) var(--s4); overflow:auto; display:flex; flex-direction:column; gap:var(--s3); }
-.ac-box .gl { font-size:var(--t-sm); font-weight:600; color:var(--ink); display:flex; align-items:center; gap:var(--s2); }
-.ac-box .gl .sp { flex:1; }
-.ac-box .cf-fl .req { color:var(--s-fail-text); }
-.ac-box .cf-fl .ferr { font-size:var(--t-xs); color:var(--s-fail-text); display:flex; align-items:center; gap:4px; }
-.ac-box .cf-fl select[aria-invalid="true"] { box-shadow:inset 0 0 0 2px var(--s-fail); }
-.ac-box .ro { font-size:var(--t-sm); color:var(--ink); height:38px; display:flex; align-items:center; }
-.ac-ct { border:1px solid var(--line); border-radius:var(--r-md); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); background:var(--paper); }
-.ac-ct.primary { box-shadow:inset 0 0 0 1px var(--accent-mark); background:var(--accent-wash); }
-.ac-ct .ch { display:flex; align-items:center; gap:var(--s2); font-size:var(--t-xs); color:var(--muted); font-weight:600; }
-.ac-ct .ch .sp { flex:1; }
-.ac-ct .pr { font-family:inherit; font-size:var(--t-xs); font-weight:600; border:none; border-radius:var(--r-pill); padding:0 10px; min-height:28px; cursor:pointer;
-  background:var(--paper); color:var(--muted); box-shadow:inset 0 0 0 1px var(--s-off-mark); }
-.ac-ct .pr[aria-pressed="true"] { background:var(--accent); color:var(--on-accent, #FFFFFF); box-shadow:none; }
-.ac-ct .rm { font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--s-fail-text); background:none; border:none; cursor:pointer; min-height:28px; padding:0 6px; border-radius:var(--r-sm); }
-.ac-ct .rm:disabled { color:var(--s-off-text); cursor:default; }
-.ac-add { align-self:flex-start; font-family:inherit; font-size:var(--t-xs); font-weight:600; color:var(--accent-deep); background:var(--accent-tint); border:none;
-  border-radius:var(--r-pill); padding:0 12px; min-height:30px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
-.ac-add svg { width:14px; height:14px; }
-.ac-box .mf { display:flex; align-items:center; gap:var(--s2); flex-wrap:wrap; padding:var(--s3) var(--s4); border-top:1px solid var(--line-soft); }
-.ac-box .mf .btn { height:38px; }
-.ac-box .mf .msg { flex-basis:100%; }
-@container acw (max-width: 900px) {
-  .ac-t .cf-hr { display:none; }
-  .ac-t .cf-r { grid-template-columns:minmax(0,1fr) auto; row-gap:6px; padding-block:var(--s3); }
-  .ac-t .cf-r > * { min-width:0; }
-  .ac-t .cf-r > .ac-who { grid-column:1 / -1; }
-  .ac-lbl { display:inline; }
-  .ac-grid { grid-template-columns:minmax(0,1fr); }
-}
-@media (max-width: 560px) { .ac-modal { padding:0; align-items:stretch; } .ac-box { max-width:none; max-height:none; min-height:100%; border-radius:0; } }
-@media (pointer:coarse) {
-  .ac-f select, .ac-dec .btn, .ac-f .lnk, .ac-ct .pr, .ac-ct .rm, .ac-add, .ac-card .hd a, .ac-card .hd .lnk { min-height:44px; }
-}
+.ac-modal { position:fixed; inset:0; z-index:var(--z-modal); display:flex; align-items:flex-start; justify-content:center; padding:6vh 12px 12px; pointer-events:none; overflow:auto; }
+.ds6 .ac-box { pointer-events:auto; width:100%; max-width:680px; background:var(--m-paper); border-radius:var(--m-r-band);
+  box-shadow:var(--m-lift); display:flex; flex-direction:column; max-height:88vh; opacity:0; transform:scale(.96);
+  transition:opacity 140ms cubic-bezier(.16,1,.3,1), transform 140ms cubic-bezier(.16,1,.3,1); }
+.ds6 .ac-box.in { opacity:1; transform:none; transition-duration:200ms; }
+.ds6 .ac-box .m-dlg__b { display:flex; flex-direction:column; gap:var(--m-4); max-block-size:none; }
+.ds6 .ac-box .m-dlg__f { flex-wrap:wrap; justify-content:flex-start; }
+.ds6 .m-gl { display:flex; align-items:center; gap:var(--m-2); font-size:var(--m-t-body); font-weight:600; color:var(--m-ink); }
+.ds6 .m-ct { border-radius:var(--m-r-ctl); box-shadow:var(--m-hair); padding:var(--m-3); display:flex; flex-direction:column; gap:var(--m-2); }
+.ds6 .m-ct[data-primary] { box-shadow:0 0 0 1px var(--m-ac-line); background:var(--m-ac-dim); }
+.ds6 .m-ct__h { display:flex; align-items:center; gap:var(--m-2); font-size:var(--m-t-micro); color:var(--m-mut); font-weight:600; }
+.ds6 .m-ro { font-size:var(--m-t-body); color:var(--m-ink); min-block-size:38px; display:flex; align-items:center; }
+@media (max-width: 560px) { .ac-modal { padding:0; align-items:stretch; } .ds6 .ac-box { max-width:none; max-height:none; min-height:100%; border-radius:0; } }
+@media (pointer:coarse) { .ds6 .m-ct button, .ds6 .m-x { min-block-size:44px; } }
 @media (prefers-reduced-motion: reduce) {
-  .ac-box { transform:none; transition:opacity 140ms linear; }
-  .ac .btn, .ac-modal .btn { transition:none; }
-  .ac .btn:active, .ac-modal .btn:active, .ac-f .lnk:active { transform:none; }
+  .ds6 .ac-box { transform:none; transition:opacity 140ms linear; }
 }
 `;
 
@@ -177,12 +92,21 @@ function acToast(m, bad, act, fn) { if (typeof opToast === "function") opToast(m
 function acRoute() { return (location.hash || "").slice(1); }
 /* The shared admin token signs as «اللوحة». «المسؤول» would read as the account OWNER on this screen. */
 function acBy(b) { return !b || b === "اللوحة" ? "مدير النظام" : b; }
+
+/* Every digit goes through .m-n — direction:ltr, isolated bidi, tabular figures. A unit that belongs
+   to the number lives INSIDE the span, or the ر.س lands on the wrong side of the digits. */
+function acN(v) { return '<span class="m-n">' + fmtN(v) + "</span>"; }
+function acMoneyN(v) { return '<span class="m-n">' + fmtN(Math.round(Number(v) || 0)) + " ر.س</span>"; }
+/* kind: "owed" a number someone owes, "unset" a classification nobody made, "none" a legitimate
+   nothing. An account with no owner is UNSET — nobody made the assignment — not a number owed. */
+function acNil(t, kind) { return '<span class="m-td-nil m-nil--' + (kind || "none") + '">' + esc(t) + "</span>"; }
+
 function acDate(ms) {
-  if (!ms) return "—";
+  if (!ms) return acNil("لم يُسجَّل", "unset");
   var d = new Date(Number(ms));
   /* The year only when it is not this one: «15 سبتمبر 2026» truncated in a 132px column. */
   var o = d.getFullYear() === new Date().getFullYear() ? { day: "numeric", month: "long" } : { day: "numeric", month: "short", year: "numeric" };
-  return d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", o);
+  return '<span class="m-n">' + d.toLocaleDateString("ar-SA-u-ca-gregory-nu-latn", o) + "</span>";
 }
 function acMoney(v) { return typeof opMoney === "function" ? opMoney(v) : fmtN(Math.round(Number(v) || 0)) + " ر.س"; }
 /* The initial a reader recognises: «م. فهد العمري» is F, not the title's م. */
@@ -190,8 +114,17 @@ function acIni(name) {
   var s = String(name || "").trim().replace(/^(م|د|أ|ا|أ\\.د)\\.\\s*/, "");
   return esc(s.charAt(0) || "؟");
 }
-function acImpPill(imp) { return imp ? '<span class="cf-pill imp-' + imp + '">أهمية ' + esc(ACCOUNT_IMPORTANCE_LABELS[imp] || imp) + "</span>" : ""; }
-function acApprPill(ap) { return '<span class="cf-pill ap-' + ap + '">' + esc(ACCOUNT_APPROVAL_LABELS[ap] || ap) + "</span>"; }
+/* Colour means status. Importance is a risk read, approval is a gate — each maps onto the
+   vocabulary's status tones rather than inventing a private palette. */
+function acImpPill(imp) {
+  if (!imp) return "";
+  var t = imp === "high" ? "bad" : imp === "medium" ? "warn" : "plain";
+  return '<span class="m-chip m-chip--' + t + '">أهمية ' + esc(ACCOUNT_IMPORTANCE_LABELS[imp] || imp) + "</span>";
+}
+function acApprPill(ap) {
+  var t = ap === "approved" ? "ok" : ap === "proposed" ? "warn" : "plain";
+  return '<span class="m-chip m-chip--' + t + '">' + esc(ACCOUNT_APPROVAL_LABELS[ap] || ap) + "</span>";
+}
 function acSource(a) { return a.source ? ACCOUNT_SOURCE_LABELS[a.source] || a.source : "غير مسجّل"; }
 function acRowById(id) { return (acRows || []).filter(function (r) { return String(r.id) === String(id); })[0] || null; }
 
@@ -252,50 +185,69 @@ function acDistinct(key) {
   return Object.keys(c).sort(function (x, y) { return c[y] - c[x] || (x < y ? -1 : 1); });
 }
 function acSel(key, label, value, opts) {
-  return '<select aria-label="' + label + '" data-acset="' + key + '"' + (value ? ' class="on"' : "") + '><option value="">' + label + ": الكل</option>" +
+  return '<select class="m-select" aria-label="' + label + '" data-acset="' + key + '"><option value="">' + label + ": الكل</option>" +
     opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(clip(o[1], 28)) + "</option>"; }).join("") + "</select>";
 }
+/* The book, minus the rejected: every KPI on this screen reads the same population, so a tile and
+   the list under it cannot disagree about what «العملاء» means. */
+function acBook() { return (acRows || []).filter(function (a) { return a.approval !== "rejected"; }); }
+/* Each figure printed in more than one place is bound to the array it is rendered from — the KPI
+   total against the book, the proposed count against the tab it also badges, the row count against
+   the pager note that repeats it. dsVerify re-derives all of them on every paint. */
+function acBind() {
+  dsD("acAll", function () { return acBook().length; });
+  dsD("acApproved", function () { return acBook().filter(function (a) { return a.approval !== "proposed"; }).length; });
+  dsD("acPending", function () { return acBook().filter(function (a) { return a.approval === "proposed"; }).length; });
+  dsD("acNoOwner", function () { return acBook().filter(function (a) { return a.ownerId == null; }).length; });
+  dsD("acProposedTab", function () { return acFiltered("proposed").length; });
+  dsD("acShown", function () { return acFiltered().length; });
+}
 function acKpis() {
-  var all = (acRows || []).filter(function (a) { return a.approval !== "rejected"; });
+  var all = acBook();
   var pending = all.filter(function (a) { return a.approval === "proposed"; }).length;
   var noOwner = all.filter(function (a) { return a.ownerId == null; }).length;
   var value = all.reduce(function (s, a) { return s + (a.opps ? a.opps.value : 0); }, 0);
   var openN = all.reduce(function (s, a) { return s + (a.opps ? a.opps.open : 0); }, 0);
   var wonN = all.reduce(function (s, a) { return s + (a.opps ? a.opps.won : 0); }, 0);
   var tile = function (k, v, s, lead, act) {
-    var open = act ? '<button class="crm-kpi crm-click' + (lead ? " crm-lead" : "") + '" data-ac="' + act + '">' : '<div class="crm-kpi' + (lead ? " crm-lead" : "") + '">';
-    return open + '<div class="crm-k">' + k + '</div><div class="crm-v">' + v + "</div>" + (s ? '<div class="crm-s">' + s + "</div>" : "") + (act ? "</button>" : "</div>");
+    var open = act ? '<button type="button" class="m-card m-kpi" data-ac="' + act + '"' + (lead ? " data-lead" : "") + ">"
+      : '<div class="m-card m-kpi"' + (lead ? " data-lead" : "") + ">";
+    return open + '<div class="m-stat__k">' + k + '</div><div class="m-stat__v">' + v + "</div>" +
+      (s ? '<div class="m-stat__s">' + s + "</div>" : "") + (act ? "</button>" : "</div>");
   };
-  return '<div class="crm-kpis crm-hasLead">' +
-    tile("العملاء", fmtN(all.length), "معتمدون: " + fmtN(all.length - pending), true) +
-    tile("بانتظار الاعتماد", fmtN(pending), pending ? "اعرضهم" : "لا أحد", false, pending ? "tabproposed" : "") +
-    tile("بلا موظف مسؤول", fmtN(noOwner), noOwner ? "اعرضهم" : "", false, noOwner ? "noowner" : "") +
+  return '<div class="m-kpis">' +
+    tile("العملاء", dsFig("acAll", all.length), "معتمدون: " + dsFig("acApproved", all.length - pending), true) +
+    tile("بانتظار الاعتماد", dsFig("acPending", pending), pending ? "اعرضهم" : "لا أحد", false, pending ? "tabproposed" : "") +
+    tile("بلا موظف مسؤول", dsFig("acNoOwner", noOwner), noOwner ? "اعرضهم" : "لا أحد", false, noOwner ? "noowner" : "") +
     /* The value includes won lines (the list column does too), so the caption names both, as counts
        that need no noun agreement (review: «فرصتان قائمة»). */
-    tile("قيمة الفرص", acMoney(value), "قائمة: " + fmtN(openN) + " · رابحة: " + fmtN(wonN), false) + "</div>";
+    tile("قيمة الفرص", acMoneyN(value), "قائمة: " + acN(openN) + " · رابحة: " + acN(wonN), false) + "</div>";
 }
 function acDecisionCell(a) {
-  if (a.approval !== "proposed") return "<span>" + acApprPill(a.approval) + "</span>";
+  if (a.approval !== "proposed") return acApprPill(a.approval);
   var busy = !!acBusy[a.id];
-  if (!acMayEdit()) return "";
-  return '<span class="ac-dec"><button class="btn ok" data-ac="approve" data-i="' + a.id + '" id="acap' + a.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ' aria-label="اعتماد ' + esc(a.name) + '">اعتماد</button>' +
-    '<button class="btn no" data-ac="reject" data-i="' + a.id + '" id="acrj' + a.id + '"' + (busy ? " disabled" : "") + ' aria-label="رفض ' + esc(a.name) + '">رفض</button></span>';
+  /* A role with customers.view but not customers.edit sees the state, never the gate. */
+  if (!acMayEdit()) return acApprPill(a.approval);
+  return '<span class="m-acc-row"><button type="button" class="m-btn m-btn--primary" data-ac="approve" data-i="' + a.id + '" id="acap' + a.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ' aria-label="اعتماد ' + esc(a.name) + '">اعتماد</button>' +
+    '<button type="button" class="m-btn" data-ac="reject" data-i="' + a.id + '" id="acrj' + a.id + '"' + (busy ? " disabled" : "") + ' aria-label="رفض ' + esc(a.name) + '">رفض</button></span>';
 }
 function acRow(a) {
   var pc = a.primaryContact;
-  var h = '<div class="cf-r" data-acrow="' + a.id + '">';
-  h += '<span class="ac-who"><span class="ac-av" aria-hidden="true">' + acIni(a.name) + '</span><span class="ac-nm"><span class="top">' +
-    '<a class="in-link ac-clip" href="#account/' + a.id + '" title="' + esc(a.name) + '">' + esc(a.name) + "</a></span>" +
-    /* Importance rides the second line: on the first it took the width the name needs (a 200px cell at 1280). */
-    '<span class="cf-sub ac-clip">' + (a.importance ? acImpPill(a.importance) + " " : "") + (pc ? esc(pc.name) + (pc.role ? " · " + esc(pc.role) : "") + (a.contactCount > 1 ? " · +" + fmtN(a.contactCount - 1) : "") : "لا جهة اتصال مسجّلة") + "</span></span></span>";
-  h += '<span class="ac-clip"><span class="ac-lbl">المدينة: </span>' + (a.city ? esc(a.city) : '<span class="cf-sub">—</span>') + "</span>";
-  h += '<span class="ac-clip"><span class="ac-lbl">القطاع: </span>' + (a.sector ? esc(a.sector) : '<span class="cf-sub">—</span>') + "</span>";
-  h += '<span class="ac-clip"><span class="ac-lbl">المسؤول: </span>' + (a.ownerName ? esc(a.ownerName) : '<span class="cf-sub">بلا مسؤول</span>') + "</span>";
-  h += '<span class="ac-nm"><span class="ac-clip' + (a.source ? "" : " cf-sub") + '">' + esc(acSource(a)) + '</span><span class="cf-sub ac-clip">' + (a.createdBy ? esc(acBy(a.createdBy)) + " · " : "") + acDate(a.createdAt) + "</span></span>";
-  h += acDecisionCell(a);
-  h += '<span class="ac-num"><span class="ac-lbl">الفرص: </span>' + (a.opps.count ? fmtN(a.opps.count) : '<span class="cf-sub">—</span>') + "</span>";
-  h += '<span class="ac-num"><span class="ac-lbl">القيمة: </span>' + (a.opps.value ? acMoney(a.opps.value) : '<span class="cf-sub">—</span>') + "</span>";
-  return h + "</div>";
+  var h = '<tr data-acrow="' + a.id + '">';
+  h += '<td class="m-td-n"><span class="m-acc-row"><span class="m-av" aria-hidden="true">' + acIni(a.name) + "</span>" +
+    '<span><a class="m-link m-acc-clip" href="#account/' + a.id + '" title="' + esc(a.name) + '">' + esc(a.name) + "</a>" +
+    /* Importance rides the second line: on the first it took the width the name needs. */
+    '<span class="m-acc-sub">' + (a.importance ? acImpPill(a.importance) + " " : "") +
+      (pc ? esc(pc.name) + (pc.role ? " · " + esc(pc.role) : "") + (a.contactCount > 1 ? " · +" + fmtN(a.contactCount - 1) : "") : "لا جهة اتصال مسجّلة") +
+    "</span></span></span></td>";
+  h += "<td>" + (a.city ? '<span class="m-acc-clip">' + esc(a.city) + "</span>" : acNil("لم تُسجَّل", "unset")) + "</td>";
+  h += "<td>" + (a.sector ? '<span class="m-acc-clip">' + esc(a.sector) + "</span>" : acNil("لم يُصنَّف", "unset")) + "</td>";
+  h += "<td>" + (a.ownerName ? '<span class="m-acc-clip">' + esc(a.ownerName) + "</span>" : acNil("لم يُسجَّل", "unset")) + "</td>";
+  h += '<td><span class="m-acc-clip">' + esc(acSource(a)) + '</span><span class="m-acc-sub">' + (a.createdBy ? esc(acBy(a.createdBy)) + " · " : "") + acDate(a.createdAt) + "</span></td>";
+  h += "<td>" + acDecisionCell(a) + "</td>";
+  h += '<td class="m-td-v">' + (a.opps.count ? acN(a.opps.count) : acNil("لا فرص", "none")) + "</td>";
+  h += '<td class="m-td-v">' + (a.opps.value ? acMoneyN(a.opps.value) : (a.opps.count ? acNil("لم تُسعَّر", "owed") : acNil("لا فرص", "none"))) + "</td>";
+  return h + "</tr>";
 }
 function acPaintCrumb() {
   var act = document.getElementById("crumbact");
@@ -306,7 +258,7 @@ function acPaintCrumb() {
   if (document.getElementById("acnewtop")) return;
   /* A role with customers.view but not customers.edit reads the book and adds nothing to it. */
   act.innerHTML = acMayEdit()
-    ? '<button class="btn btn-teal ac-newtop" id="acnewtop" data-ac="new" aria-label="إضافة عميل جديد">' + acIco("plus") + '<span class="lg">إضافة عميل جديد</span><span class="sm">عميل</span></button>'
+    ? '<button class="btn btn-teal ac-newtop" id="acnewtop" data-ac="new" aria-label="إضافة عميل جديد" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;white-space:nowrap">' + acIco("plus") + "إضافة عميل جديد</button>"
     : "";
 }
 function vAccounts() {
@@ -314,17 +266,24 @@ function vAccounts() {
   if (typeof inMemLoad === "function") inMemLoad();
   acRec = null;
   setTimeout(acPaintCrumb, 0);
-  var h = '<div class="ac">';
-  if (acRows === null && !acFailed) return h + '<section class="cf-sec"><div class="cf-state" aria-busy="true">جارٍ تحميل العملاء…</div></section></div>' + acModal();
-  if (acRows === null) return h + '<section class="cf-sec"><div class="cf-state" role="alert">تعذّر تحميل العملاء.<button class="btn btn-ghost" data-ac="retry">أعد المحاولة</button></div></section></div>' + acModal();
-  if (acFailed) h += '<section class="cf-sec"><div class="cf-state" role="alert">' + acIco("warn") + 'تعذّر التحديث — المعروض آخر نسخة محمّلة.<button class="btn btn-ghost" data-ac="retry">أعد المحاولة</button></div></section>';
+  var h = '<div class="ds6"><div class="m-acc">';
+  if (acRows === null && !acFailed) return h + '<div class="m-card"><p class="m-body" aria-busy="true">جارٍ تحميل العملاء…</p></div></div></div>' + acModal();
+  if (acRows === null) {
+    return h + '<div class="m-alert" role="alert"><span class="m-alert__t">تعذّر تحميل العملاء</span>' +
+      '<span class="m-alert__d">لم يصل ردّ من الخادم.</span><button type="button" class="m-btn" data-ac="retry">أعد المحاولة</button></div></div></div>' + acModal();
+  }
+  acBind();
+  if (acFailed) {
+    h += '<div class="m-alert" role="alert"><span class="m-alert__t">تعذّر التحديث</span>' +
+      '<span class="m-alert__d">المعروض آخر نسخة محمّلة.</span><button type="button" class="m-btn" data-ac="retry">أعد المحاولة</button></div>';
+  }
   if (!acRows.length) {
-    return h + '<section class="cf-sec"><div class="crm-empty" style="padding:var(--s5,32px) var(--s4)"><b>لا عملاء بعد</b>' +
-      "العميل منشأة تبيع لها Lean: اسمها ومدينتها وقطاعها وأهميتها ومن يتولاها والأشخاص فيها. أضفه يدويًا، أو استورد قائمة من «جهات الاستهداف»." +
+    return h + '<div class="m-empty"><div class="m-empty__t">لا عملاء بعد</div>' +
+      '<div class="m-empty__d">العميل منشأة تبيع لها Lean: اسمها ومدينتها وقطاعها وأهميتها ومن يتولاها والأشخاص فيها. أضفه يدويًا، أو استورد قائمة من «جهات الاستهداف».</div>' +
       (acMayEdit()
-        ? '<div class="in-row" style="margin-top:var(--s3)"><button class="btn btn-teal" id="acnewempty" data-ac="new" style="display:inline-flex;align-items:center;gap:6px">' + acIco("plus") + "إضافة عميل جديد</button>" +
-          '<a class="btn btn-ghost" href="#targets" style="text-decoration:none;display:inline-flex;align-items:center">استيراد من ملف</a></div>'
-        : "") + "</div></section></div>" + acModal();
+        ? '<div class="m-empty__a"><button type="button" class="m-btn m-btn--primary" id="acnewempty" data-ac="new">إضافة عميل جديد</button> ' +
+          '<a class="m-btn" href="#targets">استيراد من ملف</a></div>'
+        : "") + "</div></div></div>" + acModal();
   }
   h += acKpis();
   var counts = { all: acFiltered("all").length, approved: acFiltered("approved").length, proposed: acFiltered("proposed").length, rejected: acFiltered("rejected").length };
@@ -332,33 +291,44 @@ function vAccounts() {
   /* «M» is the tab before search and filters, so «من» says how much the filters hid (review). */
   var tabTotal = (acRows || []).filter(function (a) { return acF.tab === "all" ? a.approval !== "rejected" : a.approval === acF.tab; }).length;
   var tabs = [["all", "الكل"], ["approved", "معتمدون"], ["proposed", "مقترحون"], ["rejected", "مرفوضون"]];
-  h += '<section class="cf-sec ac-t"><div class="ac-bar">' +
-    '<span class="vtog" role="radiogroup" aria-label="حالة الاعتماد">' + tabs.map(function (t) {
+  h += '<div class="m-tabs" role="tablist" aria-label="حالة الاعتماد">' + tabs.map(function (t) {
       var on = acF.tab === t[0];
-      return '<button role="radio" aria-checked="' + on + '" tabindex="' + (on ? 0 : -1) + '" class="' + (on ? "on" : "") + '" data-ac="tab" data-v="' + t[0] + '">' + t[1] + " " + fmtN(counts[t[0]]) + "</button>";
-    }).join("") + "</span>" +
-    (counts.proposed && acF.tab !== "proposed" ? '<span class="ac-pend">' + acNCust(counts.proposed) + " بانتظار الاعتماد</span>" : "") +
-    '<span class="sp"></span><input class="in-q" id="acq" value="' + esc(acF.q) + '" placeholder="بحث بالاسم أو جهة الاتصال…" aria-label="بحث في العملاء" data-acset="q"></div>';
+      return '<button type="button" class="m-tab" role="tab" aria-selected="' + on + '" tabindex="' + (on ? 0 : -1) + '" data-ac="tab" data-v="' + t[0] + '">' +
+        t[1] + "<b>" + (t[0] === "proposed" ? dsFig("acProposedTab", counts[t[0]]) : acN(counts[t[0]])) + "</b></button>";
+    }).join("") + "</div>";
+  if (counts.proposed && acF.tab !== "proposed") {
+    h += '<div class="m-alert" role="status"><span class="m-alert__t">' + acNCust(counts.proposed) + " بانتظار الاعتماد</span>" +
+      '<span class="m-alert__d">لا يبدأ البيع لعميل مقترح قبل اعتماد فريق المبيعات.</span>' +
+      '<button type="button" class="m-btn" data-ac="tabproposed">اعرضهم</button></div>';
+  }
   var prods = {}; acRows.forEach(function (a) { acProducts(a).forEach(function (p) { prods[p] = 1; }); });
   var anyF = acF.product || acF.sector || acF.city || acF.owner || acF.importance || acF.ind;
-  h += '<div class="ac-f">' +
+  h += '<div class="m-tools"><div class="m-head__a">' +
+    '<input class="m-input" id="acq" value="' + esc(acF.q) + '" placeholder="بحث بالاسم أو جهة الاتصال…" aria-label="بحث في العملاء" data-acset="q">' +
     acSel("product", "المنتج", acF.product, Object.keys(prods).sort().map(function (p) { return [p, p]; })) +
     acSel("sector", "القطاع", acF.sector, acDistinct("sector").map(function (s) { return [s, s]; })) +
     acSel("city", "المدينة", acF.city, acDistinct("city").map(function (s) { return [s, s]; })) +
     acSel("owner", "المسؤول", acF.owner, [["none", "بلا مسؤول"]].concat(acMembers.map(function (m) { return [String(m.id), m.name]; }))) +
     acSel("importance", "الأهمية", acF.importance, ACCOUNT_IMPORTANCE.map(function (k) { return [k, ACCOUNT_IMPORTANCE_LABELS[k]]; })) +
-    (typeof inIndOptions === "function" && (inMembership || []).length ? '<select aria-label="مؤشر الاستخدام" data-acset="ind"' + (acF.ind ? ' class="on"' : "") + '><option value="">المؤشر: الكل</option>' + inIndOptions(acF.ind, true) + "</select>" : "") +
-    (anyF ? '<button class="lnk" data-ac="clearf">مسح التصفية</button>' : "") +
-    '<span class="sp" style="flex:1"></span><span class="cntpill">' + fmtN(rows.length) + " من " + fmtN(tabTotal) + "</span></div>";
-  h += '<div class="cf-t"><div class="cf-hr" role="row"><span>العميل</span><span>المدينة</span><span>القطاع</span><span>الموظف المسؤول</span><span>مصدر الإضافة</span><span>الحالة</span><span>الفرص</span><span>قيمة الفرص</span></div>';
+    (typeof inIndOptions === "function" && (inMembership || []).length ? '<select class="m-select" aria-label="مؤشر الاستخدام" data-acset="ind"><option value="">المؤشر: الكل</option>' + inIndOptions(acF.ind, true) + "</select>" : "") +
+    (anyF ? '<button type="button" class="m-btn" data-ac="clearf">مسح التصفية</button>' : "") +
+    '</div><span class="m-cap">' + dsFig("acShown", rows.length) + " من " + acN(tabTotal) + "</span></div>";
+  h += '<section class="m-card m-card--pad0"><div class="m-tablewrap"><table class="m-table m-acc-table">' +
+    "<thead><tr><th>العميل</th><th>المدينة</th><th>القطاع</th><th>الموظف المسؤول</th><th>مصدر الإضافة</th>" +
+    '<th>الحالة</th><th class="num">الفرص</th><th class="num">قيمة الفرص</th></tr></thead><tbody>';
   if (!rows.length) {
-    h += '<div class="cf-state">' + (acF.q ? "لا عميل يطابق «" + esc(acF.q) + "»." : acF.tab === "proposed" ? "لا عملاء بانتظار الاعتماد." : acF.tab === "rejected" ? "لا عملاء مرفوضون." : "لا عملاء يطابقون هذه التصفية.") +
-      (anyF || acF.q ? '<button class="btn btn-ghost" data-ac="clearall">مسح البحث والتصفية</button>' : "") + "</div>";
+    h += '<tr class="m-table__empty"><td colspan="8"><div class="m-empty"><div class="m-empty__t">' +
+      (acF.q ? "لا عميل يطابق «" + esc(acF.q) + "»" : acF.tab === "proposed" ? "لا عملاء بانتظار الاعتماد" : acF.tab === "rejected" ? "لا عملاء مرفوضون" : "لا عملاء يطابقون هذه التصفية") + "</div>" +
+      (anyF || acF.q ? '<div class="m-empty__a"><button type="button" class="m-btn" data-ac="clearall">مسح البحث والتصفية</button></div>' : "") +
+      "</div></td></tr>";
   }
   rows.slice(0, acShown).forEach(function (a) { h += acRow(a); });
-  h += "</div>";
-  if (rows.length > acShown) h += '<div class="ac-more"><button class="btn btn-ghost" data-ac="more">عرض ' + fmtN(Math.min(AC_PAGE, rows.length - acShown)) + " أخرى (المعروض " + fmtN(acShown) + " من " + fmtN(rows.length) + ")</button></div>";
-  return h + "</section></div>" + acModal();
+  h += "</tbody></table></div>";
+  if (rows.length > acShown) {
+    h += '<div class="m-foot"><span class="m-cap">المعروض ' + acN(acShown) + " من " + acN(rows.length) + "</span>" +
+      '<button type="button" class="m-btn" data-ac="more">عرض ' + acN(Math.min(AC_PAGE, rows.length - acShown)) + " أخرى</button></div>";
+  }
+  return h + "</section></div></div>" + acModal();
 }
 
 /* ---------------- approval ---------------- */
@@ -384,7 +354,7 @@ function acDecide(id, decision, name, undoTo) {
     if (acRoute().split("/")[0] === "account") target = document.getElementById("acrech");
     else if (after.indexOf(id) >= 0) target = document.querySelector('[data-acrow="' + id + '"] a');
     else if (at >= 0 && after.length) target = document.querySelector('[data-acrow="' + after[Math.min(at, after.length - 1)] + '"] a');
-    if (!target) target = document.querySelector('[data-ac="tab"][aria-checked="true"]');
+    if (!target) target = document.querySelector('[data-ac="tab"][aria-selected="true"]');
     if (target) target.focus({ preventScroll: true });
     var said = decision === "approved" ? "اعتُمد" : decision === "rejected" ? "رُفض" : "أُعيد إلى مقترح";
     acToast(said + " «" + name + "»", false, undoTo ? "تراجع" : "", undoTo ? function () { acDecide(id, undoTo, name, ""); } : null);
@@ -408,87 +378,119 @@ var AC_EVENT = { created: "أُضيف العميل", edited: "عُدّلت بي�
 var AC_OUTCOME = { sent: "أُرسلت", opted_out: "لم تُرسل — طلب الإيقاف", outside_window: "لم تُرسل — خارج نافذة 24 ساعة", no_inbound_ever: "لم تُرسل — لم يراسلنا بعد" };
 var AC_TASK = { backlog: "مؤجلة", todo: "للتنفيذ", in_progress: "قيد التنفيذ", done: "منجزة", canceled: "ملغاة" };
 function acCard(title, sub, link, body) {
-  return '<section class="ac-card"><div class="hd"><h2>' + title + "</h2>" + (sub ? '<span class="s">' + sub + "</span>" : "") + '<span class="sp"></span>' + (link || "") + '</div><div class="bd">' + body + "</div></section>";
+  return '<section class="m-card m-card--pad0 m-acc-card"><div class="m-card__h"><h2 class="m-card__t">' + title + "</h2>" +
+    '<span class="m-acc-row">' + (sub ? '<span class="m-card__k">' + sub + "</span>" : "") + (link || "") + "</span></div>" +
+    '<div class="m-acc-b">' + body + "</div></section>";
+}
+function acCardEmpty(t, d) {
+  return '<div class="m-empty" style="padding-inline:0"><div class="m-empty__t">' + t + "</div>" + (d ? '<div class="m-empty__d">' + d + "</div>" : "") + "</div>";
 }
 function vAccount(idRaw) {
   var id = Number(idRaw);
   setTimeout(acPaintCrumb, 0);
-  var h = '<div class="ac"><a class="ac-back" href="#accounts">→ كل العملاء</a>';
-  if (!(id > 0)) return h + '<section class="cf-sec"><div class="cf-state" role="alert">رابط العميل غير صحيح.</div></section></div>';
+  var h = '<div class="ds6"><div class="m-acc"><p class="m-crumb"><a href="#accounts">&#8594; كل العملاء</a></p>';
+  if (!(id > 0)) return h + '<div class="m-alert" role="alert"><span class="m-alert__t">رابط العميل غير صحيح</span></div></div></div>';
   acEnsureRec(id);
-  if (acRec.missing) return h + '<section class="cf-sec"><div class="cf-state" role="alert">لا عميل بهذا الرقم — ربما حُذف أو الرابط قديم.<a class="btn btn-ghost" href="#accounts" style="text-decoration:none">كل العملاء</a></div></section></div>';
+  if (acRec.missing) {
+    return h + '<div class="m-alert" role="alert"><span class="m-alert__t">لا عميل بهذا الرقم</span>' +
+      '<span class="m-alert__d">ربما حُذف أو الرابط قديم.</span><a class="m-btn" href="#accounts">كل العملاء</a></div></div></div>';
+  }
   if (!acRec.data) {
-    return h + '<section class="cf-sec"><div class="cf-state" ' + (acRec.failed ? 'role="alert">تعذّر تحميل العميل.<button class="btn btn-ghost" data-ac="recretry">أعد المحاولة</button>' : 'aria-busy="true">جارٍ تحميل العميل…') + "</div></section></div>" + acModal();
+    return h + '<div class="m-card">' + (acRec.failed
+      ? '<p class="m-body" role="alert">تعذّر تحميل العميل.</p><div class="m-actions"><button type="button" class="m-btn" data-ac="recretry">أعد المحاولة</button></div>'
+      : '<p class="m-body" aria-busy="true">جارٍ تحميل العميل…</p>') + "</div></div></div>" + acModal();
   }
   var d = acRec.data, a = d.account;
   /* header */
   var talked = !!d.conversation;
-  h += '<div class="ac-hd"><span class="ac-av lg" aria-hidden="true">' + acIni(a.name) + '</span><div class="main">' +
-    '<div class="in-row" style="gap:8px"><h1 id="acrech" tabindex="-1">' + esc(a.name) + "</h1>" + acApprPill(a.approval) + acImpPill(a.importance) + "</div>" +
-    '<div class="meta">' + [a.sector ? esc(a.sector) : "", a.city ? esc(a.city) : "", '<bdi dir="ltr">+' + esc(a.phone) + "</bdi>"].filter(Boolean).join(" · ") +
-    '<br>أُضيف بواسطة ' + esc(acBy(a.createdBy)) + " · " + esc(acSource(a)) + " · " + acDate(a.createdAt) + "</div></div>" +
-    '<div class="acts">' + (acMayEdit() ? '<button class="btn btn-ghost" id="acedit" data-ac="edit">' + acIco("edit") + "تعديل</button>" : "") +
-    (talked ? '<a class="btn btn-ghost" href="#customer/' + esc(a.phone) + '">فتح المحادثة</a>' : "") +
-    (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? '<button class="btn btn-teal" data-ac="opp">فرصة +</button>' : "") + "</div></div>";
+  h += '<section class="m-card m-acc-hd"><span class="m-av m-av--lg" aria-hidden="true">' + acIni(a.name) + "</span>" +
+    '<div class="m-acc-hd__m"><div class="m-acc-row"><h1 class="m-h1" id="acrech" tabindex="-1">' + esc(a.name) + "</h1>" +
+      acApprPill(a.approval) + acImpPill(a.importance) + "</div>" +
+    '<p class="m-meta">' + [a.sector ? esc(a.sector) : "", a.city ? esc(a.city) : "", '<bdi class="m-acc-ltr">+' + esc(a.phone) + "</bdi>"].filter(Boolean).join(" · ") + "</p>" +
+    '<p class="m-meta">أُضيف بواسطة ' + esc(acBy(a.createdBy)) + " · " + esc(acSource(a)) + " · " + acDate(a.createdAt) + "</p></div>" +
+    '<div class="m-acc-row">' + (acMayEdit() ? '<button type="button" class="m-btn" id="acedit" data-ac="edit">تعديل</button>' : "") +
+    (talked ? '<a class="m-btn" href="#customer/' + esc(a.phone) + '">فتح المحادثة</a>' : "") +
+    (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? '<button type="button" class="m-btn m-btn--primary" data-ac="opp">فرصة +</button>' : "") + "</div></section>";
   if (a.approval === "proposed") {
-    h += '<div class="ac-banner" role="status"><span class="tx">هذا عميل <b>مقترح</b> بانتظار اعتماد فريق المبيعات قبل بدء إجراءات البيع.</span>' +
+    h += '<div class="m-alert" role="status"><span class="m-alert__t">عميل مقترح</span>' +
+      '<span class="m-alert__d">بانتظار اعتماد فريق المبيعات قبل بدء إجراءات البيع.</span>' +
       (acMayEdit()
-        ? '<button class="btn btn-teal" data-ac="approve" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">اعتماد العميل</button>" +
-          '<button class="btn btn-ghost" data-ac="reject" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">رفض</button>"
+        ? '<button type="button" class="m-btn m-btn--primary" data-ac="approve" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">اعتماد العميل</button>" +
+          '<button type="button" class="m-btn" data-ac="reject" data-i="' + a.id + '"' + (acBusy[a.id] ? " disabled" : "") + ">رفض</button>"
         : "") + "</div>";
   } else if (a.approval === "rejected") {
-    h += '<div class="ac-banner rej" role="status"><span class="tx">رُفض هذا العميل' + (a.approvalBy ? " بواسطة " + esc(acBy(a.approvalBy)) : "") + (a.approvalAt ? " في " + acDate(a.approvalAt) : "") +
+    h += '<div class="m-alert" role="status"><span class="m-alert__t">عميل مرفوض</span>' +
+      '<span class="m-alert__d">رُفض' + (a.approvalBy ? " بواسطة " + esc(acBy(a.approvalBy)) : "") + (a.approvalAt ? " في " + acDate(a.approvalAt) : "") +
       '. لا يظهر في «الكل»، وسجله محفوظ.</span>' +
-      (acMayEdit() ? '<button class="btn btn-ghost" data-ac="repropose" data-i="' + a.id + '">إعادة إلى مقترح</button>' : "") + "</div>";
+      (acMayEdit() ? '<button type="button" class="m-btn" data-ac="repropose" data-i="' + a.id + '">إعادة إلى مقترح</button>' : "") + "</div>";
   }
   /* main column */
   var main = "";
-  var liveOpps = d.opps.filter(function (o) { return !isLostStage(o.stage); });
-  var liveValue = liveOpps.reduce(function (s, o) { return s + o.value; }, 0);
-  main += acCard("فرص العميل", d.opps.length ? acNOpp(liveOpps.length) + " · " + acMoney(liveValue) : "", '<a href="#opps">كل الفرص</a>',
+  /* THE FIX. isLostStage alone left WON lines in the total and the subtitle called the result open
+     pipeline — a closed deal reading as money still in play. Open and won are now separated exactly
+     as the list KPI separates them, and the open lines with no price are NAMED rather than summed
+     in as zero, because a zero in a money column is a claim and an unpriced line is not one. */
+  var openOpps = d.opps.filter(function (o) { return isOpenStage(o.stage); });
+  var wonOpps = d.opps.filter(function (o) { return isWonStage(o.stage); });
+  var openValue = openOpps.reduce(function (s, o) { return s + (Number(o.value) || 0); }, 0);
+  var wonValue = wonOpps.reduce(function (s, o) { return s + (Number(o.value) || 0); }, 0);
+  var unpricedOpen = openOpps.filter(function (o) { return !o.value; }).length;
+  var oppSub = "";
+  if (d.opps.length) {
+    oppSub = "قائمة: " + acN(openOpps.length) + " · " + (openValue ? acMoneyN(openValue) : acNil("لم تُسعَّر", "owed"));
+    if (unpricedOpen) oppSub += " · " + acN(unpricedOpen) + " بلا تسعير";
+    oppSub += " &#183; رابحة: " + acN(wonOpps.length) + (wonValue ? " · " + acMoneyN(wonValue) : "");
+  }
+  main += acCard("فرص العميل", oppSub, '<a class="m-link" href="#opps">كل الفرص</a>',
     d.opps.length ? d.opps.map(function (o) {
       var st = typeof opStage === "function" ? opStage(o.stage) : { label: o.stage };
       var tone = typeof opToneVars === "function" ? ' style="' + opToneVars(o.stage) + '"' : "";
-      return '<div class="ac-li"><span class="grow"><span>' + esc(o.product) + '</span><span class="sub">' +
+      return '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(o.product) + '</span><span class="m-item__s">' +
         [o.owner ? "المسؤول: " + esc(o.owner) : "", o.closeOn ? "إغلاق متوقع: " + acDate(o.closeOn) : "", o.nextStep ? "الخطوة التالية: " + esc(clip(o.nextStep, 60)) : ""].filter(Boolean).join(" · ") +
-        '</span></span><span class="ac-stage"' + tone + ">" + esc(st.label) + '</span><span class="val">' + (o.value ? acMoney(o.value) : '<span class="sub">غير مسعّرة</span>') + "</span></div>";
-    }).join("") : '<div class="empty">لا فرص بيع لهذا العميل بعد.' +
-      (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? ' <button class="sg-toggle" data-ac="opp">افتح فرصة</button>' : "") + "</div>");
+        '</span></span><span class="m-chip m-acc-stage"' + tone + ">" + esc(st.label) + '</span><span class="m-item__v">' +
+        (o.value ? acMoneyN(o.value) : acNil("لم تُسعَّر", "owed")) + "</span></div>";
+    }).join("") : acCardEmpty("لا فرص بيع لهذا العميل بعد",
+      (typeof opFromEntity === "function" && (typeof meCan !== "function" || meCan("opps.edit")) ? '<button type="button" class="m-btn" data-ac="opp">افتح فرصة</button>' : "")));
   main += acCard("الحملات", d.campaigns.length ? acNCamp(d.campaigns.length) : "", "",
     d.campaigns.length ? d.campaigns.map(function (c) {
-      return '<div class="ac-li"><span class="grow"><a href="#kmon/' + c.id + '">' + esc(c.name) + '</a><span class="sub">' +
+      return '<div class="m-item"><span class="m-item__b"><a class="m-item__n m-link" href="#kmon/' + c.id + '">' + esc(c.name) + '</a><span class="m-item__s">' +
         [c.product ? esc(c.product) : "", c.objective && typeof CAMPAIGN_OBJECTIVE_LABELS !== "undefined" ? esc(CAMPAIGN_OBJECTIVE_LABELS[c.objective] || "") : "", acDate(c.createdAt)].filter(Boolean).join(" · ") +
-        '</span></span><span class="cf-sub">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span></div>";
-    }).join("") : '<div class="empty">لم يُستهدف هذا العميل بأي حملة.</div>');
+        '</span></span><span class="m-cap">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span></div>";
+    }).join("") : acCardEmpty("لم يُستهدف هذا العميل بأي حملة"));
   var evs = [];
   (a.events || []).forEach(function (e) {
     var extra = e.action === "edited" && e.detail && e.detail.changed && e.detail.changed.length
       ? ": " + e.detail.changed.map(function (k) { return AC_FIELD_LABEL[k] || k; }).join("، ") : "";
     var src0 = e.action === "created" && e.detail && e.detail.source ? " · " + esc(ACCOUNT_SOURCE_LABELS[e.detail.source] || "") : "";
-    evs.push({ at: e.at, cls: "", html: esc(AC_EVENT[e.action] || e.action) + esc(extra) + '<span class="sub">' + esc(acBy(e.by)) + src0 + (e.detail && e.detail.note ? " · " + esc(e.detail.note) : "") + "</span>" });
+    evs.push({ at: e.at, cls: "", html: esc(AC_EVENT[e.action] || e.action) + esc(extra) + '<span class="m-tl__s">' + esc(acBy(e.by)) + src0 + (e.detail && e.detail.note ? " · " + esc(e.detail.note) : "") + "</span>" });
   });
-  (d.tasks || []).forEach(function (t) { evs.push({ at: t.dueAt || 0, cls: "t", html: "مهمة: " + esc(t.title) + '<span class="sub">' + esc(AC_TASK[t.status] || t.status) + (t.assignedTo ? " · " + esc(t.assignedTo) : "") + (t.dueAt ? " · تستحق " + acDate(t.dueAt) : "") + "</span>" }); });
-  (d.notes || []).forEach(function (n) { evs.push({ at: n.createdAt, cls: "n", html: "ملاحظة" + (n.title ? ": " + esc(n.title) : "") + '<span class="sub">' + esc(clip(n.content, 140)) + (n.author ? " · " + esc(n.author) : "") + "</span>" }); });
+  (d.tasks || []).forEach(function (t) { evs.push({ at: t.dueAt || 0, cls: "warn", html: "مهمة: " + esc(t.title) + '<span class="m-tl__s">' + esc(AC_TASK[t.status] || t.status) + (t.assignedTo ? " · " + esc(t.assignedTo) : "") + (t.dueAt ? " · تستحق " + acDate(t.dueAt) : "") + "</span>" }); });
+  (d.notes || []).forEach(function (n) { evs.push({ at: n.createdAt, cls: "idle", html: "ملاحظة" + (n.title ? ": " + esc(n.title) : "") + '<span class="m-tl__s">' + esc(clip(n.content, 140)) + (n.author ? " · " + esc(n.author) : "") + "</span>" }); });
   /* BR-OPP-003 work logged on this customer's opportunities. Calendar days sort by their noon so a meeting
      logged today sits among today's other entries. */
   (d.activities || []).forEach(function (x) {
     var at = new Date(x.occurredOn + "T12:00:00").getTime() || x.createdAt;
     var kind = typeof ACTIVITY_KIND_LABELS !== "undefined" ? ACTIVITY_KIND_LABELS[x.kind] || x.kind : x.kind;
-    evs.push({ at: at, cls: "t", html: esc(kind) + (x.product ? " · " + esc(x.product) : "") + '<span class="sub">' + esc(clip(x.summary, 140)) +
+    evs.push({ at: at, cls: "warn", html: esc(kind) + (x.product ? " · " + esc(x.product) : "") + '<span class="m-tl__s">' + esc(clip(x.summary, 140)) +
       (x.nextStep ? " · الخطوة التالية: " + esc(x.nextStep) : "") + (x.owner ? " · " + esc(x.owner) : "") + "</span>" });
   });
-  d.campaigns.forEach(function (c) { evs.push({ at: c.createdAt, cls: "c", html: "حملة: " + esc(c.name) + '<span class="sub">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span>" }); });
+  d.campaigns.forEach(function (c) { evs.push({ at: c.createdAt, cls: "ok", html: "حملة: " + esc(c.name) + '<span class="m-tl__s">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span>" }); });
   evs.sort(function (x, y) { return y.at - x.at; });
-  main += acCard("سجل الأنشطة", "", talked ? '<a href="#customer/' + esc(a.phone) + '">المحادثة</a>' : "",
-    evs.length ? evs.slice(0, 15).map(function (e) { return '<div class="ac-ev"><i class="' + e.cls + '"></i><span class="tx">' + e.html + "</span><time>" + (e.at ? acDate(e.at) : "") + "</time></div>"; }).join("") : '<div class="empty">لا أنشطة مسجّلة.</div>');
+  main += acCard("سجل الأنشطة", evs.length ? acN(evs.length) : "", talked ? '<a class="m-link" href="#customer/' + esc(a.phone) + '">المحادثة</a>' : "",
+    evs.length ? '<div class="m-tl">' + evs.slice(0, 15).map(function (e) {
+      return '<div class="m-tl__i"><span class="m-tl__d ' + e.cls + '"></span><span class="m-tl__n">' + e.html + "</span>" +
+        '<span class="m-tl__t">' + (e.at ? acDate(e.at) : acNil("بلا تاريخ", "none")) + "</span></div>";
+    }).join("") + "</div>" : acCardEmpty("لا أنشطة مسجّلة"));
   /* side column */
   var side = "";
   var owner = a.ownerId != null ? (d.members || []).filter(function (m) { return m.id === a.ownerId; })[0] : null;
-  side += '<section class="ac-card"><div class="hd"><h2>مدير الحساب</h2><span class="sp"></span>' +
-    (acMayEdit() ? '<button class="lnk" id="acedit_owner" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button>" : "") + "</div>" +
-    (a.ownerName ? '<div class="ac-owner"><span class="ac-av" aria-hidden="true">' + acIni(a.ownerName) + '</span><span><span class="nm">' + esc(a.ownerName) + '</span><br><span class="rl">' +
-      esc([owner ? (owner.role === "sales" ? "مبيعات" : owner.role === "support" ? "دعم" : owner.role === "manager" ? "مدير" : owner.role) : "لم يعد نشطًا في الفريق", owner && owner.division ? owner.division : ""].filter(Boolean).join(" · ")) + "</span></span></div>"
-      : '<div class="bd"><div class="empty">لا موظف مسؤول عن هذا العميل.</div></div>') + "</section>";
+  side += acCard("مدير الحساب", "", acMayEdit() ? '<button type="button" class="m-link" id="acedit_owner" data-ac="edit">' + (a.ownerId != null ? "تغيير" : "تعيين") + "</button>" : "",
+    a.ownerName
+      ? '<div class="m-item"><span class="m-av" aria-hidden="true">' + acIni(a.ownerName) + '</span><span class="m-item__b">' +
+        '<span class="m-item__n">' + esc(a.ownerName) + '</span><span class="m-item__s">' +
+        esc([owner ? (owner.role === "sales" ? "مبيعات" : owner.role === "support" ? "دعم" : owner.role === "manager" ? "مدير" : owner.role) : "لم يعد نشطًا في الفريق", owner && owner.division ? owner.division : ""].filter(Boolean).join(" · ")) +
+        "</span></span></div>"
+      : acCardEmpty("لم يُسجَّل موظف مسؤول", "العميل بلا مدير حساب — عيّنه من «تعيين»."));
   /* «مدراء المنتجات المعنيون بالحساب» (the prototype's 360 screen). The account manager owns the
      RELATIONSHIP; each product this customer is targeted with has its own manager, and when a
      question is about a product it is that person who answers it. Derived from the catalogue —
@@ -511,46 +513,51 @@ function vAccount(idRaw) {
     });
   })();
   if (acPm.length) {
-    side += acCard("مدراء المنتجات المعنيون", fmtN(acPm.length), '<a href="#products">كل المنتجات</a>',
+    side += acCard("مدراء المنتجات المعنيون", acN(acPm.length), '<a class="m-link" href="#products">كل المنتجات</a>',
       acPm.map(function (m) {
-        return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(m.name) + '</span>' +
-          '<span class="grow"><span>' + esc(m.name) + '</span><span class="sub">' + esc(m.products.join("، ")) + "</span></span></div>";
+        return '<div class="m-item"><span class="m-av" aria-hidden="true">' + acIni(m.name) + "</span>" +
+          '<span class="m-item__b"><span class="m-item__n">' + esc(m.name) + '</span><span class="m-item__s">' + esc(m.products.join("، ")) + "</span></span></div>";
       }).join(""));
   }
-  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", acMayEdit() ? '<button class="lnk" id="acedit_contacts" data-ac="edit">إدارة</button>' : "",
+  side += acCard("جهات الاتصال", a.contacts.length ? acNPerson(a.contacts.length) : "", acMayEdit() ? '<button type="button" class="m-link" id="acedit_contacts" data-ac="edit">إدارة</button>' : "",
     a.contacts.length ? a.contacts.map(function (c) {
-      return '<div class="ac-li ac-person"><span class="ac-av" aria-hidden="true">' + acIni(c.name) + '</span><span class="grow"><span>' + esc(c.name) +
-        (c.primary ? ' <span class="cf-pill ap-approved">رئيسية</span>' : "") + "</span>" + (c.role ? '<span class="sub">' + esc(c.role) + "</span>" : "") +
-        '<span class="reach">' + (c.phone ? '<bdi dir="ltr">+' + esc(c.phone) + "</bdi>" : "") + (c.email ? '<a href="mailto:' + esc(c.email) + '" dir="ltr">' + esc(c.email) + "</a>" : "") + "</span></span></div>";
-    }).join("") : '<div class="empty">لا جهات اتصال مسجّلة — أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال.' +
-      (acMayEdit() ? ' <button class="sg-toggle" id="acedit_addct" data-ac="edit">أضف جهة اتصال</button>' : "") + "</div>");
+      return '<div class="m-item"><span class="m-av" aria-hidden="true">' + acIni(c.name) + '</span><span class="m-item__b"><span class="m-item__n">' + esc(c.name) +
+        (c.primary ? ' <span class="m-chip m-chip--ac">رئيسية</span>' : "") + "</span>" +
+        '<span class="m-item__s">' + [c.role ? esc(c.role) : "", c.phone ? '<bdi class="m-acc-ltr">+' + esc(c.phone) + "</bdi>" : "",
+          c.email ? '<a class="m-link m-acc-ltr" href="mailto:' + esc(c.email) + '">' + esc(c.email) + "</a>" : ""].filter(Boolean).join(" · ") + "</span></span></div>";
+    }).join("") : acCardEmpty("لا جهات اتصال مسجّلة", "أُضيف هذا العميل قبل أن تُحفظ جهات الاتصال." +
+      (acMayEdit() ? ' <button type="button" class="m-link" id="acedit_addct" data-ac="edit">أضف جهة اتصال</button>' : "")));
   var lines = d.opps.map(function (o) { return { product: o.product, stage: o.stage }; });
-  var prods = acProducts({ productTags: a.productTags, usesProducts: a.usesProducts, oppProducts: a.oppProducts });
-  side += acCard("المنتجات", prods.length ? fmtN(prods.length) : "", "",
-    prods.length ? prods.map(function (p) {
+  var prodList = acProducts({ productTags: a.productTags, usesProducts: a.usesProducts, oppProducts: a.oppProducts });
+  side += acCard("المنتجات", prodList.length ? acN(prodList.length) : "", "",
+    prodList.length ? prodList.map(function (p) {
       var st = productStatusOf(p, lines);
       var uses = (a.usesProducts || []).indexOf(p) >= 0;
-      return '<div class="ac-li"><span class="grow"><a href="#product/' + encodeURIComponent(p) + '">' + esc(p) + "</a>" + (uses ? '<span class="sub">يستخدمه حاليًا</span>' : "") + "</span>" +
-        '<span class="cf-pill ' + (st === "won" ? "on" : st === "open" ? "ap-approved" : st === "lost" ? "imp-high" : "off") + '">' + esc(PRODUCT_STATUS_LABELS[st]) + "</span></div>";
-    }).join("") : '<div class="empty">لا منتجات مستهدفة. تُضاف من «جهات الاستهداف» أو بفتح فرصة.</div>');
-  side += acCard("مؤشرات الاستخدام", d.indicators.length ? fmtN(d.indicators.length) : "", '<a href="#indicators">كل المؤشرات</a>',
+      var tone = st === "won" ? "ok" : st === "open" ? "ac" : st === "lost" ? "bad" : "plain";
+      return '<div class="m-item"><span class="m-item__b"><a class="m-item__n m-link" href="#product/' + encodeURIComponent(p) + '">' + esc(p) + "</a>" +
+        (uses ? '<span class="m-item__s">يستخدمه حاليًا</span>' : "") + "</span>" +
+        '<span class="m-chip m-chip--' + tone + '">' + esc(PRODUCT_STATUS_LABELS[st]) + "</span></div>";
+    }).join("") : acCardEmpty("لا منتجات مستهدفة", "تُضاف من «جهات الاستهداف» أو بفتح فرصة."));
+  side += acCard("مؤشرات الاستخدام", d.indicators.length ? acN(d.indicators.length) : "", '<a class="m-link" href="#indicators">كل المؤشرات</a>',
     d.indicators.length ? d.indicators.map(function (r) {
-      return '<div class="ac-li"><span class="grow"><button class="in-link" id="acind' + r.id + '" data-in="view" data-i="' + r.id + '">' + esc(r.name) + '</button><span class="sub">' +
+      return '<div class="m-item"><span class="m-item__b"><button type="button" class="m-item__n m-link" id="acind' + r.id + '" data-in="view" data-i="' + r.id + '">' + esc(r.name) + '</button><span class="m-item__s">' +
         [r.product ? esc(r.product) : "", typeof INDICATOR_STATUS_LABELS !== "undefined" ? INDICATOR_STATUS_LABELS[r.status] || "" : ""].filter(Boolean).join(" · ") + "</span></span>" +
-        (r.value ? '<span class="val">' + esc(r.value) + "</span>" : "") + "</div>";
-    }).join("") : '<div class="empty">هذا العميل ليس في أي مؤشر استخدام.</div>');
+        '<span class="m-item__v">' + (r.value ? esc(r.value) : acNil("بلا قيمة", "none")) + "</span></div>";
+    }).join("") : acCardEmpty("هذا العميل ليس في أي مؤشر استخدام"));
   /* BR-PRT-004: what each partner's contact with this customer came to, and whether it reached sales. */
   if ((d.partnerResults || []).length) {
-    side += acCard("تواصل الشركاء", fmtN(d.partnerResults.length), '<a href="#partners">شركاء المبيعات</a>',
+    side += acCard("تواصل الشركاء", acN(d.partnerResults.length), '<a class="m-link" href="#partners">شركاء المبيعات</a>',
       d.partnerResults.slice(0, 10).map(function (r) {
         var lbl = typeof PARTNER_RESULT_LABELS !== "undefined" ? PARTNER_RESULT_LABELS[r.result] || r.result : r.result;
-        return '<div class="ac-li"><span class="grow"><span>' + esc(r.partnerName) + '</span><span class="sub">' + esc(r.product) + " · " + (typeof owDay === "function" ? owDay(r.contactedOn) : esc(r.contactedOn)) +
-          (r.oppId ? ' · <a href="#opps/' + r.oppId + '">حُوّل لفريق المبيعات</a>' : "") + "</span></span>" +
-          '<span class="cf-pill ' + (r.result === "interested" ? "ap-approved" : r.result === "not_interested" ? "imp-high" : "imp-low") + '">' + esc(lbl) + "</span></div>";
+        var tone = r.result === "interested" ? "ok" : r.result === "not_interested" ? "bad" : "plain";
+        return '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(r.partnerName) + '</span><span class="m-item__s">' +
+          esc(r.product) + " · " + (typeof owDay === "function" ? owDay(r.contactedOn) : esc(r.contactedOn)) +
+          (r.oppId ? ' · <a class="m-link" href="#opps/' + r.oppId + '">حُوّل لفريق المبيعات</a>' : "") + "</span></span>" +
+          '<span class="m-chip m-chip--' + tone + '">' + esc(lbl) + "</span></div>";
       }).join(""));
   }
-  h += '<div class="ac-grid"><div class="ac-col">' + main + '</div><div class="ac-col">' + side + "</div></div>";
-  return h + "</div>" + acModal() + (typeof inDrawer === "function" ? inDrawer() : "");
+  h += '<div class="m-grid m-grid--main"><div class="m-grid">' + main + '</div><div class="m-grid">' + side + "</div></div>";
+  return h + "</div></div>" + acModal() + (typeof inDrawer === "function" ? inDrawer() : "");
 }
 
 /* ---------------- the add / edit sheet ---------------- */
@@ -585,14 +592,14 @@ function acCloseForm(force) {
   setTimeout(done, reduce ? 0 : 150);
 }
 function acFld(f) { return acForm && acForm.field === f ? ' aria-invalid="true" aria-describedby="err_ac_' + f.replace(/\\./g, "_") + '"' : ""; }
-function acFerr(f) { return acForm && acForm.field === f && acForm.err ? '<span class="ferr" id="err_ac_' + f.replace(/\\./g, "_") + '" role="alert">' + acIco("warn") + esc(acForm.err) + "</span>" : ""; }
+function acFerr(f) { return acForm && acForm.field === f && acForm.err ? '<span class="m-err" id="err_ac_' + f.replace(/\\./g, "_") + '" role="alert">' + esc(acForm.err) + "</span>" : ""; }
 function acInp(id, label, key, value, opt) {
   opt = opt || {};
-  return '<div class="cf-fl"><label for="' + id + '">' + label + (opt.req ? ' <span class="req" aria-hidden="true">*</span>' : "") + "</label>" +
-    '<input class="inp" id="' + id + '" ' + (opt.ct ? 'data-acct="' + opt.ct + '"' : 'data-acfld="' + key + '"') + ' value="' + esc(value || "") + '"' +
+  return '<div class="m-field"><label class="m-label' + (opt.req ? " m-req" : "") + '" for="' + id + '">' + label + "</label>" +
+    '<input class="m-input" id="' + id + '" ' + (opt.ct ? 'data-acct="' + opt.ct + '"' : 'data-acfld="' + key + '"') + ' value="' + esc(value || "") + '"' +
     (opt.max ? ' maxlength="' + opt.max + '"' : "") + (opt.ph ? ' placeholder="' + esc(opt.ph) + '"' : "") + (opt.type ? ' type="' + opt.type + '"' : "") +
     (opt.ltr ? ' dir="ltr" lang="en"' : "") + (opt.list ? ' list="' + opt.list + '"' : "") + (opt.req ? ' aria-required="true"' : "") + (opt.auto ? ' autocomplete="' + opt.auto + '"' : "") +
-    acFld(opt.errKey || key) + ">" + (opt.hint ? '<span class="hint">' + opt.hint + "</span>" : "") + acFerr(opt.errKey || key) + "</div>";
+    acFld(opt.errKey || key) + ">" + (opt.hint ? '<span class="m-hint">' + opt.hint + "</span>" : "") + acFerr(opt.errKey || key) + "</div>";
 }
 function acModal() {
   if (!acForm) return "";
@@ -600,49 +607,50 @@ function acModal() {
   var cls = f.shown ? " in" : "";
   var members = (f.members || []).slice();
   if (isEdit && d.ownerId && !members.some(function (m) { return String(m.id) === d.ownerId; })) members.push({ id: Number(d.ownerId), name: (f.ownerName || "عضو سابق") + " (غير نشط)" });
-  var h = '<div class="ac-scrim' + cls + '" data-ac="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="acmt">';
-  h += '<div class="mh"><div><h2 id="acmt">' + (isEdit ? "تعديل بيانات العميل" : "إضافة عميل جديد") + '</h2><div class="s">' +
+  var h = '<div class="ds6"><div class="ac-scrim' + cls + '" data-ac="close"></div><div class="ac-modal"><div class="ac-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="acmt">';
+  h += '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="acmt">' + (isEdit ? "تعديل بيانات العميل" : "إضافة عميل جديد") + '</h2><p class="m-meta">' +
     (isEdit ? "رقم واتساب العميل ثابت: به ترتبط محادثاته وحملاته وفرصه." : "يُضاف العميل بحالة «مقترح» بانتظار اعتماد فريق المبيعات.") +
-    '</div></div><span class="sp"></span><button class="ac-x" data-ac="close" aria-label="إغلاق">' + acIco("x") + "</button></div>";
-  h += '<div class="mb"><div class="gl">بيانات المنشأة</div><div class="cf-g">' +
+    '</p></div><button type="button" class="m-x" data-ac="close" aria-label="إغلاق">&#215;</button></div>';
+  h += '<div class="m-dlg__b"><div class="m-gl">بيانات المنشأة</div><div class="m-form">' +
     acInp("acf_name", "اسم العميل / المنشأة", "name", d.name, { req: true, max: ACCOUNT_NAME_MAX, ph: "مثال: مستشفى الرعاية الطبية" }) +
-    acInp("acf_city", "المدينة", "city", d.city, { req: true, max: ACCOUNT_CITY_MAX, list: "acl_city", ph: "الرياض" }) + "</div>";
-  h += '<div class="cf-g">' + acInp("acf_sector", "القطاع / الشريحة", "sector", d.sector, { max: ACCOUNT_SECTOR_MAX, list: "acl_sector", ph: "رعاية صحية" }) +
-    '<div class="cf-fl"><label for="acf_importance">درجة الأهمية</label><select id="acf_importance" data-acfld="importance"' + acFld("importance") + '><option value="">— غير محددة —</option>' +
+    acInp("acf_city", "المدينة", "city", d.city, { req: true, max: ACCOUNT_CITY_MAX, list: "acl_city", ph: "الرياض" }) +
+    acInp("acf_sector", "القطاع / الشريحة", "sector", d.sector, { max: ACCOUNT_SECTOR_MAX, list: "acl_sector", ph: "رعاية صحية" }) +
+    '<div class="m-field"><label class="m-label" for="acf_importance">درجة الأهمية</label><select class="m-select" id="acf_importance" data-acfld="importance"' + acFld("importance") + '><option value="">— غير محددة —</option>' +
       ACCOUNT_IMPORTANCE.map(function (k) { return '<option value="' + k + '"' + (d.importance === k ? " selected" : "") + ">" + ACCOUNT_IMPORTANCE_LABELS[k] + "</option>"; }).join("") + "</select>" + acFerr("importance") + "</div>" +
-    '<div class="cf-fl"><label for="acf_owner">الموظف المسؤول</label><select id="acf_owner" data-acfld="ownerId"' + acFld("ownerId") + '><option value="">— بلا مسؤول —</option>' +
+    '<div class="m-field"><label class="m-label" for="acf_owner">الموظف المسؤول</label><select class="m-select" id="acf_owner" data-acfld="ownerId"' + acFld("ownerId") + '><option value="">— بلا مسؤول —</option>' +
       members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.ownerId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + "</select>" +
-      (members.length ? "" : '<span class="hint">لا أعضاء نشطون — أضفهم من <a href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div></div>";
-  if (isEdit) h += '<div class="cf-fl"><span class="cf-sub">رقم واتساب العميل</span><span class="ro"><bdi dir="ltr">+' + esc(f.phone) + "</bdi></span></div>";
-  else h += '<div class="cf-g">' + acInp("acf_phone", "رقم واتساب العميل", "phone", d.phone, { req: true, ltr: true, type: "tel", auto: "tel", ph: "05xxxxxxxx", hint: "به ترتبط المحادثات والحملات والفرص" }) + "</div>";
-  if (f.field === "phone" && f.existingId) h += '<div><a class="btn btn-ghost" href="#account/' + f.existingId + '" data-ac="gotoexisting" style="text-decoration:none;display:inline-flex;align-items:center;height:34px">افتح العميل الموجود</a></div>';
+      (members.length ? "" : '<span class="m-hint">لا أعضاء نشطون — أضفهم من <a class="m-link" href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div>";
+  if (isEdit) h += '<div class="m-field full"><span class="m-label">رقم واتساب العميل</span><span class="m-ro"><bdi class="m-acc-ltr">+' + esc(f.phone) + "</bdi></span></div>";
+  else h += acInp("acf_phone", "رقم واتساب العميل", "phone", d.phone, { req: true, ltr: true, type: "tel", auto: "tel", ph: "05xxxxxxxx", hint: "به ترتبط المحادثات والحملات والفرص" });
+  h += "</div>";
+  if (f.field === "phone" && f.existingId) h += '<div><a class="m-btn" href="#account/' + f.existingId + '" data-ac="gotoexisting">افتح العميل الموجود</a></div>';
   var cities = acDistinct("city"), sectors = acDistinct("sector");
   h += '<datalist id="acl_city">' + cities.map(function (c) { return '<option value="' + esc(c) + '">'; }).join("") + "</datalist>" +
     '<datalist id="acl_sector">' + sectors.map(function (c) { return '<option value="' + esc(c) + '">'; }).join("") + "</datalist>";
-  h += '<div class="gl" id="acf_contacts" tabindex="-1">جهات الاتصال <span class="cf-sub">' + acNPerson(f.contacts.length) + '</span><span class="sp"></span>' +
-    '<button class="ac-add" id="acaddct" data-ac="addct"' + (f.contacts.length >= CONTACTS_MAX ? " disabled" : "") + ">" + acIco("plus") + "إضافة جهة اتصال</button></div>";
-  if (f.field === "contacts" && f.err) h += '<div class="cf-err" id="err_ac_contacts" role="alert">' + acIco("warn") + esc(f.err) + "</div>";
+  h += '<div class="m-gl" id="acf_contacts" tabindex="-1">جهات الاتصال <span class="m-cap">' + acNPerson(f.contacts.length) + '</span><span style="flex:1"></span>' +
+    '<button type="button" class="m-btn" id="acaddct" data-ac="addct"' + (f.contacts.length >= CONTACTS_MAX ? " disabled" : "") + ">إضافة جهة اتصال</button></div>";
+  if (f.field === "contacts" && f.err) h += '<div class="m-err" id="err_ac_contacts" role="alert">' + esc(f.err) + "</div>";
   f.contacts.forEach(function (c, i) {
     var only = f.contacts.length === 1;
-    h += '<div class="ac-ct' + (c.primary ? " primary" : "") + '" data-ackey="' + c.key + '" role="group" aria-label="جهة الاتصال ' + fmtN(i + 1) + '">' +
-      '<div class="ch">جهة الاتصال ' + fmtN(i + 1) + '<span class="sp"></span>' +
-      '<button class="pr" data-ac="primary" data-k="' + c.key + '" aria-pressed="' + c.primary + '">' + (c.primary ? "رئيسية" : "اجعلها رئيسية") + "</button>" +
-      '<button class="rm" data-ac="rmct" data-k="' + c.key + '"' + (only ? ' disabled title="للعميل جهة اتصال واحدة على الأقل"' : "") + ' aria-label="حذف جهة الاتصال ' + fmtN(i + 1) + '">حذف</button></div>' +
-      '<div class="cf-g">' + acInp("acc_" + c.key + "_name", "الاسم", "", c.name, { req: true, max: CONTACT_NAME_MAX, ct: c.key + ":name", errKey: "contacts." + i + ".name" }) +
-      acInp("acc_" + c.key + "_role", "المنصب", "", c.role, { max: CONTACT_ROLE_MAX, ct: c.key + ":role", errKey: "contacts." + i + ".role", ph: "مدير تقنية المعلومات" }) + "</div>" +
-      '<div class="cf-g">' + acInp("acc_" + c.key + "_phone", "الهاتف", "", c.phone, { ltr: true, type: "tel", ct: c.key + ":phone", errKey: "contacts." + i + ".phone" }) +
+    h += '<div class="m-ct"' + (c.primary ? " data-primary" : "") + ' data-ackey="' + c.key + '" role="group" aria-label="جهة الاتصال ' + fmtN(i + 1) + '">' +
+      '<div class="m-ct__h">جهة الاتصال ' + acN(i + 1) + '<span style="flex:1"></span>' +
+      '<button type="button" class="m-btn" data-ac="primary" data-k="' + c.key + '" aria-pressed="' + c.primary + '">' + (c.primary ? "رئيسية" : "اجعلها رئيسية") + "</button>" +
+      '<button type="button" class="m-btn" data-ac="rmct" data-k="' + c.key + '"' + (only ? ' disabled title="للعميل جهة اتصال واحدة على الأقل"' : "") + ' aria-label="حذف جهة الاتصال ' + fmtN(i + 1) + '">حذف</button></div>' +
+      '<div class="m-form">' + acInp("acc_" + c.key + "_name", "الاسم", "", c.name, { req: true, max: CONTACT_NAME_MAX, ct: c.key + ":name", errKey: "contacts." + i + ".name" }) +
+      acInp("acc_" + c.key + "_role", "المنصب", "", c.role, { max: CONTACT_ROLE_MAX, ct: c.key + ":role", errKey: "contacts." + i + ".role", ph: "مدير تقنية المعلومات" }) +
+      acInp("acc_" + c.key + "_phone", "الهاتف", "", c.phone, { ltr: true, type: "tel", ct: c.key + ":phone", errKey: "contacts." + i + ".phone" }) +
       acInp("acc_" + c.key + "_email", "البريد الإلكتروني", "", c.email, { ltr: true, type: "email", max: CONTACT_EMAIL_MAX, ct: c.key + ":email", errKey: "contacts." + i + ".email" }) + "</div></div>";
   });
   h += "</div>";
-  h += '<div class="mf">';
+  h += '<div class="m-dlg__f">';
   if (f.confirm) {
-    h += '<span class="cf-err msg" role="alert">لديك تغييرات لم تُحفظ.</span><button class="btn btn-ghost" id="ackeep" data-ac="keep">متابعة التعديل</button><button class="btn btn-ghost" data-ac="discard" style="color:var(--s-fail-text)">تجاهل التغييرات</button>';
+    h += '<span class="m-err" role="alert">لديك تغييرات لم تُحفظ.</span><button type="button" class="m-btn m-btn--primary" id="ackeep" data-ac="keep">متابعة التعديل</button><button type="button" class="m-btn" data-ac="discard">تجاهل التغييرات</button>';
   } else {
-    h += '<button class="btn btn-teal" data-ac="save"' + (f.busy ? ' disabled aria-busy="true"' : "") + ">" + (f.busy ? "جارٍ الحفظ…" : isEdit ? "حفظ التعديلات" : "إضافة العميل") + "</button>" +
-      '<button class="btn btn-ghost" data-ac="close">إلغاء</button>' +
-      (f.err && !acFieldTarget(f.field) ? '<span class="cf-err msg" role="alert">' + acIco("warn") + esc(f.err) + "</span>" : "");
+    h += '<button type="button" class="m-btn m-btn--primary" data-ac="save"' + (f.busy ? ' disabled aria-busy="true"' : "") + ">" + (f.busy ? "جارٍ الحفظ…" : isEdit ? "حفظ التعديلات" : "إضافة العميل") + "</button>" +
+      '<button type="button" class="m-btn" data-ac="close">إلغاء</button>' +
+      (f.err && !acFieldTarget(f.field) ? '<span class="m-err" role="alert">' + esc(f.err) + "</span>" : "");
   }
-  return h + "</div></div></div>";
+  return h + "</div></div></div></div>";
 }
 var AC_FIELD_ID = { name: "acf_name", city: "acf_city", sector: "acf_sector", importance: "acf_importance", ownerId: "acf_owner", phone: "acf_phone", contacts: "acf_contacts" };
 function acFieldTarget(field) {
@@ -808,7 +816,8 @@ document.addEventListener("change", function (ev) {
 });
 document.addEventListener("keydown", function (ev) {
   if (!acForm || !document.querySelector(".ac-box")) {
-    /* Arrow keys move between the approval tabs, as a radiogroup should. */
+    /* Arrow keys move between the approval tabs, as a tablist should. Nothing animates on a
+       keyboard-repeated action: the tab strip is repainted, not transitioned. */
     var tb = ev.target && ev.target.closest ? ev.target.closest('[data-ac="tab"]') : null;
     if (tb && (ev.key === "ArrowLeft" || ev.key === "ArrowRight" || ev.key === "Home" || ev.key === "End")) {
       ev.preventDefault();
