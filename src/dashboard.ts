@@ -1251,7 +1251,11 @@ function nav() {
   // A PRODUCT RECORD gets the assistant-readiness band here instead of the tab row (founder, Sep 13):
   // «الهيكل التنظيمي» is a door, and a record's strip should answer whether the assistant can sell
   // THIS product. The band comes from products-crm so one readiness rule serves list, record and wizard.
-  const band = raw === "product" && typeof pxReadinessBand === "function" ? pxReadinessBand() : "";
+  // THE READINESS BAND MOVED INTO THE RECORD (founder, 2026-09-18). Living in this strip forced it
+  // onto one non-wrapping line: a verdict, a score, an action and four labelled facts crushed into
+  // the height of a tab row, separated by 1px rules. It is the same information, rendered in the
+  // page by products-crm where it can use full width and wrap.
+  const band = "";
   document.getElementById("subnav").innerHTML = band || (subs.length > 1
     ? subs.map((sx) => {
         const sb = badges[sx[0]];

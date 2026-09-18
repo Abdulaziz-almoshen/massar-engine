@@ -390,6 +390,47 @@ export const PRODUCTS_CRM_CSS = `
 .ds6 .px-ind__i--ac .px-ind__v { color: var(--m-ac-deep); }
 @media (max-width: 1100px) { .ds6 .px-ind { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .ds6 .px-ind { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* THE READINESS BAND. One object, hairline dividers drawn as the grid gap (the same construction as
+   the indicator strip below it), wrapping instead of compressing. The verdict leads and is wider
+   than the rest; each remaining cell is one thing the assistant needs, its state in the dot, and the
+   action to fix it where there is one. */
+.ds6 .px-rdy-band {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  margin-block-start: var(--m-4);
+  background: var(--m-line);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  overflow: hidden;
+}
+.ds6 .px-rdy-band__v,
+.ds6 .px-rdy-band__i {
+  background: var(--m-paper);
+  min-inline-size: 0;
+  padding-block: var(--m-3);
+  padding-inline: var(--m-5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ds6 .px-rdy-band__k { display: flex; align-items: center; gap: var(--m-2);
+  font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .px-rdy-band__k i { inline-size: 8px; block-size: 8px; border-radius: 50%; flex: none;
+  background: var(--m-ok); }
+.ds6 .px-rdy-band__i.is-miss .px-rdy-band__k i { background: var(--m-bad); }
+.ds6 .px-rdy-band__i.is-pend .px-rdy-band__k i { background: var(--m-warn); }
+.ds6 .px-rdy-band__w { font-size: var(--m-t-body); font-weight: 700; color: var(--m-ink); }
+.ds6 .px-rdy-band__v.ok .px-rdy-band__w { color: var(--m-ok); }
+.ds6 .px-rdy-band__v.no .px-rdy-band__w { color: var(--m-warn); }
+.ds6 .px-rdy-band__m { margin-block-start: var(--m-1); }
+.ds6 .px-rdy-band__t { font-size: var(--m-t-cap); color: var(--m-ink); }
+/* The action sits at the cell's end and does not stretch it: a button as wide as its column reads
+   as the primary thing to do on the screen, and none of these four are. */
+.ds6 .px-rdy-band__i .m-btn { align-self: flex-start; min-block-size: 30px; padding-inline: var(--m-2);
+  margin-block-start: var(--m-1); }
+@media (max-width: 760px) { .ds6 .px-rdy-band { grid-template-columns: minmax(0, 1fr); } }
+
 /* The readiness cell: the meter and the word beside it on one line, the word shrinking rather than
    the pair wrapping. The full sentence stays reachable as the cell's title. */
 .ds6 .px-rdy { display: flex; align-items: center; gap: var(--m-2); min-inline-size: 0; }
@@ -1311,22 +1352,30 @@ function pxOwnerList() {
   if (typeof cfTeam !== "undefined" && cfTeam) cfTeam.forEach(function (m) { add(m.name); });
   return out.sort(function (a, b) { return String(a).localeCompare(String(b), "ar"); });
 }
-function pxReadinessBand() {
-  if (!pcCat) return "";
-  var r = typeof pxParseProductRoute === "function" ? pxParseProductRoute() : null;
-  var p = r && r.name ? pxRow(r.name) : null;
-  if (!p) return "";
+/* THE READINESS BAND, in the record rather than in the tab strip (founder, 2026-09-18: «redesign
+   and alignment maybe not good as ux»). It used to be one nowrap line inside the subnav bar: the
+   verdict, a percentage, an action and four labelled facts, all at 13px with 1px rules between them
+   and no room to breathe. Same facts, read as a band now — the verdict leading, then one cell per
+   thing that is missing or done, wrapping on its own grid and sharing the record's 24px spine. */
+function pxReadinessBandHtml(p) {
   var rd = pxReadiness(p), st = pxReadinessState(p);
-  var h = '<div class="px-band" role="status" aria-label="جاهزية المساعد">';
-  h += '<span class="w ' + pxWordCls(rd) + '">' + pxCellsHtml(rd) + esc(rd.word) + "</span>";
+  var h = '<div class="px-rdy-band" role="status" aria-label="جاهزية المساعد">';
+  h += '<div class="px-rdy-band__v ' + pxWordCls(rd) + '">' +
+    '<span class="px-rdy-band__k">جاهزية المساعد</span>' +
+    '<span class="px-rdy-band__w">' + esc(rd.word) + "</span>" +
+    '<span class="px-rdy-band__m">' + pxCellsHtml(rd) + "</span></div>";
   h += rd.cells.map(function (c) {
-    return '<span class="sep" aria-hidden="true"></span><span class="it' + (c.state === "done" ? " done" : "") + '">' +
-      '<i class="' + (c.state === "missing" ? "miss" : c.state === "pending" ? "pend" : "") + '"></i>' +
-      PX_RD_LABELS[c.key] + '<b>' + esc(st[c.key]) + "</b>" +
-      (PX_RD_GOTO[c.key] && c.state !== "done" ? '<button class="go" data-px="jump" data-s="' + PX_RD_GOTO[c.key] + '">' + (c.key === "price" ? "أضف سعرًا" : "أكمله") + "</button>" : "") + "</span>";
+    var can = PX_RD_GOTO[c.key] && c.state !== "done";
+    return '<div class="px-rdy-band__i' + (c.state === "done" ? " is-done" : c.state === "pending" ? " is-pend" : " is-miss") + '">' +
+      '<span class="px-rdy-band__k"><i aria-hidden="true"></i>' + PX_RD_LABELS[c.key] + "</span>" +
+      '<span class="px-rdy-band__t">' + esc(st[c.key]) + "</span>" +
+      (can ? '<button type="button" class="m-btn m-btn--quiet" data-px="jump" data-s="' + PX_RD_GOTO[c.key] + '">' +
+        (c.key === "price" ? "أضف سعرًا" : "أكمله") + "</button>" : "") + "</div>";
   }).join("");
   return h + "</div>";
 }
+/* Kept as the seam the shell still calls; the record draws the band itself now. */
+function pxReadinessBand() { return ""; }
 function pxSide(p, rd) {
   var name = p.product;
   // Readiness lives in the band above the record now (pxReadinessBand): the same four rows twice on
@@ -1571,7 +1620,7 @@ function vProductDrill(name, section) {
       : '<button type="button" role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button type="button" role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button type="button" role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
   }
   h += "</div></header>";
-  h += pxSwitcher(p) + pxHero(p, rd) + pxTabStrip(p);
+  h += pxSwitcher(p) + pxReadinessBandHtml(p) + pxHero(p, rd) + pxTabStrip(p);
 
   /* One tab is painted at a time. Each pane is the tablist's panel, so a screen reader moving off
      the tab lands in the section it names. */
