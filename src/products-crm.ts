@@ -360,9 +360,40 @@ export const PRODUCTS_CRM_CSS = `
 .ds6 button.m-seg-row:active { transform: scale(.97); }
 .ds6 button.m-seg-row[aria-pressed="true"] { background: var(--m-ac-dim); }
 @media (hover: hover) and (pointer: fine) { .ds6 button.m-seg-row:hover { background: var(--m-page); } }
-/* FIVE tiles, not four. .m-kpis is a fixed four-column grid, which would leave the fifth alone on
-   a row of its own — so the record's deck fits as many as the width allows instead. */
-.ds6 .px-kpis { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+/* THE RECORD'S INDICATORS, as one strip rather than five cards (founder, 2026-09-18: «the dashboard
+   is too big here for small indicators»). As .m-card tiles on an auto-fit grid each figure sat in
+   24px of padding at card scale, the five together stood about 300px tall, and the fifth stranded
+   itself on a second row beside an empty half-screen. Five small facts are a strip: one bordered
+   object, hairline dividers, the figure at section scale.
+
+   The dividers are the GAP showing the container's own colour, so they stay correct at every wrap —
+   a per-cell border leaves a double line where a row breaks. */
+.ds6 .px-ind {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--m-line);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  overflow: hidden;
+}
+.ds6 .px-ind__i { background: var(--m-paper); min-inline-size: 0;
+  padding-block: var(--m-3); padding-inline: var(--m-4); display: flex; flex-direction: column; gap: 2px; }
+.ds6 .px-ind__k { font-size: var(--m-t-micro); color: var(--m-mut);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds6 .px-ind__v { font-size: var(--m-t-h); line-height: var(--m-leading-section); font-weight: 700;
+  color: var(--m-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds6 .px-ind__v .m-nil--owed, .ds6 .px-ind__v .m-nil--unset { font-size: var(--m-t-cap); font-weight: 400; }
+.ds6 .px-ind__s { font-size: var(--m-t-micro); color: var(--m-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds6 .px-ind .m-meter { block-size: 6px; margin-block-start: var(--m-1); }
+.ds6 .px-ind__i--ac .px-ind__v { color: var(--m-ac-deep); }
+@media (max-width: 1100px) { .ds6 .px-ind { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .ds6 .px-ind { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The readiness cell: the meter and the word beside it on one line, the word shrinking rather than
+   the pair wrapping. The full sentence stays reachable as the cell's title. */
+.ds6 .px-rdy { display: flex; align-items: center; gap: var(--m-2); min-inline-size: 0; }
+.ds6 .px-rdy .m-chip { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The record header: title, the chips that name its classification, and its actions. */
 .ds6 .px-rh { display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--m-4); flex-wrap: wrap; margin-block-end: var(--m-4); }
@@ -829,8 +860,12 @@ function pxListRow(p) {
     '<span class="m-meta">' + (p.sector ? esc(p.sector) : "بلا قطاع") + (p.sectorAssumed ? " (مُستنتَج)" : "") +
     (p.division ? " · " + esc(p.division) : "") +
     (p.owner ? " · " + esc(p.owner) : "") + (p.archived ? " · مؤرشف" : "") + "</span></td>";
-  h += '<td title="' + esc(rd.word) + '">' + pxCellsHtml(rd) +
-    '<span class="m-chip' + (pxWordCls(rd) === "ok" ? " m-chip--ok" : pxWordCls(rd) === "no" ? " m-chip--warn" : "") + '">' + esc(rd.word) + "</span></td>";
+  /* ONE ROW, ALWAYS. The meter and the chip used to flow inline, so a longer sentence in the chip
+     («ينقصه تحديث كتالوج المساعد») pushed the meter onto a line of its own — and the column read
+     ragged, with the meter above the chip on some rows and beside it on others. */
+  h += '<td title="' + esc(rd.word) + '"><span class="px-rdy">' + pxCellsHtml(rd) +
+    '<span class="m-chip' + (pxWordCls(rd) === "ok" ? " m-chip--ok" : pxWordCls(rd) === "no" ? " m-chip--warn" : "") +
+    '" title="' + esc(rd.word) + '">' + esc(rd.word) + "</span></span></td>";
   h += "<td>" + (ps.kind === "package"
       ? "<b>" + pxMoney(ps.lowest.listPrice) + " / سنة</b>" +
         '<span class="m-meta">' + (ps.count > 1 ? "يبدأ من · " + pxNPkgN(ps.count) : esc(ps.lowest.name)) + "</span>"
@@ -1359,19 +1394,19 @@ function pxHero(p, rd) {
      percentage at all, because there is no denominator for it to be a percentage OF. */
   var hasTarget = !!q && q.annualTarget !== null && q.annualTarget !== undefined;
   var tile = function (cls, label, value, sub, meter) {
-    return '<div class="m-card' + (cls ? " " + cls : "") + '"><p class="m-stat__k">' + label + "</p>" +
-      '<p class="m-stat__v">' + value + "</p>" +
-      (sub ? '<p class="m-stat__s">' + sub + "</p>" : "") + (meter || "") + "</div>";
+    return '<div class="px-ind__i' + (cls ? " " + cls : "") + '"><span class="px-ind__k">' + label + "</span>" +
+      '<span class="px-ind__v">' + value + "</span>" +
+      (sub ? '<span class="px-ind__s">' + sub + "</span>" : "") + (meter || "") + "</div>";
   };
   var meter = function (v) {
     return '<span class="m-meter" style="--m-pct:' + Math.max(0, Math.min(100, v)) + '%"><i></i></span>';
   };
-  return '<div class="m-kpis px-kpis">' +
+  return '<div class="px-ind">' +
     tile("", "المستهدف السنوي", hasTarget ? pxMoney(target) : mNil("بلا مستهدف مسجّل", "owed"),
       hasTarget ? pxYear((typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year) || new Date().getFullYear())
         : "يُحدَّد من «المستهدفات»", "") +
     tile("", "المحقق", pxMoney(achieved), "من الصفقات الرابحة", "") +
-    tile(pct === null ? "" : pct >= 100 ? "m-stat--ac" : "", "نسبة الإنجاز",
+    tile(pct === null ? "" : pct >= 100 ? "px-ind__i--ac" : "", "نسبة الإنجاز",
       pct === null ? mNil("بلا مستهدف", "owed") : mPct(pct),
       pct === null ? "لا نسبة بلا مستهدف" : "من المستهدف", pct === null ? "" : meter(pct)) +
     tile("", "الفرص المفتوحة", mN(open.length),
