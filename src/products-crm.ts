@@ -323,9 +323,29 @@ export const PRODUCTS_CRM_CSS = `
 /* The toolbar's filters. Each control keeps its own width rather than stretching to the row. */
 .ds6 .px-filters { display: flex; align-items: center; gap: var(--m-2); flex-wrap: wrap; min-inline-size: 0; }
 .ds6 .px-filters .m-input, .ds6 .px-filters .m-select { inline-size: auto; min-inline-size: 148px; }
+/* ONE SHAPE ACROSS THE ROW (founder, 2026-09-18). The search is a pill and both buttons are pills,
+   while the four filters carried the form radius — three different silhouettes in one strip. In a
+   toolbar every control is a pill; the 10px radius stays where it belongs, on form fields. */
+.ds6 .px-filters .m-select { border-radius: 999px; }
 /* A filter that is NARROWING the list has to look different from one that is not, or the reader
    cannot tell an empty table from a filtered one. The vocabulary has no word for it; this is it. */
 .ds6 .px-filters .m-select.px-on { box-shadow: 0 0 0 1px var(--m-ac), 0 1px 2px rgba(0,0,0,.05); color: var(--m-ac-deep); }
+/* THE SKILL NOTICE. It was a full-width amber bar whose middle was a raw zip filename, with the one
+   thing to do parked at the far end. It is a quiet card now: what is missing, what the skill does,
+   and the download — the filename moved onto the link, where a filename belongs. */
+.ds6 .px-skill {
+  display: flex; align-items: center; gap: var(--m-3); flex-wrap: wrap;
+  margin-block-start: var(--m-3);
+  padding-block: var(--m-3); padding-inline: var(--m-5);
+  border-radius: var(--m-r-card);
+  background: var(--m-page);
+  box-shadow: inset 0 0 0 1px var(--m-line);
+}
+.ds6 .px-skill__i { flex: none; inline-size: 18px; block-size: 18px; color: var(--m-mut);
+  fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ds6 .px-skill__t { flex: 1 1 260px; min-inline-size: 0; font-size: var(--m-t-cap); color: var(--m-ink-2); }
+.ds6 .px-skill__t b { color: var(--m-ink); }
+.ds6 .px-skill .m-btn { flex: none; }
 .ds6 .px-sp { flex: 1 1 auto; }
 /* A gap someone owes work on, inside the segmented control. Colour means STATUS here, never
    decoration, and it is the only toggle in the row that carries one. */
@@ -871,10 +891,16 @@ function pxActionRows() {
   var h = "";
   var missing = (pcCat || []).filter(function (p) { return !p.archived && !p.asset; }).length;
   if (missing) {
-    h += '<div class="m-alert"><span class="m-alert__d"><b>' + pxNProdN(missing) +
-      "</b> بلا ملف تعريفي — مهارة إعداد العرض تُنتجه بمساعد ذكاء اصطناعي" +
-      (pcSkill ? ' · <bdi>' + esc(pcSkill.filename) + "</bdi>" : "") + "</span>" +
-      pxSkillLink("تحميل المهارة") + "</div>";
+    h += '<div class="px-skill">' +
+      '<svg class="px-skill__i" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+        '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg>' +
+      '<span class="px-skill__t"><b>' + pxNProdN(missing) + " بلا ملف تعريفي</b> — " +
+        "مهارة إعداد العرض تُنتج الملف بمساعد ذكاء اصطناعي.</span>" +
+      (pcSkill
+        ? '<a class="m-btn" href="/assets/' + esc(pcSkill.publicId) + '" download data-pxskill="list"' +
+          ' title="' + esc(pcSkill.filename) + '">تحميل المهارة</a>'
+        : '<span class="m-nil--none" data-pxskill="missing">المهارة غير مرفوعة بعد</span>') +
+      "</div>";
   }
   if (pcUnmatched.length) {
     h += '<section class="m-card m-card--pad0"><div class="m-tools">' +
