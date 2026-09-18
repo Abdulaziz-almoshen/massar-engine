@@ -378,7 +378,7 @@ export const PRODUCTS_CRM_CSS = `
   overflow: hidden;
 }
 .ds6 .px-ind__i { background: var(--m-paper); min-inline-size: 0;
-  padding-block: var(--m-3); padding-inline: var(--m-4); display: flex; flex-direction: column; gap: 2px; }
+  padding-block: var(--m-3); padding-inline: var(--m-5); display: flex; flex-direction: column; gap: 2px; }
 .ds6 .px-ind__k { font-size: var(--m-t-micro); color: var(--m-mut);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ds6 .px-ind__v { font-size: var(--m-t-h); line-height: var(--m-leading-section); font-weight: 700;
@@ -394,6 +394,14 @@ export const PRODUCTS_CRM_CSS = `
    the pair wrapping. The full sentence stays reachable as the cell's title. */
 .ds6 .px-rdy { display: flex; align-items: center; gap: var(--m-2); min-inline-size: 0; }
 .ds6 .px-rdy .m-chip { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* THE SPINE, on the record's page-level blocks. The crumb, the title, the product switcher and the
+   tab rail are not inside a card, so their text sat flush against the container while every card on
+   the list screen inset its own text by --m-5 — measured: 0px against 25px, so everything shifted
+   sideways when moving between the two screens. They are padded to the same inset instead. */
+.ds6.px-rec-page > .m-crumb,
+.ds6 .px-rh,
+.ds6 .px-sw,
+.ds6 .px-tabs { padding-inline: var(--m-5); }
 /* The record header: title, the chips that name its classification, and its actions. */
 .ds6 .px-rh { display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--m-4); flex-wrap: wrap; margin-block-end: var(--m-4); }
@@ -1542,7 +1550,7 @@ function vProductDrill(name, section) {
   var sectorName = (pcSectorList || []).filter(function (s) { return String(s.id) === String(p.sectorId); }).map(function (s) { return s.name; })[0] || "";
   var divName = (typeof cfDivs !== "undefined" ? cfDivs : []).filter(function (d) { return String(d.id) === String(p.divisionId); }).map(function (d) { return d.name; })[0] || "";
 
-  var h = '<div class="ds6">' + back;
+  var h = '<div class="ds6 px-rec-page">' + back;
   h += '<header class="px-rh"><div class="px-rh__t"><h1 class="m-h1">' + esc(p.product) + "</h1>" +
     '<div class="px-acts px-meta">' + (p.archived ? '<span class="m-chip">مؤرشف</span>' : "") +
     chip("القطاع", sectorName + (sectorName && p.sectorAssumed ? " (مُستنتَج)" : ""), "pxf_sector") +

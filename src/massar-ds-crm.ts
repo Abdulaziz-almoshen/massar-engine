@@ -382,7 +382,10 @@ export const MASSAR_DS_CSS = `
   white-space:nowrap;
   background: var(--m-paper);
   border-block-end:1px solid var(--m-line);
-  padding-inline: var(--m-4);
+  /* THE SPINE. A table sits inside a card whose own padding is --m-5, so cells at --m-4 put every
+     row 8px off the text above them. One inset for both (founder, 2026-09-18: the list and the
+     record «not aligned»). */
+  padding-inline: var(--m-5);
   padding-block: var(--m-2);
 }
 .ds6 .m-table td{
@@ -393,7 +396,7 @@ export const MASSAR_DS_CSS = `
   color: var(--m-ink-2);
   vertical-align:middle;
   border-block-start:1px solid var(--m-line);
-  padding-inline: var(--m-4);
+  padding-inline: var(--m-5);
   padding-block: 10px;
 }
 .ds6 .m-table tbody tr{transition:background-color 150ms cubic-bezier(.4,0,.2,1)}
