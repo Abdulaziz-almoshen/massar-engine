@@ -1680,9 +1680,10 @@ export const MASSAR_DS_CSS = `
 }
 .ds6 .m-select:disabled{ background-color: var(--m-page); color: var(--m-mut); cursor: default; }
 /* ============================================================================
-   «الرئيسية» — the founder's reference layout (Nexora AI Analytics, 2026-09-19): four KPI cards
-   with mini-charts, a wide chart beside a pipeline list, then three cards. The shapes are the
-   reference's; the tokens, the direction and the type are Massar's.
+   «الرئيسية» — the founder's reference (Nexora AI Analytics), element for element: a controls row,
+   four KPI cards with mini-charts, a charted card with a value axis, a period switch and a hover
+   card, beside a pipeline list; then a five-column ledger, a goal with a note, and a donut with a
+   legend. Shapes and spacing are the reference's; the tokens, the direction and the type are ours.
    ============================================================================ */.ds6 .hx-home{ display: flex; flex-direction: column; gap: var(--m-4); }
 .ds6 .hx-card{
   min-inline-size: 0;
@@ -1701,16 +1702,15 @@ export const MASSAR_DS_CSS = `
   font-size: var(--m-t-cap); font-weight: 500; color: var(--m-ac); text-decoration: none;
   white-space: nowrap; }
 @media (hover: hover) and (pointer: fine){.ds6 .hx-link:hover{ text-decoration: underline; text-underline-offset: 4px; }}
-.ds6 .hx-foot{ margin: 0; font-size: var(--m-t-micro); color: var(--m-faint); }
-/* ---- row one: four figures ---- */.ds6 .hx-kpis{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-4); }
-.ds6 .hx-kpi{
-  min-inline-size: 0;
-  background: var(--m-paper);
-  border: 1px solid var(--m-line);
-  border-radius: var(--m-r-card);
-  padding-block: var(--m-3);
-  padding-inline: var(--m-4);
-}
+/* The controls the reference carries beside the title: a range, and a download. */.ds6 .hx-tools{ display: flex; align-items: center; justify-content: flex-end; gap: var(--m-2);
+  flex-wrap: wrap; }
+.ds6 .hx-tools .m-dp{ flex: 0 1 260px; }
+.ds6 .hx-dl{ gap: var(--m-2); }
+.ds6 .hx-dl svg{ inline-size: 16px; block-size: 16px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* ---- row one ---- */.ds6 .hx-kpis{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-4); }
+.ds6 .hx-kpi{ min-inline-size: 0; background: var(--m-paper); border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card); padding-block: var(--m-3); padding-inline: var(--m-4); }
 .ds6 .hx-kpi__h{ display: flex; align-items: center; gap: var(--m-2); margin-block-end: var(--m-2); }
 .ds6 .hx-kpi__i{ flex: none; display: grid; place-items: center; inline-size: 30px; block-size: 30px;
   border-radius: 9px; background: var(--m-sunk); color: var(--m-mut); }
@@ -1726,93 +1726,133 @@ export const MASSAR_DS_CSS = `
   font-weight: 700; letter-spacing: var(--m-tracking-figure); color: var(--m-ink); white-space: nowrap; }
 .ds6 .hx-kpi__v small{ font-size: var(--m-t-cap); font-weight: 500; color: var(--m-mut); }
 .ds6 .hx-kpi__v .m-nil--owed{ font-size: var(--m-t-cap); font-weight: 400; }
-.ds6 .hx-kpi__d{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-kpi__d{ display: flex; align-items: center; gap: var(--m-1); margin: var(--m-1) 0 0;
+  font-size: var(--m-t-micro); color: var(--m-mut); }
 .ds6 .hx-kpi__d.is-up{ color: var(--m-ok); }
+.ds6 .hx-kpi__a{ font-size: var(--m-t-cap); line-height: 1; }
 .ds6 .hx-kpi__c{ flex: none; inline-size: 86px; }
-/* A sparkline over a real series. A flat one is the shape of «no month differed from any other»,
-   which is exactly what a company with no closed deal has. */.ds6 .hx-spark{ inline-size: 100%; block-size: 28px; fill: none; stroke: var(--m-ok); stroke-width: 2;
+.ds6 .hx-spark{ inline-size: 100%; block-size: 28px; fill: none; stroke: var(--m-ok); stroke-width: 2;
   stroke-linecap: round; stroke-linejoin: round; }
 .ds6 .hx-spark.is-flat{ stroke: var(--m-line-2); }
 .ds6 .hx-mini{ display: flex; align-items: flex-end; gap: 2px; block-size: 28px; }
 .ds6 .hx-mini i{ flex: 1 1 0; min-inline-size: 2px; block-size: var(--hx-h, 100%); border-radius: 2px;
   background: var(--m-ac); }
-/* A period nobody recorded is hatched, not short: a bar of no height and a bar nobody filled in
-   are different facts. */.ds6 .hx-mini i.is-off{ background-color: var(--m-sunk);
+.ds6 .hx-mini i.is-off{ background-color: var(--m-sunk);
   background-image: repeating-linear-gradient(135deg, transparent 0 2px, var(--m-line-2) 2px 3px); }
-/* ---- row two ---- */.ds6 .hx-r2{ display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: var(--m-4); }
-.ds6 .hx-flow{ position: relative; margin-block: var(--m-3) 0; }
+/* ---- row two ---- */.ds6 .hx-r2{ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--m-4); }
+.ds6 .hx-seg{ display: inline-flex; padding: 3px; border-radius: 999px; background: var(--m-sunk); }
+.ds6 .hx-seg button{ border: 0; background: transparent; font: inherit; font-size: var(--m-t-micro);
+  color: var(--m-mut); padding-block: 5px; padding-inline: var(--m-3); border-radius: 999px;
+  cursor: pointer; white-space: nowrap; }
+.ds6 .hx-seg button[aria-pressed="true"]{ background: var(--m-paper); color: var(--m-ink);
+  font-weight: 600; box-shadow: var(--m-low); }
+/* The plot: a value axis beside the bars, gridlines behind them. */.ds6 .hx-flow{ display: flex; gap: var(--m-2); margin-block-start: var(--m-3); }
+.ds6 .hx-flow__y{ display: flex; flex-direction: column; justify-content: space-between;
+  block-size: 186px; padding-block-end: 22px; font-size: var(--m-t-micro); color: var(--m-faint); }
+.ds6 .hx-flow__p{ position: relative; flex: 1 1 auto; min-inline-size: 0; }
 .ds6 .hx-flow__g{ position: absolute; inset-block: 0 22px; inset-inline: 0; display: flex;
   flex-direction: column; justify-content: space-between; pointer-events: none; }
 .ds6 .hx-flow__g i{ display: block; border-block-start: 1px solid var(--m-line); }
-.ds6 .hx-flow__c{ position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--m-1); block-size: 208px; }
-.ds6 .hx-flow__m{ display: flex; flex-direction: column; justify-content: flex-end; gap: var(--m-1);
-  min-inline-size: 0; }
-.ds6 .hx-flow__pair{ display: flex; align-items: flex-end; justify-content: center; gap: 2px;
-  block-size: 178px; }
-.ds6 .hx-flow__pair i{ inline-size: 9px; block-size: var(--hx-h, 0%); min-block-size: 2px;
-  border-start-start-radius: 3px; border-start-end-radius: 3px; position: relative; }
+.ds6 .hx-flow__c{ position: relative; display: grid;
+  grid-template-columns: repeat(var(--hx-n, 12), minmax(0, 1fr)); gap: var(--m-1); block-size: 208px; }
+.ds6 .hx-flow__m{ position: relative; display: flex; flex-direction: column; justify-content: flex-end;
+  gap: var(--m-1); min-inline-size: 0; }
+.ds6 .hx-flow__pair{ display: flex; align-items: flex-end; justify-content: center; gap: 3px;
+  block-size: 186px; }
+.ds6 .hx-flow__pair i{ inline-size: 10px; block-size: var(--hx-h, 0%); min-block-size: 2px;
+  border-start-start-radius: 3px; border-start-end-radius: 3px; }
 .ds6 .hx-flow__pair i.is-open{ background: var(--m-ac); }
 .ds6 .hx-flow__pair i.is-closed{ background: var(--m-ok); }
-.ds6 .hx-flow__pair i[data-v]::after{ content: attr(data-v); position: absolute;
-  inset-block-end: calc(100% + 3px); inset-inline-start: 50%; transform: translateX(50%);
-  font-size: var(--m-t-micro); color: var(--m-ink); }
 .ds6 .hx-flow__x{ text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The reference's dark card over the period under the pointer. Pointer only: it is decoration for
+   a mouse and noise for a touch screen, where there is no hover to leave. */.ds6 .hx-tip{ display: none; }
+@media (hover: hover) and (pointer: fine){.ds6 .hx-tip{ position: absolute; inset-block-end: calc(100% - 150px); inset-inline-start: 50%;
+    transform: translateX(50%); z-index: var(--z-overlay, 300);
+    min-inline-size: 150px; padding: var(--m-2) var(--m-3); border-radius: var(--m-r-ctl);
+    background: var(--m-ink); color: var(--m-paper); font-size: var(--m-t-micro);
+    flex-direction: column; gap: 3px; box-shadow: var(--m-lift); pointer-events: none; }.ds6 .hx-tip b{ color: var(--m-paper); }.ds6 .hx-tip > span{ display: flex; align-items: center; gap: var(--m-2); }.ds6 .hx-tip > span b{ margin-inline-start: auto; font-variant-numeric: tabular-nums; }.ds6 .hx-tip i{ inline-size: 7px; block-size: 7px; border-radius: 2px; }.ds6 .hx-tip i.is-open{ background: var(--m-ac); }.ds6 .hx-tip i.is-closed{ background: var(--m-ok); }.ds6 .hx-flow__m:hover .hx-tip{ display: flex; }}
 .ds6 .hx-legend2{ display: flex; align-items: center; gap: var(--m-4); flex-wrap: wrap;
   margin: var(--m-3) 0 0; font-size: var(--m-t-micro); color: var(--m-ink-2); }
 .ds6 .hx-legend2 span{ display: inline-flex; align-items: center; gap: var(--m-1); }
 .ds6 .hx-legend2 i{ inline-size: 8px; block-size: 8px; border-radius: 2px; }
 .ds6 .hx-legend2 i.is-open{ background: var(--m-ac); }
 .ds6 .hx-legend2 i.is-closed{ background: var(--m-ok); }
-/* ---- the pipeline list ---- */.ds6 .hx-pipe{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--m-3); }
+/* ---- the pipeline list ---- */.ds6 .hx-pipe{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column;
+  gap: var(--m-3); }
 .ds6 .hx-pipe__r{ display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
   grid-template-areas: "d t p" ". s s" ". b b"; gap: 2px var(--m-2); align-items: center; }
-.ds6 .hx-pipe__d{ grid-area: d; inline-size: 8px; block-size: 8px; border-radius: 50%;
-  background: var(--m-ac); }
-.ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
+.ds6 .hx-pipe__d{ grid-area: d; inline-size: 8px; block-size: 8px; border-radius: 50%; }
 .ds6 .hx-pipe__t{ grid-area: t; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds6 .hx-pipe__s{ grid-area: s; font-size: var(--m-t-micro); color: var(--m-mut); }
 .ds6 .hx-pipe__b{ grid-area: b; block-size: 6px; border-radius: 999px; background: var(--m-sunk);
   overflow: hidden; margin-block-start: var(--m-1); }
-.ds6 .hx-pipe__b i{ display: block; block-size: 100%; inline-size: var(--hx-w, 0%);
-  border-radius: 999px; background: var(--m-ac); }
+.ds6 .hx-pipe__b i{ display: block; block-size: 100%; inline-size: var(--hx-w, 0%); border-radius: 999px; }
 .ds6 .hx-pipe__p{ grid-area: p; font-size: var(--m-t-micro); color: var(--m-mut); }
-/* ---- row three ---- */.ds6 .hx-r3{ display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+/* Five tones down the ladder, as the reference steps its stages — a position on one ladder, which
+   is the one thing a sequence of hues may legitimately mean. */.ds6 .t0{ background: var(--m-ac); }
+.ds6 .hx-pipe__d.t0{ background: var(--m-ac); }
+.ds6 .hx-pipe__d.t1, .ds6 .hx-pipe__b i.t1{ background: #5B8DEF; }
+.ds6 .hx-pipe__d.t2, .ds6 .hx-pipe__b i.t2{ background: var(--m-ok); }
+.ds6 .hx-pipe__d.t3, .ds6 .hx-pipe__b i.t3{ background: var(--m-warn); }
+.ds6 .hx-pipe__d.t4, .ds6 .hx-pipe__b i.t4{ background: var(--m-line-2); }
+.ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
+/* ---- row three ---- */.ds6 .hx-r3{ display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1.15fr);
   gap: var(--m-4); align-items: stretch; }
+.ds6 .hx-tblw{ overflow-x: auto; }
 .ds6 .hx-tbl{ inline-size: 100%; border-collapse: collapse; }
 .ds6 .hx-tbl th{ text-align: start; font-size: var(--m-t-micro); font-weight: 500; color: var(--m-mut);
-  padding-block-end: var(--m-2); border-block-end: 1px solid var(--m-line); }
+  padding-block-end: var(--m-2); border-block-end: 1px solid var(--m-line); white-space: nowrap; }
 .ds6 .hx-tbl td{ padding-block: var(--m-2); border-block-end: 1px solid var(--m-line);
   font-size: var(--m-t-cap); color: var(--m-ink-2); }
 .ds6 .hx-tbl tr:last-child td{ border-block-end: 0; }
 .ds6 .hx-tbl__w{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 0; }
-.ds6 .hx-tbl__t{ text-align: end; white-space: nowrap; color: var(--m-mut); font-size: var(--m-t-micro); }
+.ds6 .hx-tbl__t, .ds6 .hx-tbl__c{ white-space: nowrap; color: var(--m-mut); font-size: var(--m-t-micro); }
+/* The reference marks each row with a round glyph before its label. */.ds6 .hx-ev{ display: inline-flex; align-items: center; gap: var(--m-2); white-space: nowrap; }
+.ds6 .hx-ev i{ display: grid; place-items: center; inline-size: 22px; block-size: 22px; flex: none;
+  /* --m-t-micro, not 11px: the type ladder has no 11 and the glyph reads fine at 13. */
+  border-radius: 50%; background: var(--m-sunk); color: var(--m-ink-2); font-size: var(--m-t-micro);
+  font-style: normal; line-height: 1; }
+.ds6 .hx-ev i.is-ok{ background: var(--m-ok-dim); color: var(--m-ok); }
+.ds6 .hx-ev i.is-ac{ background: var(--m-ac-dim); color: var(--m-ac); }
+.ds6 .hx-ev i.is-bad{ background: var(--m-bad-dim); color: var(--m-bad); }
 .ds6 .hx-tag{ display: inline-flex; align-items: center; padding-block: 2px; padding-inline: var(--m-2);
-  border-radius: 999px; font-size: var(--m-t-micro); background: var(--m-sunk); color: var(--m-ink-2); }
+  border-radius: 999px; font-size: var(--m-t-micro); background: var(--m-sunk); color: var(--m-ink-2);
+  white-space: nowrap; }
 .ds6 .hx-tag.is-ok{ background: var(--m-ok-dim); color: var(--m-ok); }
 .ds6 .hx-tag.is-ac{ background: var(--m-ac-dim); color: var(--m-ac); }
 .ds6 .hx-tag.is-bad{ background: var(--m-bad-dim); color: var(--m-bad); }
-.ds6 .hx-goal{ display: flex; flex-direction: column; gap: var(--m-2); }
-.ds6 .hx-goal__v{ margin: 0; font-size: var(--m-t-h); font-weight: 700; color: var(--m-ink); }
-.ds6 .hx-goal__of{ font-size: var(--m-t-cap); font-weight: 400; color: var(--m-mut); }
-.ds6 .hx-goal__b{ position: relative; block-size: 10px; border-radius: 999px; background: var(--m-sunk);
-  margin-block: var(--m-1) var(--m-4); }
+.ds6 .hx-goal{ display: flex; flex-direction: column; }
+.ds6 .hx-goal__h{ display: flex; align-items: center; gap: var(--m-3); }
+.ds6 .hx-goal__h b{ display: block; font-size: var(--m-t-cap); color: var(--m-ink); }
+.ds6 .hx-goal__i{ flex: none; display: grid; place-items: center; inline-size: 34px; block-size: 34px;
+  border-radius: 10px; background: var(--m-ac-dim); color: var(--m-ac); }
+.ds6 .hx-goal__i svg{ inline-size: 17px; block-size: 17px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; }
+.ds6 .hx-goal__v{ display: block; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-goal__b{ block-size: 10px; border-radius: 999px; background: var(--m-sunk);
+  margin-block: var(--m-4) var(--m-1); overflow: hidden; }
 .ds6 .hx-goal__b i{ display: block; block-size: 100%; inline-size: var(--hx-w, 0%);
   border-radius: 999px; background: var(--m-ok); }
-.ds6 .hx-goal__b b{ position: absolute; inset-block-start: calc(100% + 4px); inset-inline-start: 0;
-  font-size: var(--m-t-micro); font-weight: 600; color: var(--m-ink-2); }
-.ds6 .hx-goal__n{ margin: 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-goal__p{ align-self: flex-end; font-size: var(--m-t-micro); font-weight: 600; color: var(--m-ink-2); }
+/* The specimen's encouragement card, carrying a fact rather than a slogan. */.ds6 .hx-note{ display: flex; align-items: flex-start; gap: var(--m-3); margin-block-start: var(--m-3);
+  padding: var(--m-3); border-radius: var(--m-r-ctl); background: var(--m-page); }
+.ds6 .hx-note b{ display: block; font-size: var(--m-t-cap); color: var(--m-ink); }
+.ds6 .hx-note span{ font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-note__i{ flex: none; display: grid; place-items: center; inline-size: 28px; block-size: 28px;
+  border-radius: 8px; background: var(--m-warn-dim); color: var(--m-warn); }
+.ds6 .hx-note__i svg{ inline-size: 15px; block-size: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; }
 .ds6 .hx-donut{ display: flex; align-items: center; gap: var(--m-4); flex-wrap: wrap; }
 .ds6 .hx-donut__r{ position: relative; flex: none; inline-size: 116px; block-size: 116px; }
 .ds6 .hx-donut__r svg{ inline-size: 100%; block-size: 100%; transform: rotate(-90deg); }
 .ds6 .hx-donut__r circle{ fill: none; stroke-width: 5; }
 .ds6 .hx-donut__t{ stroke: var(--m-sunk); }
 .ds6 .hx-donut__s.t0{ stroke: var(--m-ac); }
-.ds6 .hx-donut__s.t1{ stroke: var(--m-ok); }
-.ds6 .hx-donut__s.t2{ stroke: var(--m-warn); }
-.ds6 .hx-donut__s.t3{ stroke: var(--m-line-2); }
+.ds6 .hx-donut__s.t1{ stroke: #5B8DEF; }
+.ds6 .hx-donut__s.t2{ stroke: var(--m-ok); }
+.ds6 .hx-donut__s.t3{ stroke: var(--m-warn); }
+.ds6 .hx-donut__s.t4{ stroke: var(--m-line-2); }
 .ds6 .hx-donut__c{ position: absolute; inset-block: 0; inset-inline: 0; display: grid;
   place-content: center; text-align: center; }
 .ds6 .hx-donut__c b{ font-size: var(--m-t-h); color: var(--m-ink); }
@@ -1823,12 +1863,13 @@ export const MASSAR_DS_CSS = `
   color: var(--m-ink-2); }
 .ds6 .hx-donut__l i{ flex: none; inline-size: 8px; block-size: 8px; border-radius: 50%; }
 .ds6 .hx-donut__l i.t0{ background: var(--m-ac); }
-.ds6 .hx-donut__l i.t1{ background: var(--m-ok); }
-.ds6 .hx-donut__l i.t2{ background: var(--m-warn); }
-.ds6 .hx-donut__l i.t3{ background: var(--m-line-2); }
+.ds6 .hx-donut__l i.t1{ background: #5B8DEF; }
+.ds6 .hx-donut__l i.t2{ background: var(--m-ok); }
+.ds6 .hx-donut__l i.t3{ background: var(--m-warn); }
+.ds6 .hx-donut__l i.t4{ background: var(--m-line-2); }
 .ds6 .hx-donut__l span{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; }
 .ds6 .hx-donut__l b{ color: var(--m-ink); }
 @media (max-width: 1280px){.ds6 .hx-kpis{ grid-template-columns: repeat(2, minmax(0, 1fr)); }.ds6 .hx-r2, .ds6 .hx-r3{ grid-template-columns: minmax(0, 1fr); }}
-@media (max-width: 700px){.ds6 .hx-kpis{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-flow__c{ block-size: 176px; }.ds6 .hx-flow__pair{ block-size: 146px; }}
+@media (max-width: 700px){.ds6 .hx-kpis{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-flow__c{ block-size: 176px; }.ds6 .hx-flow__pair, .ds6 .hx-flow__y{ block-size: 154px; }}
 `;

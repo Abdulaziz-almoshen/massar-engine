@@ -248,13 +248,68 @@ function hdsAccounts() {
   };
 }
 
+/* ---------- the page's own controls, as the reference carries them ----------
+   The specimen puts a date-range picker and a Download button on the header line, to the side of
+   the title. The shell already prints the breadcrumb, the title and the subtitle, so only the two
+   controls are added here — and both do the thing they name: the range filters «آخر الأحداث», and
+   the download writes the figures on this screen to a CSV. A control that decides nothing would be
+   the one thing the reference cannot lend us. */
+var hxFrom = "", hxTo = "";
+var hxSpan = 12;   /* months in the chart: 6, 12 or 24 */
+
+window.hxSetSpan = function (n) { hxSpan = Number(n) || 12; render(false); };
+document.addEventListener("change", function (ev) {
+  var t = ev.target;
+  if (!t || !t.getAttribute || !t.getAttribute("data-hxrange")) return;
+  var a = document.getElementById("hxrange"), b = document.getElementById("hxrange_to");
+  hxFrom = a ? a.value : ""; hxTo = b ? b.value : "";
+  if (hxFrom && hxTo) render(false);
+});
+/* The CSV is built from the same arrays the cards render, so the file and the screen cannot
+   disagree. A Blob, not a data: URI — a long Arabic URI is silently truncated by some browsers. */
+window.hdsExport = function () {
+  var f = hdsFacts(), lines = hdsLines(), ac = hdsAccounts(), m = hdsMonthly(f.year);
+  var rows = [["المؤشر", "القيمة", "النطاق"],
+    ["الإيراد المحقق", f.achieved, hdsYearTxt(f.year)],
+    ["المستهدف المسجّل", f.recorded, hdsYearTxt(f.year)],
+    ["البنود المفتوحة", lines.length, "الآن"],
+    ["الحسابات", ac.total, "الآن"],
+    ["حسابات بلا مسؤول", ac.noOwner, "الآن"]];
+  (typeof opOpenStages === "function" ? opOpenStages() : []).forEach(function (s) {
+    var mine = lines.filter(function (l) { return l.stage === s.key; });
+    var v = 0; mine.forEach(function (l) { v += l.value; });
+    rows.push(["مرحلة: " + s.label, mine.length, v ? v + " ر.س" : "بلا قيمة مسعّرة"]);
+  });
+  m.opened.forEach(function (v, i) { rows.push(["بنود فُتحت — " + HX_MONTHS[i], v, hdsYearTxt(f.year)]); });
+  var csv = "\\ufeff" + rows.map(function (r) {
+    return r.map(function (c) { return '"' + String(c).split('"').join('""') + '"'; }).join(",");
+  }).join("\\r\\n");
+  try {
+    var url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    var a = document.createElement("a");
+    a.href = url; a.download = "massar-home-" + hdsYearTxt(f.year) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  } catch (e) { /* a browser that refuses the blob keeps the screen; nothing else breaks */ }
+};
+function hdsPageTools() {
+  return '<div class="hx-tools">' +
+    mDateRange({ id: "hxrange", from: hxFrom, to: hxTo, max: toISODate(new Date()),
+      label: "المدى", placeholder: "كل الفترة", attrs: ' data-hxrange="1"' }) +
+    '<button type="button" class="m-btn m-btn--primary hx-dl" onclick="hdsExport()">تنزيل' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg></button></div>';
+}
+
 /* ---------- row one: the four figures ---------- */
 function hdsKpi(o) {
   return '<section class="hx-kpi">' +
     '<div class="hx-kpi__h"><span class="hx-kpi__i ' + (o.tone || "") + '">' + hdsIcon(o.icon) + "</span>" +
       '<span class="hx-kpi__k">' + o.label + "</span></div>" +
     '<div class="hx-kpi__b"><div><p class="hx-kpi__v">' + o.value + "</p>" +
-      '<p class="hx-kpi__d ' + (o.deltaTone || "") + '">' + o.delta + "</p></div>" +
+      '<p class="hx-kpi__d ' + (o.deltaTone || "") + '">' +
+      (o.arrow ? '<span class="hx-kpi__a" aria-hidden="true">' + o.arrow + "</span>" : "") +
+      o.delta + "</p></div>" +
       '<div class="hx-kpi__c">' + (o.chart || "") + "</div></div></section>";
 }
 function hdsKpiRow(f, lines) {
@@ -266,8 +321,6 @@ function hdsKpiRow(f, lines) {
   var rowsAll = (typeof oppRows !== "undefined" && oppRows) ? oppRows : [];
   var newLines = hdsLast30(rowsAll, "created_at");
 
-  /* The quarters of the year, with the recorded ones filled — the same four the targets card draws,
-     read from the same rows. */
   var qs = [1, 2, 3, 4].map(function (q) {
     var t = null;
     f.rows.forEach(function (p) {
@@ -289,18 +342,18 @@ function hdsKpiRow(f, lines) {
     icon: "people", tone: "is-ac", label: "الحسابات",
     value: ac.loaded ? dsFig("acN", ac.total) : hdsNil("جارٍ القراءة", "unset"),
     delta: ac.loaded
-      ? (newAc ? "+" + fmtN(newAc) + " في آخر 30 يومًا" : "بلا إضافات في آخر 30 يومًا")
+      ? (newAc ? fmtN(newAc) + " في آخر 30 يومًا" : "بلا إضافات في آخر 30 يومًا")
       : "",
-    deltaTone: newAc ? "is-up" : "",
+    arrow: newAc ? "&#8593;" : "", deltaTone: newAc ? "is-up" : "",
     chart: ac.loaded && ac.total
-      ? hdsMiniBars([ac.total - ac.noOwner, ac.noOwner], function (i) { return i === 0; })
+      ? hdsMiniBars([ac.total - ac.noOwner, ac.noOwner], function (i) { return true; })
       : ""
   });
   h += hdsKpi({
     icon: "stages", tone: "is-ac", label: "البنود المفتوحة",
     value: dsFig("nLines", lines.length),
-    delta: newLines ? "+" + fmtN(newLines) + " في آخر 30 يومًا" : "بلا بنود جديدة في آخر 30 يومًا",
-    deltaTone: newLines ? "is-up" : "",
+    delta: newLines ? fmtN(newLines) + " في آخر 30 يومًا" : "بلا بنود جديدة في آخر 30 يومًا",
+    arrow: newLines ? "&#8593;" : "", deltaTone: newLines ? "is-up" : "",
     chart: hdsMiniBars(m.opened, function (i, v) { return v > 0; })
   });
   h += hdsKpi({
@@ -316,41 +369,87 @@ function hdsKpiRow(f, lines) {
   return h + "</div>";
 }
 
-/* ---------- row two, left: the wide chart ---------- */
+/* ---------- row two, left: the chart ----------
+   The reference's shape, complete: a value axis on the side, a period switch, grouped bars per
+   period, a legend, and a card that appears over the period the pointer is on. The series are the
+   two this company records — what was opened, and what was closed — because a third invented one
+   would be the specimen's «Profit», a number nobody here has. */
+function hdsSeries(span) {
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : [];
+  var now = new Date(), out = [];
+  for (var i = span - 1; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push({ y: d.getFullYear(), m: d.getMonth(), opened: 0, closed: 0 });
+  }
+  var at = function (y, m) {
+    for (var j = 0; j < out.length; j++) if (out[j].y === y && out[j].m === m) return out[j];
+    return null;
+  };
+  rows.forEach(function (l) {
+    if (l.created_at) {
+      var c = new Date(Number(l.created_at)), s = at(c.getFullYear(), c.getMonth());
+      if (s) s.opened++;
+    }
+    var isClosed = typeof opIsOpen === "function" ? !opIsOpen(l) : false;
+    if (isClosed && l.stage_at) {
+      var e = new Date(Number(l.stage_at)), s2 = at(e.getFullYear(), e.getMonth());
+      if (s2) s2.closed++;
+    }
+  });
+  return out;
+}
 function hdsFlowCard(f) {
-  var m = hdsMonthly(f.year);
-  var max = Math.max.apply(null, m.opened.concat(m.closed).concat([1]));
-  var any = m.opened.concat(m.closed).some(function (v) { return v > 0; });
-  var body = "";
+  var span = hxSpan;
+  var series = hdsSeries(span);
+  var peak = Math.max.apply(null, series.map(function (s) { return Math.max(s.opened, s.closed); }).concat([1]));
+  /* Rounded up to a multiple of four so the four gridlines carry whole numbers. At a peak of 6 the
+     quarter marks were 4.5 and 1.5, printed as «5» and «2» — labels a pixel-reader would check the
+     bars against and find wrong. */
+  var max = Math.ceil(peak / 4) * 4;
+  var any = series.some(function (s) { return s.opened || s.closed; });
+  var ticks = [max, (max / 4) * 3, max / 2, max / 4, 0];
+  var seg = function (n, label) {
+    return '<button type="button" aria-pressed="' + (span === n) + '" onclick="hxSetSpan(' + n + ')">' + label + "</button>";
+  };
+  var h = '<section class="hx-card hx-card--wide">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">حركة البنود</h3>' +
+      '<p class="m-meta">ما فُتح وما أُغلق شهرًا بشهر خلال ' +
+      (span === 6 ? "آخر ستة أشهر" : span === 12 ? "آخر سنة" : "آخر سنتين") + "</p></div>" +
+      '<div class="hx-seg" role="group" aria-label="مدى الرسم">' +
+        seg(6, "6 أشهر") + seg(12, "سنة") + seg(24, "سنتان") + "</div></div>";
   if (!any) {
-    body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا حركة مسجّلة في " + hdsYearTxt(f.year), "none") + "</div>" +
-      '<div class="m-empty__d">تظهر هنا البنود فور فتحها أو إغلاقها.</div></div>';
-  } else {
-    body = '<div class="hx-flow" role="img" aria-label="' +
-      esc("البنود المفتوحة والمغلقة شهريًا في " + f.year) + '">' +
-      '<div class="hx-flow__g" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
-      '<div class="hx-flow__c" aria-hidden="true">' +
-      m.opened.map(function (v, i) {
-        var c = m.closed[i];
+    return h + '<div class="m-empty"><div class="m-empty__t">' +
+      hdsNil("لا حركة مسجّلة في هذه الفترة", "none") + "</div>" +
+      '<div class="m-empty__d">تظهر هنا البنود فور فتحها أو إغلاقها.</div></div></section>';
+  }
+  h += '<div class="hx-flow" role="img" aria-label="' +
+    esc("البنود المفتوحة والمغلقة شهريًا: " + series.map(function (s) {
+      return HX_MONTHS[s.m] + " " + s.opened + " فُتحت و" + s.closed + " أُغلقت";
+    }).join("، ")) + '">' +
+    '<div class="hx-flow__y" aria-hidden="true">' + ticks.map(function (t) {
+      return '<span class="m-n">' + fmtN(t) + "</span>";
+    }).join("") + "</div>" +
+    '<div class="hx-flow__p">' +
+      '<div class="hx-flow__g" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>' +
+      '<div class="hx-flow__c" style="--hx-n:' + series.length + '" aria-hidden="true">' +
+      series.map(function (s) {
         return '<div class="hx-flow__m">' +
           '<span class="hx-flow__pair">' +
-            '<i class="is-open" style="--hx-h:' + Math.round((v / max) * 100) + '%"' +
-              (v ? ' data-v="' + fmtN(v) + '"' : "") + "></i>" +
-            '<i class="is-closed" style="--hx-h:' + Math.round((c / max) * 100) + '%"' +
-              (c ? ' data-v="' + fmtN(c) + '"' : "") + "></i>" +
+            '<i class="is-open" style="--hx-h:' + Math.round((s.opened / max) * 100) + '%"></i>' +
+            '<i class="is-closed" style="--hx-h:' + Math.round((s.closed / max) * 100) + '%"></i>' +
           "</span>" +
-          '<span class="hx-flow__x">' + HX_MONTHS[i] + "</span></div>";
-      }).join("") + "</div></div>";
-    body += '<p class="hx-legend2">' +
-      '<span><i class="is-open"></i>بنود فُتحت</span>' +
-      '<span><i class="is-closed"></i>بنود أُغلقت</span>' +
-      '<span class="m-meta">من تاريخ الإنشاء وتاريخ دخول المرحلة الحالية</span></p>';
-  }
-  return '<section class="hx-card hx-card--wide">' +
-    '<div class="hx-card__h"><div><h3 class="hx-card__t">حركة البنود</h3>' +
-      '<p class="m-meta">ما فُتح وما أُغلق شهرًا بشهر في ' + hdsYearTxt(f.year) + "</p></div>" +
-      '<a class="hx-link" href="#opps">كل الفرص <span aria-hidden="true">&#8592;</span></a></div>' +
-    body + "</section>";
+          '<span class="hx-flow__x">' + HX_MONTHS[s.m] + "</span>" +
+          /* The reference's dark card, over the period the pointer is on. */
+          '<span class="hx-tip"><b>' + HX_MONTHS[s.m] + " " + hdsYearTxt(s.y) + "</b>" +
+            '<span><i class="is-open"></i>فُتحت<b class="m-n">' + fmtN(s.opened) + "</b></span>" +
+            '<span><i class="is-closed"></i>أُغلقت<b class="m-n">' + fmtN(s.closed) + "</b></span></span>" +
+          "</div>";
+      }).join("") + "</div></div></div>";
+  h += '<p class="hx-legend2">' +
+    '<span><i class="is-open"></i>بنود فُتحت</span>' +
+    '<span><i class="is-closed"></i>بنود أُغلقت</span>' +
+    '<span class="m-meta">من تاريخ الإنشاء وتاريخ دخول المرحلة الحالية</span></p>';
+  return h + "</section>";
 }
 
 /* ---------- row two, right: the pipeline ---------- */
@@ -363,56 +462,61 @@ function hdsPipelineCard(lines) {
     return { s: s, n: mine.length, val: val, pct: Math.round((mine.length / total) * 100) };
   });
   var body = lines.length
-    ? '<ol class="hx-pipe">' + rows.map(function (r) {
+    ? '<ol class="hx-pipe">' + rows.map(function (r, i) {
         return '<li class="hx-pipe__r' + (r.n ? "" : " is-empty") + '">' +
-          '<span class="hx-pipe__d" aria-hidden="true"></span>' +
+          '<span class="hx-pipe__d t' + (i % 5) + '" aria-hidden="true"></span>' +
           '<span class="hx-pipe__t">' + esc(r.s.label) + "</span>" +
           '<span class="hx-pipe__s">' + hdsPl(r.n, "بند واحد", "بندان", "بنود", "بندًا") +
             (r.val ? " · " + hdsMoney(r.val) : "") + "</span>" +
-          '<span class="hx-pipe__b" aria-hidden="true"><i style="--hx-w:' + r.pct + '%"></i></span>' +
+          '<span class="hx-pipe__b" aria-hidden="true"><i class="t' + (i % 5) + '" style="--hx-w:' + r.pct + '%"></i></span>' +
           '<span class="hx-pipe__p"><span class="m-n">' + fmtN(r.pct) + "٪</span></span></li>";
       }).join("") + "</ol>"
     : '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا بنود مفتوحة", "none") + "</div></div>";
   return '<section class="hx-card">' +
-    '<div class="hx-card__h"><div><h3 class="hx-card__t">خط البيع</h3>' +
-      '<p class="m-meta">البنود المفتوحة على السلّم، وحصة كل مرحلة</p></div>' +
-      '<a class="hx-link" href="#board">اللوحة <span aria-hidden="true">&#8592;</span></a></div>' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">خط البيع</h3>' +
+      '<a class="hx-link" href="#board">عرض التقرير <span aria-hidden="true">&#8592;</span></a></div>' +
     body + "</section>";
 }
 
 /* ---------- row three, left: the ledger ---------- */
-var HX_EV = { sent: ["أُرسلت", "is-muted"], delivered: ["وصلت", "is-muted"], read: ["شوهدت", "is-ac"],
-              customer: ["ردّ العميل", "is-ok"], agent: ["ردّ المساعد", "is-muted"], failed: ["أخفقت", "is-bad"] };
+var HX_EV = { sent: ["أُرسلت", "is-muted", "&#8599;"], delivered: ["وصلت", "is-muted", "&#10003;"],
+              read: ["شوهدت", "is-ac", "&#128065;"], customer: ["ردّ العميل", "is-ok", "&#8592;"],
+              agent: ["ردّ المساعد", "is-muted", "&#8594;"], failed: ["أخفقت", "is-bad", "!"] };
 function hdsEventsCard() {
   var cs = (typeof cache !== "undefined" && cache && cache.contacts) ? cache.contacts : null;
   var out = [];
+  var from = hxFrom ? parseISODate(hxFrom) : null, to = hxTo ? parseISODate(hxTo) : null;
+  var lo = from ? new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime() : 0;
+  var hi = to ? new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999).getTime() : Infinity;
   (cs || []).forEach(function (c) {
     if (c.test) return;
     (c.transcript || []).forEach(function (t) {
-      if (t.ts) out.push({ ts: t.ts, kind: t.role, who: c.waName || c.phone || "", text: t.text || "" });
+      if (t.ts && t.ts >= lo && t.ts <= hi) out.push({ ts: t.ts, kind: t.role, who: c.waName || c.phone || "", ch: "واتساب" });
     });
     var st = c.statusTimes || {};
     ["sent", "delivered", "read", "failed"].forEach(function (k) {
-      if (st[k]) out.push({ ts: st[k], kind: k, who: c.waName || c.phone || "", text: "" });
+      if (st[k] && st[k] >= lo && st[k] <= hi) out.push({ ts: st[k], kind: k, who: c.waName || c.phone || "", ch: "واتساب" });
     });
   });
   out.sort(function (a, b) { return b.ts - a.ts; });
   var body;
   if (!cs) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("جارٍ القراءة", "unset") + "</div></div>";
-  else if (!out.length) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا أحداث مسجّلة", "none") + "</div></div>";
+  else if (!out.length) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا أحداث في هذه الفترة", "none") + "</div></div>";
   else {
-    body = '<table class="hx-tbl"><thead><tr><th>الحدث</th><th>الجهة</th><th>الوقت</th></tr></thead><tbody>' +
-      out.slice(0, 5).map(function (e) {
-        var k = HX_EV[e.kind] || [e.kind, "is-muted"];
-        return "<tr><td><span class='hx-tag " + k[1] + "'>" + esc(k[0]) + "</span></td>" +
-          "<td class='hx-tbl__w'>" + esc(clip(e.who, 22)) + "</td>" +
-          "<td class='hx-tbl__t'>" + esc(fmtD(e.ts)) + "</td></tr>";
-      }).join("") + "</tbody></table>";
+    body = '<div class="hx-tblw"><table class="hx-tbl">' +
+      "<thead><tr><th>التاريخ</th><th>الحدث</th><th>الجهة</th><th>القناة</th><th>الحالة</th></tr></thead><tbody>" +
+      out.slice(0, 4).map(function (e) {
+        var k = HX_EV[e.kind] || [e.kind, "is-muted", "&#8226;"];
+        return "<tr><td class='hx-tbl__t'>" + esc(fmtD(e.ts)) + "</td>" +
+          "<td><span class='hx-ev'><i class='" + k[1] + "'>" + k[2] + "</i>" + esc(k[0]) + "</span></td>" +
+          "<td class='hx-tbl__w'>" + esc(clip(e.who, 18)) + "</td>" +
+          "<td class='hx-tbl__c'>" + esc(e.ch) + "</td>" +
+          "<td><span class='hx-tag " + k[1] + "'>" + esc(k[0]) + "</span></td></tr>";
+      }).join("") + "</tbody></table></div>";
   }
   return '<section class="hx-card">' +
-    '<div class="hx-card__h"><div><h3 class="hx-card__t">آخر الأحداث</h3>' +
-      '<p class="m-meta">من سجل الرسائل — لا تقديرات</p></div>' +
-      '<a class="hx-link" href="#pipeline">السجل <span aria-hidden="true">&#8592;</span></a></div>' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">آخر الأحداث</h3>' +
+      '<a class="hx-link" href="#pipeline">عرض الكل <span aria-hidden="true">&#8592;</span></a></div>' +
     body + "</section>";
 }
 
@@ -431,19 +535,23 @@ function hdsGoalCard(f) {
     });
     var pct = f.recorded > 0 ? Math.round((tAch / f.recorded) * 100) : 0;
     body = '<div class="hx-goal">' +
-      '<p class="hx-goal__v">' + hdsMoney(tAch) + ' <span class="hx-goal__of">من ' + hdsMoney(f.recorded) + "</span></p>" +
+      '<div class="hx-goal__h"><span class="hx-goal__i">' + hdsIcon("target") + "</span>" +
+        "<div><b>مستهدف " + hdsYearTxt(f.year) + "</b>" +
+        '<span class="hx-goal__v">' + hdsMoney(tAch) + " / " + hdsMoney(f.recorded) + "</span></div></div>" +
       '<div class="hx-goal__b" role="img" aria-label="' + esc("المحقق على المستهدف " + pct + " بالمئة") + '">' +
-        '<i style="--hx-w:' + Math.min(100, pct) + '%"></i>' +
-        '<b class="m-n">' + fmtN(pct) + "٪</b></div>" +
-      '<p class="m-meta">' + (f.onlyProduct ? esc(f.onlyProduct) + " · " : "") +
-        (f.onlyScope ? esc(f.onlyScope) : "على المنتجات ذات المستهدف") + "</p>" +
-      '<p class="hx-goal__n">' + (tAch ? "المتبقي " + hdsMoney(Math.max(0, f.recorded - tAch))
-        : "لم يُسجَّل أي إغلاق ربح على هذا المستهدف بعد.") + "</p></div>";
+        '<i style="--hx-w:' + Math.min(100, pct) + '%"></i></div>' +
+      '<span class="hx-goal__p"><span class="m-n">' + fmtN(pct) + "٪</span></span>" +
+      /* The specimen's encouragement card, carrying a fact instead of a slogan. */
+      '<div class="hx-note"><span class="hx-note__i">' + hdsIcon("target") + "</span>" +
+        "<div><b>" + (tAch ? "على المسار" : "لم يبدأ بعد") + "</b>" +
+        "<span>" + (tAch
+          ? "المتبقي " + hdsMoney(Math.max(0, f.recorded - tAch)) + " على " +
+            (f.onlyProduct ? esc(f.onlyProduct) : "المنتجات ذات المستهدف") + "."
+          : "لم يُسجَّل أي إغلاق ربح على هذا المستهدف بعد.") + "</span></div></div></div>";
   }
   return '<section class="hx-card">' +
-    '<div class="hx-card__h"><div><h3 class="hx-card__t">المستهدف</h3>' +
-      '<p class="m-meta">ما تحقق منه حتى الآن</p></div>' +
-      '<a class="hx-link" href="#perf">المستهدفات <span aria-hidden="true">&#8592;</span></a></div>' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">المستهدف</h3>' +
+      '<a class="hx-link" href="#perf">عرض التقرير <span aria-hidden="true">&#8592;</span></a></div>' +
     body + "</section>";
 }
 
@@ -451,7 +559,9 @@ function hdsGoalCard(f) {
 function hdsDonutCard(lines) {
   var stages = (typeof opOpenStages === "function") ? opOpenStages() : [];
   var parts = stages.map(function (s) {
-    return { label: s.label, n: lines.filter(function (l) { return l.stage === s.key; }).length };
+    var mine = lines.filter(function (l) { return l.stage === s.key; });
+    var v = 0; mine.forEach(function (l) { v += l.value; });
+    return { label: s.label, n: mine.length, v: v };
   }).filter(function (x) { return x.n > 0; });
   var total = parts.reduce(function (n, x) { return n + x.n; }, 0);
   var body;
@@ -461,7 +571,7 @@ function hdsDonutCard(lines) {
     var off = 0;
     var ring = parts.map(function (x, i) {
       var pct = (x.n / total) * 100;
-      var seg = '<circle class="hx-donut__s t' + (i % 4) + '" cx="21" cy="21" r="15.9" pathLength="100"' +
+      var seg = '<circle class="hx-donut__s t' + (i % 5) + '" cx="21" cy="21" r="15.9" pathLength="100"' +
         ' stroke-dasharray="' + pct.toFixed(2) + " " + (100 - pct).toFixed(2) + '"' +
         ' stroke-dashoffset="' + (-off).toFixed(2) + '"></circle>';
       off += pct;
@@ -473,21 +583,17 @@ function hdsDonutCard(lines) {
         '<svg viewBox="0 0 42 42"><circle class="hx-donut__t" cx="21" cy="21" r="15.9" pathLength="100"></circle>' + ring + "</svg>" +
         '<span class="hx-donut__c"><b class="m-n">' + fmtN(total) + "</b><small>بنود</small></span></div>" +
       '<ul class="hx-donut__l">' + parts.map(function (x, i) {
-        return '<li><i class="t' + (i % 4) + '"></i><span>' + esc(x.label) + "</span>" +
+        return '<li><i class="t' + (i % 5) + '"></i><span>' + esc(x.label) + "</span>" +
           '<b class="m-n">' + fmtN(Math.round((x.n / total) * 100)) + "٪</b></li>";
       }).join("") + "</ul></div>";
   }
   return '<section class="hx-card">' +
-    '<div class="hx-card__h"><div><h3 class="hx-card__t">توزيع البنود المفتوحة</h3>' +
-      '<p class="m-meta">حصة كل مرحلة من البنود</p></div></div>' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">توزيع البنود المفتوحة</h3></div>' +
     body + "</section>";
 }
 
 /* ---------- the surface ---------- */
 function vHomeDs() {
-  /* Every loader is idempotent, guards its own in-flight flag, and ends in render(false), so
-     calling them here is safe and the screen repaints itself as each one lands. #home is off the
-     5s tick (R14), so none of them inherits a poll. */
   if (typeof pcLoad === "function") pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);
   if (typeof pcPerfLoad === "function") pcPerfLoad(hdsYear(), false);
@@ -503,10 +609,10 @@ function vHomeDs() {
   }
   var lines = hdsLines();
   return '<div class="ds6 hx-home">' +
+    hdsPageTools() +
     hdsKpiRow(f, lines) +
     '<div class="hx-r2">' + hdsFlowCard(f) + hdsPipelineCard(lines) + "</div>" +
     '<div class="hx-r3">' + hdsEventsCard() + hdsGoalCard(f) + hdsDonutCard(lines) + "</div>" +
-    '<p class="hx-foot">المسجّل يظهر بقيمته. ما ينقص التسجيل يبقى ظاهرًا، وما يساوي صفرًا يبقى صفرًا.</p>' +
     "</div>";
 }
 `;
