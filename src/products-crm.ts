@@ -410,6 +410,21 @@ export const PRODUCTS_CRM_CSS = `
 .ds6 .px-ind__i--ac .px-ind__v { color: var(--m-ac-deep); }
 @media (max-width: 1100px) { .ds6 .px-ind { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .ds6 .px-ind { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* The list's summary: the strip sits flush inside a padding-less card, so the card's own border is
+   the strip's border and there is no double frame. */
+.ds6 .px-ind--flush { border: 0; border-radius: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .ds6 .px-ind--flush { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .ds6 .px-ind--flush { grid-template-columns: minmax(0, 1fr); } }
+.ds6 .px-sum__k { padding-block: var(--m-3) 0; padding-inline: var(--m-5);
+  font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .px-sum__v { padding-block: 0 var(--m-3); padding-inline: var(--m-5); }
+.ds6 .px-sum__f { padding-block: var(--m-3); padding-inline: var(--m-5);
+  border-block-start: 1px solid var(--m-line); }
+.ds6 .px-sum__n { padding-block: var(--m-3) 0; padding-inline: var(--m-5); }
+/* The search takes the room it needs, not the whole row: at flex 1 it stretched to half the toolbar
+   and read as the page's subject rather than one of its controls. */
+.ds6 .px-filters .m-sf { flex: 0 1 300px; }
+
 /* THE READINESS BAND. One object, hairline dividers drawn as the grid gap (the same construction as
    the indicator strip below it), wrapping instead of compressing. The verdict leads and is wider
    than the rest; each remaining cell is one thing the assistant needs, its state in the dot, and the
@@ -795,13 +810,17 @@ function pxSummary() {
   var notSelling = rows.filter(function (p) { return !p.eligible; }).length;
   var noPrice = rows.filter(function (p) { return pxPrice(p).kind === "none"; }).length;
   var assumed = rows.filter(function (p) { return !!p.sectorAssumed; }).length;
-  var h = '<section class="m-card" aria-label="ملخص المنتجات">';
-  h += '<p class="m-stat__k">المحقق ' + pxYear(pcPerfYear) + "</p>";
+  /* ONE FIGURE IS NOT A DECK (founder, 2026-09-18: «the top indicator is alone»). «المحقق» sat by
+     itself in a full-width card with its number at one end and nothing at the other. It joins the
+     three facts it is read against — what was targeted, what is open now, and how much of the
+     catalogue carries a target at all — in the same strip the product record uses. */
+  var h = '<section class="m-card m-card--pad0" aria-label="ملخص المنتجات">';
   if (!perf) {
     /* A failed read and an empty catalogue look identical to the reader, so the card says which:
        a read that did not happen is a classification nobody made, not a legitimate nothing. */
-    h += '<p class="m-stat__v">' + (pcPerfFailed[pcPerfYear]
-      ? mNil("تعذّر تحميل الأداء", "unset") : mNil("لم يُقرأ الأداء بعد", "unset")) + "</p>";
+    h += '<p class="px-sum__k">المحقق ' + pxYear(pcPerfYear) + "</p>" +
+      '<p class="px-sum__v">' + (pcPerfFailed[pcPerfYear]
+        ? mNil("تعذّر تحميل الأداء", "unset") : mNil("لم يُقرأ الأداء بعد", "unset")) + "</p>";
   } else {
     /* ach was accumulated for EVERY product while tgt only for the targeted ones, so the
        printed «٪» was a percentage of a denominator that did not cover its own numerator.
@@ -816,11 +835,30 @@ function pxSummary() {
       if (a > 0) won.push({ n: p.product, v: a });
     });
     var cov = anyT ? targetCoveragePct(ach, tgt) : null;
-    h += '<p class="m-stat__v">' + pxMoney(ach) + "</p>";
-    h += '<p class="m-stat__s">' + (anyT
-      ? ("من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + mPct(cov)) +
-         (offN ? " · " + pxNProdN(offN) + " بلا مستهدف، محققها " + pxMoney(offA) + " خارج النسبة" : ""))
-      : mNil("بلا مستهدف سنوي", "owed")) + "</p>";
+    /* What is open right now, across the products this page is showing — the same lines the table's
+       «المفتوح الآن» column counts, summed once here. */
+    var openRows = ((typeof oppRows !== "undefined" && oppRows) ? oppRows : []).filter(function (l) {
+      return typeof opIsOpen === "function" && opIsOpen(l) &&
+        rows.some(function (p) { return p.product === l.product; });
+    });
+    var openVal = typeof opSumLive === "function" ? opSumLive(openRows) : 0;
+    var targeted = rows.length - offN;
+    var cell = function (k, v, sub) {
+      return '<div class="px-ind__i"><span class="px-ind__k">' + k + "</span>" +
+        '<span class="px-ind__v">' + v + "</span>" +
+        '<span class="px-ind__s">' + sub + "</span></div>";
+    };
+    h += '<div class="px-ind px-ind--flush">' +
+      cell("المحقق " + pxYear(pcPerfYear), pxMoney(ach),
+        anyT ? ("من مستهدف " + pxMoney(tgt) + (cov === null ? "" : " · " + mPct(cov)))
+             : mNil("بلا مستهدف سنوي", "owed")) +
+      cell("المستهدف المسجّل", anyT ? pxMoney(tgt) : mNil("لا مستهدف", "owed"),
+        anyT ? pxNProdN(targeted) + " من " + pxNProdN(rows.length) : "يُحدَّد من «المستهدفات»") +
+      cell("المفتوح الآن", openRows.length ? pxMoney(openVal) : mNil("لا بنود مفتوحة", "none"),
+        openRows.length ? opNLineN(openRows.length) : "لا شيء مفتوح على هذه المنتجات") +
+      cell("خارج النسبة", offN ? pxMoney(offA) : mNil("لا شيء خارجها", "none"),
+        offN ? pxNProdN(offN) + " بلا مستهدف" : "كل المنتجات لها مستهدف") +
+      "</div>";
     if (won.length) {
       /* Each product's achieved against the LARGEST achieved, not against a target: most products
          carry no target, and a bar drawn against a denominator that does not exist for the row is
@@ -836,7 +874,7 @@ function pxSummary() {
           '<span class="m-seg-row__v">' + pxMoney(w.v) + "</span></button>";
       }).join("") + "</div>";
     } else {
-      h += '<p class="m-meta">لا مبيعات مربوحة بعد في ' + pxYear(pcPerfYear) + ".</p>";
+      h += '<p class="px-sum__n m-meta">لا مبيعات مربوحة بعد في ' + pxYear(pcPerfYear) + ".</p>";
     }
   }
   /* The three gaps, as independent toggles rather than one exclusive control — so the row is a
@@ -849,10 +887,10 @@ function pxSummary() {
     return '<button type="button" aria-pressed="' + on + '" data-px="short" data-nm="' + key + '"' +
       (warn && n ? ' class="px-owed"' : "") + ">" + label + " " + dsFig(dkey, n) + "</button>";
   };
-  h += '<div class="m-seg px-wrapseg" role="group" aria-label="ما يلزم إكماله">' +
+  h += '<div class="px-sum__f"><div class="m-seg px-wrapseg" role="group" aria-label="ما يلزم إكماله">' +
     met("notSelling", "pxNotSelling", notSelling, "لا يبيعها المساعد", true) +
     met("noPrice", "pxNoPrice", noPrice, "بلا سعر منشور", false) +
-    met("assumed", "pxAssumed", assumed, "قطاع مُستنتَج", false) + "</div>";
+    met("assumed", "pxAssumed", assumed, "قطاع مُستنتَج", false) + "</div></div>";
   return h + "</section>";
 }
 function pxSelect(id, label, value, opts, on) {

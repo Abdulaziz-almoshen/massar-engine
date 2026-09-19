@@ -1935,10 +1935,12 @@ function vHome(d) {
   //                          several of different ages and calling the result a funnel
   // vExecBand() now has no caller; it stays in products-crm.ts until its screen is ported, and
   // scripts/check-browser-globals.mjs still sees it, so it cannot rot into a name collision.
-  // vHomeExecBands() stays: it is the partner week, role-conditional, and no card covers it.
+  // NO BANDS AT ALL (founder, 2026-09-19: «الرئيسية» is the reference layout exactly). The partner
+  // week was the last one; it sat outside the grid as a lone band of another shape, and
+  // «شركاء المبيعات» is its own screen. vHomeExecBands stays defined for that screen.
   // No type annotation and no cast: vHome is serialised into the client script verbatim, so any
   // TypeScript syntax here ships to the browser as a parse error.
-  const bands = (typeof vHomeExecBands === "function") ? vHomeExecBands() : [];
+  const bands = [];
   // The deck is full-bleed and sits ABOVE the numbered bands: it is one dark object continuous with
   // the rail, not a section of the page, so it carries its own header and escapes .body's padding.
   // The surface is the new design system (home-ds-crm.ts), scoped to .ds6. It replaces vHomeDeck,

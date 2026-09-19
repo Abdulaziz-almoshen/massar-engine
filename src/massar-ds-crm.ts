@@ -1353,333 +1353,6 @@ export const MASSAR_DS_CSS = `
 .ds6 .hds-ind:focus-visible{ outline: none; box-shadow: var(--m-focus); border-radius: var(--m-r-ctl); }
 @media (prefers-reduced-motion: reduce){.ds6 .hds-ind, .ds6 .hds-ind__b i{ transition: none; }.ds6 .hds-ind:active{ transform: none; }}
 /* ============================================================================
-   THE HOME SURFACE — a hero band over a three-column grid of graph cards.
-   From the GPT-Astra entry at massar-ds/review/entries/astra-home2/, chosen by
-   the founder on 2026-09-17 after he rejected the previous flat layout twice.
-
-   WHY EVERY CLASS HERE IS hx- PREFIXED. (It was hm- until the hero shipped boxed: revamp.ts and
-   home-crm.ts already style .hm-kpi, .hm-kpis, .hm-fig and .hm-split, globally.) The entry as delivered used .card,
-   .metric, .tag, .segment, .plot. Those are exactly the unprefixed names that
-   lost the design competition: .btn alone already has 98 definitions in this
-   app. Scoping to .ds6 is not enough, because the bands this screen composes
-   below the fold are themselves wrapped in .ds6 and still carry old-system
-   classes. A .ds6 .card rule would reach straight into them.
-   ============================================================================ */
-
-/* The hero: three panes divided by hairlines, not three cards with gutters.
-   One object saying three things beats three objects saying one each. */.ds6 .hx-hero{
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  background: var(--m-paper);
-  border: 1px solid var(--m-line);
-  border-radius: var(--m-r-card);
-  overflow: hidden;
-}
-.ds6 .hx-hero__c{ padding-block: var(--m-5); padding-inline: var(--m-5); min-inline-size: 0; }
-.ds6 .hx-hero__c + .hx-hero__c{ border-inline-start: 1px solid var(--m-line); }
-.ds6 .hx-eyebrow{
-  margin: 0;
-  font-size: var(--m-t-cap);
-  font-weight: 500;
-  color: var(--m-mut);
-  line-height: var(--m-leading-meta);
-}
-.ds6 .hx-rev{
-  margin-block: var(--m-2) var(--m-1);
-  font-size: var(--m-t-hero);
-  line-height: var(--m-leading-hero);
-  font-weight: 500;
-  letter-spacing: var(--m-tracking-hero);
-  color: var(--m-ink);
-}
-.ds6 .hx-rev .hx-cur, .ds6 .hx-tgt .hx-cur{
-  font-size: var(--m-t-h);
-  font-weight: 400;
-  letter-spacing: 0;
-}
-.ds6 .hx-sub{ margin: 0; font-size: var(--m-t-cap); color: var(--m-mut);
-  line-height: var(--m-leading-meta); }
-.ds6 .hx-tgt{
-  margin-block: var(--m-2) 0;
-  font-size: var(--m-t-display);
-  line-height: var(--m-leading-figure);
-  font-weight: 500;
-  letter-spacing: var(--m-tracking-figure);
-  color: var(--m-ink);
-}
-.ds6 .hx-tgt__x{ margin: 0; font-size: var(--m-t-body); color: var(--m-ink-2);
-  line-height: var(--m-leading-body); }
-.ds6 .hx-tgt__s{
-  display: inline-flex; align-items: center; gap: var(--m-1);
-  margin-block-start: var(--m-1);
-  font-size: var(--m-t-micro); color: var(--m-mut);
-}
-.ds6 .hx-tgt__s svg{ inline-size: 13px; block-size: 13px; fill: none; stroke: currentColor;
-  stroke-width: 1.7; flex-shrink: 0; }
-.ds6 .hx-link{ align-self: flex-start; margin-block-start: var(--m-2); }
-.ds6 .hx-link{
-  display: inline-flex; align-items: center; gap: var(--m-1);
-  color: var(--m-ac); font-size: var(--m-t-cap); font-weight: 500;
-  text-decoration: none;
-}
-.ds6 .hx-glabel{
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: var(--m-3);
-  margin-block: var(--m-5) var(--m-3);
-}
-.ds6 .hx-glabel h2{ margin: 0; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
-.ds6 .hx-glabel p{ margin: 0; font-size: var(--m-t-micro); color: var(--m-mut); }
-/* THE THREE COLUMNS. The founder has asked for this twice and it is not a
-   breakpoint preference: a graph card is only readable at a width where its
-   bars still separate, and full-width rows of four short values were what he
-   rejected. minmax(0, 1fr) rather than 1fr so a long Arabic label inside a
-   card cannot push its column wider than its share. */.ds6 .hx-grid{
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--m-4);
-  align-items: stretch;
-}
-.ds6 .hx-card{
-  min-inline-size: 0;
-  background: var(--m-paper);
-  border: 1px solid var(--m-line);
-  border-radius: var(--m-r-card);
-  padding-block: var(--m-4) var(--m-3);
-  padding-inline: var(--m-5);
-  display: flex;
-  flex-direction: column;
-}
-.ds6 .hx-card__h{ display: flex; align-items: center; justify-content: space-between;
-  gap: var(--m-2); margin-block-end: var(--m-3); }
-.ds6 .hx-card__t{ display: flex; align-items: center; gap: var(--m-2);
-  margin: 0; font-size: var(--m-t-body); font-weight: 600; color: var(--m-ink); }
-.ds6 .hx-card__t > svg{ inline-size: 17px; block-size: 17px; color: var(--m-mut);
-  fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round;
-  stroke-linejoin: round; flex-shrink: 0; }
-.ds6 .hx-tag{
-  border: 1px solid var(--m-line); background: var(--m-page);
-  border-radius: 5px; padding-block: 1px; padding-inline: 6px;
-  font-size: var(--m-t-micro); color: var(--m-mut); white-space: nowrap;
-}
-.ds6 .hx-fig{ display: flex; align-items: baseline; gap: var(--m-1); }
-.ds6 .hx-fig__v{ font-size: var(--m-t-fig); line-height: var(--m-leading-figure);
-  font-weight: 500; letter-spacing: var(--m-tracking-figure); color: var(--m-ink); }
-.ds6 .hx-fig__v .hx-cur{ font-size: var(--m-t-sub); font-weight: 400; letter-spacing: 0; }
-.ds6 .hx-fig__l{ font-size: var(--m-t-cap); color: var(--m-mut); }
-.ds6 .hx-note{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut);
-  line-height: var(--m-leading-meta); }
-/* margin-block-start:auto pins the foot to the bottom whatever each card holds,
-   so six cards of different content still line their rules up across a row. */.ds6 .hx-card__f{
-  display: flex; align-items: center; justify-content: space-between; gap: var(--m-2);
-  border-block-start: 1px solid var(--m-line);
-  margin-block-start: auto;
-  padding-block-start: var(--m-2);
-  font-size: var(--m-t-micro); color: var(--m-mut);
-}
-.ds6 .hx-src{
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--m-1);
-  min-block-size: 28px; flex-shrink: 0;
-  border: 0; background: none; padding-block: 2px; padding-inline: 3px;
-  font: inherit; font-size: var(--m-t-micro); color: var(--m-mut); cursor: pointer;
-}
-.ds6 .hx-src svg{ inline-size: 13px; block-size: 13px; fill: none; stroke: currentColor;
-  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-/* The stage distribution. One scale across every rung: a bar whose length is
-   relative to its own row says nothing about which stage holds the work. */.ds6 .hx-stage{ margin: var(--m-4) 0 0; }
-.ds6 .hx-stage__r{
-  display: grid;
-  grid-template-columns: 107px minmax(0, 1fr) 20px;
-  gap: var(--m-2); align-items: center;
-  margin-block-end: var(--m-3);
-}
-.ds6 .hx-stage__l{ font-size: var(--m-t-micro); color: var(--m-ink-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ds6 .hx-stage__t{ block-size: 13px; background: var(--m-sunk); border-radius: 3px;
-  overflow: hidden; }
-/* NO transition on the fill. This screen repaints on every route change and every app open —
-   tens of times a day — and a bar that grows each time is an animation the reader has to wait
-   out to read a number they came here for. Motion is spent on the press, which is feedback,
-   not on the paint, which is not. */.ds6 .hx-stage__f{ display: block; block-size: 100%; inline-size: var(--hx-v, 0%);
-  background: var(--m-ink-2); border-radius: 3px; }
-.ds6 .hx-stage__n{ font-size: var(--m-t-cap); color: var(--m-ink); text-align: end; }
-/* The empty rungs are drawn, not omitted. Five stages with nothing in them is
-   the finding on this card; a chart that lists only occupied stages hides it. */.ds6 .hx-rungs{ display: flex; align-items: center; gap: var(--m-3);
-  padding-block: var(--m-2) var(--m-3); }
-.ds6 .hx-rungs__g{ display: grid; grid-template-columns: repeat(var(--hx-c, 5), 1fr);
-  gap: var(--m-1); flex: 1; }
-.ds6 .hx-rung{ block-size: 25px; border: 1px solid var(--m-line); border-radius: 3px;
-  display: grid; place-items: center; background: var(--m-page);
-  font-size: var(--m-t-micro); color: var(--m-mut); }
-.ds6 .hx-rungs__c{ font-size: var(--m-t-micro); line-height: 1.5; color: var(--m-ink-2); }
-/* A column plot. Bars are positioned by height only; nothing here animates,
-   because this paints on every route change and a growing bar would replay
-   dozens of times a day. */.ds6 .hx-plot{ position: relative; margin-block-start: var(--m-5); }
-/* No z-index. The guides are absolute and come FIRST in the markup, the columns are positioned
-   and come second, so the columns already paint above them by document order — and DESIGN.md
-   defines a z-scale that a bare integer here would sit outside of. */.ds6 .hx-cols{ display: grid; grid-template-columns: repeat(var(--hx-c, 6), minmax(0, 1fr));
-  gap: var(--m-3); block-size: 132px; align-items: end; position: relative; }
-.ds6 .hx-col{ position: relative; block-size: var(--hx-h, 0%); min-block-size: 0;
-  display: flex; align-items: flex-start; justify-content: center; }
-.ds6 .hx-col i{ position: absolute; inset-block: 0; inset-inline: 3px;
-  background: var(--m-line-2); border-start-start-radius: 3px; border-start-end-radius: 3px; }
-.ds6 .hx-col b{ position: absolute; inset-block-end: calc(100% + 4px);
-  font-size: var(--m-t-micro); font-weight: 400; color: var(--m-ink); }
-.ds6 .hx-col.is-max i{ background: var(--m-ac); }
-.ds6 .hx-col.is-max b{ color: var(--m-ac); font-weight: 600; }
-/* Zero is a baseline mark, not a one-pixel bar pretending to be a quantity. */.ds6 .hx-col.is-zero i{ block-size: 1px; inset-block-start: auto; background: var(--m-line-2);
-  border-radius: 0; }
-.ds6 .hx-col.is-zero::after{ content: ""; position: absolute; inset-block-end: -3px;
-  inline-size: 7px; block-size: 7px; border-radius: 50%;
-  border: 1.5px solid var(--m-mut); background: var(--m-paper); }
-.ds6 .hx-guides{ position: absolute; inset-block: 0; inset-inline: 0;
-  display: flex; flex-direction: column; justify-content: space-between;
-  pointer-events: none; }
-.ds6 .hx-guides i{ display: block; border-block-start: 1px solid var(--m-line);
-  inline-size: 100%; }
-.ds6 .hx-plot--axis{ padding-inline-start: 21px; }
-.ds6 .hx-plot--axis .hx-guides{ inset-inline-start: 21px; }
-.ds6 .hx-axis{ position: absolute; inset-inline-start: 0; font-size: var(--m-t-micro);
-  color: var(--m-faint); line-height: 1; }
-.ds6 .hx-axis--hi{ inset-block-start: -4px; }
-.ds6 .hx-axis--mid{ inset-block-start: calc(50% - 4px); }
-.ds6 .hx-axis--lo{ inset-block-end: -4px; }
-.ds6 .hx-xlabels{ display: grid; grid-template-columns: repeat(var(--hx-c, 6), minmax(0, 1fr));
-  gap: var(--m-3); text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
-  margin-block-start: var(--m-2); }
-.ds6 .hx-cap{ display: flex; justify-content: space-between; align-items: center;
-  gap: var(--m-2); font-size: var(--m-t-micro); color: var(--m-mut);
-  margin-block: var(--m-2) var(--m-3); }
-.ds6 .hx-cap--plain{ display: block; }
-.ds6 .hx-legend{ display: inline-flex; align-items: center; gap: var(--m-1); white-space: nowrap; }
-.ds6 .hx-legend i{ inline-size: 6px; block-size: 6px; border-radius: 1px; background: var(--m-ac); }
-/* Coverage strips. One cell per record: filled when the figure was recorded,
-   hatched when it was not. Never a zero-height bar, which would read as a
-   recorded zero. */.ds6 .hx-segs{ display: grid; gap: var(--m-1); block-size: 12px;
-  grid-template-columns: repeat(var(--hx-c, 8), minmax(0, 1fr));
-  margin-block: var(--m-3) var(--m-1); }
-.ds6 .hx-segs i{ border-radius: 2px; background: var(--m-sunk); border: 1px solid var(--m-line); }
-.ds6 .hx-segs i.is-on{ background: var(--m-ac); border-color: var(--m-ac); }
-.ds6 .hx-segs i.is-off{
-  background-color: var(--m-page);
-  background-image: repeating-linear-gradient(135deg, transparent 0 3px, var(--m-line-2) 3px 4px);
-}
-.ds6 .hx-cov{ display: flex; align-items: center; justify-content: space-between;
-  gap: var(--m-2); font-size: var(--m-t-micro); color: var(--m-mut); flex-wrap: wrap; }
-.ds6 .hx-qhead{ display: flex; justify-content: space-between; gap: var(--m-2);
-  margin-block: var(--m-4) var(--m-1); font-size: var(--m-t-micro); color: var(--m-ink-2); }
-.ds6 .hx-qs{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-1); }
-.ds6 .hx-q{ min-inline-size: 0; text-align: center; }
-.ds6 .hx-q__n{ margin: 0 0 var(--m-1); font-size: var(--m-t-micro); color: var(--m-mut); }
-.ds6 .hx-q__c{ min-block-size: 48px; border-radius: 5px; border: 1px solid var(--m-line);
-  background: var(--m-sunk); display: flex; align-items: center; justify-content: center;
-  padding-block: var(--m-1); padding-inline: 2px; }
-.ds6 .hx-q__c .m-nil--owed{ border: 0; padding: 0; background: transparent;
-  color: var(--m-mut); white-space: normal; }
-.ds6 .hx-q.is-on .hx-q__c{ border-color: var(--m-ac-line); background: var(--m-ac-dim);
-  color: var(--m-ac); font-size: var(--m-t-micro); font-weight: 600; }
-.ds6 .hx-q.is-on .hx-q__n{ color: var(--m-ac); font-weight: 600; }
-.ds6 .hx-sectors{ margin-block-end: var(--m-2); }
-.ds6 .hx-sectors > div{ display: flex; align-items: center; justify-content: space-between;
-  gap: var(--m-2); padding-block: var(--m-2);
-  border-block-start: 1px solid var(--m-line); font-size: var(--m-t-micro); }
-.ds6 .hx-sectors dt{ display: flex; align-items: center; gap: var(--m-1); color: var(--m-ink-2); }
-.ds6 .hx-sectors dd{ margin: 0; color: var(--m-ink); }
-.ds6 .hx-sectors svg{ inline-size: 12px; block-size: 12px; color: var(--m-ac); fill: none;
-  stroke: currentColor; stroke-width: 1.7; flex-shrink: 0; }
-.ds6 .hx-dots{ display: grid; grid-template-columns: repeat(var(--hx-c, 16), minmax(0, 1fr));
-  gap: var(--m-1); margin-block: var(--m-3) var(--m-2); }
-.ds6 .hx-dots i{ block-size: 9px; background: var(--m-sunk); border: 1px solid var(--m-line);
-  border-radius: 2px; }
-.ds6 .hx-dots i.is-on{ background: var(--m-ac); border-color: var(--m-ac); }
-.ds6 .hx-know{ display: flex; align-items: center; gap: var(--m-3);
-  border-block-start: 1px solid var(--m-line);
-  margin-block: var(--m-4) var(--m-3); padding-block-start: var(--m-4); }
-.ds6 .hx-ring{ position: relative; inline-size: 74px; block-size: 74px; flex-shrink: 0; }
-.ds6 .hx-ring svg{ inline-size: 100%; block-size: 100%; transform: rotate(-90deg); }
-.ds6 .hx-ring circle{ fill: none; stroke-width: 5; }
-.ds6 .hx-ring .hx-ring__t{ stroke: var(--m-sunk); }
-.ds6 .hx-ring .hx-ring__v{ stroke: var(--m-ac); stroke-dasharray: var(--hx-v, 0) 100; }
-.ds6 .hx-ring__l{ position: absolute; inset-block: 0; inset-inline: 0;
-  display: grid; place-content: center; font-size: var(--m-t-sub); line-height: 1.3;
-  text-align: center; color: var(--m-ink); }
-.ds6 .hx-ring__l small{ font-size: var(--m-t-micro); color: var(--m-mut); }
-.ds6 .hx-know h3{ margin: 0; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
-.ds6 .hx-know p{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut); }
-.ds6 .hx-foot{ display: flex; align-items: center; justify-content: space-between;
-  gap: var(--m-3); padding-block: var(--m-4) var(--m-1);
-  font-size: var(--m-t-micro); color: var(--m-faint); }
-@media (hover: hover) and (pointer: fine){.ds6 .hx-src:hover, .ds6 .hx-link:hover{ color: var(--m-ac); text-decoration: underline;
-    text-underline-offset: 4px; }}
-.ds6 .hx-src:focus-visible, .ds6 .hx-link:focus-visible{
-  outline: none; box-shadow: var(--m-focus); border-radius: 5px;
-}
-/* Press feedback, the one place motion earns its keep here: it confirms the interface heard the
-   pointer. Gated on a fine pointer so it never fires from a keyboard activation. */.ds6 @media (hover: hover) and (pointer: fine){
-  .hx-src:active, .hx-link:active { transform: scale(.97); }
-  .hx-src, .hx-link { transition: transform var(--m-press) var(--m-ease); }
-}
-/* Under 1100px the three columns keep their count and lose their padding: two
-   columns would leave one card orphaned on its own row, and the founder asked
-   for three. Below 760px they stack, because at a phone width three bar charts
-   side by side are three unreadable bar charts. */.ds6 @media (max-width: 1100px){
-  .hx-grid { gap: var(--m-3); }
-  .hx-card { padding-inline: var(--m-3); }
-  .hx-hero__c { padding-inline: var(--m-4); }
-  .hx-stage__r { grid-template-columns: 87px minmax(0, 1fr) 17px; gap: var(--m-1); }
-  .hx-cols, .hx-xlabels { gap: var(--m-1); }
-  .hx-rungs { gap: var(--m-1); }
-}
-@media (max-width: 760px){.ds6 .hx-hero{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-hero__c + .hx-hero__c{ border-inline-start: 0;
-    border-block-start: 1px solid var(--m-line); }.ds6 .hx-grid{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-card__f, .ds6 .hx-src{ min-block-size: 44px; }.ds6 .hx-cols{ block-size: 142px; }}
-@media (prefers-reduced-motion: reduce){.ds6 .hx-src, .ds6 .hx-link{ transition: none; }.ds6 .hx-src:active, .ds6 .hx-link:active{ transform: none; }}
-/* A card foot's link never wraps: two lines of «لوحة / المتابعة» beside a one-line note is a
-   foot that is taller in one card than in its row-mates. The note gives way instead. */.ds6 .hx-card__f > span{ min-inline-size: 0; }
-.ds6 .hx-card__f .hx-link{ white-space: nowrap; flex-shrink: 0; }
-.ds6 .hx-tag{ max-inline-size: 50%; overflow: hidden; text-overflow: ellipsis; }
-/* ---- the two hero indicators, rebuilt at equal weight (founder, 2026-09-17: «get better») ----
-   One figure size for both. The first version set revenue at 72px and the target at 28px, which
-   told the reader the target was a footnote to a zero. Same anatomy in each pane: head, figure,
-   qualifier, a graphic, three supporting counts. */.ds6 .hx-hero__c{ display: flex; flex-direction: column; gap: var(--m-2);
-  padding-block: var(--m-5); padding-inline: var(--m-6); }
-.ds6 .hx-hero__h{ display: flex; align-items: center; justify-content: space-between; gap: var(--m-2); }
-.ds6 .hx-big{
-  margin: 0;
-  font-size: 44px;   /* on --type-ladder; 48 is not */
-  line-height: 52px;
-  font-weight: 600;
-  letter-spacing: var(--m-tracking-hero);
-  color: var(--m-ink);
-}
-.ds6 .hx-big .hx-cur{ font-size: var(--m-t-h); font-weight: 500; letter-spacing: 0; color: var(--m-mut); }
-.ds6 .hx-big .m-nil--owed{ font-size: var(--m-t-body); vertical-align: middle; }
-.ds6 .hx-hero .hx-sub{ display: flex; align-items: center; gap: var(--m-1); flex-wrap: wrap; }
-.ds6 .hx-hero .hx-sub svg{ inline-size: 13px; block-size: 13px; fill: none; stroke: currentColor;
-  stroke-width: 1.7; flex-shrink: 0; }
-/* The graphic row. Both panes draw a 10px track at the same height so the two panes line up
-   across the divider; an empty track is still drawn, because «nothing closed» is a state. */.ds6 .hx-track, .ds6 .hx-split{
-  display: flex; block-size: 10px; border-radius: 999px; overflow: hidden;
-  background: var(--m-sunk); margin-block: var(--m-2) var(--m-1);
-}
-.ds6 .hx-track i, .ds6 .hx-split i{ display: block; block-size: 100%; inline-size: var(--hx-v, 0%); }
-.ds6 .hx-track i{ background: var(--m-ac); border-radius: 999px; }
-.ds6 .hx-split i.is-won{ background: var(--m-ok); }
-.ds6 .hx-split i.is-lost{ background: var(--m-bad); }
-.ds6 .hx-kpis{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-block-start: 1px solid var(--m-line); padding-block-start: var(--m-3); margin-block-start: auto; }
-.ds6 .hx-kpi{ display: flex; flex-direction: column; gap: 2px; min-inline-size: 0;
-  padding-inline: var(--m-3); }
-.ds6 .hx-kpi:first-child{ padding-inline-start: 0; }
-.ds6 .hx-kpi + .hx-kpi{ border-inline-start: 1px solid var(--m-line); }
-.ds6 .hx-kpi__k{ display: inline-flex; align-items: center; gap: var(--m-1);
-  font-size: var(--m-t-micro); color: var(--m-mut); white-space: nowrap; }
-.ds6 .hx-kpi__v{ font-size: var(--m-t-sub); font-weight: 600; color: var(--m-ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ds6 .hx-sw{ inline-size: 8px; block-size: 8px; border-radius: 2px; flex-shrink: 0; }
-.ds6 .hx-sw.is-won{ background: var(--m-ok); }
-.ds6 .hx-sw.is-lost{ background: var(--m-bad); }
-.ds6 .hx-kpi .hx-link{ margin-block-start: auto; }
-@media (max-width: 760px){.ds6 .hx-hero__c{ padding-inline: var(--m-4); }.ds6 .hx-big{ font-size: 40px; line-height: 48px; }}
-/* ============================================================================
    THE NUMBER FIELD — every numeric input (number-field-crm.ts), after the coss ui NumberField,
    measured on coss.com/ui/particles?tags=input: one joined control, − and + as borderless 38px
    buttons with 16px glyphs either side of a centred tabular value, a 10px radius, a 1px ring that
@@ -2006,4 +1679,156 @@ export const MASSAR_DS_CSS = `
   box-shadow: var(--m-focus);
 }
 .ds6 .m-select:disabled{ background-color: var(--m-page); color: var(--m-mut); cursor: default; }
+/* ============================================================================
+   «الرئيسية» — the founder's reference layout (Nexora AI Analytics, 2026-09-19): four KPI cards
+   with mini-charts, a wide chart beside a pipeline list, then three cards. The shapes are the
+   reference's; the tokens, the direction and the type are Massar's.
+   ============================================================================ */.ds6 .hx-home{ display: flex; flex-direction: column; gap: var(--m-4); }
+.ds6 .hx-card{
+  min-inline-size: 0;
+  background: var(--m-paper);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  padding-block: var(--m-4);
+  padding-inline: var(--m-5);
+  display: flex;
+  flex-direction: column;
+}
+.ds6 .hx-card__h{ display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--m-3); margin-block-end: var(--m-3); }
+.ds6 .hx-card__t{ margin: 0; font-size: var(--m-t-body); font-weight: 600; color: var(--m-ink); }
+.ds6 .hx-link{ flex: none; display: inline-flex; align-items: center; gap: var(--m-1);
+  font-size: var(--m-t-cap); font-weight: 500; color: var(--m-ac); text-decoration: none;
+  white-space: nowrap; }
+@media (hover: hover) and (pointer: fine){.ds6 .hx-link:hover{ text-decoration: underline; text-underline-offset: 4px; }}
+.ds6 .hx-foot{ margin: 0; font-size: var(--m-t-micro); color: var(--m-faint); }
+/* ---- row one: four figures ---- */.ds6 .hx-kpis{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-4); }
+.ds6 .hx-kpi{
+  min-inline-size: 0;
+  background: var(--m-paper);
+  border: 1px solid var(--m-line);
+  border-radius: var(--m-r-card);
+  padding-block: var(--m-3);
+  padding-inline: var(--m-4);
+}
+.ds6 .hx-kpi__h{ display: flex; align-items: center; gap: var(--m-2); margin-block-end: var(--m-2); }
+.ds6 .hx-kpi__i{ flex: none; display: grid; place-items: center; inline-size: 30px; block-size: 30px;
+  border-radius: 9px; background: var(--m-sunk); color: var(--m-mut); }
+.ds6 .hx-kpi__i svg{ inline-size: 16px; block-size: 16px; fill: none; stroke: currentColor;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ds6 .hx-kpi__i.is-ok{ background: var(--m-ok-dim); color: var(--m-ok); }
+.ds6 .hx-kpi__i.is-ac{ background: var(--m-ac-dim); color: var(--m-ac); }
+.ds6 .hx-kpi__i.is-warn{ background: var(--m-warn-dim); color: var(--m-warn); }
+.ds6 .hx-kpi__k{ font-size: var(--m-t-cap); color: var(--m-mut); min-inline-size: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hx-kpi__b{ display: flex; align-items: flex-end; justify-content: space-between; gap: var(--m-2); }
+.ds6 .hx-kpi__v{ margin: 0; font-size: var(--m-t-fig); line-height: var(--m-leading-figure);
+  font-weight: 700; letter-spacing: var(--m-tracking-figure); color: var(--m-ink); white-space: nowrap; }
+.ds6 .hx-kpi__v small{ font-size: var(--m-t-cap); font-weight: 500; color: var(--m-mut); }
+.ds6 .hx-kpi__v .m-nil--owed{ font-size: var(--m-t-cap); font-weight: 400; }
+.ds6 .hx-kpi__d{ margin: var(--m-1) 0 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-kpi__d.is-up{ color: var(--m-ok); }
+.ds6 .hx-kpi__c{ flex: none; inline-size: 86px; }
+/* A sparkline over a real series. A flat one is the shape of «no month differed from any other»,
+   which is exactly what a company with no closed deal has. */.ds6 .hx-spark{ inline-size: 100%; block-size: 28px; fill: none; stroke: var(--m-ok); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; }
+.ds6 .hx-spark.is-flat{ stroke: var(--m-line-2); }
+.ds6 .hx-mini{ display: flex; align-items: flex-end; gap: 2px; block-size: 28px; }
+.ds6 .hx-mini i{ flex: 1 1 0; min-inline-size: 2px; block-size: var(--hx-h, 100%); border-radius: 2px;
+  background: var(--m-ac); }
+/* A period nobody recorded is hatched, not short: a bar of no height and a bar nobody filled in
+   are different facts. */.ds6 .hx-mini i.is-off{ background-color: var(--m-sunk);
+  background-image: repeating-linear-gradient(135deg, transparent 0 2px, var(--m-line-2) 2px 3px); }
+/* ---- row two ---- */.ds6 .hx-r2{ display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: var(--m-4); }
+.ds6 .hx-flow{ position: relative; margin-block: var(--m-3) 0; }
+.ds6 .hx-flow__g{ position: absolute; inset-block: 0 22px; inset-inline: 0; display: flex;
+  flex-direction: column; justify-content: space-between; pointer-events: none; }
+.ds6 .hx-flow__g i{ display: block; border-block-start: 1px solid var(--m-line); }
+.ds6 .hx-flow__c{ position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--m-1); block-size: 208px; }
+.ds6 .hx-flow__m{ display: flex; flex-direction: column; justify-content: flex-end; gap: var(--m-1);
+  min-inline-size: 0; }
+.ds6 .hx-flow__pair{ display: flex; align-items: flex-end; justify-content: center; gap: 2px;
+  block-size: 178px; }
+.ds6 .hx-flow__pair i{ inline-size: 9px; block-size: var(--hx-h, 0%); min-block-size: 2px;
+  border-start-start-radius: 3px; border-start-end-radius: 3px; position: relative; }
+.ds6 .hx-flow__pair i.is-open{ background: var(--m-ac); }
+.ds6 .hx-flow__pair i.is-closed{ background: var(--m-ok); }
+.ds6 .hx-flow__pair i[data-v]::after{ content: attr(data-v); position: absolute;
+  inset-block-end: calc(100% + 3px); inset-inline-start: 50%; transform: translateX(50%);
+  font-size: var(--m-t-micro); color: var(--m-ink); }
+.ds6 .hx-flow__x{ text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hx-legend2{ display: flex; align-items: center; gap: var(--m-4); flex-wrap: wrap;
+  margin: var(--m-3) 0 0; font-size: var(--m-t-micro); color: var(--m-ink-2); }
+.ds6 .hx-legend2 span{ display: inline-flex; align-items: center; gap: var(--m-1); }
+.ds6 .hx-legend2 i{ inline-size: 8px; block-size: 8px; border-radius: 2px; }
+.ds6 .hx-legend2 i.is-open{ background: var(--m-ac); }
+.ds6 .hx-legend2 i.is-closed{ background: var(--m-ok); }
+/* ---- the pipeline list ---- */.ds6 .hx-pipe{ list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--m-3); }
+.ds6 .hx-pipe__r{ display: grid; grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-areas: "d t p" ". s s" ". b b"; gap: 2px var(--m-2); align-items: center; }
+.ds6 .hx-pipe__d{ grid-area: d; inline-size: 8px; block-size: 8px; border-radius: 50%;
+  background: var(--m-ac); }
+.ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
+.ds6 .hx-pipe__t{ grid-area: t; font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hx-pipe__s{ grid-area: s; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-pipe__b{ grid-area: b; block-size: 6px; border-radius: 999px; background: var(--m-sunk);
+  overflow: hidden; margin-block-start: var(--m-1); }
+.ds6 .hx-pipe__b i{ display: block; block-size: 100%; inline-size: var(--hx-w, 0%);
+  border-radius: 999px; background: var(--m-ac); }
+.ds6 .hx-pipe__p{ grid-area: p; font-size: var(--m-t-micro); color: var(--m-mut); }
+/* ---- row three ---- */.ds6 .hx-r3{ display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--m-4); align-items: stretch; }
+.ds6 .hx-tbl{ inline-size: 100%; border-collapse: collapse; }
+.ds6 .hx-tbl th{ text-align: start; font-size: var(--m-t-micro); font-weight: 500; color: var(--m-mut);
+  padding-block-end: var(--m-2); border-block-end: 1px solid var(--m-line); }
+.ds6 .hx-tbl td{ padding-block: var(--m-2); border-block-end: 1px solid var(--m-line);
+  font-size: var(--m-t-cap); color: var(--m-ink-2); }
+.ds6 .hx-tbl tr:last-child td{ border-block-end: 0; }
+.ds6 .hx-tbl__w{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-inline-size: 0; }
+.ds6 .hx-tbl__t{ text-align: end; white-space: nowrap; color: var(--m-mut); font-size: var(--m-t-micro); }
+.ds6 .hx-tag{ display: inline-flex; align-items: center; padding-block: 2px; padding-inline: var(--m-2);
+  border-radius: 999px; font-size: var(--m-t-micro); background: var(--m-sunk); color: var(--m-ink-2); }
+.ds6 .hx-tag.is-ok{ background: var(--m-ok-dim); color: var(--m-ok); }
+.ds6 .hx-tag.is-ac{ background: var(--m-ac-dim); color: var(--m-ac); }
+.ds6 .hx-tag.is-bad{ background: var(--m-bad-dim); color: var(--m-bad); }
+.ds6 .hx-goal{ display: flex; flex-direction: column; gap: var(--m-2); }
+.ds6 .hx-goal__v{ margin: 0; font-size: var(--m-t-h); font-weight: 700; color: var(--m-ink); }
+.ds6 .hx-goal__of{ font-size: var(--m-t-cap); font-weight: 400; color: var(--m-mut); }
+.ds6 .hx-goal__b{ position: relative; block-size: 10px; border-radius: 999px; background: var(--m-sunk);
+  margin-block: var(--m-1) var(--m-4); }
+.ds6 .hx-goal__b i{ display: block; block-size: 100%; inline-size: var(--hx-w, 0%);
+  border-radius: 999px; background: var(--m-ok); }
+.ds6 .hx-goal__b b{ position: absolute; inset-block-start: calc(100% + 4px); inset-inline-start: 0;
+  font-size: var(--m-t-micro); font-weight: 600; color: var(--m-ink-2); }
+.ds6 .hx-goal__n{ margin: 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-donut{ display: flex; align-items: center; gap: var(--m-4); flex-wrap: wrap; }
+.ds6 .hx-donut__r{ position: relative; flex: none; inline-size: 116px; block-size: 116px; }
+.ds6 .hx-donut__r svg{ inline-size: 100%; block-size: 100%; transform: rotate(-90deg); }
+.ds6 .hx-donut__r circle{ fill: none; stroke-width: 5; }
+.ds6 .hx-donut__t{ stroke: var(--m-sunk); }
+.ds6 .hx-donut__s.t0{ stroke: var(--m-ac); }
+.ds6 .hx-donut__s.t1{ stroke: var(--m-ok); }
+.ds6 .hx-donut__s.t2{ stroke: var(--m-warn); }
+.ds6 .hx-donut__s.t3{ stroke: var(--m-line-2); }
+.ds6 .hx-donut__c{ position: absolute; inset-block: 0; inset-inline: 0; display: grid;
+  place-content: center; text-align: center; }
+.ds6 .hx-donut__c b{ font-size: var(--m-t-h); color: var(--m-ink); }
+.ds6 .hx-donut__c small{ font-size: var(--m-t-micro); color: var(--m-mut); }
+.ds6 .hx-donut__l{ list-style: none; margin: 0; padding: 0; flex: 1 1 130px; min-inline-size: 0;
+  display: flex; flex-direction: column; gap: var(--m-2); }
+.ds6 .hx-donut__l li{ display: flex; align-items: center; gap: var(--m-2); font-size: var(--m-t-micro);
+  color: var(--m-ink-2); }
+.ds6 .hx-donut__l i{ flex: none; inline-size: 8px; block-size: 8px; border-radius: 50%; }
+.ds6 .hx-donut__l i.t0{ background: var(--m-ac); }
+.ds6 .hx-donut__l i.t1{ background: var(--m-ok); }
+.ds6 .hx-donut__l i.t2{ background: var(--m-warn); }
+.ds6 .hx-donut__l i.t3{ background: var(--m-line-2); }
+.ds6 .hx-donut__l span{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.ds6 .hx-donut__l b{ color: var(--m-ink); }
+@media (max-width: 1280px){.ds6 .hx-kpis{ grid-template-columns: repeat(2, minmax(0, 1fr)); }.ds6 .hx-r2, .ds6 .hx-r3{ grid-template-columns: minmax(0, 1fr); }}
+@media (max-width: 700px){.ds6 .hx-kpis{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-flow__c{ block-size: 176px; }.ds6 .hx-flow__pair{ block-size: 146px; }}
 `;

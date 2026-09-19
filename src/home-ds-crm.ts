@@ -1,27 +1,19 @@
-// home-ds-crm.ts — «الرئيسية»: a hero band over three columns of graph cards.
+// home-ds-crm.ts — «الرئيسية», laid out as the founder's reference (Nexora AI Analytics).
 //
-// WHY THIS SHAPE. The founder rejected the previous layout twice ("layout not accepted", and
-// "the grid should be 3 columns not flat full width this is a must") and supplied a fintech
-// dashboard as the reference: one leading figure over a dense row of charts. GPT-Astra produced
-// the entry at massar-ds/review/entries/astra-home2/, he opened it and approved it on 2026-09-17.
+// THE LAYOUT IS THE FOUNDER'S, THE FIGURES ARE THE RECORDS'. He supplied the reference on
+// 2026-09-19 and asked for it exactly: four KPI cards with mini-charts, a wide chart beside a
+// pipeline list, then three cards — a recent-activity table, a goal with a progress bar, and a
+// donut with a legend. Every slot below keeps that shape and is filled from what Massar stores.
 //
-// WHY A NAIVE COPY OF THE REFERENCE WOULD BE A LIE. The reference is dense with history. This
-// product has almost none: no deal has ever closed, ONE product-quarter carries a target, five of
-// six open lines have no price. A revenue-over-time chart here is a flat line at zero, and an
-// invented one is worse — a previous design divided the annual target by twelve to draw a monthly
-// series, inventing a "required to date" for periods that never had a target. So the charts here
-// are the ones the records actually support: how the open lines sit across the stage ladder, how
-// long each has stood still, the campaign cohort followed through, and how much of the target book
-// is even filled in. Coverage of RECORDING, never a fabricated rate of achievement.
+// WHERE THE REFERENCE INVENTS, THIS DOES NOT. The specimen carries six months of revenue, growth
+// percentages under every figure, and a portfolio split. This company has one month of history, no
+// closed deal, and one recorded target. So a slot with nothing behind it says so — the three typed
+// absences (PORT-SPEC §4), never a dash and never a zero standing in for a number nobody recorded.
+// A change line is printed only where a real past exists: counts carry created_at, so «+N في آخر 30
+// يومًا» is measured; revenue has no month unlike another, so it says «لا صفقة مغلقة» instead.
 //
-// ABSENCE IS TYPED, NOT DASHED (PORT-SPEC §4). Three kinds, three treatments: a number someone
-// owes (m-nil--owed), a classification nobody made (m-nil--unset), a legitimate nothing
-// (m-nil--none). A page of identical em-dashes teaches the reader to stop seeing dashes.
-//
-// MOTION. This surface repaints on every route change and every app open. Per the animation
-// decision framework that means NOTHING here animates on paint — no growing bars, no staggered
-// cards. The only motion is press feedback on the two interactive elements, behind a fine-pointer
-// query, and it is defined in massar.css, not here.
+// MOTION. This surface repaints on every route change and every app open, so nothing animates on
+// paint — no growing bars, no staggered cards.
 //
 // SCOPED. The markup is wrapped in .ds6, the only place massar-ds-crm.ts can reach.
 //
@@ -156,430 +148,94 @@ function hdsIcon(n) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (HDS_ICONS[n] || "") + "</svg>";
 }
 
-/* ---------- the hero: two indicators, equal weight ----------
-   The founder kept two and asked for them to be better (2026-09-17). Each is now the same shape —
-   eyebrow, one figure at one size, a small graphic, and a row of supporting counts — so neither
-   reads as the lesser one, and each graphic is drawn from the same population as its figure.
+/* ============================================================================================
+   THE LAYOUT, AS THE FOUNDER SPECIFIED IT (Nexora AI Analytics, 2026-09-19: «must be like this
+   exact»): a row of four KPI cards each with an icon, a figure, a change line and a small chart;
+   a wide chart card beside a pipeline list; then three cards — a recent-activity table, a goal
+   with a progress bar, and a donut with a legend.
 
-   REVENUE: won value for the fiscal year, with the year's won / lost / open line counts under it.
-   Won and lost are this fiscal year's closes; open is every open line whatever its age, and the
-   label says «مفتوحة الآن» so the three are not read as one period's split.
+   EVERY SLOT IS FILLED FROM THE RECORDS. The reference is a specimen full of invented history; this
+   company has one month of it. So each slot keeps its SHAPE and takes the nearest thing Massar
+   actually stores, and where the records hold nothing the slot says so rather than drawing a line
+   that implies a past nobody recorded:
 
-   TARGET: the recorded target, with a track of what has been won ON THE TARGETED PRODUCTS, IN THE
-   TARGETED QUARTERS, against it. Not company revenue against it: untargeted revenue in that numerator is exactly the defect
-   that let attainment pass 100٪ with targets unmet. */
-function hdsTargetPeriod(f) {
-  var only = null;
-  f.rows.forEach(function (p) { if (p.annualTarget !== null && p.annualTarget !== undefined) only = only || p; });
-  if (f.withTarget !== 1 || !only) return "";
-  var qs = (only.quarters || []).filter(function (q) { return q.target !== null && q.target !== undefined; });
-  if (qs.length !== 1) return "";
-  var q = Number(qs[0].quarter);
-  var cur = (typeof pcQuarters !== "undefined" && pcQuarters) ? Number(pcQuarters.currentQuarter) : null;
-  if (!cur) return "";
-  if (q < cur) return "انتهى";
-  if (q > cur) return "لم يبدأ بعد";
-  var end = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.periodEnd) ? Date.parse(pcSectors.periodEnd) : NaN;
-  if (isNaN(end)) return "جارٍ";
-  var left = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
-  return left
-    ? ("باقٍ منه " + mPl(left, "يوم واحد", "يومان", "أيام", "يومًا"))
-    : "ينتهي اليوم";
-}
-function hdsHeroStat(label, valueHtml) {
-  return '<div class="hx-kpi"><span class="hx-kpi__k">' + label + '</span>' +
-    '<span class="hx-kpi__v">' + valueHtml + "</span></div>";
-}
-function hdsHero(f, lines) {
-  var won = 0, lost = 0, tAch = 0;
-  f.rows.forEach(function (p) {
-    won += Number(p.wonLines) || 0;
-    lost += Number(p.lostLines) || 0;
-    /* Only the QUARTERS that carry a target. A product targeted for Q3 alone, measured against its
-       whole year's wins, would count a Q1 close against a Q3 target — the same numerator/denominator
-       mismatch as untargeted revenue, one axis over. */
-    (p.quarters || []).forEach(function (q) {
-      if (q.target !== null && q.target !== undefined) tAch += Number(q.achieved) || 0;
-    });
-  });
-  var closed = won + lost;
+     Total Revenue        -> الإيراد المحقق, with the year's real month-by-month wins (all zero).
+     New Customers        -> الحسابات, and how many arrived in the last 30 days (created_at).
+     Total Deals          -> البنود المفتوحة, and how many were opened in the last 30 days.
+     Total Expenses       -> المستهدف المسجّل, with the four quarters, the recorded one filled.
+     Revenue Overview     -> حركة البنود: opened and closed per month, from created_at and stage_at.
+     Sales Pipeline       -> the live stage ladder, counts and value, each as a share of the book.
+     Recent Transactions  -> آخر الأحداث from the message ledger (sent/delivered/seen/replied).
+     Savings Goal         -> the recorded target and what has been won against it.
+     Portfolio Allocation -> the open lines by stage, as a donut with its legend.
 
-  var h = '<section class="hx-hero" aria-label="الإيراد المحقق والمستهدف المسجّل">';
+   A CHANGE LINE IS MEASURED OR IT IS ABSENT. «12.5%+ vs last 30 days» under every figure is the
+   reference's habit, not a fact: a delta needs a past. Counts have created_at, so theirs are real;
+   revenue has no month that differs from any other, so it says «لا صفقة مغلقة» instead of «٪0».
+   ============================================================================================ */
 
-  /* ---- revenue ---- */
-  h += '<div class="hx-hero__c">';
-  h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">الإيراد المحقق</h2>' +
-       '<span class="hx-tag">السنة المالية <span class="m-n">' + hdsYearTxt(f.year) + "</span></span></div>";
-  h += '<p class="hx-big"><span class="m-n">' + fmtN(f.achieved) +
-       ' <span class="hx-cur">ر.س</span></span></p>';
-  h += '<p class="hx-sub">' + (f.achieved ? "من الصفقات الرابحة المسجّلة هذه السنة."
-                                          : "لم تُغلق أي صفقة رابحة هذه السنة.") + "</p>";
-  /* The close split as a bar: won against everything closed. With nothing closed there is no
-     ratio to draw, so the track is empty and says so, rather than a zero-width fill that reads as
-     «every close was lost». */
-  h += '<div class="hx-split" role="img" aria-label="' + esc(closed
-      ? ("من " + closed + " صفقات مغلقة: " + won + " رابحة و" + lost + " خاسرة")
-      : "لا صفقات مغلقة هذه السنة") + '">';
-  if (closed) {
-    h += '<i class="is-won" style="--hx-v:' + Math.round((won / closed) * 1000) / 10 + '%"></i>' +
-         '<i class="is-lost" style="--hx-v:' + Math.round((lost / closed) * 1000) / 10 + '%"></i>';
-  }
-  h += "</div>";
-  h += '<div class="hx-kpis">' +
-    hdsHeroStat('<i class="hx-sw is-won" aria-hidden="true"></i>رابحة', hdsN(won)) +
-    hdsHeroStat('<i class="hx-sw is-lost" aria-hidden="true"></i>خاسرة', hdsN(lost)) +
-    hdsHeroStat("مفتوحة الآن", dsFig("nLines", lines.length)) +
-    "</div>";
-  h += "</div>";
+var HX_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                 "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
-  /* ---- target ---- */
-  h += '<div class="hx-hero__c">';
-  if (f.withTarget) {
-    var pct = f.recorded > 0 ? Math.round((tAch / f.recorded) * 100) : 0;
-    var remain = Math.max(0, f.recorded - tAch);
-    h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">' +
-         (f.withTarget === 1 ? "المستهدف الوحيد المسجّل" : "المستهدف المسجّل") + "</h2>" +
-         '<span class="hx-tag">' + (f.withTarget === 1 ? esc(f.onlyProduct)
-            : (dsFig("withTarget", f.withTarget) + " من " + dsFig("products", f.products) + " منتجات")) +
-         "</span></div>";
-    h += '<p class="hx-big"><span class="m-n">' + fmtN(f.recorded) +
-         ' <span class="hx-cur">ر.س</span></span></p>';
-    var period = hdsTargetPeriod(f);
-    /* The scope names the quarter once and the period says only where that quarter stands:
-       «الربع الثالث فقط · الربع الثالث جارٍ» named it twice on the live page. */
-    h += '<p class="hx-sub">' + hdsIcon("target") +
-         (f.onlyScope ? esc(f.onlyScope) : "على المنتجات ذات المستهدف") +
-         (period ? ' <span aria-hidden="true">&#183;</span> ' + period : "") + "</p>";
-    h += '<div class="hx-track" role="img" aria-label="' +
-         esc("المحقق على المنتجات ذات المستهدف " + tAch + " من " + f.recorded + " ريال") + '">' +
-         '<i style="--hx-v:' + Math.min(100, pct) + '%"></i></div>';
-    h += '<div class="hx-kpis">' +
-      hdsHeroStat("المحقق مقابله", hdsMoney(tAch)) +
-      hdsHeroStat("المتبقي", hdsMoney(remain)) +
-      hdsHeroStat("نسبة الإنجاز", '<span class="m-n">' + fmtN(pct) + "٪</span>") +
-      "</div>";
-  } else {
-    h += '<div class="hx-hero__h"><h2 class="hx-eyebrow">المستهدف المسجّل</h2></div>';
-    h += '<p class="hx-big">' + hdsNil("لا مستهدف مسجّل", "owed") + "</p>";
-    h += '<p class="hx-sub">لم يُسجَّل مستهدف على أي منتج في ' + hdsYearTxt(f.year) + ".</p>";
-    h += '<div class="hx-track" aria-hidden="true"></div>';
-    h += '<div class="hx-kpis">' +
-      hdsHeroStat("المنتجات", dsFig("products", f.products)) +
-      hdsHeroStat("بلا مستهدف", dsFig("noTarget", f.noTarget)) +
-      '<div class="hx-kpi"><a class="hx-link" href="#perf">حدِّد المستهدفات <span aria-hidden="true">&#8592;</span></a></div>' +
-      "</div>";
-  }
-  h += "</div></section>";
-  return h;
-}
-
-/* ---------- card chrome ---------- */
-function hdsCard(icon, title, tag, body, footNote, href, linkTxt) {
-  return '<section class="hx-card">' +
-    '<div class="hx-card__h"><h3 class="hx-card__t">' + hdsIcon(icon) + title + "</h3>" +
-      (tag ? '<span class="hx-tag">' + tag + "</span>" : "") + "</div>" +
-    body +
-    '<div class="hx-card__f"><span>' + footNote + "</span>" +
-      '<a class="hx-link" href="' + href + '">' + esc(linkTxt) +
-      ' <span aria-hidden="true">&#8592;</span></a></div></section>';
-}
-function hdsFig(v, label, note) {
-  return '<div class="hx-fig"><span class="hx-fig__v">' + v + "</span>" +
-    '<span class="hx-fig__l">' + label + "</span></div>" +
-    (note ? '<p class="hx-note">' + note + "</p>" : "");
-}
-
-/* ---------- 1. where the open lines sit on the ladder ----------
-   ONE SCALE across every rung: a bar whose length is relative to its own row says nothing about
-   which stage holds the work. The empty rungs are DRAWN, by their real names — five stages with
-   nothing in them is the finding on this card, and a chart listing only occupied stages hides it.
-   Only OPEN rungs appear: a line on «إغلاق – ربح» is by definition not an open line, and putting
-   the terminal rungs in a distribution of open work would double-count the ladder. */
-function hdsStageCard(lines) {
-  var stages = (typeof opOpenStages === "function") ? opOpenStages() : [];
-  var counts = stages.map(function (s) {
-    return { s: s, n: lines.filter(function (l) { return l.stage === s.key; }).length };
-  });
-  /* A line whose stage key is not on the ladder at all still has to be counted somewhere, or the
-     bars silently sum to less than the figure above them. */
-  var known = {}; stages.forEach(function (s) { known[s.key] = 1; });
-  var offLadder = lines.filter(function (l) { return !known[l.stage]; });
-  var occupied = counts.filter(function (c) { return c.n > 0; });
-  var empty = counts.filter(function (c) { return c.n === 0; });
-  var top = occupied.length ? Math.max.apply(null, occupied.map(function (c) { return c.n; })) : 1;
-
-  /* «0 بنود مفتوحة» is a count of nothing dressed as a quantity. Zero open lines is a legitimate
-     nothing, so it is typed as one — the figure slot carries the absence, not a numeral. */
-  var body = lines.length
-    ? hdsFig(dsFig("nLines", lines.length),
-        hdsNoun(lines.length, "بند مفتوح", "بندان مفتوحان", "بنود مفتوحة", "بندًا مفتوحًا"),
-        "أغلب البنود في " + esc(occupied[0].s.label) + ".")
-    : hdsFig(hdsNil("لا بنود مفتوحة", "none"), "",
-        "تظهر هنا فور تسجيل أول فرصة في «فرص البيع».");
-
-  body += '<div class="hx-stage">';
-  occupied.forEach(function (c) {
-    body += '<div class="hx-stage__r">' +
-      '<span class="hx-stage__l" title="' + esc(c.s.label) + '">' + esc(c.s.label) + "</span>" +
-      '<span class="hx-stage__t" aria-hidden="true"><span class="hx-stage__f" style="--hx-v:' +
-        Math.round((c.n / top) * 100) + '%"></span></span>' +
-      '<span class="hx-stage__n m-n">' + fmtN(c.n) + "</span></div>";
-  });
-  if (empty.length) {
-    body += '<div class="hx-rungs">' +
-      '<div class="hx-rungs__c">' + hdsPl(empty.length, "مرحلة واحدة", "مرحلتان", "مراحل", "مرحلة") +
-        "<br>" + hdsNil("لا بنود مفتوحة", "none") + "</div>" +
-      '<div class="hx-rungs__g" style="--hx-c:' + empty.length + '" role="list" aria-label="' +
-        esc(hdsPl(empty.length, "مرحلة واحدة", "مرحلتان", "مراحل", "مرحلة") + " بلا بنود مفتوحة") + '">' +
-      empty.map(function (c) {
-        return '<span class="hx-rung" role="listitem" title="' + esc(c.s.label) + '">' +
-          '<span class="m-n">0</span></span>';
-      }).join("") + "</div></div>";
-  }
-  if (offLadder.length) {
-    body += '<p class="hx-note">' + hdsNil(hdsPl(offLadder.length, "بند واحد", "بندان", "بنود", "بندًا") +
-      " على مرحلة خارج السلّم", "unset") + "</p>";
-  }
-  body += "</div>";
-
-  return hdsCard("stages", "توزيع مراحل البيع",
-    '<span class="m-n">' + fmtN(stages.length) + "</span> مراحل مفتوحة", body,
-    "الفراغ في المراحل جزء من الصورة.", "#opps", "كل الفرص");
-}
-
-/* ---------- 2. how long each line has stood still ----------
-   Six independent columns, NOT a time series. Sorted ascending from the right, which in RTL is
-   the start of the reading order. The accent marks the observed maximum, not an invented overdue
-   threshold — this ladder's SLA is nullable and only two rungs carry one, so a red "late" count
-   here would be a rule the records do not hold. */
-function hdsAgeCard(lines) {
-  if (!lines.length) {
-    return hdsCard("clock", "زمن بلا حركة", "تغيير المرحلة",
-      hdsFig(hdsNil("لا بنود مفتوحة", "none"), "", "تظهر هنا فور تسجيل أول فرصة."),
-      "أيام منذ آخر تغيير مرحلة.", "#board", "لوحة المتابعة");
-  }
-  var days = lines.map(function (l) { return l.days; }).sort(function (a, b) { return a - b; });
-  var hi = days[days.length - 1];
-  var atMax = days.filter(function (d) { return d === hi; }).length;
-  var scale = hi > 0 ? hi : 1;
-
-  var body = hdsFig(dsFig("maxDays", hi), "يومًا، أطول توقف",
-    atMax > 1
-      ? (esc(hdsPl(atMax, "بند واحد", "بندان", "بنود", "بندًا")) + " لم تتغير مرحلتها طوال هذه المدة.")
-      : "بند واحد لم تتغير مرحلته طوال هذه المدة.");
-
-  body += '<div class="hx-plot hx-plot--axis" role="img" aria-label="' +
-    esc(hdsPl(days.length, "بند واحد", "بندان", "بنود", "بندًا") +
-        " مستقلة، مرتبة من اليمين: " + days.join("، ") + " يومًا دون تغيير المرحلة") + '">' +
-    '<span class="hx-axis hx-axis--hi" aria-hidden="true"><span class="m-n">' + fmtN(hi) + "</span></span>" +
-    '<span class="hx-axis hx-axis--mid" aria-hidden="true"><span class="m-n">' +
-      fmtN(Math.round(hi / 2)) + "</span></span>" +
-    '<span class="hx-axis hx-axis--lo" aria-hidden="true"><span class="m-n">0</span></span>' +
-    '<div class="hx-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
-    '<div class="hx-cols" style="--hx-c:' + days.length + '" aria-hidden="true">' +
-    days.map(function (d) {
-      return '<div class="hx-col' + (d === hi ? " is-max" : "") +
-        '" style="--hx-h:' + Math.round((d / scale) * 1000) / 10 + '%">' +
-        '<i></i><b class="m-n">' + fmtN(d) + "</b></div>";
-    }).join("") + "</div></div>";
-  body += '<p class="hx-cap"><span>كل عمود بند مستقل؛ مرتبة حسب المدة.</span>' +
-    '<span class="hx-legend"><i aria-hidden="true"></i>الأطول</span></p>';
-
-  return hdsCard("clock", "زمن بلا حركة", "تغيير المرحلة", body,
-    "أيام في المرحلة، لا عمر الصفقة.", "#board", "لوحة المتابعة");
-}
-
-/* ---------- 3. the campaign cohort, followed through ----------
-   ONE cohort through its own steps, which is what makes this a legitimate funnel. No conversion
-   rate is printed between steps: a rate needs its denominator beside it, and a rate BETWEEN two
-   steps of a cohort invites reading it as a rate for the whole book. The last rung is the
-   attributed opportunity count from the campaign results endpoint, not a guess from oppRows. */
-function hdsCampaign() {
-  var camps = (typeof campaigns !== "undefined" && campaigns) ? campaigns : [];
-  var live = camps.filter(function (c) {
-    return (typeof campIsTest !== "function") || !campIsTest(c);
-  });
-  if (!live.length || typeof campStats !== "function") {
-    return hdsCard("campaign", "مسار الحملة", "",
-      hdsFig(hdsNil("لا حملات بعد", "none"), "", "أطلق الأولى من «إنشاء حملة»."),
-      "تتابع المجموعة نفسها.", "#kmon", "متابعة الحملات");
-  }
-  /* The most recent live campaign, named. An aggregate across campaigns is a different measure —
-     several cohorts at different ages added together — and calling that "a funnel" is the kind of
-     population mismatch the audit kept finding. Sorted HERE rather than trusting the array order:
-     the server sends newest-first, and the first version of this card took the last element and
-     rendered the oldest campaign on the live page. */
-  var cp = live.slice().sort(function (a, b) {
-    return String(b.created_at || "").localeCompare(String(a.created_at || ""));
-  })[0];
-  var st = campStats(cp);
-  var opps = null;
-  if (typeof crLoad === "function") {
-    crLoad(cp.id, false);
-    var r = (typeof crRes !== "undefined" && crRes && crRes[cp.id]) ? crRes[cp.id] : null;
-    if (r && r.data && r.data.results) opps = Number(r.data.results.opportunities) || 0;
-  }
-
-  var steps = [
-    { k: "أُرسلت", v: st.sent }, { k: "وصلت", v: st.delivered }, { k: "شوهدت", v: st.seen },
-    { k: "ردّوا", v: st.replied }, { k: "اهتمّوا", v: st.interested }
-  ];
-  if (opps !== null) steps.push({ k: "فرص", v: opps });
-  var top = Math.max.apply(null, steps.map(function (s) { return s.v; }).concat([1]));
-
-  var body = hdsFig(
-    opps === null ? hdsNil("جارٍ القراءة", "unset") : '<span class="m-n">' + fmtN(opps) + "</span>",
-    "فرص نتجت عن الحملة",
-    /* Counted, not «بـ1 رسالة»: one and two take their own forms and carry no numeral. */
-    "بدأت بـ" + mPl(st.sent, "رسالة واحدة", "رسالتين", "رسائل", "رسالة") + "؛ " + (st.interested
-      ? "وصلت إلى " + mPl(st.interested, "مهتم واحد", "مهتمَّين", "مهتمين", "مهتمًا") + "."
-      : "لم يُبدِ أحد اهتمامًا بعد."));
-
-  body += '<div class="hx-plot" role="img" aria-label="' +
-    esc("تتابع الحملة من اليمين إلى اليسار: " +
-        steps.map(function (s) { return s.k + " " + s.v; }).join("، ")) + '">' +
-    '<div class="hx-guides" aria-hidden="true"><i></i><i></i><i></i></div>' +
-    '<div class="hx-cols" style="--hx-c:' + steps.length + '" aria-hidden="true">' +
-    steps.map(function (s) {
-      return '<div class="hx-col' + (s.v === 0 ? " is-zero" : "") +
-        '" style="--hx-h:' + Math.round((s.v / top) * 1000) / 10 + '%">' +
-        '<i></i><b class="m-n">' + fmtN(s.v) + "</b></div>";
-    }).join("") + "</div></div>";
-  body += '<div class="hx-xlabels" style="--hx-c:' + steps.length + '" aria-hidden="true">' +
-    steps.map(function (s) { return "<span>" + esc(s.k) + "</span>"; }).join("") + "</div>";
-  body += '<p class="hx-cap hx-cap--plain">تتابع المجموعة نفسها ' +
-    '<span aria-hidden="true">&#8592;</span> من الإرسال إلى الفرصة</p>';
-
-  /* The card title stays «مسار الحملة» and the campaign's own name goes in the tag: a name in the
-     title wrapped to two lines and pushed this card's figure below its row-mates'. */
-  return hdsCard("campaign", "مسار الحملة",
-    '<span title="' + esc(cp.name) + '">' + esc(clip(cp.name, 20)) + "</span>", body,
-    opps === 0 ? "لا فرص من هذه الحملة بعد." : "بلا معدلات تحويل.",
-    "#kmon/" + cp.id, "سجل الحملة");
-}
-
-/* ---------- 4. how much of the target book is filled in ----------
-   A COMPLETENESS meter, not a performance one, and the card says so in its own foot. The quarters
-   that carry no target are hatched, never drawn as zero: a target nobody set is not a target of
-   zero, and that single confusion is what let attainment pass 100٪ with targets unmet. */
-function hdsTargetCard(f) {
-  /* No products at all is not «0/0» — a ratio with nothing on either side of the slash is a
-     figure that looks computed and means nothing. */
-  if (!f.products) {
-    return hdsCard("target", "تغطية المستهدفات", "اكتمال التسجيل",
-      hdsFig(hdsNil("لا منتجات مسجّلة", "none"), "",
-        "تظهر التغطية فور تسجيل أول منتج."),
-      "اكتمال المستهدفات، لا نسبة تحقيقها.", "#products", "المنتجات");
-  }
-  var body = hdsFig(
-    '<span class="m-n">' + fmtN(f.withTarget) + " / " + fmtN(f.products) + "</span>",
-    hdsNoun(f.withTarget, "منتج له مستهدف", "منتجان لهما مستهدف",
-            "منتجات لها مستهدف", "منتجًا له مستهدف"),
-    "");
-
-  body += '<div class="hx-segs" style="--hx-c:' + Math.max(f.products, 1) + '" aria-hidden="true">' +
-    f.rows.map(function (p) {
-      var on = p.annualTarget !== null && p.annualTarget !== undefined;
-      return '<i class="' + (on ? "is-on" : "is-off") + '" title="' + esc(p.product) + '"></i>';
-    }).join("") + "</div>";
-  body += '<p class="hx-cov"><span>' +
-    (f.withTarget === 1 ? esc(f.onlyProduct) + " فقط" : hdsN(f.withTarget) + " من " + hdsN(f.products)) +
-    "</span>" +
-    (f.noTarget ? hdsNil(hdsPl(f.noTarget, "منتج واحد بلا مستهدف", "منتجان بلا مستهدف",
-      "منتجات بلا مستهدف", "منتجًا بلا مستهدف"), "owed") : "") + "</p>";
-
-  /* Quarters run الأول at the RIGHT: first child of an RTL grid is the right-hand cell, which is
-     where the earliest period belongs. Reversing the array here would put Q1 on the left. */
-  var qs = [1, 2, 3, 4].map(function (q) {
-    var t = null;
-    f.rows.forEach(function (p) {
-      (p.quarters || []).forEach(function (x) {
-        if (Number(x.quarter) === q && x.target !== null && x.target !== undefined) {
-          t = (t || 0) + Number(x.target);
-        }
-      });
-    });
-    return { q: q, t: t };
-  });
-  var recorded = qs.filter(function (x) { return x.t !== null; }).length;
-  body += '<div class="hx-qhead"><span>سجل الأرباع <span class="m-n">' + hdsYearTxt(f.year) +
-    "</span></span><span>" + hdsPl(recorded, "ربع واحد", "ربعان", "أرباع", "ربعًا") +
-    " من أربعة</span></div>";
-  body += '<div class="hx-qs">' + qs.map(function (x) {
-    return '<div class="hx-q' + (x.t !== null ? " is-on" : "") + '">' +
-      '<p class="hx-q__n">' + hdsQName(x.q) + "</p>" +
-      '<div class="hx-q__c">' + (x.t !== null ? hdsMoney(x.t) : hdsNil("بلا مستهدف", "owed")) +
-      "</div></div>";
-  }).join("") + "</div>";
-  body += '<p class="hx-cap hx-cap--plain">التسجيل عبر الأرباع ' +
-    '<span aria-hidden="true">&#8592;</span> المستهدف الغائب ليس صفرًا.</p>';
-
-  return hdsCard("target", "تغطية المستهدفات", "اكتمال التسجيل", body,
-    "اكتمال المستهدفات، لا نسبة تحقيقها.", "#perf", "المستهدفات والأداء");
-}
-
-/* ---------- 5. what the open pipeline is worth, and where it sits ----------
-   The figure is the sum of the PRICED lines only, and it is labelled «مسجّلة» rather than
-   «إجمالي»: the unpriced lines have an unknown value, not a value of zero, so no total exists
-   until they are priced. Adding zeros for them would understate the book and print a number
-   nobody recorded. */
-function hdsValueCard(f, lines) {
-  var priced = lines.filter(function (l) { return l.value > 0; });
-  var pricedValue = 0; priced.forEach(function (l) { pricedValue += l.value; });
-  var unpriced = lines.length - priced.length;
-
-  var body = hdsFig(
-    priced.length ? '<span class="m-n">' + fmtN(Math.round(pricedValue)) +
-      ' <span class="hx-cur">ر.س</span></span>' : hdsNil("لا بند مسعَّر", "owed"),
-    "مسجّلة",
-    priced.length === 1 ? "قيمة بند واحد مُسعّر، وليست إيرادًا."
-      : "قيمة البنود المسعّرة، وليست إيرادًا.");
-
-  if (lines.length) {
-    body += '<div class="hx-segs" style="--hx-c:' + lines.length + '" aria-hidden="true">' +
-      lines.map(function (l) {
-        return '<i class="' + (l.value > 0 ? "is-on" : "is-off") + '"></i>';
-      }).join("") + "</div>";
-    body += '<p class="hx-cov"><span>' + dsFig("priced", priced.length) + " من " +
-      dsFig("nLines", lines.length) + "</span>" +
-      (unpriced ? hdsNil(hdsPl(unpriced, "بند واحد لم يُسعَّر", "بندان لم يُسعَّرا",
-        "بنود لم تُسعَّر", "بندًا لم يُسعَّر"), "owed") : "") + "</p>";
-    if (unpriced) {
-      body += '<p class="hx-note">إجمالي قيمة الفرص غير معروف حتى يكتمل التسعير.</p>';
+/* Rows keyed by month index for the fiscal year on screen: what was opened, and what was closed.
+   stage_at is when a line ENTERED its current stage, so for a line that is now won or lost it is
+   the close; for an open line it is not a close and is not counted as one. */
+function hdsMonthly(year) {
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : [];
+  var opened = [], closed = [], won = [], i;
+  for (i = 0; i < 12; i++) { opened.push(0); closed.push(0); won.push(0); }
+  rows.forEach(function (l) {
+    var c = Number(l.created_at) || 0;
+    if (c) { var d = new Date(c); if (d.getFullYear() === year) opened[d.getMonth()]++; }
+    var isClosed = typeof opIsOpen === "function" ? !opIsOpen(l) : false;
+    if (isClosed && l.stage_at) {
+      var e = new Date(Number(l.stage_at));
+      if (e.getFullYear() === year) {
+        closed[e.getMonth()]++;
+        if (typeof opIsWon === "function" && opIsWon(l)) won[e.getMonth()] += opValue(l);
+      }
     }
-    /* THE ONE DISCOUNT FIGURE. offListRollup (sales-domain) is what the reports page calls too, so
-       the two screens cannot disagree. It weighs money, not lines, and it speaks only for the lines
-       that carry a published reference — most do not, and the count says so rather than the ratio
-       quietly standing for the whole book. */
-    var off = offListRollup(lines);
-    body += '<div class="hx-cov"><span>الخصم عن السعر المعلن</span>' +
-      (off.pct === null
-        ? hdsNil("لا باقة مرتبطة بأي بند", "none")
-        : '<span class="m-n">' + fmtN(Math.round(off.pct)) + "٪</span> على " +
-          hdsN(off.withReference) + " من " + hdsN(off.lines)) + "</div>";
-  }
-
-  var secs = (typeof pcSectors !== "undefined" && pcSectors && pcSectors.sectors)
-    ? pcSectors.sectors : [];
-  if (secs.length) {
-    body += '<dl class="hx-sectors">' + secs.map(function (sc) {
-      return "<div><dt>" + esc(sc.sector) +
-        (sc.target > 0 ? '<span role="img" aria-label="قطاع ذو مستهدف مسجّل">' +
-          hdsIcon("target") + "</span>" : "") + "</dt><dd>" +
-        (sc.openCount
-          ? esc(hdsPl(sc.openCount, "بند واحد", "بندان", "بنود", "بندًا"))
-          : hdsNil("لا بنود مفتوحة", "none")) + "</dd></div>";
-    }).join("") + "</dl>";
-  }
-
-  return hdsCard("wallet", "قيمة الفرص وقطاعاتها", "بنود مفتوحة", body,
-    "القيمة المسعّرة، لا الإيراد.", "#opps", "كل الفرص");
+  });
+  return { opened: opened, closed: closed, won: won };
 }
 
-/* ---------- 6. can the people and the material carry it ----------
-   Two facts about readiness rather than performance: whether every account has someone
-   responsible for it, and whether the assistant has the material to answer for the products.
-   An account with no owner is UNSET — nobody made the assignment — not a number owed. */
+/* How many of a set arrived in the last 30 days. Real, because created_at is real — and stated as
+   a count over a named window rather than as a percentage against a month nobody recorded. */
+function hdsLast30(list, key) {
+  var since = Date.now() - 30 * 86400000, n = 0;
+  (list || []).forEach(function (x) { if (Number(x[key]) >= since) n++; });
+  return n;
+}
+
+/* A sparkline over a real series. An all-zero series draws its baseline and says so — the shape of
+   «nothing happened in any month», which is what the records hold. */
+function hdsSpark(series, cls) {
+  var max = Math.max.apply(null, series.concat([0]));
+  var n = series.length, step = n > 1 ? 100 / (n - 1) : 100;
+  var pts = series.map(function (v, i) {
+    var y = max > 0 ? 26 - (v / max) * 22 : 26;
+    return (i * step).toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  return '<svg class="hx-spark ' + (cls || "") + '" viewBox="0 0 100 28" preserveAspectRatio="none"' +
+    ' aria-hidden="true" focusable="false"><polyline points="' + pts + '"/></svg>';
+}
+/* Small bars, one per period, used where the series is a set of discrete periods rather than a
+   trend — four quarters, twelve months. A period with nothing recorded is hatched, never zero-high:
+   a bar of no height and a bar nobody filled in look identical otherwise. */
+function hdsMiniBars(vals, filled) {
+  var max = Math.max.apply(null, vals.concat([0]));
+  return '<span class="hx-mini" aria-hidden="true">' + vals.map(function (v, i) {
+    /* «on» means RECORDED, not non-zero. A recorded zero is a short bar; an unrecorded period is a
+       full hatched one. Drawing a recorded zero at full height made «0 حسابات لها مسؤول» look like
+       every account had one — measured on the live page. */
+    var on = filled ? filled(i, v) : v > 0;
+    var h = on ? (max > 0 && v > 0 ? Math.max(12, Math.round((v / max) * 100)) : 6) : 100;
+    return '<i class="' + (on ? "is-on" : "is-off") + '" style="--hx-h:' + h + '%"></i>';
+  }).join("") + "</span>";
+}
+
+/* The account book, and how much of it has someone responsible for it. An account with no owner is
+   a classification nobody made — «unset», never a number owed. */
 function hdsAccounts() {
   var rows = (typeof acRows !== "undefined" && acRows) ? acRows : null;
   if (!rows) return { loaded: false, total: 0, noOwner: 0, approved: 0 };
@@ -591,63 +247,240 @@ function hdsAccounts() {
     noOwner: book.filter(function (a) { return !a.ownerId; }).length
   };
 }
-function hdsReadyCard() {
-  var a = hdsAccounts();
+
+/* ---------- row one: the four figures ---------- */
+function hdsKpi(o) {
+  return '<section class="hx-kpi">' +
+    '<div class="hx-kpi__h"><span class="hx-kpi__i ' + (o.tone || "") + '">' + hdsIcon(o.icon) + "</span>" +
+      '<span class="hx-kpi__k">' + o.label + "</span></div>" +
+    '<div class="hx-kpi__b"><div><p class="hx-kpi__v">' + o.value + "</p>" +
+      '<p class="hx-kpi__d ' + (o.deltaTone || "") + '">' + o.delta + "</p></div>" +
+      '<div class="hx-kpi__c">' + (o.chart || "") + "</div></div></section>";
+}
+function hdsKpiRow(f, lines) {
+  var year = f.year;
+  var m = hdsMonthly(year);
+  var ac = hdsAccounts();
+  var acRowsAll = (typeof acRows !== "undefined" && acRows) ? acRows : [];
+  var newAc = hdsLast30(acRowsAll, "createdAt");
+  var rowsAll = (typeof oppRows !== "undefined" && oppRows) ? oppRows : [];
+  var newLines = hdsLast30(rowsAll, "created_at");
+
+  /* The quarters of the year, with the recorded ones filled — the same four the targets card draws,
+     read from the same rows. */
+  var qs = [1, 2, 3, 4].map(function (q) {
+    var t = null;
+    f.rows.forEach(function (p) {
+      (p.quarters || []).forEach(function (x) {
+        if (Number(x.quarter) === q && x.target !== null && x.target !== undefined) t = (t || 0) + Number(x.target);
+      });
+    });
+    return t;
+  });
+
+  var h = '<div class="hx-kpis">';
+  h += hdsKpi({
+    icon: "wallet", tone: "is-ok", label: "الإيراد المحقق",
+    value: '<span class="m-n">' + fmtN(f.achieved) + ' <small>ر.س</small></span>',
+    delta: f.achieved ? ("من الصفقات الرابحة في " + hdsYearTxt(year)) : "لا صفقة مغلقة ربحًا في " + hdsYearTxt(year),
+    chart: hdsSpark(m.won, "is-flat")
+  });
+  h += hdsKpi({
+    icon: "people", tone: "is-ac", label: "الحسابات",
+    value: ac.loaded ? dsFig("acN", ac.total) : hdsNil("جارٍ القراءة", "unset"),
+    delta: ac.loaded
+      ? (newAc ? "+" + fmtN(newAc) + " في آخر 30 يومًا" : "بلا إضافات في آخر 30 يومًا")
+      : "",
+    deltaTone: newAc ? "is-up" : "",
+    chart: ac.loaded && ac.total
+      ? hdsMiniBars([ac.total - ac.noOwner, ac.noOwner], function (i) { return i === 0; })
+      : ""
+  });
+  h += hdsKpi({
+    icon: "stages", tone: "is-ac", label: "البنود المفتوحة",
+    value: dsFig("nLines", lines.length),
+    delta: newLines ? "+" + fmtN(newLines) + " في آخر 30 يومًا" : "بلا بنود جديدة في آخر 30 يومًا",
+    deltaTone: newLines ? "is-up" : "",
+    chart: hdsMiniBars(m.opened, function (i, v) { return v > 0; })
+  });
+  h += hdsKpi({
+    icon: "target", tone: "is-warn", label: "المستهدف المسجّل",
+    value: f.withTarget
+      ? '<span class="m-n">' + fmtN(f.recorded) + ' <small>ر.س</small></span>'
+      : hdsNil("لا مستهدف مسجّل", "owed"),
+    delta: f.withTarget
+      ? (hdsPl(qs.filter(function (t) { return t !== null; }).length, "ربع واحد", "ربعان", "أرباع", "ربعًا") + " من أربعة")
+      : "يُحدَّد من «المستهدفات والأداء»",
+    chart: hdsMiniBars(qs.map(function (t) { return t || 0; }), function (i) { return qs[i] !== null; })
+  });
+  return h + "</div>";
+}
+
+/* ---------- row two, left: the wide chart ---------- */
+function hdsFlowCard(f) {
+  var m = hdsMonthly(f.year);
+  var max = Math.max.apply(null, m.opened.concat(m.closed).concat([1]));
+  var any = m.opened.concat(m.closed).some(function (v) { return v > 0; });
+  var body = "";
+  if (!any) {
+    body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا حركة مسجّلة في " + hdsYearTxt(f.year), "none") + "</div>" +
+      '<div class="m-empty__d">تظهر هنا البنود فور فتحها أو إغلاقها.</div></div>';
+  } else {
+    body = '<div class="hx-flow" role="img" aria-label="' +
+      esc("البنود المفتوحة والمغلقة شهريًا في " + f.year) + '">' +
+      '<div class="hx-flow__g" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
+      '<div class="hx-flow__c" aria-hidden="true">' +
+      m.opened.map(function (v, i) {
+        var c = m.closed[i];
+        return '<div class="hx-flow__m">' +
+          '<span class="hx-flow__pair">' +
+            '<i class="is-open" style="--hx-h:' + Math.round((v / max) * 100) + '%"' +
+              (v ? ' data-v="' + fmtN(v) + '"' : "") + "></i>" +
+            '<i class="is-closed" style="--hx-h:' + Math.round((c / max) * 100) + '%"' +
+              (c ? ' data-v="' + fmtN(c) + '"' : "") + "></i>" +
+          "</span>" +
+          '<span class="hx-flow__x">' + HX_MONTHS[i] + "</span></div>";
+      }).join("") + "</div></div>";
+    body += '<p class="hx-legend2">' +
+      '<span><i class="is-open"></i>بنود فُتحت</span>' +
+      '<span><i class="is-closed"></i>بنود أُغلقت</span>' +
+      '<span class="m-meta">من تاريخ الإنشاء وتاريخ دخول المرحلة الحالية</span></p>';
+  }
+  return '<section class="hx-card hx-card--wide">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">حركة البنود</h3>' +
+      '<p class="m-meta">ما فُتح وما أُغلق شهرًا بشهر في ' + hdsYearTxt(f.year) + "</p></div>" +
+      '<a class="hx-link" href="#opps">كل الفرص <span aria-hidden="true">&#8592;</span></a></div>' +
+    body + "</section>";
+}
+
+/* ---------- row two, right: the pipeline ---------- */
+function hdsPipelineCard(lines) {
+  var stages = (typeof opOpenStages === "function") ? opOpenStages() : [];
+  var total = lines.length || 1;
+  var rows = stages.map(function (s) {
+    var mine = lines.filter(function (l) { return l.stage === s.key; });
+    var val = 0; mine.forEach(function (l) { val += l.value; });
+    return { s: s, n: mine.length, val: val, pct: Math.round((mine.length / total) * 100) };
+  });
+  var body = lines.length
+    ? '<ol class="hx-pipe">' + rows.map(function (r) {
+        return '<li class="hx-pipe__r' + (r.n ? "" : " is-empty") + '">' +
+          '<span class="hx-pipe__d" aria-hidden="true"></span>' +
+          '<span class="hx-pipe__t">' + esc(r.s.label) + "</span>" +
+          '<span class="hx-pipe__s">' + hdsPl(r.n, "بند واحد", "بندان", "بنود", "بندًا") +
+            (r.val ? " · " + hdsMoney(r.val) : "") + "</span>" +
+          '<span class="hx-pipe__b" aria-hidden="true"><i style="--hx-w:' + r.pct + '%"></i></span>' +
+          '<span class="hx-pipe__p"><span class="m-n">' + fmtN(r.pct) + "٪</span></span></li>";
+      }).join("") + "</ol>"
+    : '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا بنود مفتوحة", "none") + "</div></div>";
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">خط البيع</h3>' +
+      '<p class="m-meta">البنود المفتوحة على السلّم، وحصة كل مرحلة</p></div>' +
+      '<a class="hx-link" href="#board">اللوحة <span aria-hidden="true">&#8592;</span></a></div>' +
+    body + "</section>";
+}
+
+/* ---------- row three, left: the ledger ---------- */
+var HX_EV = { sent: ["أُرسلت", "is-muted"], delivered: ["وصلت", "is-muted"], read: ["شوهدت", "is-ac"],
+              customer: ["ردّ العميل", "is-ok"], agent: ["ردّ المساعد", "is-muted"], failed: ["أخفقت", "is-bad"] };
+function hdsEventsCard() {
+  var cs = (typeof cache !== "undefined" && cache && cache.contacts) ? cache.contacts : null;
+  var out = [];
+  (cs || []).forEach(function (c) {
+    if (c.test) return;
+    (c.transcript || []).forEach(function (t) {
+      if (t.ts) out.push({ ts: t.ts, kind: t.role, who: c.waName || c.phone || "", text: t.text || "" });
+    });
+    var st = c.statusTimes || {};
+    ["sent", "delivered", "read", "failed"].forEach(function (k) {
+      if (st[k]) out.push({ ts: st[k], kind: k, who: c.waName || c.phone || "", text: "" });
+    });
+  });
+  out.sort(function (a, b) { return b.ts - a.ts; });
   var body;
-  if (!a.loaded) {
-    body = hdsFig(hdsNil("جارٍ القراءة", "unset"), "الحسابات", "");
-  } else {
-    body = hdsFig(dsFig("acN", a.total), hdsNoun(a.total, "حساب", "حسابان", "حسابات", "حسابًا"),
-      a.approved === a.total ? "جميعها معتمدة."
-        : (hdsN(a.approved) + " معتمد، والباقي بانتظار الاعتماد."));
-    if (a.total) {
-      body += '<div class="hx-dots" style="--hx-c:' + Math.min(a.total, 24) + '" role="img" ' +
-        'aria-label="' + esc(a.noOwner
-          ? (hdsPl(a.noOwner, "حساب واحد", "حسابان", "حسابات", "حسابًا") + " بلا مسؤول من " + a.total)
-          : "لكل حساب مسؤول") + '">' +
-        (function () {
-          var out = "", withOwner = a.total - a.noOwner, i;
-          for (i = 0; i < Math.min(a.total, 24); i++) {
-            out += '<i class="' + (i < withOwner ? "is-on" : "") + '"></i>';
-          }
-          return out;
-        })() + "</div>";
-      body += '<p class="hx-note">' + (a.noOwner === a.total
-        ? hdsNil("لم يُسنَد مسؤول لأي حساب", "unset")
-        : (a.noOwner
-            ? (dsFig("acNoOwner", a.noOwner) + " بلا مسؤول؛ كل خانة حساب.")
-            : "لكل حساب مسؤول.")) + "</p>";
-    }
+  if (!cs) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("جارٍ القراءة", "unset") + "</div></div>";
+  else if (!out.length) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا أحداث مسجّلة", "none") + "</div></div>";
+  else {
+    body = '<table class="hx-tbl"><thead><tr><th>الحدث</th><th>الجهة</th><th>الوقت</th></tr></thead><tbody>' +
+      out.slice(0, 5).map(function (e) {
+        var k = HX_EV[e.kind] || [e.kind, "is-muted"];
+        return "<tr><td><span class='hx-tag " + k[1] + "'>" + esc(k[0]) + "</span></td>" +
+          "<td class='hx-tbl__w'>" + esc(clip(e.who, 22)) + "</td>" +
+          "<td class='hx-tbl__t'>" + esc(fmtD(e.ts)) + "</td></tr>";
+      }).join("") + "</tbody></table>";
   }
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">آخر الأحداث</h3>' +
+      '<p class="m-meta">من سجل الرسائل — لا تقديرات</p></div>' +
+      '<a class="hx-link" href="#pipeline">السجل <span aria-hidden="true">&#8592;</span></a></div>' +
+    body + "</section>";
+}
 
-  /* The knowledge figure is khAvg() — the mean over products that HAVE a score — and khReadyN()
-     the count that clear the readiness line. Neither is derived from the other, and a product
-     nobody has written for is excluded from the mean rather than entered as a zero. */
-  var avg = (typeof khAvg === "function") ? khAvg() : null;
-  var readyN = (typeof khReadyN === "function") ? khReadyN() : null;
-  var prodN = (typeof pcCat !== "undefined" && pcCat) ? pcCat.length : 0;
-  body += '<div class="hx-know">';
-  if (avg === null) {
-    body += '<div><h3>جاهزية المعرفة</h3><p>' + hdsNil("لم تُقَس", "unset") + "</p></div>";
+/* ---------- row three, middle: the goal ---------- */
+function hdsGoalCard(f) {
+  var body;
+  if (!f.withTarget) {
+    body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا مستهدف مسجّل", "owed") + "</div>" +
+      '<div class="m-empty__d">يُحدَّد المستهدف من «المستهدفات والأداء».</div></div>';
   } else {
-    body += '<div class="hx-ring" role="img" aria-label="' +
-      esc("متوسط جاهزية المعرفة " + avg + " من 100") + '">' +
-      '<svg viewBox="0 0 80 80" aria-hidden="true">' +
-      '<circle class="hx-ring__t" cx="40" cy="40" r="34"/>' +
-      '<circle class="hx-ring__v" cx="40" cy="40" r="34" pathLength="100" style="--hx-v:' +
-        avg + '"/></svg>' +
-      '<div class="hx-ring__l" aria-hidden="true"><span class="m-n">' + fmtN(avg) +
-        '</span><small>من <span class="m-n">100</span></small></div></div>';
-    body += "<div><h3>جاهزية المعرفة</h3><p>" +
-      (readyN !== null && prodN
-        ? (hdsN(readyN) + " من " + hdsN(prodN) + " منتجات جاهزة للمساعد.")
-        : "متوسط المنتجات المقيسة.") + "</p>" +
-      "<p>المتوسط لا يشمل منتجًا لم يُكتب له محتوى.</p></div>";
+    var tAch = 0;
+    f.rows.forEach(function (p) {
+      (p.quarters || []).forEach(function (q) {
+        if (q.target !== null && q.target !== undefined) tAch += Number(q.achieved) || 0;
+      });
+    });
+    var pct = f.recorded > 0 ? Math.round((tAch / f.recorded) * 100) : 0;
+    body = '<div class="hx-goal">' +
+      '<p class="hx-goal__v">' + hdsMoney(tAch) + ' <span class="hx-goal__of">من ' + hdsMoney(f.recorded) + "</span></p>" +
+      '<div class="hx-goal__b" role="img" aria-label="' + esc("المحقق على المستهدف " + pct + " بالمئة") + '">' +
+        '<i style="--hx-w:' + Math.min(100, pct) + '%"></i>' +
+        '<b class="m-n">' + fmtN(pct) + "٪</b></div>" +
+      '<p class="m-meta">' + (f.onlyProduct ? esc(f.onlyProduct) + " · " : "") +
+        (f.onlyScope ? esc(f.onlyScope) : "على المنتجات ذات المستهدف") + "</p>" +
+      '<p class="hx-goal__n">' + (tAch ? "المتبقي " + hdsMoney(Math.max(0, f.recorded - tAch))
+        : "لم يُسجَّل أي إغلاق ربح على هذا المستهدف بعد.") + "</p></div>";
   }
-  body += "</div>";
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">المستهدف</h3>' +
+      '<p class="m-meta">ما تحقق منه حتى الآن</p></div>' +
+      '<a class="hx-link" href="#perf">المستهدفات <span aria-hidden="true">&#8592;</span></a></div>' +
+    body + "</section>";
+}
 
-  return hdsCard("people", "جاهزية التنفيذ", "الحسابات والمعرفة", body,
-    "من يتابع، وبأي محتوى.", "#accounts", "العملاء");
+/* ---------- row three, right: the donut ---------- */
+function hdsDonutCard(lines) {
+  var stages = (typeof opOpenStages === "function") ? opOpenStages() : [];
+  var parts = stages.map(function (s) {
+    return { label: s.label, n: lines.filter(function (l) { return l.stage === s.key; }).length };
+  }).filter(function (x) { return x.n > 0; });
+  var total = parts.reduce(function (n, x) { return n + x.n; }, 0);
+  var body;
+  if (!total) {
+    body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا بنود مفتوحة", "none") + "</div></div>";
+  } else {
+    var off = 0;
+    var ring = parts.map(function (x, i) {
+      var pct = (x.n / total) * 100;
+      var seg = '<circle class="hx-donut__s t' + (i % 4) + '" cx="21" cy="21" r="15.9" pathLength="100"' +
+        ' stroke-dasharray="' + pct.toFixed(2) + " " + (100 - pct).toFixed(2) + '"' +
+        ' stroke-dashoffset="' + (-off).toFixed(2) + '"></circle>';
+      off += pct;
+      return seg;
+    }).join("");
+    body = '<div class="hx-donut">' +
+      '<div class="hx-donut__r" role="img" aria-label="' +
+        esc("توزيع البنود المفتوحة: " + parts.map(function (x) { return x.label + " " + x.n; }).join("، ")) + '">' +
+        '<svg viewBox="0 0 42 42"><circle class="hx-donut__t" cx="21" cy="21" r="15.9" pathLength="100"></circle>' + ring + "</svg>" +
+        '<span class="hx-donut__c"><b class="m-n">' + fmtN(total) + "</b><small>بنود</small></span></div>" +
+      '<ul class="hx-donut__l">' + parts.map(function (x, i) {
+        return '<li><i class="t' + (i % 4) + '"></i><span>' + esc(x.label) + "</span>" +
+          '<b class="m-n">' + fmtN(Math.round((x.n / total) * 100)) + "٪</b></li>";
+      }).join("") + "</ul></div>";
+  }
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><div><h3 class="hx-card__t">توزيع البنود المفتوحة</h3>' +
+      '<p class="m-meta">حصة كل مرحلة من البنود</p></div></div>' +
+    body + "</section>";
 }
 
 /* ---------- the surface ---------- */
@@ -658,9 +491,6 @@ function vHomeDs() {
   if (typeof pcLoad === "function") pcLoad(false);
   if (typeof opLoad === "function") opLoad(false);
   if (typeof pcPerfLoad === "function") pcPerfLoad(hdsYear(), false);
-  /* These three were missing and each one silently emptied a card: the stage ladder fell back to
-     the compiled rungs (so an admin rename never showed), accounts read as none at all, and the
-     campaign funnel had no attributed opportunity count. */
   if (typeof cfLoad === "function") cfLoad(false);
   if (typeof acLoad === "function") acLoad(false);
 
@@ -668,23 +498,14 @@ function vHomeDs() {
   var f = hdsFacts();
   var linesReady = (typeof oppRows !== "undefined" && oppRows);
   if (!f.loaded || !linesReady) {
-    return '<div class="ds6"><section class="hx-hero"><div class="hx-hero__c">' +
-      '<p class="hx-sub" aria-busy="true">جارٍ قراءة الأداء…</p></div></section></div>';
+    return '<div class="ds6"><section class="hx-card">' +
+      '<p class="m-meta" aria-busy="true">جارٍ قراءة الأداء…</p></section></div>';
   }
   var lines = hdsLines();
-
-  return '<div class="ds6">' +
-    hdsHero(f, lines) +
-    '<div class="hx-glabel"><h2>ما وراء الرقم</h2>' +
-      '<p>من السجلات المتاحة <span aria-hidden="true">&#183;</span> بلا توقعات</p></div>' +
-    '<div class="hx-grid">' +
-      hdsStageCard(lines) +
-      hdsAgeCard(lines) +
-      hdsCampaign() +
-      hdsTargetCard(f) +
-      hdsValueCard(f, lines) +
-      hdsReadyCard() +
-    "</div>" +
+  return '<div class="ds6 hx-home">' +
+    hdsKpiRow(f, lines) +
+    '<div class="hx-r2">' + hdsFlowCard(f) + hdsPipelineCard(lines) + "</div>" +
+    '<div class="hx-r3">' + hdsEventsCard() + hdsGoalCard(f) + hdsDonutCard(lines) + "</div>" +
     '<p class="hx-foot">المسجّل يظهر بقيمته. ما ينقص التسجيل يبقى ظاهرًا، وما يساوي صفرًا يبقى صفرًا.</p>' +
     "</div>";
 }
