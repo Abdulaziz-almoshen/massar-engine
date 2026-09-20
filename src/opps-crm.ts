@@ -719,6 +719,9 @@ var opMode = "cards";        /* cards | list | kanban — cards is the landing v
 var opSort = "value";        /* value | recent | stage | account */
 var opSel = {};              /* selected LINE ids, keyed by id */
 var opQ = "", opStat = "all", opSrc = "all", opStg = "all";
+/* The account rollup's own filter. It narrows GROUPS, not lines, so it applies to the card view
+   alone - the list and the kanban are not grouped and have nothing to narrow. */
+var opGStat = "all";
 var opOwn = "all";           /* all | __none | <owner name> */
 /* Exact product, set by links from a product record so the list reproduces that record's count. */
 var opProd = "";
@@ -972,7 +975,7 @@ function opLines() {
     return opShortMatch(l);
   });
 }
-function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort || opProd || !!opIds; }
+function opFiltered() { return opQ.trim() || opSrc !== "all" || opOwn !== "all" || opStg !== "all" || opShort || opProd || !!opIds || (opMode === "cards" && opGStat !== "all"); }
 function opSorted() {
   var rows = opLines().slice();
   var pos = {}; OPP_ST.forEach(function (st, i) { pos[st.key] = i; });
@@ -1134,6 +1137,13 @@ function opToolbar() {
   h += opSelect("oxf_src", "المصدر", opSrc,
     [["all", "كل المصادر"]].concat(Object.keys(OPP_SRC).filter(function (k) { return k !== "other"; }).map(function (k) { return [k, OPP_SRC[k]]; })),
     opSrc !== "all", "opSetSrc");
+  /* Only where it can act: the rollup exists on the card view and nowhere else. A control that
+     silently does nothing on two of three views is worse than no control. */
+  if (opMode === "cards") {
+    h += opSelect("oxf_gst", "حالة الفرصة", opGStat,
+      [["all", "كل الحالات"]].concat(OP_GROUP_STATUS.map(function (x) { return [x.key, x.label]; })),
+      opGStat !== "all", "opSetGStat");
+  }
   h += opSelect("oxf_own", "المسؤول", opOwn,
     [["all", "كل المسؤولين"], ["__none", "بلا مسؤول"]].concat(opOwners().map(function (o) { return [o, o]; })), opOwn !== "all", "opSetOwn");
   {
@@ -1264,6 +1274,12 @@ function opAccountGroups(rows) {
     g.value = opSumLive(g.lines);
     g.stalled = g.open.some(opStalled);
     g.priced = g.open.some(opPriced) || g.won.some(opPriced);
+    /* THE ROLLUP THE HEAD CAN SAY. groupStatusKey has been exported, unit-tested and injected into
+       this page since the board was built, and no UI ever called it - so the card could say
+       «قائمة» and nothing else, and «مكتملة جزئياً» (won some, lost the rest) had no way to be
+       printed at all. The head must never claim a deal is won while a line beneath it is open,
+       which is exactly the precedence that function owns. */
+    g.status = (typeof groupStatusKey === "function") ? groupStatusKey(g.lines) : (g.open.length ? "open" : "won");
   });
   /* Live money first: the card grid is read top-left to bottom-right, and the accounts worth the most
      open money are the ones a sales lead is looking for. Accounts with no open line sink. */
@@ -1275,12 +1291,31 @@ function opAccountGroups(rows) {
   return order;
 }
 
+/* One identity per rollup state. «مكتملة جزئياً» is the one that had nowhere to be said: an account
+   whose deal was partly won and partly lost reads as neither a win nor a loss, and calling it
+   either is a lie about a closed deal. */
+var OP_GROUP_STATUS = [
+  { key: "open", label: "قائمة", chip: "m-chip--ac" },
+  { key: "partial", label: "مكتملة جزئياً", chip: "m-chip--warn" },
+  { key: "won", label: "ربح", chip: "m-chip--ok" },
+  { key: "lost", label: "خسارة", chip: "m-chip--bad" }
+];
+function opGroupStatus(k) {
+  for (var i = 0; i < OP_GROUP_STATUS.length; i++) if (OP_GROUP_STATUS[i].key === k) return OP_GROUP_STATUS[i];
+  return OP_GROUP_STATUS[0];
+}
+function opGroupChip(k) {
+  var s = opGroupStatus(k);
+  return '<span class="m-chip ' + s.chip + '">' + esc(s.label) + "</span>";
+}
+
 function opCardsView() {
   /* «بانتظار الدعم» is read from the escalations table, the same source الرئيسية uses — so the two
      screens cannot disagree about which deals are blocked. */
   if (typeof hmEscLoad === "function") hmEscLoad(false);
   var esc2 = typeof hmOpenEscIds === "function" ? hmOpenEscIds() : {};
   var groups = opAccountGroups(opLines());
+  if (opGStat !== "all") groups = groups.filter(function (g) { return g.status === opGStat; });
   var page = pageSlice("opps", groups);
   if (!page.length) return opEmpty();
   var h = '<div class="ox-cards">';
@@ -1296,7 +1331,7 @@ function opCardsView() {
       "<span>قيمة قائمة</span></span></div>";
     /* the health of THIS account, said once */
     h += '<div class="ox-cb">' +
-      (g.open.length ? '<span class="m-chip m-chip--ac">قائمة</span>' : "") +
+      opGroupChip(g.status) +
       (g.stalled ? '<span class="m-chip m-chip--warn">متوقّف</span>' : "") +
       (openEsc ? '<span class="m-chip m-chip--ac">دعم</span>' : "") +
       '<span class="split">' + ["قائمة " + opN(g.open.length), g.won.length ? "ربح " + opN(g.won.length) : "", g.lost.length ? "خسارة " + opN(g.lost.length) : ""]
@@ -2072,7 +2107,8 @@ window.opSetSrc = function (v) { opSrc = v; opResetScope(); opRender(); };
 window.opSetOwn = function (v) { opOwn = v; opResetScope(); opRender(); };
 window.opSetShort = function (v) { opShort = opShort === v ? "" : v; opResetScope(); opRender(); };
 window.opSetStat = function (v) { opStat = v; opRender(); };
-window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opProd = ""; opIds = null; opIdsLabel = ""; opResetScope(); opRender(); };
+window.opClearFilters = function () { opQ = ""; opSrc = "all"; opOwn = "all"; opStg = "all"; opShort = ""; opProd = ""; opGStat = "all"; opIds = null; opIdsLabel = ""; opResetScope(); opRender(); };
+window.opSetGStat = function (v) { opGStat = v; if (typeof PAGE !== "undefined") PAGE.opps = 1; opRender(); };
 /* The report's drill: ids it counted, and the words it counted them with. */
 window.opClearIds = function () { opIds = null; opIdsLabel = ""; opResetScope(); opRender(); };
 window.opSetIds = function (ids, label) {
