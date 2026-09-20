@@ -1816,6 +1816,34 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-pipe__d.t3, .ds6 .hx-pipe__b i.t3{ background: var(--m-warn); }
 .ds6 .hx-pipe__d.t4, .ds6 .hx-pipe__b i.t4{ background: var(--m-line-2); }
 .ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
+/* ---- the health band ----
+   Four states on the same twelve-column rail as the indicators above: each tile is three columns,
+   so a tile edge lands on an indicator edge. A tile is a button because each state opens exactly
+   the deals it counted — that is the whole point of a classification that does not overlap. */.ds6 .hx-r15 > *{ grid-column: span 12; }
+.ds6 .hx-health__d{ margin: 0 0 var(--m-3); font-size: var(--m-t-cap); color: var(--m-mut); }
+.ds6 .hx-hls{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-3); }
+.ds6 .hx-hl{ display: grid; gap: var(--m-1); text-align: start; cursor: pointer;
+  padding-block: var(--m-3); padding-inline: var(--m-3);
+  background: var(--m-paper); border: 1px solid var(--m-line); border-radius: var(--m-r-ctl);
+  transition: border-color 180ms var(--m-ease), transform 100ms var(--m-ease); }
+.ds6 .hx-hl:active{ transform: scale(.97); }
+@media (hover: hover) and (pointer: fine){.ds6 .hx-hl:hover{ border-color: var(--m-line-2); }}
+.ds6 .hx-hl__h{ display: flex; align-items: center; gap: var(--m-2); }
+.ds6 .hx-hl__i{ flex: none; display: grid; place-items: center; inline-size: 26px; block-size: 26px;
+  border-radius: 8px; background: var(--m-sunk); color: var(--m-mut); }
+.ds6 .hx-hl__i svg{ inline-size: 15px; block-size: 15px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ds6 .hx-hl.is-ok .hx-hl__i{ background: var(--m-ok-dim); color: var(--m-ok); }
+.ds6 .hx-hl.is-warn .hx-hl__i{ background: var(--m-warn-dim); color: var(--m-warn); }
+.ds6 .hx-hl.is-ac .hx-hl__i{ background: var(--m-ac-dim); color: var(--m-ac); }
+.ds6 .hx-hl.is-bad .hx-hl__i{ background: var(--m-bad-dim); color: var(--m-bad); }
+.ds6 .hx-hl__k{ font-size: var(--m-t-cap); color: var(--m-ink-2); min-inline-size: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hx-hl__v{ font-size: var(--m-t-h); font-weight: 800; color: var(--m-ink); line-height: 1.1; }
+.ds6 .hx-hl__m{ font-size: var(--m-t-cap); color: var(--m-ink-2); }
+.ds6 .hx-hl__d{ font-size: var(--m-t-micro); color: var(--m-mut); }
+@media (max-width: 980px){.ds6 .hx-hls{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+@media (max-width: 560px){.ds6 .hx-hls{ grid-template-columns: minmax(0, 1fr); }}
 /* ---- row three ---- */.ds6 .hx-tblw{ overflow-x: auto; }
 /* FIXED COLUMNS. With auto layout each cell took the width of its own text, so «Deema» and «واتساب»
    ran together and the status pill drifted away from the header naming it. Each column now has a

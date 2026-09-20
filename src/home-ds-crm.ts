@@ -142,7 +142,10 @@ var HDS_ICONS = {
   campaign: '<path d="m4 9 13-5v16L4 15Zm0 0v6H2V9m6 8 1 4h4l-2-5m9-7 2-1m-2 8 2 1"/>',
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
   wallet: '<path d="M20 8H5a2 2 0 0 1 0-4h13v4M4 8v12h16V8m0 5h-5v3h5"/>',
-  people: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 4v2"/>'
+  people: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 4v2"/>',
+  check: '<path d="m5 13 4 4L19 7"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  lift: '<path d="M12 19V5m-6 6 6-6 6 6"/>'
 };
 function hdsIcon(n) {
   return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + (HDS_ICONS[n] || "") + "</svg>";
@@ -389,6 +392,57 @@ function hdsKpiRow(f, lines) {
     chart: hdsMiniBars(qs.map(function (t) { return t || 0; }), function (i) { return qs[i] !== null; })
   });
   return h + "</div>";
+}
+
+/* ---------- the health of the pipeline ----------
+   THE REFERENCE'S SECOND LAYER, and the rule behind it has been written and unit-tested since
+   Sep 4: home-domain.pipelineHealth places every open line in exactly ONE of four states, in a
+   stated order of precedence, so the four counts reconcile to the open book. What was missing was
+   a caller — vHome built an empty band list, so the screen never asked. This card asks, in the
+   ds6 vocabulary rather than the old band markup, and every state opens the deals it counted. */
+var HDS_HEALTH_TONE = { on_track: "is-ok", late: "is-warn", support: "is-ac", rejected: "is-bad" };
+var HDS_HEALTH_ICON = { on_track: "check", late: "clock", support: "people", rejected: "x" };
+
+function hdsHealthCard() {
+  if (typeof pipelineHealth !== "function" || typeof hmHealth !== "function") return "";
+  if (typeof hmEscLoad === "function") hmEscLoad(false);
+  var h = hmHealth();
+  var open = h.openCount;
+
+  /* The escalations feed «بانتظار الدعم» alone. Until it arrives that state reads zero, which
+     would be a claim we cannot make — so the card says it is still reading rather than printing
+     a four-way split that does not yet add up. */
+  var escReady = (typeof hmEsc !== "undefined" && hmEsc) || (typeof hmEscFailed !== "undefined" && hmEscFailed);
+
+  var tiles = h.buckets.map(function (b) {
+    var tone = HDS_HEALTH_TONE[b.key] || "";
+    var pending = !escReady && (b.key === "support" || b.key === "late" || b.key === "on_track");
+    /* The key travels as an HTML entity rather than an escaped quote: this module is one template
+       literal, and a backslash-quote here is consumed by it before the browser sees it. */
+    return '<button type="button" class="hx-hl ' + tone + '" onclick="hmOpenState(&#39;' + esc(b.key) + '&#39;)">' +
+      '<span class="hx-hl__h"><span class="hx-hl__i">' + hdsIcon(HDS_HEALTH_ICON[b.key]) + "</span>" +
+        '<span class="hx-hl__k">' + esc(b.label) + "</span></span>" +
+      '<span class="hx-hl__v">' + (pending ? hdsNil("جارٍ القراءة", "unset") : dsFig("hl_" + b.key, b.count)) + "</span>" +
+      /* Three different absences, and only one of them is owed: no lines in this state at all is a
+         legitimate nothing, while lines that exist and carry no price is a number someone owes. */
+      '<span class="hx-hl__m">' +
+        (!b.count ? hdsNil("لا بنود", "none")
+          : b.value ? hdsMoney(b.value) : hdsNil("بلا قيمة مسجّلة", "owed")) + "</span>" +
+      '<span class="hx-hl__d">' + esc(b.hint) + "</span></button>";
+  }).join("");
+
+  /* The open VALUE, which the reference prints beside the open count and this screen had nowhere:
+     the indicator row carries the count alone. It is the sum of the three non-lost states, so it
+     is stated here rather than computed a second time somewhere else. */
+  var sub = open
+    ? hdsPl(open, "بند مفتوح", "بندان مفتوحان", "بنود مفتوحة", "بندًا مفتوحًا") + " · " + hdsMoney(h.openValue)
+    : "لا بنود مفتوحة";
+
+  return '<section class="hx-card hx-health">' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">صحة خط البيع</h3>' +
+      '<span class="hx-card__n">' + sub + "</span></div>" +
+    '<p class="hx-health__d">كل بند في حالة واحدة فقط — اضغط الحالة لترى بنودها.</p>' +
+    '<div class="hx-hls">' + tiles + "</div></section>";
 }
 
 /* ---------- row two, left: the chart ----------
@@ -723,6 +777,7 @@ function vHomeDs() {
   return '<div class="ds6 hx-home">' +
     hdsPageTools() +
     hdsKpiRow(f, lines) +
+    '<div class="hx-r15">' + hdsHealthCard() + "</div>" +
     '<div class="hx-r2">' + hdsFlowCard(f) + hdsPipelineCard(lines) + "</div>" +
     '<div class="hx-r3">' + hdsEventsCard() + hdsGoalCard(f) + hdsDonutCard(lines) + "</div>" +
     "</div>";
