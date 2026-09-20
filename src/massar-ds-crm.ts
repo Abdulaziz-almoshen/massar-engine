@@ -1872,4 +1872,7 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-donut__l b{ color: var(--m-ink); }
 @media (max-width: 1280px){.ds6 .hx-kpis{ grid-template-columns: repeat(2, minmax(0, 1fr)); }.ds6 .hx-r2, .ds6 .hx-r3{ grid-template-columns: minmax(0, 1fr); }}
 @media (max-width: 700px){.ds6 .hx-kpis{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-flow__c{ block-size: 176px; }.ds6 .hx-flow__pair, .ds6 .hx-flow__y{ block-size: 154px; }}
+/* The legend carries the count as well as the share: «17٪» of six lines is one line, and the
+   reader should not have to divide to learn that. */.ds6 .hx-donut__l em{ font-style: normal; font-size: var(--m-t-micro); color: var(--m-mut);
+  white-space: nowrap; }
 `;
