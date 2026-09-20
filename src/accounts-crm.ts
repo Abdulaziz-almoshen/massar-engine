@@ -74,7 +74,7 @@ export const ACCOUNTS_CRM_CSS = `
 export const ACCOUNTS_CRM_JS = `
 /* ================= «العملاء» — accounts ================= */
 var acRows = null, acMembers = [], acLoading = false, acFailed = false, acPending = false;
-var acF = { q: "", tab: "all", product: "", sector: "", city: "", owner: "", importance: "", ind: "" };
+var acF = { q: "", tab: "all", product: "", sector: "", city: "", owner: "", importance: "", size: "", ind: "" };
 function acMayEdit() { return typeof meCan !== "function" || meCan("customers.edit"); }
 var acShown = 100;
 var acBusy = {};        /* account id -> true while an approval is being written */
@@ -173,9 +173,9 @@ function acIndSet() {
 }
 function acFiltered(tabOverride) {
   var set = acIndSet();
-  var f = { q: acF.q, tab: tabOverride || acF.tab, product: acF.product, sector: acF.sector, city: acF.city, owner: acF.owner, importance: acF.importance, inIndicator: set };
+  var f = { q: acF.q, tab: tabOverride || acF.tab, product: acF.product, sector: acF.sector, city: acF.city, owner: acF.owner, importance: acF.importance, size: acF.size, inIndicator: set };
   return (acRows || []).filter(function (a) {
-    return accountMatches({ id: a.id, name: a.name, phone: a.phone, city: a.city, sector: a.sector, importance: a.importance, ownerId: a.ownerId,
+    return accountMatches({ id: a.id, name: a.name, phone: a.phone, city: a.city, sector: a.sector, importance: a.importance, sizeTier: a.sizeTier, ownerId: a.ownerId,
       approval: a.approval, products: acProducts(a), contactText: a.contactText }, f);
   });
 }
@@ -302,7 +302,7 @@ function vAccounts() {
       '<button type="button" class="m-btn" data-ac="tabproposed">اعرضهم</button></div>';
   }
   var prods = {}; acRows.forEach(function (a) { acProducts(a).forEach(function (p) { prods[p] = 1; }); });
-  var anyF = acF.product || acF.sector || acF.city || acF.owner || acF.importance || acF.ind;
+  var anyF = acF.product || acF.sector || acF.city || acF.owner || acF.importance || acF.size || acF.ind;
   h += '<div class="m-tools"><div class="m-head__a">' +
     mSearch({ id: "acq", value: acF.q, placeholder: "بحث بالاسم أو جهة الاتصال…", label: "بحث في العملاء", wide: true, attrs: ' data-acset="q"' }) +
     acSel("product", "المنتج", acF.product, Object.keys(prods).sort().map(function (p) { return [p, p]; })) +
@@ -310,6 +310,7 @@ function vAccounts() {
     acSel("city", "المدينة", acF.city, acDistinct("city").map(function (s) { return [s, s]; })) +
     acSel("owner", "المسؤول", acF.owner, [["none", "بلا مسؤول"]].concat(acMembers.map(function (m) { return [String(m.id), m.name]; }))) +
     acSel("importance", "الأهمية", acF.importance, ACCOUNT_IMPORTANCE.map(function (k) { return [k, ACCOUNT_IMPORTANCE_LABELS[k]]; })) +
+    acSel("size", "الحجم", acF.size, ACCOUNT_SIZES.map(function (k) { return [k, ACCOUNT_SIZE_LABELS[k]]; }).concat([["__none", "بلا حجم مسجّل"]])) +
     (typeof inIndOptions === "function" && (inMembership || []).length ? '<select class="m-select" aria-label="مؤشر الاستخدام" data-acset="ind"><option value="">المؤشر: الكل</option>' + inIndOptions(acF.ind, true) + "</select>" : "") +
     (anyF ? '<button type="button" class="m-btn" data-ac="clearf">مسح التصفية</button>' : "") +
     '</div><span class="m-cap">' + dsFig("acShown", rows.length) + " من " + acN(tabTotal) + "</span></div>";
@@ -373,7 +374,24 @@ function acEnsureRec(id) {
   acRec = { id: id, data: null, failed: false, missing: false };
   acRecLoad(id);
 }
-var AC_FIELD_LABEL = { name: "الاسم", city: "المدينة", sector: "القطاع", importance: "الأهمية", owner: "الموظف المسؤول", contacts: "جهات الاتصال" };
+/* «حجم المنشأة». Three states, and they are different facts:
+     a recorded tier            -> the label, with its basis on hover
+     a raw «الحجم» that did not map -> shown AS the raw text and marked unrecorded, because the
+                                   value is real data someone typed and hiding it loses it
+     nothing at all             -> a classification nobody made (PORT-SPEC §4 «unset») */
+function acSizePill(tier, raw) {
+  if (tier && ACCOUNT_SIZE_LABELS[tier]) {
+    return ' <span class="m-chip m-chip--plain" title="' + esc(ACCOUNT_SIZE_BASIS[tier]) + '">' +
+      esc(ACCOUNT_SIZE_LABELS[tier]) + "</span>";
+  }
+  if (raw && String(raw).trim()) {
+    return ' <span class="m-chip m-chip--plain" title="قيمة مستوردة لم تطابق تصنيف «منشآت» — تحتاج مراجعة">' +
+      esc(String(raw).trim()) + " ⚠</span>";
+  }
+  return " " + acNil("الحجم غير مسجّل", "unset");
+}
+
+var AC_FIELD_LABEL = { name: "الاسم", city: "المدينة", sector: "القطاع", importance: "الأهمية", size: "حجم المنشأة", owner: "الموظف المسؤول", contacts: "جهات الاتصال" };
 var AC_EVENT = { created: "أُضيف العميل", edited: "عُدّلت بياناته", approved: "اعتُمد", rejected: "رُفض", proposed: "أُعيد إلى مقترح" };
 var AC_OUTCOME = { sent: "أُرسلت", opted_out: "لم تُرسل — طلب الإيقاف", outside_window: "لم تُرسل — خارج نافذة 24 ساعة", no_inbound_ever: "لم تُرسل — لم يراسلنا بعد" };
 var AC_TASK = { backlog: "مؤجلة", todo: "للتنفيذ", in_progress: "قيد التنفيذ", done: "منجزة", canceled: "ملغاة" };
@@ -405,7 +423,7 @@ function vAccount(idRaw) {
   var talked = !!d.conversation;
   h += '<section class="m-card m-acc-hd"><span class="m-av m-av--lg" aria-hidden="true">' + acIni(a.name) + "</span>" +
     '<div class="m-acc-hd__m"><div class="m-acc-row"><h1 class="m-h1" id="acrech" tabindex="-1">' + esc(a.name) + "</h1>" +
-      acApprPill(a.approval) + acImpPill(a.importance) + "</div>" +
+      acApprPill(a.approval) + acImpPill(a.importance) + acSizePill(a.sizeTier, a.sizeText) + "</div>" +
     '<p class="m-meta">' + [a.sector ? esc(a.sector) : "", a.city ? esc(a.city) : "", '<bdi class="m-acc-ltr">+' + esc(a.phone) + "</bdi>"].filter(Boolean).join(" · ") + "</p>" +
     '<p class="m-meta">أُضيف بواسطة ' + esc(acBy(a.createdBy)) + " · " + esc(acSource(a)) + " · " + acDate(a.createdAt) + "</p></div>" +
     '<div class="m-acc-row">' + (acMayEdit() ? '<button type="button" class="m-btn" id="acedit" data-ac="edit">تعديل</button>' : "") +
@@ -572,12 +590,12 @@ function acOpenForm(mode, from) {
   if (mode === "edit") {
     var a = acRec && acRec.data && acRec.data.account; if (!a) return;
     acForm = { mode: "edit", id: a.id, updatedAt: a.updatedAt, phone: a.phone, from: from || "",
-      d: { name: a.name, city: a.city || "", sector: a.sector || "", importance: a.importance || "", ownerId: a.ownerId == null ? "" : String(a.ownerId) },
+      d: { name: a.name, city: a.city || "", sector: a.sector || "", importance: a.importance || "", sizeTier: a.sizeTier || "", ownerId: a.ownerId == null ? "" : String(a.ownerId) },
       contacts: a.contacts.length ? a.contacts.map(function (c) { acCtSeq++; return { key: "c" + acCtSeq, id: c.id, name: c.name, role: c.role || "", phone: c.phone || "", email: c.email || "", primary: c.primary }; }) : [acBlankContact(true)],
       members: acRec.data.members || [], ownerName: a.ownerName };
   } else {
     acForm = { mode: "new", id: 0, updatedAt: 0, phone: "", from: from || "",
-      d: { name: "", city: "", sector: "", importance: "medium", ownerId: "" }, contacts: [acBlankContact(true)], members: acMembers };
+      d: { name: "", city: "", sector: "", importance: "medium", sizeTier: "", ownerId: "" }, contacts: [acBlankContact(true)], members: acMembers };
     if (!acRows) acLoad(false);
   }
   acForm.err = ""; acForm.field = ""; acForm.busy = false; acForm.dirty = false; acForm.shown = false; acForm.confirm = false; acForm.focus = "acf_name"; acForm.existingId = 0;
@@ -620,7 +638,14 @@ function acModal() {
     acInp("acf_city", "المدينة", "city", d.city, { req: true, max: ACCOUNT_CITY_MAX, list: "acl_city", ph: "الرياض" }) +
     acInp("acf_sector", "القطاع / الشريحة", "sector", d.sector, { max: ACCOUNT_SECTOR_MAX, list: "acl_sector", ph: "رعاية صحية" }) +
     '<div class="m-field"><label class="m-label" for="acf_importance">درجة الأهمية</label><select class="m-select" id="acf_importance" data-acfld="importance"' + acFld("importance") + '><option value="">— غير محددة —</option>' +
-      ACCOUNT_IMPORTANCE.map(function (k) { return '<option value="' + k + '"' + (d.importance === k ? " selected" : "") + ">" + ACCOUNT_IMPORTANCE_LABELS[k] + "</option>"; }).join("") + "</select>" + acFerr("importance") + "</div>" +
+      ACCOUNT_IMPORTANCE.map(function (k) { return '<option value="' + k + '"' + (d.importance === k ? " selected" : "") + ">" + ACCOUNT_IMPORTANCE_LABELS[k] + "</option>"; }).join("") + "</select>" +
+      '<span class="m-hint">تقديرنا نحن لأهمية العميل — لا حجمه.</span>' + acFerr("importance") + "</div>" +
+    /* «حجم المنشأة» on the Kingdom's own classification (منشآت). Each choice carries the line it
+       sits on, so nobody has to remember where 49 employees stops and 50 begins, and the client
+       can confirm it from their own «شهادة حجم المنشأة». */
+    '<div class="m-field"><label class="m-label" for="acf_size">حجم المنشأة</label><select class="m-select" id="acf_size" data-acfld="sizeTier"' + acFld("sizeTier") + '><option value="">— غير محدد —</option>' +
+      ACCOUNT_SIZES.map(function (k) { return '<option value="' + k + '"' + (d.sizeTier === k ? " selected" : "") + ">" + ACCOUNT_SIZE_LABELS[k] + " — " + ACCOUNT_SIZE_BASIS[k] + "</option>"; }).join("") + "</select>" +
+      '<span class="m-hint">تصنيف «منشآت»: عدد الموظفين والإيرادات معًا، والأعلى بينهما يُغلّب.</span>' + acFerr("sizeTier") + "</div>" +
     '<div class="m-field"><label class="m-label" for="acf_owner">الموظف المسؤول</label><select class="m-select" id="acf_owner" data-acfld="ownerId"' + acFld("ownerId") + '><option value="">— بلا مسؤول —</option>' +
       members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.ownerId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + "</select>" +
       (members.length ? "" : '<span class="m-hint">لا أعضاء نشطون — أضفهم من <a class="m-link" href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div>";
@@ -656,7 +681,7 @@ function acModal() {
   }
   return h + "</div></div></div></div>";
 }
-var AC_FIELD_ID = { name: "acf_name", city: "acf_city", sector: "acf_sector", importance: "acf_importance", ownerId: "acf_owner", phone: "acf_phone", contacts: "acf_contacts" };
+var AC_FIELD_ID = { name: "acf_name", city: "acf_city", sector: "acf_sector", importance: "acf_importance", sizeTier: "acf_size", ownerId: "acf_owner", phone: "acf_phone", contacts: "acf_contacts" };
 function acFieldTarget(field) {
   if (AC_FIELD_ID[field]) return AC_FIELD_ID[field];
   var m = /^contacts\\.(\\d+)\\.(\\w+)$/.exec(field || "");
@@ -665,7 +690,7 @@ function acFieldTarget(field) {
 }
 function acSave() {
   var f = acForm; if (!f || f.busy) return;
-  var payload = { name: f.d.name, city: f.d.city, sector: f.d.sector, importance: f.d.importance, ownerId: f.d.ownerId, phone: f.d.phone,
+  var payload = { name: f.d.name, city: f.d.city, sector: f.d.sector, importance: f.d.importance, sizeTier: f.d.sizeTier, ownerId: f.d.ownerId, phone: f.d.phone,
     contacts: f.contacts.map(function (c) { return { id: c.id || undefined, name: c.name, role: c.role, phone: c.phone, email: c.email, primary: c.primary }; }) };
   var ids = (f.members || []).map(function (m) { return m.id; });
   if (f.mode === "edit" && f.d.ownerId) ids.push(Number(f.d.ownerId));
@@ -743,8 +768,8 @@ document.addEventListener("click", function (ev) {
   if (a === "tab") { acF.tab = t.getAttribute("data-v"); acShown = AC_PAGE; render(false); var b = document.querySelector('[data-ac="tab"][data-v="' + acF.tab + '"]'); if (b) b.focus(); return; }
   if (a === "tabproposed") { acF.tab = "proposed"; acShown = AC_PAGE; render(false); return; }
   if (a === "noowner") { acF.tab = "all"; acF.owner = "none"; acShown = AC_PAGE; render(false); return; }
-  if (a === "clearf") { acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.ind = ""; render(false); var f0 = document.querySelector('[data-acset="product"]'); if (f0) f0.focus(); return; }
-  if (a === "clearall") { acF.q = ""; acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.ind = ""; render(false); return; }
+  if (a === "clearf") { acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.size = ""; acF.ind = ""; render(false); var f0 = document.querySelector('[data-acset="product"]'); if (f0) f0.focus(); return; }
+  if (a === "clearall") { acF.q = ""; acF.product = ""; acF.sector = ""; acF.city = ""; acF.owner = ""; acF.importance = ""; acF.size = ""; acF.ind = ""; render(false); return; }
   if (a === "more") { acShown += AC_PAGE; render(false); return; }
   if (a === "new") { acOpenForm("new", t.id || ""); return; }
   if (a === "edit") { acOpenForm("edit", t.id || "acedit"); return; }

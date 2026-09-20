@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG_DOMAIN_JS, isEmailShaped } from "../src/config-domain.js";
 import {
-  ACCOUNT_DOMAIN_JS, AUDIENCE_NONE, accountFieldsFromAttrs, accountMatches, audienceGroups, audienceMatches,
+  ACCOUNT_DOMAIN_JS, ACCOUNT_SIZES, ACCOUNT_SIZE_BASIS, ACCOUNT_SIZE_LABELS, AUDIENCE_NONE,
+  accountFieldsFromAttrs, accountMatches, audienceGroups, audienceMatches, normalizeAccountSize,
   audienceValueOf, checkAccount, checkAccountDomainClosure, checkApproval,
   phoneDigits, phoneShapeProblem, productStatusOf, summarizeAccountOpps,
 } from "../src/account-domain.js";
@@ -186,5 +187,43 @@ describe("campaign audience by account column (BR-CAM-002)", () => {
     const many = ["د", "ج", "ب", "أ"].map((s) => ({ sector: s }));
     expect(audienceGroups(many)[0].values.map((v) => v[0])).toEqual(["د", "ج", "ب", "أ"]);
     expect(audienceGroups(many, 2)[0].values.length).toBe(2);
+  });
+});
+
+describe("enterprise size — the Saudi classification, not an invented one", () => {
+  it("carries exactly Monsha'at's four tiers, each with a label and its basis", () => {
+    expect([...ACCOUNT_SIZES]).toEqual(["micro", "small", "medium", "large"]);
+    expect(ACCOUNT_SIZE_LABELS.micro).toBe("متناهية الصغر");
+    expect(ACCOUNT_SIZE_LABELS.large).toBe("كبيرة");
+    // Every tier states where its line falls; a classification nobody can check is a guess.
+    for (const k of ACCOUNT_SIZES) expect(ACCOUNT_SIZE_BASIS[k].length).toBeGreaterThan(10);
+  });
+
+  it("agrees in gender throughout, unlike the source page's own tabs", () => {
+    // monshaat.gov.sa renders «متوسط» and «كبير» against «منشأة». Massar does not.
+    expect(ACCOUNT_SIZE_LABELS.medium).toBe("متوسطة");
+    expect(ACCOUNT_SIZE_LABELS.large).toBe("كبيرة");
+  });
+
+  it("reads the spellings production already holds", () => {
+    // Three spellings are live in the imported «الحجم» attribute today.
+    expect(normalizeAccountSize("كبيرة")).toBe("large");
+    expect(normalizeAccountSize("صغيرة")).toBe("small");
+    expect(normalizeAccountSize("صغير")).toBe("small");
+    expect(normalizeAccountSize("متوسطة")).toBe("medium");
+    expect(normalizeAccountSize("متناهية الصغر")).toBe("micro");
+    expect(normalizeAccountSize(" كبير ")).toBe("large");
+    expect(normalizeAccountSize("Large")).toBe("large");
+    expect(normalizeAccountSize("micro")).toBe("micro");
+  });
+
+  it("refuses to guess, because a guess is indistinguishable from a fact once stored", () => {
+    expect(normalizeAccountSize("")).toBeNull();
+    expect(normalizeAccountSize(null)).toBeNull();
+    expect(normalizeAccountSize(undefined)).toBeNull();
+    expect(normalizeAccountSize("الرياض")).toBeNull();
+    expect(normalizeAccountSize("كبيرة جدًا")).toBeNull();
+    expect(normalizeAccountSize({ a: 1 })).toBeNull();
+    expect(normalizeAccountSize(12)).toBeNull();
   });
 });

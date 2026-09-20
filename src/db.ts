@@ -1038,6 +1038,33 @@ UPDATE entities SET sector = left(btrim(attrs->>'الشريحة'), 80)
  WHERE sector IS NULL AND jsonb_typeof(attrs->'الشريحة') = 'string' AND btrim(attrs->>'الشريحة') <> '';
 `,
   },
+  {
+    version: "018-account-size-tier",
+    sql: `
+-- «حجم المنشأة» as a TYPED field, on the Kingdom's own classification
+-- (monshaat.gov.sa/ar/SMEs-definition: متناهية الصغر · صغيرة · متوسطة · كبيرة).
+--
+-- entities.size already exists and stays exactly as it is: it holds whatever a spreadsheet column
+-- called «الحجم» contained, and production has «كبيرة», «صغيرة», «صغير» AND «القصيم» in it — a city
+-- typed into the size column. Constraining that column would reject a real row on the next write,
+-- so the raw text is kept (it is data, and it is the audience facets' source) and the typed tier
+-- sits beside it.
+ALTER TABLE entities ADD COLUMN IF NOT EXISTS size_tier TEXT
+  CHECK (size_tier IN ('micro','small','medium','large'));
+
+-- Backfill ONLY what maps unambiguously, mirroring account-domain.normalizeAccountSize. «القصيم»
+-- stays null: a guessed classification is worse than an absent one, because once stored it is
+-- indistinguishable from a recorded fact.
+UPDATE entities SET size_tier = CASE btrim(size)
+    WHEN 'متناهية الصغر' THEN 'micro'
+    WHEN 'متناهي الصغر'  THEN 'micro'
+    WHEN 'صغيرة' THEN 'small'  WHEN 'صغير' THEN 'small'
+    WHEN 'متوسطة' THEN 'medium' WHEN 'متوسط' THEN 'medium'
+    WHEN 'كبيرة' THEN 'large'   WHEN 'كبير' THEN 'large'
+    ELSE NULL END
+ WHERE size_tier IS NULL AND size IS NOT NULL AND btrim(size) <> '';
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1864,6 +1891,10 @@ export async function ensureEntity(phone: string, name: string): Promise<boolean
 export type ContactRow = { id: number; name: string; role: string | null; phone: string | null; email: string | null; primary: boolean };
 export type AccountRow = {
   id: number; name: string; phone: string; city: string | null; sector: string | null; importance: string | null;
+  /** «حجم المنشأة», the typed Monsha'at tier. `sizeText` is the raw imported «الحجم» string it was
+   *  read from, kept so a value that did not map (a city typed into the size column) is still
+   *  visible rather than silently dropped. */
+  sizeTier: string | null; sizeText: string | null;
   ownerId: number | null; ownerName: string | null; approval: string; approvalBy: string | null; approvalAt: number | null;
   source: string | null; createdBy: string | null; createdAt: number; updatedAt: number;
   productTags: string[]; usesProducts: string[];
@@ -1872,7 +1903,7 @@ export type AccountRow = {
 };
 
 const ACCOUNT_SELECT = `
-  SELECT e.id, e.name, e.phone, e.city, e.sector, e.importance, e.owner_member_id, m.name AS owner_name,
+  SELECT e.id, e.name, e.phone, e.city, e.sector, e.importance, e.size_tier, e.size, e.owner_member_id, m.name AS owner_name,
          e.approval, e.approval_by, e.approval_at, e.source, e.created_by, e.created_at, e.updated_at, e.product_tags,
          e.facts->'currentProducts'->>'value' AS uses,
          (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'role', c.role, 'phone', c.phone, 'email', c.email, 'primary', c.is_primary)
@@ -1893,6 +1924,7 @@ function accountFrom(x: any): AccountRow & { contacts: ContactRow[] } {
   const p = contacts[0];
   return {
     id: Number(x.id), name: String(x.name), phone: String(x.phone), city: x.city ?? null, sector: x.sector ?? null, importance: x.importance ?? null,
+    sizeTier: x.size_tier ?? null, sizeText: x.size ?? null,
     ownerId: x.owner_member_id == null ? null : Number(x.owner_member_id), ownerName: x.owner_name ?? null,
     approval: String(x.approval), approvalBy: x.approval_by ?? null, approvalAt: x.approval_at == null ? null : Number(x.approval_at),
     source: x.source ?? null, createdBy: x.created_by ?? null, createdAt: Number(x.created_at), updatedAt: Number(x.updated_at ?? x.created_at),
@@ -1962,10 +1994,10 @@ export async function createAccount(v: acct.AccountValue, source: acct.AccountSo
     await client.query("BEGIN");
     const now = Date.now();
     const ins = await client.query(
-      `INSERT INTO entities (name, phone, city, sector, importance, owner_member_id, approval, source, created_by, created_at, updated_at, attrs, facts)
-       VALUES ($1,$2,$3,$4,$5,$6,'proposed',$7,$8,$9,$9,'{}','{}')
+      `INSERT INTO entities (name, phone, city, sector, importance, size_tier, owner_member_id, approval, source, created_by, created_at, updated_at, attrs, facts)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'proposed',$8,$9,$10,$10,'{}','{}')
        ON CONFLICT (phone) DO NOTHING RETURNING id`,
-      [v.name, v.phone, v.city, v.sector, v.importance, v.ownerId, source, by, now]);
+      [v.name, v.phone, v.city, v.sector, v.importance, v.sizeTier ?? null, v.ownerId, source, by, now]);
     if (!ins.rows.length) {
       await client.query("ROLLBACK");
       const ex = await pool.query(`SELECT id FROM entities WHERE phone = $1`, [v.phone]);
@@ -1991,7 +2023,7 @@ export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedA
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const cur = await client.query(`SELECT name, city, sector, importance, owner_member_id, updated_at, created_at FROM entities WHERE id = $1 FOR UPDATE`, [id]);
+    const cur = await client.query(`SELECT name, city, sector, importance, size_tier, owner_member_id, updated_at, created_at FROM entities WHERE id = $1 FOR UPDATE`, [id]);
     if (!cur.rows.length) { await client.query("ROLLBACK"); return null; }
     const was = cur.rows[0];
     const version = Number(was.updated_at ?? was.created_at);
@@ -2003,6 +2035,7 @@ export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedA
     const changed = [
       was.name !== v.name ? "name" : "", (was.city ?? null) !== v.city ? "city" : "", (was.sector ?? null) !== v.sector ? "sector" : "",
       (was.importance ?? null) !== v.importance ? "importance" : "",
+      (was.size_tier ?? null) !== v.sizeTier ? "size" : "",
       (was.owner_member_id == null ? null : Number(was.owner_member_id)) !== v.ownerId ? "owner" : "",
       contactsChanged ? "contacts" : "",
     ].filter(Boolean);
@@ -2010,8 +2043,8 @@ export async function updateAccount(id: number, v: acct.AccountValue, ifUpdatedA
     if (!changed.length) { await client.query("ROLLBACK"); return { ok: true, updatedAt: version }; }
     const now = Math.max(Date.now(), version + 1);
     await client.query(
-      `UPDATE entities SET name=$2, city=$3, sector=$4, importance=$5, owner_member_id=$6, updated_at=$7 WHERE id=$1`,
-      [id, v.name, v.city, v.sector, v.importance, v.ownerId, now]);
+      `UPDATE entities SET name=$2, city=$3, sector=$4, importance=$5, size_tier=$8, owner_member_id=$6, updated_at=$7 WHERE id=$1`,
+      [id, v.name, v.city, v.sector, v.importance, v.ownerId, now, v.sizeTier ?? null]);
     if (contactsChanged) await writeContacts(client, id, v.contacts, by);
     await client.query(`INSERT INTO account_events (entity_id, action, detail, by_name, at) VALUES ($1,'edited',$2,$3,$4)`,
       [id, JSON.stringify({ changed, contacts: v.contacts.length }), by, now]);

@@ -32,6 +32,67 @@ export const ACCOUNT_IMPORTANCE_LABELS: Readonly<Record<AccountImportance, strin
   high: "عالية", medium: "متوسطة", low: "منخفضة",
 };
 
+/**
+ * HOW BIG THE CLIENT IS — the official Saudi classification, not one invented here.
+ *
+ * Monsha'at (the Small and Medium Enterprises General Authority) publishes the Kingdom's own
+ * enterprise-size definition at monshaat.gov.sa/ar/SMEs-definition, read 2026-09-20:
+ *
+ *   متناهية الصغر   1–5 employees      revenue 0–3 million SAR
+ *   صغيرة          6–49 employees     revenue over 3m, up to 40m
+ *   متوسطة         50–249 employees   revenue over 40m, up to 200m
+ *   كبيرة          250+ employees     revenue over 200m
+ *
+ * The page states the rule too: an enterprise is classified on BOTH criteria together, and where
+ * they disagree «يؤخذ بالتصنيف الأعلى بين المعيارين» — the higher of the two wins.
+ *
+ * WHY THIS AND NOT «Enterprise / Mid-Market / SMB». The English sales convention has no
+ * authority behind it: Wikipedia's own middle-market article says different authorities use
+ * revenue, assets or headcount «with the result that definitions differ». Massar's customers are
+ * Saudi organisations who can pull a government «شهادة حجم المنشأة» stating their tier, and who
+ * write that tier on tenders. A client can confirm or correct this field from a certificate; they
+ * could never confirm «mid-market».
+ *
+ * GENDER. Monsha'at's own tabs read «متناهية الصغر · صغيرة · متوسط · كبير» — the last two break
+ * agreement with «منشأة». The labels below agree throughout, which is what the rest of Massar does.
+ *
+ * NOT «درجة الأهمية». Size is a fact ABOUT the client; importance is OUR judgement of them. A
+ * micro clinic can be a high-importance account and a large hospital a low one. They are stored,
+ * filtered and displayed apart, and the record says which is which.
+ */
+export const ACCOUNT_SIZES = ["micro", "small", "medium", "large"] as const;
+export type AccountSize = (typeof ACCOUNT_SIZES)[number];
+export const ACCOUNT_SIZE_LABELS: Readonly<Record<AccountSize, string>> = {
+  micro: "متناهية الصغر", small: "صغيرة", medium: "متوسطة", large: "كبيرة",
+};
+/** The basis, printed beside the choice so nobody has to remember where the line falls. */
+export const ACCOUNT_SIZE_BASIS: Readonly<Record<AccountSize, string>> = {
+  micro: "1–5 موظفين · حتى 3 مليون ريال",
+  small: "6–49 موظفًا · أكثر من 3 وحتى 40 مليون",
+  medium: "50–249 موظفًا · أكثر من 40 وحتى 200 مليون",
+  large: "250 موظفًا فأكثر · أكثر من 200 مليون",
+};
+
+/**
+ * Read a size out of whatever a spreadsheet column held. Accounts imported before this field
+ * existed carry «الحجم» as free text, already spelled three ways in production («كبيرة»,
+ * «صغيرة», «صغير»). Only an UNAMBIGUOUS match becomes a typed value; anything else stays null,
+ * because a guessed classification is worse than an absent one — it is indistinguishable from a
+ * recorded fact once stored.
+ */
+export function normalizeAccountSize(raw: unknown): AccountSize | null {
+  if (raw === null || raw === undefined) return null;
+  const t = String(raw).trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  if ((ACCOUNT_SIZES as readonly string[]).indexOf(t) >= 0) return t as AccountSize;
+  // Arabic forms, both genders, with and without «منشأة».
+  if (/^(متناهية|متناهي) الصغر$/.test(t) || /micro/i.test(t)) return "micro";
+  if (/^(صغيرة|صغير)$/.test(t) || /^small$/i.test(t)) return "small";
+  if (/^(متوسطة|متوسط)$/.test(t) || /^medium$/i.test(t)) return "medium";
+  if (/^(كبيرة|كبير)$/.test(t) || /^large$/i.test(t)) return "large";
+  return null;
+}
+
 /** BR-CUS-005. NULL in the table means the row predates this column: «غير مسجّل», never a guess. */
 export const ACCOUNT_SOURCES = ["manual", "import", "whatsapp", "indicator", "partner", "other"] as const;
 export type AccountSource = (typeof ACCOUNT_SOURCES)[number];
@@ -57,12 +118,13 @@ export const CONTACTS_MAX = 20;
 
 export type ContactInput = { id?: unknown; name?: unknown; role?: unknown; phone?: unknown; email?: unknown; primary?: unknown };
 export type AccountInput = {
-  name?: unknown; city?: unknown; sector?: unknown; importance?: unknown; ownerId?: unknown; phone?: unknown;
-  contacts?: unknown;
+  name?: unknown; city?: unknown; sector?: unknown; importance?: unknown; sizeTier?: unknown;
+  ownerId?: unknown; phone?: unknown; contacts?: unknown;
 };
 export type ContactValue = { id?: number | null; name: string; role: string | null; phone: string | null; email: string | null; primary: boolean };
 export type AccountValue = {
-  name: string; city: string | null; sector: string | null; importance: AccountImportance | null; ownerId: number | null;
+  name: string; city: string | null; sector: string | null; importance: AccountImportance | null;
+  sizeTier: AccountSize | null; ownerId: number | null;
   phone: string; contacts: ContactValue[];
 };
 export type AccountCheck = { ok: true; value: AccountValue } | { ok: false; field: string; reason: string };
@@ -124,6 +186,15 @@ export function checkAccount(input: AccountInput, memberIds: readonly number[], 
   if (sector.length > ACCOUNT_SECTOR_MAX) return { ok: false, field: "sector", reason: "القطاع أطول من " + ACCOUNT_SECTOR_MAX + " حرفًا" };
   var importance = text(src.importance);
   if (importance && ACCOUNT_IMPORTANCE.indexOf(importance as AccountImportance) < 0) return { ok: false, field: "importance", reason: "درجة الأهمية غير معروفة" };
+  /* «حجم المنشأة» is optional: nobody should be blocked from recording a client because they do
+     not yet know its size. An unrecognised value is REFUSED rather than dropped — silently storing
+     null would tell the caller the size was saved. */
+  var sizeRaw = text(src.sizeTier);
+  var sizeTier: AccountSize | null = null;
+  if (sizeRaw) {
+    sizeTier = normalizeAccountSize(sizeRaw);
+    if (!sizeTier) return { ok: false, field: "sizeTier", reason: "حجم المنشأة غير معروف" };
+  }
   var ownerRaw = text(src.ownerId);
   var ownerId: number | null = null;
   if (ownerRaw) {
@@ -165,7 +236,7 @@ export function checkAccount(input: AccountInput, memberIds: readonly number[], 
   if (contacts.length) contacts[primaryAt < 0 ? 0 : primaryAt].primary = true;
   return {
     ok: true,
-    value: { name: name, city: city || null, sector: sector || null, importance: (importance || null) as AccountImportance | null, ownerId: ownerId, phone: phone, contacts: contacts },
+    value: { name: name, city: city || null, sector: sector || null, importance: (importance || null) as AccountImportance | null, sizeTier: sizeTier, ownerId: ownerId, phone: phone, contacts: contacts },
   };
 }
 
@@ -180,10 +251,13 @@ export function checkApproval(current: string, next: unknown): { ok: true; value
 
 export type AccountFilterRow = {
   id: number; name: string; phone: string; city: string | null; sector: string | null; importance: string | null;
+  sizeTier?: string | null;
   ownerId: number | null; approval: string; products: readonly string[]; contactText: string;
 };
 export type AccountFilter = {
   q?: string; tab?: string; product?: string; sector?: string; city?: string; owner?: string; importance?: string;
+  /** a tier key, or "__none" for accounts nobody has classified yet */
+  size?: string;
   /** entity ids in the chosen indicator, or null for no indicator filter */
   inIndicator?: Record<string, number> | null;
 };
@@ -197,6 +271,12 @@ export function accountMatches(a: AccountFilterRow, f: AccountFilter): boolean {
   if (f.sector && (a.sector || "") !== f.sector) return false;
   if (f.city && (a.city || "") !== f.city) return false;
   if (f.importance && (a.importance || "") !== f.importance) return false;
+  /* «بلا حجم مسجّل» is a real thing to ask for — it is the worklist of accounts still to classify,
+     and it is 16 of 16 on the day this shipped. It is NOT the same as matching the empty string. */
+  if (f.size) {
+    if (f.size === "__none") { if (a.sizeTier) return false; }
+    else if ((a.sizeTier || "") !== f.size) return false;
+  }
   if (f.owner) {
     if (f.owner === "none") { if (a.ownerId != null) return false; }
     else if (String(a.ownerId) !== f.owner) return false;
@@ -354,10 +434,11 @@ export function accountFieldsFromAttrs(attrs: Readonly<Record<string, string>>):
 // ---------------------------------------------------------------------------------------- the seam
 
 const DOMAIN_FNS = [phoneDigits, phoneShapeProblem, checkAccount, checkApproval, accountMatches, productStatusOf,
-  audienceValueOf, audienceMatches, audienceGroups] as const;
+  audienceValueOf, audienceMatches, audienceGroups, normalizeAccountSize] as const;
 
 const INJECTED = [
   "ACCOUNT_APPROVALS", "ACCOUNT_APPROVAL_LABELS", "ACCOUNT_IMPORTANCE", "ACCOUNT_IMPORTANCE_LABELS",
+  "ACCOUNT_SIZES", "ACCOUNT_SIZE_LABELS", "ACCOUNT_SIZE_BASIS",
   "ACCOUNT_SOURCES", "ACCOUNT_SOURCE_LABELS", "PRODUCT_STATUS_LABELS",
   "ACCOUNT_NAME_MAX", "ACCOUNT_CITY_MAX", "ACCOUNT_SECTOR_MAX", "CONTACT_NAME_MAX", "CONTACT_ROLE_MAX", "CONTACT_EMAIL_MAX", "CONTACTS_MAX",
   "AUDIENCE_FIELDS", "AUDIENCE_NONE", "AUDIENCE_ATTR_KEYS",
@@ -369,6 +450,9 @@ export const ACCOUNT_DOMAIN_JS: string = [
   "var ACCOUNT_APPROVAL_LABELS = " + JSON.stringify(ACCOUNT_APPROVAL_LABELS) + ";",
   "var ACCOUNT_IMPORTANCE = " + JSON.stringify(ACCOUNT_IMPORTANCE) + ";",
   "var ACCOUNT_IMPORTANCE_LABELS = " + JSON.stringify(ACCOUNT_IMPORTANCE_LABELS) + ";",
+  "var ACCOUNT_SIZES = " + JSON.stringify(ACCOUNT_SIZES) + ";",
+  "var ACCOUNT_SIZE_LABELS = " + JSON.stringify(ACCOUNT_SIZE_LABELS) + ";",
+  "var ACCOUNT_SIZE_BASIS = " + JSON.stringify(ACCOUNT_SIZE_BASIS) + ";",
   "var ACCOUNT_SOURCES = " + JSON.stringify(ACCOUNT_SOURCES) + ";",
   "var ACCOUNT_SOURCE_LABELS = " + JSON.stringify(ACCOUNT_SOURCE_LABELS) + ";",
   "var PRODUCT_STATUS_LABELS = " + JSON.stringify(PRODUCT_STATUS_LABELS) + ";",
