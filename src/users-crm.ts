@@ -119,7 +119,7 @@ function usPl(n, one, two, few, many) {
 }
 function vDenied(route) {
   return '<div class="ds6"><div class="us"><section class="m-card"><div class="m-empty" role="alert">' +
-    '<p class="m-empty__t">لا تملك صلاحية فتح هذه الشاشة</p>' +
+    '<p class="m-empty__t">لا صلاحية لفتح هذه الشاشة</p>' +
     '<p class="m-empty__d">دورك: ' + esc(ME ? ME.roleLabel : "") + ". اطلب الصلاحية من مدير النظام.</p>" +
     '<p class="m-empty__a"><a class="m-btn" href="#' + esc(ME ? ME.home : "home") + '">العودة إلى شاشتك</a></p>' +
     "</div></section></div></div>";
@@ -151,8 +151,8 @@ function vUsers() {
     (users.length ? usPl(users.length, "مستخدم واحد", "مستخدمان", "مستخدمين", "مستخدمًا") + " · " : "") +
     "يدخل كل مستخدم برمزه، ويبقى الرمز الرئيسي لمدير النظام صالحًا</p></div></header></div>";
   if (!users.length) {
-    h += '<div class="m-empty"><p class="m-empty__t">لا مستخدمون بعد</p>' +
-      '<p class="m-empty__d">أضف لكل شخص حسابًا بدور من أدوار الوثيقة: تنفيذي، مدير منتج، مبيعات، شريك، مدير نظام. يرى كل دور ما يسمح به فقط.</p>' +
+    h += '<div class="m-empty"><p class="m-empty__t">لا مستخدمين بعد</p>' +
+      '<p class="m-empty__d">لكل شخص حساب بدور من أدوار الوثيقة: تنفيذي، مدير منتج، مبيعات، شريك، مدير نظام، ويرى ما يسمح به دوره فقط.</p>' +
       '<p class="m-empty__a"><button class="m-btn m-btn--primary" id="usnewempty" data-us="new">إضافة مستخدم</button></p></div>';
   } else {
     h += '<div class="m-tablewrap"><table class="m-table us-tbl"><thead><tr>' +
@@ -224,7 +224,7 @@ function usModal() {
     var ps = usData.partners || [];
     h += '<div class="m-field"><label class="m-label m-req" for="usf_partner">الشريك</label><select class="m-select" id="usf_partner" data-usf="partnerId"' + (s.field === "partnerId" ? ' aria-invalid="true" aria-describedby="usferr"' : "") + '><option value="">— اختر الشريك —</option>' +
       ps.map(function (p) { return '<option value="' + p.id + '"' + (String(p.id) === d.partnerId ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select>" +
-      (ps.length ? '<span class="m-hint">يرى هذا المستخدم شريكه فقط، ويسجّل نتائجه.</span>' : '<span class="m-hint">لا شركاء بعد — أضفهم من <a class="m-link" href="#partners">شركاء المبيعات</a>.</span>') +
+      (ps.length ? '<span class="m-hint">يرى المستخدم شريكه فقط، ويسجّل نتائجه.</span>' : '<span class="m-hint">لا شركاء بعد؛ يضافون من <a class="m-link" href="#partners">شركاء المبيعات</a>.</span>') +
       (s.field === "partnerId" ? '<span class="m-err" id="usferr" role="alert">' + esc(s.err) + "</span>" : "") + "</div>";
   } else if ((usData.members || []).length) {
     h += '<div class="m-field"><label class="m-label" for="usf_member">عضو الفريق (اختياري)</label><select class="m-select" id="usf_member" data-usf="memberId"><option value="">— غير مرتبط —</option>' +
@@ -297,7 +297,7 @@ function vAudit() {
   var h = '<div class="ds6"><section class="m-card m-card--pad0">' +
     '<div class="m-card__h"><div class="m-section-head__t">' +
     '<h2 class="m-card__t">سجل التدقيق</h2>' +
-    '<p class="m-meta">كل عملية حفظ ناجحة: من، وبأي دور، وماذا، ومتى</p></div>' +
+    '<p class="m-meta">كل حفظ ناجح: المنفّذ ودوره وما حفظه ووقته</p></div>' +
     '<div class="m-row">' +
       sel("who", "المستخدم", auData.facets.who.map(function (w) { return [w.key, w.label]; })) +
       sel("action", "العملية", auData.facets.actions.map(function (a2) { return [a2, a2]; })) +

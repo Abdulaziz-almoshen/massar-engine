@@ -1147,7 +1147,7 @@ function opToolbar() {
     h += '<select class="m-select" id="oxb_stage" aria-label="نقل المحدَّد إلى مرحلة" onchange="opBulkStage(this)"' + (oppBusy ? " disabled" : "") + ">" +
       '<option value="">نقل إلى مرحلة…</option>' +
       opSelectableStages().map(function (st) { return '<option value="' + st.key + '">' + esc(st.label) + "</option>"; }).join("") + "</select>";
-    h += '<input class="m-input" id="oxb_owner" style="max-inline-size:170px" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="أسنِد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
+    h += '<input class="m-input" id="oxb_owner" style="max-inline-size:170px" list="oxowners" aria-label="إسناد المحدَّد إلى" placeholder="إسناد إلى…" onchange="opBulkOwner(this)"' + (oppBusy ? " disabled" : "") + ">";
     h += '<datalist id="oxowners">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
     var pg = pageSlice("opps", opSorted());
     if (sel.length < all.length && pg.length && pg.every(function (l) { return opSel[l.id]; })) {
@@ -1189,7 +1189,7 @@ function opToolbar() {
      sight. */
   h += '<span class="m-seg" role="group" aria-label="طريقة العرض">' +
     '<button type="button" aria-pressed="' + (opMode === "list") + '" aria-label="عرض القائمة" title="قائمة" onclick="opSetMode(&quot;list&quot;)">' + opIco("list") + "</button>" +
-    '<button type="button" aria-pressed="' + (opMode === "cards") + '" aria-label="عرض البطاقات" title="بطاقات — بطاقة لكل عميل" onclick="opSetMode(&quot;cards&quot;)">' + opIco("cards") + "</button>" +
+    '<button type="button" aria-pressed="' + (opMode === "cards") + '" aria-label="عرض البطاقات" title="بطاقة لكل عميل" onclick="opSetMode(&quot;cards&quot;)">' + opIco("cards") + "</button>" +
     '<button type="button" aria-pressed="' + (opMode === "kanban") + '" aria-label="عرض كانبان" title="كانبان" onclick="opSetMode(&quot;kanban&quot;)">' + opIco("board") + "</button></span>";
   /* While the create drawer is open ITS primary is the only blue button in the DOM. */
   h += !opMayEdit() ? ""
@@ -1251,7 +1251,7 @@ function opRowHtml(l) {
     : "") + "</td>";
   h += '<td class="m-td-n ox-ac"><span class="ox-stack">' +
     (l.phone ? '<a class="ox-a" href="#customer/' + esc(l.phone) + '" title="ملف العميل" onclick="event.stopPropagation()">' + nm + "</a>" : nm) +
-    (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac" title="فتحها المساعد تلقائيًا عند قراءة نية مرتفعة">تلقائي</span>' : "") +
+    (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac" title="فتحها المساعد تلقائيًا بسبب نية مرتفعة">تلقائي</span>' : "") +
     (opUnsaved(l.id) ? '<span class="m-chip m-chip--bad" title="تعديل لم يُحفظ">لم يُحفظ</span>' : "") + "</span></td>";
   h += '<td class="ox-pd"><span class="ox-pn" title="' + esc(l.product) + '">' + esc(l.product) + "</span></td>";
   h += '<td class="ox-st"><span class="ox-stack">' + opStageCell(l) + "</span></td>";
@@ -1274,7 +1274,7 @@ function opEmpty() {
       '<div class="m-empty__a"><button class="m-btn" onclick="opClearFilters()">مسح التصفية</button></div></div>';
   }
   return '<div class="m-empty"><p class="m-empty__t">لا فرص مسجّلة بعد.</p>' +
-    '<p class="m-empty__d">الفرصة تُسجَّل هنا سواء جاءت من ردّ على حملة واتساب أو من مكالمة أو زيارة. ' +
+    '<p class="m-empty__d">تُسجَّل الفرصة هنا من ردّ على حملة واتساب أو مكالمة أو زيارة. ' +
     "النية المرتفعة التي يقرأها المساعد تفتح فرصةً تلقائيًا.</p></div>";
 }
 function opSkeleton(n) {
@@ -1500,7 +1500,7 @@ function opField(l, key, label, type) {
   }
   var val = st && st.s !== "saved" ? st.v : cur;
   var num = type === "number";
-  var tail = (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="ما الذي يجب فعله بعد؟"' : "") +
+  var tail = (key === "sale_price" ? ' placeholder="بلا سعر"' : key === "owner" ? ' placeholder="بلا مسؤول" list="oxowners2"' : key === "next_step" ? ' placeholder="الخطوة التالية"' : "") +
     (st && (st.s === "invalid" || st.s === "failed") ? ' aria-invalid="true"' : "") +
     ' aria-describedby="' + id + '_s" onchange="opSaveField(' + l.id + ',&quot;' + key + '&quot;,this.value)"';
   var field = '<div class="m-field"><div class="ox-lr"><label class="m-label" for="' + id + '">' + label + "</label>" + opFieldStatus(sk, id) + "</div>";
@@ -1571,7 +1571,7 @@ function opEscSection(l) {
     b += '<div class="ox-escform">';
     b += '<div class="m-field"><label class="m-label" for="opesc_to">' + (opEsc.kind === "support" ? "إلى مسؤول الدعم" : "تصعيد إلى") + "</label>";
     if (!cands.length) {
-      b += '<div class="ox-hint2">لا أحد مسجّل لهذا الدور — أضِفه في <a class="m-link" href="#team">إعدادات النظام · الفريق</a>.</div>';
+      b += '<div class="ox-hint2">لا أحد مسجّل للدور؛ يُضاف في <a class="m-link" href="#team">إعدادات النظام · الفريق</a>.</div>';
     } else {
       b += '<select class="m-select" id="opesc_to" data-opesc="memberId"><option value="">اختر الشخص…</option>' +
         cands.map(function (m) {
@@ -1976,11 +1976,11 @@ function opCreateDrawer() {
   // that offers what the save will reject is a dead control.
   var reg = tagList().filter(function (t) { return !t.archived; });
   var head = '<div class="ox-hd"><div class="tt"><h2 class="m-dlg__t" id="oxdrt" tabindex="-1">إضافة فرصة</h2>' +
-    '<div class="m-meta">جهة واحدة، ومنتج أو أكثر — ومن أين جاءت</div></div></div>';
+    '<div class="m-meta">جهة واحدة، ومنتج أو أكثر، والمصدر</div></div></div>';
   var errOf = function (f) { return opErrFld === f ? ' aria-invalid="true"' : ""; };
   var b = '<section class="ox-sec"><div class="ox-sech">الجهة</div>';
   b += '<div class="m-field"><label class="m-label m-req" for="opd_name">اسم الجهة</label>' +
-    '<input class="m-input" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مثال: مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
+    '<input class="m-input" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
     ' oninput="opDraft(&quot;name&quot;,this.value)"></div>';
   var accts = entities.slice(0, 400);
   b += '<datalist id="opaccts">' + accts.map(function (e) { return '<option value="' + esc(e.name) + '"></option>'; }).join("") + "</datalist>";
@@ -2503,7 +2503,7 @@ function opPkgField(i, l) {
     pk.map(function (k) {
       return '<option value="' + k.id + '"' + (cur === String(k.id) ? " selected" : "") + ">" + esc(opPkgLabel(k)) + "</option>";
     }).join("") + "</select>" +
-    (cur ? '<span class="m-hint">السعر والمدة مأخوذان من الباقة — عدِّلهما لتسجيل سعر متفاوَض عليه.</span>' : "") +
+    (cur ? '<span class="m-hint">السعر والمدة من الباقة، ويُعدَّلان لتسجيل سعر متفاوَض عليه.</span>' : "") +
     "</div>";
 }
 window.opLineAdd = function () { opSheet.lines.push(opBlankLine()); opRender(); };

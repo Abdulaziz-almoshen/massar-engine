@@ -178,7 +178,7 @@ function actTabs() {
 function actToolbar(n) {
   var h = '<div class="m-tools">';
   h += '<div class="m-head__a">' +
-    mSearch({ id: "actq", value: actQ, placeholder: "ابحث في الأحداث…", label: "ابحث في الأحداث", wide: true, attrs: ' oninput="actSearch(this)"' }) +
+    mSearch({ id: "actq", value: actQ, placeholder: "بحث في الأحداث…", label: "ابحث في الأحداث", wide: true, attrs: ' oninput="actSearch(this)"' }) +
     '<select class="m-select" onchange="actSetWin(this.value)" aria-label="الفترة">' +
     [[1, "آخر يوم"], [7, "آخر 7 أيام"], [30, "آخر 30 يومًا"], [0, "كل الفترة"], [-1, "مدى مخصص"]].map(function (w) {
       return '<option value="' + w[0] + '"' + (String(actWin) === String(w[0]) ? " selected" : "") + ">" + w[1] + "</option>";
@@ -199,7 +199,7 @@ function vActivityCrm() {
   actBind();
   if (!((cache && cache.contacts) || []).length) {
     return '<div class="ds6"><div class="m-empty"><div class="m-empty__t">لا أحداث بعد</div>' +
-      '<div class="m-empty__d">يظهر هنا كل إرسال وتسليم وردّ فور حدوثه.</div></div></div>';
+      '<div class="m-empty__d">يظهر كل إرسال وتسليم وردّ فور حدوثه.</div></div></div>';
   }
   var rows = actEvents();
   var shown = pageSlice("act", rows);

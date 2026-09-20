@@ -279,7 +279,7 @@ function vAccounts() {
   }
   if (!acRows.length) {
     return h + '<div class="m-empty"><div class="m-empty__t">لا عملاء بعد</div>' +
-      '<div class="m-empty__d">العميل منشأة تبيع لها Lean: اسمها ومدينتها وقطاعها وأهميتها ومن يتولاها والأشخاص فيها. أضفه يدويًا، أو استورد قائمة من «جهات الاستهداف».</div>' +
+      '<div class="m-empty__d">العميل منشأة تبيع لها Lean: اسمها ومدينتها وقطاعها وأهميتها ومن يتولاها وأشخاصها، ويُضاف يدويًا أو باستيراد قائمة من «جهات الاستهداف».</div>' +
       (acMayEdit()
         ? '<div class="m-empty__a"><button type="button" class="m-btn m-btn--primary" id="acnewempty" data-ac="new">إضافة عميل جديد</button> ' +
           '<a class="m-btn" href="#targets">استيراد من ملف</a></div>'
@@ -385,7 +385,7 @@ function acSizePill(tier, raw) {
       esc(ACCOUNT_SIZE_LABELS[tier]) + "</span>";
   }
   if (raw && String(raw).trim()) {
-    return ' <span class="m-chip m-chip--plain" title="قيمة مستوردة لم تطابق تصنيف «منشآت» — تحتاج مراجعة">' +
+    return ' <span class="m-chip m-chip--plain" title="مستوردة لا تطابق تصنيف «منشآت»؛ للمراجعة">' +
       esc(String(raw).trim()) + " ⚠</span>";
   }
   return " " + acNil("الحجم غير مسجّل", "unset");
@@ -639,16 +639,16 @@ function acModal() {
     acInp("acf_sector", "القطاع / الشريحة", "sector", d.sector, { max: ACCOUNT_SECTOR_MAX, list: "acl_sector", ph: "رعاية صحية" }) +
     '<div class="m-field"><label class="m-label" for="acf_importance">درجة الأهمية</label><select class="m-select" id="acf_importance" data-acfld="importance"' + acFld("importance") + '><option value="">— غير محددة —</option>' +
       ACCOUNT_IMPORTANCE.map(function (k) { return '<option value="' + k + '"' + (d.importance === k ? " selected" : "") + ">" + ACCOUNT_IMPORTANCE_LABELS[k] + "</option>"; }).join("") + "</select>" +
-      '<span class="m-hint">تقديرنا نحن لأهمية العميل — لا حجمه.</span>' + acFerr("importance") + "</div>" +
+      '<span class="m-hint">تقديرنا لأهمية العميل، لا حجمه.</span>' + acFerr("importance") + "</div>" +
     /* «حجم المنشأة» on the Kingdom's own classification (منشآت). Each choice carries the line it
        sits on, so nobody has to remember where 49 employees stops and 50 begins, and the client
        can confirm it from their own «شهادة حجم المنشأة». */
     '<div class="m-field"><label class="m-label" for="acf_size">حجم المنشأة</label><select class="m-select" id="acf_size" data-acfld="sizeTier"' + acFld("sizeTier") + '><option value="">— غير محدد —</option>' +
       ACCOUNT_SIZES.map(function (k) { return '<option value="' + k + '"' + (d.sizeTier === k ? " selected" : "") + ">" + ACCOUNT_SIZE_LABELS[k] + " — " + ACCOUNT_SIZE_BASIS[k] + "</option>"; }).join("") + "</select>" +
-      '<span class="m-hint">تصنيف «منشآت»: عدد الموظفين والإيرادات معًا، والأعلى بينهما يُغلّب.</span>' + acFerr("sizeTier") + "</div>" +
+      '<span class="m-hint">تصنيف «منشآت»: عدد الموظفين والإيرادات معًا، ويُغلّب الأعلى.</span>' + acFerr("sizeTier") + "</div>" +
     '<div class="m-field"><label class="m-label" for="acf_owner">الموظف المسؤول</label><select class="m-select" id="acf_owner" data-acfld="ownerId"' + acFld("ownerId") + '><option value="">— بلا مسؤول —</option>' +
       members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.ownerId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + "</select>" +
-      (members.length ? "" : '<span class="m-hint">لا أعضاء نشطون — أضفهم من <a class="m-link" href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div>";
+      (members.length ? "" : '<span class="m-hint">لا أعضاء نشطون؛ يضافون من <a class="m-link" href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div>";
   if (isEdit) h += '<div class="m-field full"><span class="m-label">رقم واتساب العميل</span><span class="m-ro"><bdi class="m-acc-ltr">+' + esc(f.phone) + "</bdi></span></div>";
   else h += acInp("acf_phone", "رقم واتساب العميل", "phone", d.phone, { req: true, ltr: true, type: "tel", auto: "tel", ph: "05xxxxxxxx", hint: "به ترتبط المحادثات والحملات والفرص" });
   h += "</div>";

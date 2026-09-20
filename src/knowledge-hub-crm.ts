@@ -105,7 +105,7 @@ function vKnowledgeHub() {
   }
   h += '<p class="m-body">' + dsFig("khReady", readyN) + " من " + dsFig("khProducts", rows.length) +
     " " + (rows.length === 1 ? "منتج جاهز" : "منتجًا جاهزًا") + " للبيع بمعرفته الحالية — الحد " + khPct(KB_READY_MIN) + ".</p>";
-  h += '<p class="m-meta">كل قسم تكمله يرفع دقّة ردود المساعد على العملاء. الأقسام الثمانية موزونة، وما ينقص منها معروض أمام كل منتج.</p>';
+  h += '<p class="m-meta">إكمال كل قسم يرفع دقّة ردود المساعد على العملاء؛ الأقسام الثمانية موزونة، والنواقص معروضة أمام كل منتج.</p>';
   h += "</section>";
 
   /* ---- the products, least ready first ---- */

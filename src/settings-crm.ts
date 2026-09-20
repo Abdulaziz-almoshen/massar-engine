@@ -213,7 +213,7 @@ function cfStagesView() {
     "</tr></thead><tbody>";
   if (!rows.length) {
     h += '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا مراحل مطابقة</p>' +
-      '<p class="m-empty__d">أظهر الموقوفة لرؤية المراحل التي أُوقفت.</p></div></td></tr>';
+      '<p class="m-empty__d">إظهار الموقوفة يعرض المراحل الموقوفة.</p></div></td></tr>';
   }
   rows.forEach(function (s) {
     var editing = cfEdit && cfEdit.kind === "stage" && cfEdit.id === s.key;
@@ -230,7 +230,7 @@ function cfStagesView() {
     h += '<td><span class="cf-row-acts">' +
       '<button class="m-btn" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
       (terminal || cfSeeded(s.key) ? '<span class="m-meta" title="مرحلة أساسية في المحرك — أوقفها بدل حذفها">أساسية</span>'
-        : s.openLines ? '<span class="m-meta" title="أوقفها بدل حذفها">عليها فرص</span>'
+        : s.openLines ? '<span class="m-meta" title="أوقفها بدل حذفها">لها فرص</span>'
         : cfHold("cfDeleteStage", s.key, "حذف")) + "</span></td>";
     h += "</tr>";
     if (editing) h += cfEditorRow(7, cfStageEditor());
@@ -264,7 +264,7 @@ function cfDivisionsView() {
     "</tr></thead><tbody>";
   if (!cfDivs.length) {
     h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><p class="m-empty__t">لا أقسام بعد</p>' +
-      '<p class="m-empty__d">أضف قسمًا ثم اربط به منتجاته وأعضاءه.</p></div></td></tr>';
+      '<p class="m-empty__d">يضاف قسم ثم تُربط به منتجاته وأعضاؤه.</p></div></td></tr>';
   }
   cfDivs.forEach(function (d) {
     var editing = cfEdit && cfEdit.kind === "division" && cfEdit.id === d.id;
@@ -277,7 +277,7 @@ function cfDivisionsView() {
     h += "<td>" + (d.members ? cfNMember(d.members) : cfNil("لا أعضاء", "none")) + "</td>";
     h += "<td>" + (d.active ? '<span class="m-chip m-chip--ok">مفعّل</span>' : '<span class="m-chip">موقوف</span>') + "</td>";
     h += '<td><span class="cf-row-acts"><button class="m-btn" data-cf="editdiv" data-i="' + d.id + '">تعديل</button>' +
-      (d.products || d.members ? '<span class="m-meta" title="انقل منتجاته وأعضاءه أولًا، أو أوقفه">مرتبط</span>'
+      (d.products || d.members ? '<span class="m-meta" title="نقل منتجاته وأعضائه أولًا، أو إيقافه">مرتبط</span>'
         : cfHold("cfDeleteDivision", d.id, "حذف")) + "</span></td></tr>";
     if (editing) h += cfEditorRow(6, cfDivisionEditor());
   });

@@ -272,7 +272,7 @@ function vPartners() {
     /* SMOKE: «لا شركاء بعد» is the accepted empty render for #partners, and the paragraph below
        carries «غير مهتم», the route's landmark. Neither may be reworded without smoke.py. */
     return h + '<section class="m-card m-empty"><p class="m-empty__t">لا شركاء بعد</p>' +
-      '<p class="m-empty__d">الشريك شركة متعاقدة تتولى التواصل الأولي مع العملاء لمنتج ما. حدّد لكل شريك مستهدفًا أسبوعيًا لكل منتج، وسجّل ما انتهى إليه كل تواصل: مهتم، غير مهتم، لم يرد. كل «مهتم» يُحوَّل فرصة بيع لفريق المبيعات.</p>' +
+      '<p class="m-empty__d">الشريك شركة متعاقدة للتواصل الأولي مع عملاء منتج، بمستهدف أسبوعي لكل منتج ونتيجة مسجّلة لكل تواصل: مهتم، غير مهتم، لم يرد؛ وتُحوَّل كل نتيجة «مهتم» إلى فرصة بيع لفريق المبيعات.</p>' +
       (typeof meCan !== "function" || meCan("partners.manage")
         ? '<div class="m-empty__a"><button class="m-btn m-btn--primary" id="ptnewempty" data-pt="newpartner">' + ptIco("plus") + "إضافة شريك</button></div>"
         : "") + "</section></div></div>" + ptModal();
@@ -557,7 +557,7 @@ function ptTargetsForm(s) {
   h += '<div class="pt-tg">';
   s.rows.forEach(function (p, i) {
     var bad = s.field === "targets." + i;
-    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="m-meta">(مؤرشف — امسح مستهدفه فقط)</span>' : "") + '</label>' + mNum({ id: "ptt_" + i, value: s.d[p] || "", label: p, min: 0, max: PARTNER_TARGET_MAX, step: 1, mode: "numeric",
+    h += '<div class="row"><label for="ptt_' + i + '">' + esc(p) + (ptIsArchived(p) ? ' <span class="m-meta">مؤرشف — مسح مستهدفه فقط</span>' : "") + '</label>' + mNum({ id: "ptt_" + i, value: s.d[p] || "", label: p, min: 0, max: PARTNER_TARGET_MAX, step: 1, mode: "numeric",
         attrs: ' data-pttg="' + esc(p) + '" placeholder="بلا مستهدف"' + (bad ? ' aria-invalid="true" aria-describedby="err_pt_tg"' : "") }) + "</div>" + (bad ? '<span class="m-err" id="err_pt_tg" role="alert">' + ptIco("warn") + esc(s.err) + "</span>" : "");
   });
   return h + "</div>";
@@ -591,11 +591,11 @@ function ptRecordForm(s) {
       ptInp("ptr_phone", "جوال المنشأة", "phone", d.phone, { req: true, ltr: true, type: "tel", ph: "05xxxxxxxx", hint: "به يرتبط العميل بحسابه وفرصه" }) + "</div>";
     h += '<div class="m-field"><span class="m-label m-req" id="ptr_result_l">النتيجة</span><span class="pt-radio' + (s.field === "result" ? " bad" : "") + '" role="radiogroup" aria-labelledby="ptr_result_l" id="ptr_result">' +
       PARTNER_RESULTS.map(function (k, i) { return '<button role="radio" aria-checked="' + (d.result === k) + '" tabindex="' + (d.result === k || (!d.result && i === 0) ? 0 : -1) + '" data-pt="result" data-v="' + k + '">' + PARTNER_RESULT_LABELS[k] + "</button>"; }).join("") + "</span>" +
-      (d.result === "interested" ? '<span class="m-hint">يُحوَّل فرصة بيع لفريق المبيعات فور الحفظ.</span>' : "") + ptErr("result") + "</div>";
+      (d.result === "interested" ? '<span class="m-hint">يصبح فرصة بيع لفريق المبيعات فور الحفظ.</span>' : "") + ptErr("result") + "</div>";
     h += ptInp("ptr_note", "ملاحظة", "note", d.note, { max: RESULT_NOTE_MAX });
   } else {
     h += '<div class="m-field"><label class="m-label m-req" for="ptr_paste">القائمة</label><textarea class="pt-paste" id="ptr_paste" data-ptfld="paste" dir="auto" placeholder="مستشفى الأمل، 0551234567، مهتم&#10;عيادة النور، 0559876543، لم يرد، اتصلنا مرتين">' + esc(s.paste) + "</textarea>" +
-      '<span class="m-hint">سطر لكل منشأة: الاسم، الجوال، النتيجة (مهتم / غير مهتم / لم يرد)، ثم ملاحظة اختيارية. يُقبل النسخ من جدول.</span>' + ptErr("paste") + "</div>";
+      '<span class="m-hint">يُقبل النسخ من جدول بسطر لكل منشأة: الاسم، الجوال، النتيجة (مهتم/غير مهتم/لم يرد)، ثم ملاحظة اختيارية.</span>' + ptErr("paste") + "</div>";
     var pv = ptPastePreview(s);
     if (s.paste.trim()) {
       var hot = pv.ok.filter(function (x) { return x.value.result === "interested"; }).length;

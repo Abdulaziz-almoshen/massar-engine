@@ -1528,7 +1528,7 @@ function renderConvo() {
     (c.human ? 'color:#fff;background:#1E5FCC;' : 'color:#D9534F;background:#fff;border:1px solid #f0d3d3;') +
     '" onclick="setHuman(\\'' + esc(c.phone) + '\\',' + (c.human ? "false" : "true") + ')">' +
     (c.human ? "استئناف المساعد" : "إيقاف المساعد") + "</button>" +
-    '<button class="btn" title="فصل بيانات البيئة التجريبية عن البيانات الفعلية" style="flex:none;font-size:12px;' +
+    '<button class="btn" title="فصل البيانات التجريبية عن الفعلية" style="flex:none;font-size:12px;' +
     (c.test ? 'color:#14161A;background:#ECEEF2;border:1px solid #ECEEF2;' : 'color:#656B76;background:#fff;border:1px solid #D8DCE3;') +
     '" onclick="setTestFlag(\\'' + esc(c.phone) + '\\',' + (c.test ? "false" : "true") + ')">' +
     (c.test ? "تجريبي" : "تصنيف كتجريبي") + "</button></div></aside>";
@@ -2045,7 +2045,7 @@ var CRM_STAGE = [
   { key: "engaged",     pos: 3, type: "ongoing", label: "متجاوب",        dot: "#1E5FCC", hint: "ردّ مرة واحدة على الأقل" },
   { key: "nurture",     pos: 4, type: "ongoing", label: "مؤجَّل",         dot: "#7A5600", hint: "طلب التأجيل صراحةً" },
   { key: "qualified",   pos: 5, type: "ongoing", label: "مؤهَّل",         dot: "#12633F", hint: "سجّل المساعد اهتمامًا واضحًا" },
-  { key: "meeting",     pos: 6, type: "ongoing", label: "موعد محدَّد",    dot: "#2563EB", hint: "موعد أكّده إنسان" },
+  { key: "meeting",     pos: 6, type: "ongoing", label: "موعد محدَّد",    dot: "#2563EB", hint: "موعد أكّده شخص" },
   { key: "handoff",     pos: 7, type: "won",     label: "مع المندوب",    dot: "#2563EB", hint: "سُلّم لمندوب المبيعات" },
   { key: "unqualified", pos: 8, type: "lost",    label: "غير مؤهَّل",     dot: "#656B76", hint: "أعلن عدم اهتمامه، أو أُغلق الملف" },
   { key: "stopped",     pos: 9, type: "lost",    label: "أوقف التواصل",  dot: "#8E2A27", hint: "طلب إيقاف الرسائل" },
@@ -2625,7 +2625,7 @@ function vAffinityBand(selName, matched) {
     if (!list.length) return "";
     return '<span class="fld"><span>الوسم:</span>' +
       '<select class="' + (on ? "on" : "") + '" onchange="setProdFilter(&quot;candidate&quot;, this.value)" ' +
-      'title="وسوم يضعها فريقك من شاشة جهات الاستهداف">' +
+      'title="وسوم فريقك من شاشة جهات الاستهداف">' +
       '<option value="">الكل</option>' +
       list.map((t) => '<option value="' + esc(t.name) + '"' + (on === t.name ? " selected" : "") + ">" +
         esc(clip(t.name, 26)) + " (" + fmtN(t.count) + ")</option>").join("") + "</select></span>";
@@ -2642,8 +2642,8 @@ function vAffinityBand(selName, matched) {
   }
   h += '<div class="row">' + tagSel() + (typeof indWizardSelect === "function" ? indWizardSelect() : "") +
     sel("uses", "يستخدم:", "الخدمات المسجَّلة في ملف الحساب", (p) => p.uses) +
-    sel("notUses", "لا يستخدم:", "من ليس لدينا سجل بأنه يستخدمها", (p) => p.uses) +
-    sel("interest", "أبدى اهتمامًا بـ:", "من وسم المساعد اهتمامه بها في المحادثة", (p) => p.interest) +
+    sel("notUses", "لا يستخدم:", "من لم نسجّل استخدامه لها", (p) => p.uses) +
+    sel("interest", "أبدى اهتمامًا بـ:", "مَن وسم المساعد اهتمامه بها بالمحادثة", (p) => p.interest) +
     (prodFilterOn() ? '<button class="excl" onclick="clearProdFilter()">مسح فرز الخدمة</button>' : "") +
     "</div>";
   // The honest caveat, and only when it can actually mislead: «لا يستخدم» matches unknowns, and
@@ -4212,7 +4212,7 @@ function propEditorHtml(key, val, err) {
       DQ_REASONS.map((r) => '<option value="' + r[0] + '"' + (r[0] === sel ? " selected" : "") + ">" + r[1] + "</option>").join("") + "</select>";
   }
   h += key === "note"
-    ? '<textarea id="propinp" class="inp" rows="3" maxlength="' + cap + '" style="margin-top:6px;width:100%;" onkeydown="propKey(event)" placeholder="ما لا يظهر في المحادثة: من قابلته، ما وعدت به، ما يمنع الشراء.">' + esc(val) + "</textarea>"
+    ? '<textarea id="propinp" class="inp" rows="3" maxlength="' + cap + '" style="margin-top:6px;width:100%;" onkeydown="propKey(event)" placeholder="ما لا يظهر في المحادثة: من قابلته، وعودك، عوائق الشراء.">' + esc(val) + "</textarea>"
     : '<input id="propinp" class="inp" maxlength="' + cap + '" style="margin-top:6px;width:100%;" value="' + esc(val) + '" onkeydown="propKey(event)">';
   // FR-4 promises «نص + تاريخ اختياري», and there was no date control at all — so the operator could
   // not record WHEN, which is the third thing this whole product exists to answer, and the bad_date

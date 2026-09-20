@@ -137,7 +137,7 @@ function vReportsStuck() {
   if (!rpList) return moSkeleton(4, ["w40", "w80", "w60"]);
   if (!rpList.length) {
     return '<div class="m-card m-empty"><p class="m-empty__t">لا تقارير</p>' +
-      '<p class="m-empty__d">لم يُعرَّف أي تقرير.</p></div>';
+      '<p class="m-empty__d">لم يُعرَّف تقرير.</p></div>';
   }
 
   /* Each report's count is printed TWICE — on its tab and above its list — so both sites are bound
@@ -189,7 +189,7 @@ function vReportsStuck() {
         (r.dept ? " · " + esc(r.dept) : "") + "</span></span>" +
       '<span class="m-item__v">' + mMoney(r.value) + "</span>" + rpAge(r.daysWaiting);
     h += r.oppId
-      ? '<a class="m-item" href="#opps/' + fmtId(r.oppId) + '" title="افتح هذه الفرصة">' + inner +
+      ? '<a class="m-item" href="#opps/' + fmtId(r.oppId) + '" title="فتح الفرصة">' + inner +
         '<span class="rx-say">افتح فرصة ' + esc(r.account || r.product) + "</span></a>"
       : '<div class="m-item">' + inner + "</div>";
   });
@@ -231,7 +231,7 @@ function vReportRollups() {
 
   h += '<section class="m-card rp-sec"><div class="m-card__h"><div>' +
     '<h3 class="m-card__t">الخسائر حسب السبب</h3>' +
-    '<p class="m-meta">كل صفقة مغلقة خسارةً، حسب النتيجة التي أغلقتها. النتيجة تُقرأ من السجل ومن النشاط معًا: نتيجة تُسجَّل على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل السجل.</p>' +
+    '<p class="m-meta">الصفقات المغلقة خسارةً حسب نتيجة إغلاقها، من السجل والنشاط معًا؛ فالنتيجة المسجّلة على صفقة خاسرة أصلًا لا تُنتج انتقال مرحلة، فلا تصل إلى السجل.</p>' +
     "</div></div>";
   if (!rpRoll.byReason.length) {
     h += '<div class="m-empty"><p class="m-empty__t">' + esc(rpRoll.empty.reason.title) + "</p>" +

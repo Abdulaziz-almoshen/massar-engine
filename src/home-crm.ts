@@ -271,7 +271,7 @@ function vHomeHealth() {
   var loading = (typeof oppLoading !== "undefined" && oppLoading) || hmEscLoading;
   var failed = (typeof oppFailed !== "undefined" && oppFailed) || hmEscFailed;
   if (!((typeof oppRows !== "undefined" && oppRows)) && loading) {
-    return '<div class="m-empty" aria-busy="true"><div class="m-empty__t">جارٍ قراءة الفرص…</div></div>';
+    return '<div class="m-empty" aria-busy="true"><div class="m-empty__t">تجري قراءة الفرص…</div></div>';
   }
   if (!((typeof oppRows !== "undefined" && oppRows)) && failed) {
     return '<div class="m-empty" role="alert"><div class="m-empty__t">تعذّر تحميل الفرص</div>' +
@@ -305,7 +305,7 @@ function vHomeHealth() {
       : '<button type="button" class="m-seg-row" style="width:100%;text-align:start;' +
         'font:inherit;background:none;border:0;cursor:pointer" ' +
         'onclick="hmOpenState(&quot;' + bk.key + '&quot;)" ' +
-        'title="' + esc(bk.label) + ' — افتح هذه الفرص">' + body + "</button>";
+        'title="' + esc(bk.label) + ' — فتح الفرص">' + body + "</button>";
   }).join("");
 
   return '<div class="m-segs">' + rows + "</div>" +
@@ -322,7 +322,7 @@ function vHomeHealth() {
 function vHomePartners() {
   if (typeof meCan === "function" && !meCan("partners.view")) return "";
   hmPtLoad(false);
-  if (!hmPt && hmPtLoading) return '<div class="m-empty" aria-busy="true"><div class="m-empty__t">جارٍ قراءة أسبوع الشركاء…</div></div>';
+  if (!hmPt && hmPtLoading) return '<div class="m-empty" aria-busy="true"><div class="m-empty__t">تجري قراءة أسبوع الشركاء…</div></div>';
   if (!hmPt) {
     return '<div class="m-empty" role="alert"><div class="m-empty__t">تعذّر تحميل أداء الشركاء</div>' +
       '<div class="m-empty__a"><button class="m-btn" onclick="hmRetry()">أعد المحاولة</button></div></div>';

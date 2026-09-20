@@ -266,8 +266,8 @@ function vSalesPerf() {
     perfKpis(totT, totA, totW, totCover, totAttain, totOpen, d.quarter, d.year);
 
   if (!rows.length) {
-    return h + '<section class="m-card m-empty"><p class="m-empty__t">لا توجد خدمات في الكتالوج بعد</p>' +
-      '<p class="m-empty__d">المستهدفات تُدخل لكل خدمة، فأضف خدمة من «المنتجات» أولًا ثم عد إلى هنا لتحديد مستهدفها.</p>' +
+    return h + '<section class="m-card m-empty"><p class="m-empty__t">لا خدمات في الكتالوج بعد</p>' +
+      '<p class="m-empty__d">تُحدَّد المستهدفات لكل خدمة بعد إضافتها من «المنتجات».</p>' +
       "</section></div>";
   }
 
@@ -308,8 +308,8 @@ function vSalesPerf() {
   // The PARTIAL case needs saying too: a percentage measured on part of the catalogue reads as
   // the whole one unless the page states what it left out. Both counts go through dsFig.
   if (offCount === rows.length) {
-    h += '<section class="m-card m-empty"><p class="m-empty__t">لم تُحدَّد أي مستهدفات لهذا الربع</p>' +
-      '<p class="m-empty__d">الأرقام المحققة والمتوقعة أعلاه صحيحة الآن — لكن «الإنجاز» و«التغطية» و«الحالة» ' +
+    h += '<section class="m-card m-empty"><p class="m-empty__t">لم تُحدَّد مستهدفات لهذا الربع</p>' +
+      '<p class="m-empty__d">الأرقام المحققة والمتوقعة أعلاه صحيحة الآن. ' +
       "تحتاج مستهدفًا لتُقاس عليه. اضغط «تحديد المستهدف» بجوار أي خدمة.</p></section>";
   } else if (offCount) {
     h += '<p class="m-status m-status--warn">النسب محسوبة على ' +

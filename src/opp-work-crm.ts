@@ -185,7 +185,7 @@ function owLossModal() {
   var h = '<div class="ow-scrim' + cls + '" data-ow="losscancel"></div><div class="ow-lossm"><div class="ow-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="owlt">' +
     '<div class="m-dlg__h"><h2 class="m-dlg__t" id="owlt">' + title + "</h2>" +
     (n === 1 && L.name ? '<div class="m-meta">' + esc(L.name) + "</div>" : "") +
-    '<div class="m-meta">السبب يُسجَّل على البند وفي «الخسائر حسب السبب» — لا يُغلق بند خسارة بلا سبب.</div></div><div class="m-dlg__b">';
+    '<div class="m-meta">يُسجَّل السبب على البند وفي «الخسائر حسب السبب»؛ لا يُغلق بند خسارة دونه.</div></div><div class="m-dlg__b">';
   h += '<div class="ow-reasons" role="radiogroup" aria-label="سبب الخسارة"' + (L.field === "lost_reason" ? ' aria-describedby="owlerr"' : "") + ">";
   LOSS_REASONS.forEach(function (r, i) {
     var on = L.reason === r.key;
@@ -286,7 +286,7 @@ function owJourneySection(l) {
   var ladder = (typeof OPP_ST !== "undefined" ? OPP_ST : []).map(function (s) { return s.key; });
   var b = '<section class="ox-sec" aria-labelledby="oxsec_j"><div class="ox-sech" id="oxsec_j">نتائج المراحل</div>' +
     '<div class="ow-jsub">نتيجة كل مرحلة وسببها عبر دورة البيع</div>';
-  if (!w.data && w.loading) return b + '<div class="ox-hint2" aria-busy="true">جارٍ قراءة سجل المراحل…</div></section>';
+  if (!w.data && w.loading) return b + '<div class="ox-hint2" aria-busy="true">تجري قراءة سجل المراحل…</div></section>';
   if (!w.data && w.failed) {
     return b + '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر قراءة سجل المراحل.' +
       '<button class="m-btn" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div></section>';
@@ -303,7 +303,7 @@ function owJourneySection(l) {
   if (closed) {
     b += '<div class="ow-jout"><span class="m-chip ' + (opIsWon(l) ? "m-chip--ok" : "m-chip--bad") + '">' +
       (opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
-      '<span class="m-meta">الصفقة مغلقة — لا نسبة إنجاز تُقاس على دورة انتهت</span></div>';
+      '<span class="m-meta">الصفقة مغلقة — لا تُقاس نسبة الإنجاز</span></div>';
   } else {
     var pct = journeyPct(openKeys, l.stage);
     b += '<div class="ow-jpct"><span class="l">نسبة الإنجاز في الدورة المفتوحة</span>';
@@ -351,7 +351,7 @@ function owJourneySection(l) {
       " لم يصل إليها البند بعد.</div>";
   }
   if (!evs.length) {
-    b += '<div class="ox-hint2">لا انتقالات مسجّلة لهذا البند بعد — يُسجَّل الانتقال تلقائيًا عند تغيير المرحلة.</div>';
+    b += '<div class="ox-hint2">لا انتقالات مسجّلة للبند بعد؛ تُسجَّل تلقائيًا عند تغيير المرحلة.</div>';
   }
   return b + "</section>";
 }
@@ -387,13 +387,13 @@ function owActivitiesSection(l) {
       '<div class="ow-btns"><button class="m-btn m-btn--primary" id="owasave" data-ow="actsave"' + (A.busy ? ' disabled aria-busy="true"' : "") + ">" + (A.busy ? "جارٍ الحفظ…" : "حفظ النشاط") + "</button>" +
       '<button class="m-btn" data-ow="actcancel">إلغاء</button>' +
       (A.err ? '<span class="ow-err" id="owaerr" role="alert">' + opIco("warn") + esc(A.err) + "</span>" : "") +
-      '<span class="m-hint" style="flex-basis:100%">الخطوة التالية تصبح «الخطوة التالية» على البند.</span></div></div>';
+      '<span class="m-hint" style="flex-basis:100%">تُسجَّل الخطوة التالية على البند.</span></div></div>';
   }
   if (w.failed && !w.data) b += '<div class="ox-hint2" role="alert">' + opIco("warn") + 'تعذّر تحميل الأنشطة.<button class="m-btn" data-ow="workretry" data-i="' + l.id + '">أعد المحاولة</button></div>';
   else if (!w.data) b += '<div class="ox-hint2" aria-busy="true">جارٍ التحميل…</div>';
   else if (!rows.length && !(owAct && owAct.oppId === l.id)) {
     b += '<div class="m-empty"><p class="m-empty__t">لا أنشطة مسجّلة</p>' +
-      '<p class="m-empty__d">سجّل الاجتماعات والمكالمات هنا ليعرف من يتابع البند ما جرى.</p></div>';
+      '<p class="m-empty__d">تُسجَّل الاجتماعات والمكالمات هنا ليعرف متابع البند ما جرى.</p></div>';
   }
   if (rows.length) {
     b += '<div class="ow-list">' + rows.map(function (a) {

@@ -233,11 +233,11 @@ function tgtRow(e) {
        releasing early is the undo. Keyboard still arms in two steps. */
     '<td><span class="tgt-act">' +
       (tgtMayOpenOpp()
-        ? '<button type="button" class="m-btn" title="سجّل فرصة بيع لهذه الجهة" onclick="opFromEntity(' + e.id + ')">فرصة +</button>' : "") +
+        ? '<button type="button" class="m-btn" title="تسجيل فرصة بيع للجهة" onclick="opFromEntity(' + e.id + ')">فرصة +</button>' : "") +
       (tgtMayEdit()
         ? '<button class="rv-hold rv-hold-sm" data-do="entDel" data-arg="' + e.id + '"' +
           ' data-idle="حذف" data-holding="استمر…" data-armed="اضغط مرة أخرى" aria-pressed="false"' +
-          ' title="اضغط مع الاستمرار لحذف الجهة">' +
+          ' title="حذف الجهة بالضغط المطوّل">' +
           '<span class="rv-fill"></span><span class="rv-lbl">حذف</span></button>' : "") +
     "</span></td></tr>";
 }
@@ -293,7 +293,7 @@ function vTargetsCrm() {
   if (!shown.length) {
     h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty">' +
       '<p class="m-empty__t">لا جهة تطابق هذا الفرز</p>' +
-      '<p class="m-empty__d">امسح البحث أو غيّر إحدى الشرائح أعلاه.</p></div></td></tr>';
+      '<p class="m-empty__d">يمكن مسح البحث أو تغيير إحدى الشرائح.</p></div></td></tr>';
   }
   h += '</tbody></table></div><div class="m-foot">' +
     dsPageBar("tgt", rows.length, tgtNoun(rows.length), "tgtShown") +
@@ -343,7 +343,7 @@ function tgtBulkBar() {
        in it, and the per-row «فرصة +» is gated the same way. */
     (tgtMayOpenOpp()
       ? '<button' + (tgtOppBusy ? " disabled" : "") + ' onclick="tgtBulkOpp()" ' +
-        'title="افتح فرصة بيع بالخدمة المختارة لكل جهة محدَّدة">' +
+        'title="فرصة بالخدمة المختارة لكل جهة محدَّدة">' +
         (tgtOppBusy ? "جارٍ…" : "افتح فرصة") + "</button>"
       : "") +
     '<button class="x" aria-label="إلغاء التحديد" onclick="tgtClearSel()">&#215;</button></div></div>';
@@ -359,7 +359,7 @@ function tgtTagsPanel() {
   return '<div class="tgt-sheet" onclick="if(event.target===this) tgtCloseTags()"><div class="tgt-sheet__p" role="dialog" aria-modal="true" aria-labelledby="tgtagt">' +
     '<div class="m-between"><h2 class="m-h2" id="tgtagt">إدارة الوسوم</h2>' +
     '<button type="button" class="m-x" onclick="tgtCloseTags()" aria-label="إغلاق">&#215;</button></div>' +
-    '<p class="m-meta">الوسم تسمّيه كما تشاء — خدمة، خط منتجات قسم آخر، أو فعالية. يُنشأ مرة، ثم يُختار.</p>' +
+    '<p class="m-meta">تختار اسم الوسم: خدمة، خط منتجات قسم آخر، أو فعالية؛ يُنشأ مرة ثم يُختار.</p>' +
     '<div class="tgt-sheet__mk"><input id="tgnew" class="m-input" maxlength="60" placeholder="اسم الوسم الجديد…" aria-label="اسم الوسم الجديد" ' +
       'onkeydown="if(event.key===&quot;Enter&quot;) tgtCreateTag()">' +
       '<button type="button" class="m-btn m-btn--primary" onclick="tgtCreateTag()">أضف</button></div>' +

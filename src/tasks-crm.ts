@@ -132,7 +132,7 @@ function vTasksCrm() {
 
   var h = '<div class="ds6"><div class="m-task">';
   h += '<div class="m-tools"><div class="m-head__a">' +
-    mSearch({ id: "tskq", value: tskQ, placeholder: "ابحث في المهام…", label: "ابحث في المهام", wide: true, attrs: ' oninput="tskSearch(this)"' }) + "</div>" +
+    mSearch({ id: "tskq", value: tskQ, placeholder: "بحث في المهام…", label: "ابحث في المهام", wide: true, attrs: ' oninput="tskSearch(this)"' }) + "</div>" +
     '<span class="m-cap">' + tskPl(rows.length) + " في هذا التبويب</span></div>";
 
   h += '<div class="m-tabs" role="tablist" aria-label="حالة المهام">' +
@@ -150,7 +150,7 @@ function vTasksCrm() {
   if (!rows.length) {
     h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><div class="m-empty__t">' +
       (all.length ? "لا مهام في هذا التبويب" : "لا مهام بعد") + "</div>" +
-      (all.length ? "" : '<div class="m-empty__d">تُضاف المهمة من ملف أي عميل، وتظهر هنا مجمّعة.</div>') +
+      (all.length ? "" : '<div class="m-empty__d">تُضاف المهام من ملف أي عميل، وتظهر هنا مجمّعة.</div>') +
       "</div></td></tr>";
   }
   h += '</tbody></table></div><div class="m-foot"><span class="m-cap">المهام سجلات داخلية. لا تُرسل شيئًا للعميل.</span></div></section>';
@@ -168,7 +168,7 @@ function vNotesCrm() {
   });
   var h = '<div class="ds6"><div class="m-task">';
   h += '<div class="m-tools"><div class="m-head__a">' +
-    mSearch({ id: "nteq", value: nteQ, placeholder: "ابحث في الملاحظات…", label: "ابحث في الملاحظات", wide: true, attrs: ' oninput="nteSearch(this)"' }) + "</div>" +
+    mSearch({ id: "nteq", value: nteQ, placeholder: "بحث في الملاحظات…", label: "ابحث في الملاحظات", wide: true, attrs: ' oninput="nteSearch(this)"' }) + "</div>" +
     /* The count had no label: a bare «ملاحظة واحدة» floating in a toolbar says what it is only
        if you already know. Naming the surface also gives smoke a landmark that does not depend
        on how many rows happen to exist - the counted noun alone reads «ملاحظات» at three rows

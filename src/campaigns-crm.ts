@@ -437,7 +437,7 @@ function crmEmptyList() {
       '<p class="m-empty__d">امسح البحث أو جرّب تبويبًا آخر.</p></div>';
   }
   return '<div class="m-empty"><p class="m-empty__t">لا حملات في هذا التبويب</p>' +
-    '<p class="m-empty__d">جرّب «الكل»، أو أطلق حملة جديدة.</p></div>';
+    '<p class="m-empty__d">يمكن اختيار «الكل» أو إطلاق حملة</p></div>';
 }
 
 /* --------------------------------- grouping --------------------------------- */
@@ -576,7 +576,7 @@ function vKmonCrm(d) {
   if (!campaigns.length) {
     /* SMOKE: «لا حملات بعد» is the accepted empty render for #kmon. */
     return '<div class="ds6"><section class="m-card m-empty"><p class="m-empty__t">لا حملات بعد</p>' +
-      '<p class="m-empty__d">أطلق أول حملة من «إنشاء حملة» — كل إطلاق يظهر هنا بلوحته وأرقامه الحية.</p>' +
+      '<p class="m-empty__d">تُطلق الحملة من «إنشاء حملة»، ويظهر كل إطلاق بلوحته وأرقامه الحية.</p>' +
       '<p class="m-empty__a"><a class="m-btn m-btn--primary" href="#aimkt">إنشاء حملة</a></p></section></div>';
   }
   var h = '<div class="ds6"><div class="cx">';
@@ -607,7 +607,7 @@ function crmSpecStrip(camp, st) {
       "<div><dt>حجم الجمهور</dt><dd>" + mN(st.targeted) + "</dd></div>" +
       "<div><dt>التصنيف</dt><dd>" + (campIsTest(camp) ? "تجريبية" : "فعلية") + "</dd></div>" +
     "</dl></div>" +
-    '<p class="m-meta">هذا نصّ ما أُرسل فعليًا. لا يقبل التعديل بعد الإطلاق.</p></section>';
+    '<p class="m-meta">النص المرسل فعليًا؛ لا يُعدَّل بعد الإطلاق.</p></section>';
 }
 
 function crmDetailBulkBar(camp) {
@@ -727,7 +727,7 @@ function vKmonDetailCrm(id, d) {
         '<div class="m-stat__s">' + caption + "</div>" +
         '<span class="m-meter"><i style="--m-pct:' + (i === 0 ? 100 : (r === null ? 0 : r)) + '%"></i></span></div>';
     }).join("") + "</div>" +
-    '<p class="m-meta">«شوهدت» = قُرئت أو ردّت — أي إشارة مؤكدة أن الرسالة وصلت لعين العميل.</p>';
+    '<p class="m-meta">«شوهدت» = قُرئت أو ردّت؛ تأكيد أن العميل رأى الرسالة.</p>';
     /* BR-MON-004/006: what the campaign led to after «مهتم» (campaign-results-crm). */
     if (typeof crChainCard === "function") h += crChainCard(camp, st);
     return h + "</div></div>";
@@ -784,7 +784,7 @@ function vKmonDetailCrm(id, d) {
     "<tbody>" + (shown.length
       ? crmTargetRows(shown, cwin)
       : '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا نتائج</p>' +
-        '<p class="m-empty__d">امسح البحث أو اختر تصفية أخرى.</p></div></td></tr>') +
+        '<p class="m-empty__d">يُمسح البحث أو تُغيّر التصفية.</p></div></td></tr>') +
     "</tbody></table></div></section>";
   h += crmDetailBulkBar(camp);
   return h + "</div></div>";
@@ -917,7 +917,7 @@ function crmCampaignsHtml(campId) {
          ADR-0001 was written after. Say something rather than nothing. */
       try { console.error("campaigns-crm fallback also failed:", e3); } catch (e4) {}
       return '<div class="ds6"><section class="m-card m-empty"><p class="m-empty__t">تعذّر عرض الحملات</p>' +
-        '<p class="m-empty__d">أعد تحميل الصفحة. إن تكرر الأمر، فالمشكلة في هذا الإصدار وليست في بياناتك.</p></section></div>';
+        '<p class="m-empty__d">تُحمَّل الصفحة مجددًا؛ إن تكرر الخلل فهو في الإصدار لا في بياناتك.</p></section></div>';
     }
   }
 }

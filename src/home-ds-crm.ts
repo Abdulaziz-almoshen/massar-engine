@@ -441,7 +441,7 @@ function hdsHealthCard() {
   return '<section class="hx-card hx-health">' +
     '<div class="hx-card__h"><h3 class="hx-card__t">صحة خط البيع</h3>' +
       '<span class="hx-card__n">' + sub + "</span></div>" +
-    '<p class="hx-health__d">كل بند في حالة واحدة فقط — اضغط الحالة لترى بنودها.</p>' +
+    '<p class="hx-health__d">لكل بند حالة واحدة، وبالضغط عليها تظهر بنودها.</p>' +
     '<div class="hx-hls">' + tiles + "</div></section>";
 }
 
@@ -555,7 +555,7 @@ function hdsFlowCard(f) {
   if (!any) {
     return h + '<div class="m-empty"><div class="m-empty__t">' +
       hdsNil("لا رسائل في هذه الفترة", "none") + "</div>" +
-      '<div class="m-empty__d">تظهر هنا الرسائل فور إرسالها أو ورودها.</div></div></section>';
+      '<div class="m-empty__d">تظهر الرسائل فور إرسالها أو ورودها.</div></div></section>';
   }
   h += '<div class="hx-flow" role="img" aria-label="' +
     esc("الرسائل: " + series.map(function (s) {

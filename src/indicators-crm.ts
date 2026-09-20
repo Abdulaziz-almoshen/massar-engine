@@ -423,7 +423,7 @@ function inRow(r) {
     '<button class="m-btn in-btn-sm" id="invb' + r.id + '" data-in="view" data-i="' + r.id + '">عرض العملاء</button>' +
     (inMayEdit()
       ? '<a class="m-btn in-btn-sm" href="#indicator/' + r.id + '">' + (r.status === "draft" ? "أكمل المسودة" : "تعديل") + "</a>" +
-        '<a class="m-btn in-btn-sm" href="#indicator/' + r.id + '/data" title="ارفع بيانات أحدث لهذا المؤشر">تحديث البيانات</a>' +
+        '<a class="m-btn in-btn-sm" href="#indicator/' + r.id + '/data" title="رفع بيانات أحدث للمؤشر">تحديث البيانات</a>' +
         (r.status === "draft" ? "" : '<button class="m-btn in-btn-sm' + (r.status === "active" ? " in-btn-off" : "") + '" data-in="toggle" data-i="' + r.id + '"' + (busy ? ' disabled aria-busy="true"' : "") + ">" +
           (r.status === "active" ? "تعطيل" : "تفعيل") + "</button>")
       : "") +
@@ -567,7 +567,7 @@ function inDrawer() {
       b += '<div class="m-item"><span class="m-item__b">' +
         (talked
           ? '<a class="m-item__n" href="#customer/' + esc(m.phone) + '">' + esc(m.name) + "</a>"
-          : '<a class="m-item__n" href="#account/' + Number(m.entityId) + '" title="لم تُراسل بعد — افتح سجل العميل">' + esc(m.name) + "</a>") +
+          : '<a class="m-item__n" href="#account/' + Number(m.entityId) + '" title="لم تُراسل بعد — فتح سجل العميل">' + esc(m.name) + "</a>") +
         '<span class="m-item__s">' + meta + "</span></span>" +
         (m.value ? '<span class="m-item__v m-n">' + esc(m.value) + "</span>" : "") + "</div>";
     });
@@ -790,7 +790,7 @@ function inPreviewView() {
     (inc ? "سيُحفظ " + opPlFig("inPvInc", inc, "عميل واحد", "عميلان", "عملاء", "عميلًا") : "لن يُحفظ أي عميل بعد") + "</span>" +
     (t.review - resolved > 0 ? '<span class="m-chip m-chip--warn">' + mPl(t.review - resolved, "صف واحد لم يُراجع", "صفّان لم يُراجعا", "صفوف لم تُراجع", "صفًّا لم يُراجع") + " — لن يُحفظ</span>" : "") +
     (dupPicks > 0 ? '<span class="m-chip m-chip--warn">' + mPl(dupPicks, "صف مكرر", "صفّان مكرران", "صفوف مكررة", "صفًّا مكررًا") + " لعميل مطابق في سطر آخر</span>" : "") +
-    (t.unmatched ? '<span class="m-meta">غير المطابقين لا يُحفظون — أضف من له جوال كعميل جديد من الجدول، أو من <a class="m-link" href="#targets">جهات الاستهداف</a>.</span>' : "") + "</div>";
+    (t.unmatched ? '<span class="m-meta">لا يُحفظ غير المطابقين؛ يُضاف من له جوال كعميل جديد من الجدول أو من <a class="m-link" href="#targets">جهات الاستهداف</a>.</span>' : "") + "</div>";
   return h;
 }
 function inManualView() {
@@ -867,7 +867,7 @@ function vIndicatorForm(rest) {
   /* 1 */
   h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">1. معلومات المؤشر</h2>' +
     '<p class="m-meta">اسم واضح، ومنتج مرتبط، ودلالة محددة — بها يبني مسار على المؤشر توصية يذكر سببها.</p></div></div><div class="in-secb">';
-  h += '<div class="m-form">' + inInp("inf_name", "اسم المؤشر", "name", d.name, { max: INDICATOR_NAME_MAX, ph: "مثال: استخدام مرتفع للإجازات المرضية" }, true) +
+  h += '<div class="m-form">' + inInp("inf_name", "اسم المؤشر", "name", d.name, { max: INDICATOR_NAME_MAX, ph: "استخدام مرتفع للإجازات المرضية" }, true) +
     inSel("inf_product", "المنتج المرتبط", "product", d.product, prods, true) + "</div>";
   h += '<div class="m-field"><label class="m-label" for="inf_desc">وصف المؤشر</label>' +
     '<textarea class="m-input" id="inf_desc" rows="2" maxlength="' + INDICATOR_DESC_MAX + '" data-infld="description" placeholder="اشرح بإيجاز ما يمثّله المؤشر وكيف قيس"' + inFld("description") + ">" + esc(d.description) + "</textarea>" + inFerr("description") + "</div>";
@@ -878,7 +878,7 @@ function vIndicatorForm(rest) {
   h += "</div></section>";
   /* 2 */
   h += '<section class="m-card" id="inf_members" tabindex="-1"><div class="m-card__h"><div><h2 class="m-card__t">2. بيانات العملاء</h2>' +
-    '<p class="m-meta">زوّد مسار بالعملاء المشمولين — برفع ملف يُطابَق بقائمة العملاء، أو باختيارهم يدويًا.</p></div></div><div class="in-secb">';
+    '<p class="m-meta">يُحدَّد العملاء المشمولون برفع ملف يُطابَق بقائمة العملاء أو باختيارهم يدويًا.</p></div></div><div class="in-secb">';
   if (isEdit && !inF.replace) {
     h += '<div class="in-row"><span class="m-body">يحتوي المؤشر على ' + inMCust(inF.memberCount) +
       (inF.source === "file" && inF.sourceFilename ? " من ملف " + esc(inF.sourceFilename) : inF.source === "manual" ? " (اختيار يدوي)" : "") + ".</span>" +
@@ -905,7 +905,7 @@ function vIndicatorForm(rest) {
   h += "</div></section>";
   /* 3 */
   h += '<section class="m-card"><div class="m-card__h"><div><h2 class="m-card__t">3. فترة البيانات</h2>' +
-    '<p class="m-meta">متى قيست البيانات. البيانات الأقدم من ' + inMDay(INDICATOR_STALE_DAYS) + " تُستخدم، وتقول كل توصية مبنية عليها ذلك.</p></div></div>" +
+    '<p class="m-meta">وقت القياس. البيانات الأقدم من ' + inMDay(INDICATOR_STALE_DAYS) + " تُستخدم، وتقول كل توصية مبنية عليها ذلك.</p></div></div>" +
     '<div class="in-secb"><div class="in-g3">' + inInp("inf_from", "من تاريخ", "periodFrom", d.periodFrom, { type: "date" }) + inInp("inf_to", "إلى تاريخ", "periodTo", d.periodTo, { type: "date" }) +
     inInp("inf_upd", "تاريخ تحديث البيانات", "dataUpdatedAt", d.dataUpdatedAt, { type: "date" }, true) + "</div></div></section>";
   /* 4 */

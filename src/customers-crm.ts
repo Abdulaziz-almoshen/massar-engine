@@ -185,7 +185,7 @@ function cusHead(allOn) {
 /* ------------------------------- control bar ------------------------------- */
 function cusControlBar(nTotal) {
   var h = '<div class="m-tools"><div class="m-head__a">';
-  h += mSearch({ id: "cusq", value: cusQ, placeholder: "ابحث بالاسم أو الرقم أو الخدمة…", label: "ابحث في العملاء", wide: true, attrs: ' oninput="cusSearch(this)"' });
+  h += mSearch({ id: "cusq", value: cusQ, placeholder: "بحث بالاسم أو الرقم أو الخدمة", label: "ابحث في العملاء", wide: true, attrs: ' oninput="cusSearch(this)"' });
   h += '<div class="m-seg" role="group" aria-label="طريقة العرض">' + [["list", "قائمة"], ["group", "تجميع"]].map(function (v) {
       return '<button type="button" aria-pressed="' + (cusView === v[0]) + '" onclick="cusSetView(&quot;' + v[0] + '&quot;)">' + v[1] + "</button>";
     }).join("") + "</div>";
@@ -300,7 +300,7 @@ function vCustomersCrm() {
   cusBind();
   if (!cusBook().length) {
     return '<div class="ds6"><div class="m-empty"><div class="m-empty__t">لا جهات بعد</div>' +
-      '<div class="m-empty__d">ارفع ملف جهات الاستهداف — كل جهة تظهر هنا بعد أول رسالة.</div>' +
+      '<div class="m-empty__d">يُرفع ملف جهات الاستهداف، وتظهر كل جهة بعد أول رسالة.</div>' +
       '<div class="m-empty__a"><a class="m-btn m-btn--primary" href="#targets">جهات الاستهداف</a></div></div></div>';
   }
   var rows = cusContacts();

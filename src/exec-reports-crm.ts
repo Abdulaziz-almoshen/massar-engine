@@ -330,7 +330,7 @@ function rxOffListCard() {
     "</div></div>";
   if (off.pct === null) {
     h += '<div class="m-empty"><div class="m-empty__t">' + mNil("لا بند مرتبط بباقة", "none") + "</div>" +
-      '<div class="m-empty__d">اربط البنود بباقاتها من سجل الفرصة ليصبح الفرق قابلًا للقياس.</div></div>';
+      '<div class="m-empty__d">ربط البنود بباقاتها من سجل الفرصة يتيح قياس الفرق.</div></div>';
     return h + "</section>";
   }
   var pctR = Math.round(off.pct);
@@ -463,7 +463,7 @@ function rxFunnel(f) {
       ? rxSig(mPct(100), "لا تسرّب مقاس: كل فرصة غادرت مرحلة انتقلت إلى التالية، على " +
           mPl(f.decidedTotal, "فرصة واحدة محسومة", "فرصتين محسومتين", "فرص محسومة", "فرصة محسومة"))
       : rxSig(mNil("لم يُقَس", "none"), "لا انتقال يُقاس بعد: لم تغادر أي فرصة مرحلتها");
-  return rxCard("fun", "قمع المراحل", "كم فرصة وصلت كل مرحلة، وكم ممن غادرها انتقل إلى التالية؟ الفرصة الباقية في مرحلتها لا تُحسب تسرّبًا.", sig, body, f.action, false);
+  return rxCard("fun", "قمع المراحل", "عدد الفرص التي وصلت كل مرحلة، والمنتقلة للتالية ممن غادرها؛ الباقية في مرحلتها لا تُحسب تسرّبًا.", sig, body, f.action, false);
 }
 
 function rxVelocity(v) {
@@ -497,7 +497,7 @@ function rxVelocity(v) {
     : bn
       ? rxSig(mPlOf(bn.maxOpenDays || 0, opNDay(bn.maxOpenDays || 0)), "أطول بقاء الآن — «" + esc(bn.label) + "»")
       : rxSig(mNil("لا بنود مفتوحة", "none"), "لا مرحلة تحمل بندًا مفتوحًا الآن");
-  return rxCard("vel", "زمن المراحل", "كم تبقى الفرصة في كل مرحلة، ومن تجاوز المهلة؟", sig, body, v.action, false);
+  return rxCard("vel", "زمن المراحل", "مدة بقاء الفرصة بكل مرحلة، ومن تجاوز المهلة", sig, body, v.action, false);
 }
 
 function rxProducts(p) {
@@ -533,7 +533,7 @@ function rxProducts(p) {
     : top && p.topSharePct !== null
     ? rxSig(rxPct(p.topSharePct), "من القيمة المفتوحة في «" + esc(top.product) + "»")
     : rxSig(mN(p.rows.length), p.rows.length === 1 ? "منتج في الأنبوب" : "منتجات في الأنبوب، ولا قيمة مسعَّرة بعد");
-  return rxCard("prd", "المنتجات", "أي منتج يحمل الأنبوب، وفي أي مرحلة تقف بنوده؟", sig, body, p.action, true);
+  return rxCard("prd", "المنتجات", "المنتجات التي تحمل الأنبوب ومراحل بنودها", sig, body, p.action, true);
 }
 
 function rxSources(s) {
@@ -560,7 +560,7 @@ function rxSources(s) {
     : rxSig(mNil("لم يُقَس", "none"),
         "لا ترتيب بعد: يُقارن المصدر حين يملك بندين أو أكثر، " +
         (s.eligible ? "ولا يملك ذلك الآن إلا مصدر واحد" : "ولا مصدر يملك ذلك الآن"));
-  return rxCard("src", "مصادر الفرص", "أي قناة تُنتج فرصًا تتقدّم فعلًا؟", sig, body, s.action, false);
+  return rxCard("src", "مصادر الفرص", "القنوات التي تُنتج فرصًا تتقدّم", sig, body, s.action, false);
 }
 
 var RX_KINDS = [
@@ -591,6 +591,6 @@ function rxMovement(m) {
   var sig = rxSig(mN(moved), "انتقال إلى الأمام أو ربح خلال " + mN(m.days) + " يومًا" +
     (m.wonValue ? "، صفقات رابحة بقيمتها الحالية " + opMoneyShort(m.wonValue) : "") +
     (m.lostValue ? "، وخاسرة " + opMoneyShort(m.lostValue) : ""));
-  return rxCard("mov", "الحركة", "ماذا تغيّر في الأنبوب خلال الفترة؟", sig, body, m.action, false);
+  return rxCard("mov", "الحركة", "تغيّرات الأنبوب خلال الفترة", sig, body, m.action, false);
 }
 `;

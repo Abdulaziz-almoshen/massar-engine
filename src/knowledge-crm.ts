@@ -185,7 +185,7 @@ function kbEditor() {
      own wrapper — every rule this sheet needs is scoped to .ds6, and an overlay that inherits none
      of them renders as unstyled markup over the page. */
   var h = '<div class="ds6"><div class="kb-ed"><div class="kb-scrim' + cls + '" data-kb="close"></div><div class="kb-wrap"><div class="m-dlg__p kb-box' + cls + '" role="dialog" aria-modal="true" aria-labelledby="kbmt" aria-describedby="kbms">' +
-    '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="kbmt">معرفة «' + esc(e.product) + '»</h2><p class="m-meta" id="kbms">تُحفظ مسودةً، ويقرؤها المساعد بعد «اعتماد المعرفة» فقط. اكتب ما يُسمح للمساعد بقوله حرفيًا — لا يضيف إليه شيئًا.</p></div>' +
+    '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="kbmt">معرفة «' + esc(e.product) + '»</h2><p class="m-meta" id="kbms">تُحفظ مسودةً ويقرؤها المساعد بعد «اعتماد المعرفة» فقط؛ محتواها ما يُسمح له بقوله حرفيًا بلا إضافة.</p></div>' +
     '<button type="button" class="m-x" data-kb="close" aria-label="إغلاق">' + (typeof pxIco === "function" ? pxIco("x") : "×") + "</button></div>";
   h += '<div class="m-dlg__b"><div class="kb-live" id="kblive">' + kbLiveHtml(live) + "</div>";
   KB_SECTIONS.forEach(function (d) {
@@ -201,7 +201,7 @@ function kbEditor() {
   var badX = e.field === "extra";
   h += '<div class="kb-row m-field"><div class="kb-rh"><label class="m-label" for="kbt_extra">' + esc(KB_EXTRA_LABEL) + '</label><span class="m-meta">لا وزن له</span></div>' +
     '<textarea class="m-input" id="kbt_extra" data-kbsec="__extra" dir="auto" maxlength="' + KB_SECTION_MAX + '"' + (badX ? ' aria-invalid="true"' : "") + ">" + esc(e.extra) + "</textarea>" +
-    '<span class="m-hint">أرقام ومراجع وشهادات وتكاملات. للعناوين الفرعية استخدم ###.</span>' + (badX ? '<span class="m-err" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
+    '<span class="m-hint">أرقام ومراجع وشهادات وتكاملات، و### للعناوين الفرعية.</span>' + (badX ? '<span class="m-err" role="alert">' + esc(e.err) + "</span>" : "") + "</div>";
   h += '</div><div class="m-dlg__f">';
   if (e.confirm) {
     h += '<span class="m-err" role="alert">لديك تغييرات لم تُحفظ.</span><button type="button" class="m-btn" id="kbkeep" data-kb="keep">متابعة التحرير</button><button type="button" class="m-btn" data-kb="discard">تجاهل التغييرات</button>';

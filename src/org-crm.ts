@@ -150,7 +150,7 @@ function vOrg() {
       head("الإدارات", ogNDiv(divs.length)) + "</div>";
     if (!divs.length) {
       h += '<div class="m-empty"><p class="m-empty__t">لا أقسام بعد</p>' +
-        '<p class="m-empty__d">القسم هو وحدة الشركة التي يتبعها المنتج ويعمل داخلها عضو الفريق.</p>' +
+        '<p class="m-empty__d">القسم وحدة الشركة التي يتبعها المنتج ويعمل فيها عضو الفريق.</p>' +
         '<p class="m-empty__a"><a class="m-link" href="#divisions">أضف قسمًا من «الأقسام» &#8592;</a></p></div>';
     } else {
       h += '<div class="m-tablewrap"><table class="m-table og-tbl"><thead><tr>' +

@@ -1036,7 +1036,7 @@ function vProductsCrm() {
       ? '<p class="m-empty__t">' + (pxArchived && !pxFiltered() ? "لا منتجات مؤرشفة." : "لا منتج يطابق التصفية.") + "</p>" +
         (pxFiltered() ? '<p class="m-empty__a"><button type="button" class="m-btn" data-px="clear">مسح التصفية</button></p>' : "")
       : '<p class="m-empty__t">لم تُضف منتجات بعد.</p>' +
-        '<p class="m-empty__d">أضف منتجًا ثم ارفع ملف معرفته ليبيعه المساعد.</p>' +
+        '<p class="m-empty__d">يبيع المساعد المنتج بإضافته ورفع ملف معرفته.</p>' +
         '<p class="m-empty__a"><button type="button" class="m-btn m-btn--primary" data-px="create">إضافة منتج</button></p>') +
       "</div></td></tr>";
   }
@@ -1080,7 +1080,7 @@ function pxSheetHtml() {
   var h = '<div class="ds6"><div class="px-scrim' + cls + '" data-px="sheetclose"></div>';
   h += '<div class="px-dr' + cls + '" role="dialog" aria-modal="true" aria-labelledby="pxdrt">';
   h += '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="pxdrt" tabindex="-1">إضافة منتج</h2>' +
-    '<p class="m-meta">يولد المنتج غير جاهز للمساعد، وسجلّه يوضح ما يلزم</p></div>' +
+    '<p class="m-meta">يُنشأ المنتج غير جاهز للمساعد؛ سجلّه يوضح المطلوب</p></div>' +
     '<button type="button" class="m-x" data-px="sheetclose" aria-label="إغلاق">' + pxIco("x") + "</button></div>";
   /* The division picker reads «إعدادات النظام»; without this it renders with «بلا قسم» alone and
      silently offers no division at all - the same miss that left the ladder unread on الرئيسية. */
@@ -1112,7 +1112,7 @@ function pxSheetHtml() {
     '<div class="m-field"><label class="m-label" for="pxs_target">المستهدف السنوي (ر.س)</label>' +
       mNum({ id: "pxs_target", value: d.annualTarget, label: "المستهدف السنوي", min: 0, step: 1000,
         mode: "numeric", attrs: ' placeholder="بلا مستهدف" data-pxsheet="annualTarget"' }) +
-      '<span class="m-hint">يُوزَّع بالتساوي على الأرباع الأربعة، ويُعدَّل ربعًا ربعًا من سجل المنتج.</span></div>' +
+      '<span class="m-hint">يُوزَّع بالتساوي على الأرباع الأربعة، ويُعدَّل كل ربع من سجل المنتج.</span></div>' +
     '<div class="full">' + fld("pxs_note", "ملاحظة التسعير", "pricingNote", d.pricingNote, { max: 120 }, "مثال: اشتراك سنوي يحدده المختص وفق الحجم", "") + "</div>" +
     "</div></section>";
   h += '<section><h3 class="m-label">الباقة الأولى (اختياري)</h3><div class="m-form">' +
@@ -1456,7 +1456,7 @@ function pxKnowledgeSection(p) {
   if (kn && kn.state === "legacy" && kn.md) {
     b += '<section class="m-card"><div class="m-card__h"><div>' +
       '<h3 class="m-card__t">نص مستخدم قبل تسجيل الاعتماد</h3>' +
-      '<p class="m-meta">راجعه ثم اعتمده ليعود إليه المساعد.</p></div></div>' +
+      '<p class="m-meta">مرجع للمساعد بعد مراجعته واعتماده.</p></div></div>' +
       '<div class="px-md">' + mdRender(kn.md) + "</div>" + (ap.err ? '<span class="m-err" role="alert">' + esc(ap.err) + "</span>" : "") +
       (pxMayEditKb() ? '<div class="px-acts"><button type="button" class="m-btn' + (kn.draftMd ? "" : " m-btn--primary") + '" data-px="approvecurrent"' + (ap.busy ? " disabled" : "") + ">" + (ap.busy ? "جارٍ الاعتماد…" : "اعتماد النص الحالي") + "</button></div>" : "") + "</section>";
   } else if (kn && kn.state === "approved" && kn.md) {
@@ -1682,7 +1682,7 @@ function pxMetaSection(p) {
   b += '<div class="m-field"><label class="m-label" for="pxf_sector">القطاع</label>' +
     '<select class="m-select" id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + dis + '><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
-    '<span class="px-acts">' + (p.sectorAssumed ? '<span class="m-chip m-chip--warn" title="القطاع مُستنتَج — اختر قيمة لتأكيده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
+    '<span class="px-acts">' + (p.sectorAssumed ? '<span class="m-chip m-chip--warn" title="القطاع مُستنتَج؛ اختيار قيمة يؤكده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
   if (typeof cfDivs !== "undefined" && cfDivs.length) {
     b += '<div class="m-field"><label class="m-label" for="pxf_division">القسم</label>' +
       '<select class="m-select" id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا قسم</option>' +
@@ -2567,7 +2567,7 @@ function vSectorDrill(name) {
 
   h += '<section class="m-card m-card--pad0"><div class="m-tools"><div>' +
     '<h2 class="m-card__t">منتجات القطاع حسب الإنجاز</h2>' +
-    '<p class="m-meta">اضغط منتجًا لفتح لوحته.</p></div></div><div class="px-secb px-um">';
+    '</div></div><div class="px-secb px-um">';
   (sec.products || []).forEach(function (nm) {
     var pq = (pcQuarters && pcQuarters.byProduct ? pcQuarters.byProduct : []).filter(function (x) { return x.product === nm; })[0];
     var c = pq ? pq.coveragePct : null;

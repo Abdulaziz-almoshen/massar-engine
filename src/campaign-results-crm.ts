@@ -96,7 +96,7 @@ function crChainCard(camp, st) {
      Nesting the wrapper would paint the page ground inside a card. */
   var h = '<section class="m-card" aria-labelledby="crh"><header class="m-card__h"><div>' +
     '<h2 class="m-card__t" id="crh">سلسلة التحويل</h2>' +
-    '<p class="m-meta">من الإرسال حتى البيع: ما حدث بعد «مهتم». تُنسب الفرصة إلى الحملة إن ذكرتها، أو إن فُتحت عبر واتساب لرقم استهدفته الحملة للمنتج نفسه خلال ' +
+    '<p class="m-meta">من الإرسال حتى البيع: ما حدث بعد «مهتم». تُنسب الفرصة للحملة إن ذكرتها أو فُتحت عبر واتساب لرقم استهدفته الحملة للمنتج نفسه خلال ' +
     crN(ATTRIBUTION_DAYS) + " يومًا من إطلاقها. النسبة تحت كل خطوة محسوبة على الخطوة التي تُقاس عليها: القراءة والردود على المُرسل، والاهتمام على الردود، والعروض والمبيعات على الفرص.</p></div></header><div class=\\"cr-bd\\">";
   if (!w.data) {
     return h + '<p class="m-body"' + (w.failed
@@ -117,7 +117,7 @@ function crChainCard(camp, st) {
     crRate("التحويل إلى فرص", crPct(rates.opportunityConversion), "فرص ÷ مؤهلون") +
     crRate("نسبة الفوز", crPct(rates.winRate), "بنود رابحة ÷ بنود مغلقة") +
     crRate("إيراد الحملة", r.revenue || r.wonLines ? crMoneyN(r.revenue) : crNil("لا بنود رابحة", "none"), "قيمة البنود الرابحة المنسوبة" + (r.openValue ? " · مفتوح: " + crMoneyN(r.openValue) : "")) + "</div>";
-  if (st.interested < r.qualified) h += '<p class="m-meta">«مؤهلون» أكثر من «مهتمون»، فلا نسبة تأهيل: بعض العملاء بلغوا نية مرتفعة أو فُتحت لهم فرصة دون أن يُسجَّل «مهتم» على ردّهم للحملة.</p>';
+  if (st.interested < r.qualified) h += '<p class="m-meta">لا نسبة تأهيل لأن «مؤهلون» أكثر من «مهتمون»؛ بلغ بعض العملاء نية مرتفعة أو فُتحت لهم فرصة دون تسجيل «مهتم» على ردّهم للحملة.</p>';
   if (w.data.lines.length) {
     h += '<div><h3 class="m-label">البنود المنسوبة إلى هذه الحملة</h3><div class="cr-lines">' +
       w.data.lines.slice(0, 30).map(function (l) {
@@ -127,7 +127,7 @@ function crChainCard(camp, st) {
       }).join("") + "</div>" +
       (w.data.lines.length > 30 ? '<p class="m-meta">يُعرض ' + crN(30) + " من " + crN(w.data.lines.length) + ".</p>" : "") + "</div>";
   } else {
-    h += '<p class="m-meta">لا فرص بيع منسوبة إلى هذه الحملة بعد. تُفتح تلقائيًا عند النية المرتفعة، أو يدويًا من «فرص البيع» مع اختيار الحملة مصدرًا.</p>';
+    h += '<p class="m-meta">لا فرص بيع منسوبة للحملة بعد؛ تُفتح تلقائيًا عند النية المرتفعة، أو يدويًا من «فرص البيع» باختيار الحملة مصدرًا.</p>';
   }
   return h + "</div></section>";
 }
