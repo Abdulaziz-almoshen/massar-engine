@@ -1708,7 +1708,16 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-dl{ gap: var(--m-2); }
 .ds6 .hx-dl svg{ inline-size: 16px; block-size: 16px; fill: none; stroke: currentColor;
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-/* ---- row one ---- */.ds6 .hx-kpis{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--m-4); }
+/* ---- row one ---- */
+/* ONE RAIL FOR THE WHOLE SCREEN. Every row is the same twelve columns with the same gutter, and a
+   card takes a whole number of them — so a card edge in one row lands on a card edge in every other
+   row. Before this the three rows each had their own fractions (2fr/1fr, 1.45fr/1fr/1.15fr) and no
+   two column edges below the indicators agreed. */.ds6 .hx-kpis, .ds6 .hx-r2, .ds6 .hx-r3{ display: grid; gap: var(--m-4); align-items: stretch;
+  grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.ds6 .hx-kpis > *{ grid-column: span 3; }
+.ds6 .hx-r3 > :first-child{ grid-column: span 5; }
+.ds6 .hx-r3 > :nth-child(2){ grid-column: span 3; }
+.ds6 .hx-r3 > :nth-child(3){ grid-column: span 4; }
 .ds6 .hx-kpi{ min-inline-size: 0; background: var(--m-paper); border: 1px solid var(--m-line);
   border-radius: var(--m-r-card); padding-block: var(--m-3); padding-inline: var(--m-4); }
 .ds6 .hx-kpi__h{ display: flex; align-items: center; gap: var(--m-2); margin-block-end: var(--m-2); }
@@ -1739,32 +1748,41 @@ export const MASSAR_DS_CSS = `
   background: var(--m-ac); }
 .ds6 .hx-mini i.is-off{ background-color: var(--m-sunk);
   background-image: repeating-linear-gradient(135deg, transparent 0 2px, var(--m-line-2) 2px 3px); }
-/* ---- row two ---- */.ds6 .hx-r2{ display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--m-4); }
+/* ---- row two ---- */.ds6 .hx-r2 > :first-child{ grid-column: span 8; }
+.ds6 .hx-r2 > :nth-child(2){ grid-column: span 4; }
 .ds6 .hx-seg{ display: inline-flex; padding: 3px; border-radius: 999px; background: var(--m-sunk); }
 .ds6 .hx-seg button{ border: 0; background: transparent; font: inherit; font-size: var(--m-t-micro);
   color: var(--m-mut); padding-block: 5px; padding-inline: var(--m-3); border-radius: 999px;
   cursor: pointer; white-space: nowrap; }
 .ds6 .hx-seg button[aria-pressed="true"]{ background: var(--m-paper); color: var(--m-ink);
   font-weight: 600; box-shadow: var(--m-low); }
-/* The plot: a value axis beside the bars, gridlines behind them. */.ds6 .hx-flow{ display: flex; gap: var(--m-2); margin-block-start: var(--m-3); }
+/* The plot: a value axis beside the bars, gridlines behind them. */
+/* THE PLOT FILLS THE CARD. Both cards in this row stretch to the taller one (the pipeline's six
+   stages), so a fixed-height plot left a blank half-card under its legend. The plot grows instead,
+   and its bars grow with it — measured: about 200px of nothing is now chart. */.ds6 .hx-card--wide{ min-block-size: 360px; }
+.ds6 .hx-card--wide .hx-flow{ flex: 1 1 auto; min-block-size: 220px; }
+.ds6 .hx-flow{ display: flex; gap: var(--m-2); margin-block-start: var(--m-3); }
 .ds6 .hx-flow__y{ display: flex; flex-direction: column; justify-content: space-between;
-  block-size: 186px; padding-block-end: 22px; font-size: var(--m-t-micro); color: var(--m-faint); }
+  block-size: auto; padding-block-end: 24px; font-size: var(--m-t-micro); color: var(--m-faint); }
 .ds6 .hx-flow__p{ position: relative; flex: 1 1 auto; min-inline-size: 0; }
 .ds6 .hx-flow__g{ position: absolute; inset-block: 0 22px; inset-inline: 0; display: flex;
   flex-direction: column; justify-content: space-between; pointer-events: none; }
 .ds6 .hx-flow__g i{ display: block; border-block-start: 1px solid var(--m-line); }
 .ds6 .hx-flow__c{ position: relative; display: grid;
-  grid-template-columns: repeat(var(--hx-n, 12), minmax(0, 1fr)); gap: var(--m-1); block-size: 208px; }
+  grid-template-columns: repeat(var(--hx-n, 12), minmax(0, 1fr)); gap: var(--m-1);
+  block-size: 100%; min-block-size: 208px; }
 .ds6 .hx-flow__m{ position: relative; display: flex; flex-direction: column; justify-content: flex-end;
   gap: var(--m-1); min-inline-size: 0; }
-.ds6 .hx-flow__pair{ display: flex; align-items: flex-end; justify-content: center; gap: 3px;
-  block-size: 186px; }
+.ds6 .hx-flow__pair{ flex: 1 1 auto; display: flex; align-items: flex-end; justify-content: center;
+  gap: 3px; min-block-size: 0; }
 .ds6 .hx-flow__pair i{ inline-size: 10px; block-size: var(--hx-h, 0%); min-block-size: 2px;
   border-start-start-radius: 3px; border-start-end-radius: 3px; }
 .ds6 .hx-flow__pair i.is-open{ background: var(--m-ac); }
 .ds6 .hx-flow__pair i.is-closed{ background: var(--m-ok); }
-.ds6 .hx-flow__x{ text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The label belongs to its column and must not be cut: at 13 weekly buckets «30 أغسطس» was
+   rendering as «30 أغ…». It wraps to two lines instead, and the row reserves the space. */
+/* One line, never broken: a wrapped label gave every column a different baseline. */.ds6 .hx-flow__x{ text-align: center; font-size: var(--m-t-micro); color: var(--m-mut);
+  line-height: 1.25; min-block-size: 18px; white-space: nowrap; }
 /* The reference's dark card over the period under the pointer. Pointer only: it is decoration for
    a mouse and noise for a touch screen, where there is no hover to leave. */.ds6 .hx-tip{ display: none; }
 @media (hover: hover) and (pointer: fine){.ds6 .hx-tip{ position: absolute; inset-block-end: calc(100% - 150px); inset-inline-start: 50%;
@@ -1798,10 +1816,19 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-pipe__d.t3, .ds6 .hx-pipe__b i.t3{ background: var(--m-warn); }
 .ds6 .hx-pipe__d.t4, .ds6 .hx-pipe__b i.t4{ background: var(--m-line-2); }
 .ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
-/* ---- row three ---- */.ds6 .hx-r3{ display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1.15fr);
-  gap: var(--m-4); align-items: stretch; }
-.ds6 .hx-tblw{ overflow-x: auto; }
-.ds6 .hx-tbl{ inline-size: 100%; border-collapse: collapse; }
+/* ---- row three ---- */.ds6 .hx-tblw{ overflow-x: auto; }
+/* FIXED COLUMNS. With auto layout each cell took the width of its own text, so «Deema» and «واتساب»
+   ran together and the status pill drifted away from the header naming it. Each column now has a
+   role and a share, and every cell is aligned to the header above it. */.ds6 .hx-tbl{ inline-size: 100%; border-collapse: collapse; table-layout: fixed; }
+.ds6 .hx-tbl col.c-date{ inline-size: 22%; }
+.ds6 .hx-tbl col.c-ev{ inline-size: 26%; }
+.ds6 .hx-tbl col.c-who{ inline-size: 20%; }
+.ds6 .hx-tbl col.c-ch{ inline-size: 14%; }
+.ds6 .hx-tbl col.c-st{ inline-size: 18%; }
+.ds6 .hx-tbl th, .ds6 .hx-tbl td{ padding-inline-end: var(--m-2); }
+.ds6 .hx-tbl th:last-child, .ds6 .hx-tbl td:last-child{ padding-inline-end: 0; }
+.ds6 .hx-tbl__s{ text-align: end; }
+.ds6 .hx-tbl th:last-child{ text-align: end; }
 .ds6 .hx-tbl th{ text-align: start; font-size: var(--m-t-micro); font-weight: 500; color: var(--m-mut);
   padding-block-end: var(--m-2); border-block-end: 1px solid var(--m-line); white-space: nowrap; }
 .ds6 .hx-tbl td{ padding-block: var(--m-2); border-block-end: 1px solid var(--m-line);
@@ -1844,7 +1871,7 @@ export const MASSAR_DS_CSS = `
   border-radius: 8px; background: var(--m-warn-dim); color: var(--m-warn); }
 .ds6 .hx-note__i svg{ inline-size: 15px; block-size: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; }
 .ds6 .hx-donut{ display: flex; align-items: center; gap: var(--m-4); flex-wrap: wrap; }
-.ds6 .hx-donut__r{ position: relative; flex: none; inline-size: 116px; block-size: 116px; }
+/* The ring gives width back to the legend: the names are what the reader is here for. */.ds6 .hx-donut__r{ position: relative; flex: none; inline-size: 100px; block-size: 100px; }
 .ds6 .hx-donut__r svg{ inline-size: 100%; block-size: 100%; transform: rotate(-90deg); }
 .ds6 .hx-donut__r circle{ fill: none; stroke-width: 5; }
 .ds6 .hx-donut__t{ stroke: var(--m-sunk); }
@@ -1859,8 +1886,13 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-donut__c small{ font-size: var(--m-t-micro); color: var(--m-mut); }
 .ds6 .hx-donut__l{ list-style: none; margin: 0; padding: 0; flex: 1 1 130px; min-inline-size: 0;
   display: flex; flex-direction: column; gap: var(--m-2); }
-.ds6 .hx-donut__l li{ display: flex; align-items: center; gap: var(--m-2); font-size: var(--m-t-micro);
-  color: var(--m-ink-2); }
+/* A grid, not a flex row: the labels differ in width, so the counts and the shares were landing at
+   a different x on every line. */
+/* The count column is FIXED, not auto: an auto column is pinned to the share beside it and grows
+   the other way, so the counts began at a different x on every line — the ragged edge is the one
+   the eye reads first in Arabic. */.ds6 .hx-donut__l li{ display: grid; grid-template-columns: 8px minmax(0, 1fr) 52px 30px;
+  align-items: center; gap: var(--m-2); font-size: var(--m-t-micro); color: var(--m-ink-2); }
+.ds6 .hx-donut__l b{ text-align: end; }
 .ds6 .hx-donut__l i{ flex: none; inline-size: 8px; block-size: 8px; border-radius: 50%; }
 .ds6 .hx-donut__l i.t0{ background: var(--m-ac); }
 .ds6 .hx-donut__l i.t1{ background: #5B8DEF; }
@@ -1870,8 +1902,8 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-donut__l span{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; }
 .ds6 .hx-donut__l b{ color: var(--m-ink); }
-@media (max-width: 1280px){.ds6 .hx-kpis{ grid-template-columns: repeat(2, minmax(0, 1fr)); }.ds6 .hx-r2, .ds6 .hx-r3{ grid-template-columns: minmax(0, 1fr); }}
-@media (max-width: 700px){.ds6 .hx-kpis{ grid-template-columns: minmax(0, 1fr); }.ds6 .hx-flow__c{ block-size: 176px; }.ds6 .hx-flow__pair, .ds6 .hx-flow__y{ block-size: 154px; }}
+@media (max-width: 1280px){.ds6 .hx-kpis > *{ grid-column: span 6; }.ds6 .hx-r2 > *, .ds6 .hx-r3 > *{ grid-column: span 12; }}
+@media (max-width: 700px){.ds6 .hx-kpis > *{ grid-column: span 12; }.ds6 .hx-flow__c{ min-block-size: 176px; }}
 /* The legend carries the count as well as the share: «17٪» of six lines is one line, and the
    reader should not have to divide to learn that. */.ds6 .hx-donut__l em{ font-style: normal; font-size: var(--m-t-micro); color: var(--m-mut);
   white-space: nowrap; }

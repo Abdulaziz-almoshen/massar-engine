@@ -417,13 +417,21 @@ function hdsActivity(days) {
   };
   var labelOf = function (d) {
     if (step === "month") return HX_MONTHS[d.getMonth()];
-    return fmtN(d.getDate()) + " " + HX_MONTHS[d.getMonth()].slice(0, 4);
+    /* A compact date on a dense axis. The month name truncated to «أغسط» at 13 buckets, and letting
+       it wrap broke the word across three lines and pushed each column's baseline to a different
+       height. «30/8» cannot do either, and the tooltip carries the full date. */
+    return fmtN(d.getDate()) + "/" + fmtN(d.getMonth() + 1);
   };
   var start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days + 1);
   var cursor = new Date(start.getTime());
   while (cursor <= now) {
     var k = keyOf(cursor);
-    if (!index[k]) { index[k] = { k: k, label: labelOf(cursor), out: 0, inb: 0 }; buckets.push(index[k]); }
+    if (!index[k]) {
+      index[k] = { k: k, label: labelOf(cursor), out: 0, inb: 0,
+        full: step === "month" ? HX_MONTHS[cursor.getMonth()] + " " + cursor.getFullYear()
+          : fmtN(cursor.getDate()) + " " + HX_MONTHS[cursor.getMonth()] + (step === "week" ? " — أسبوع" : "") };
+      buckets.push(index[k]);
+    }
     cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
   }
   var since = start.getTime();
@@ -472,7 +480,7 @@ function hdsFlowCard(f) {
       '<p class="m-meta">الرسائل الصادرة والواردة</p></div></div>' +
       '<div class="m-empty"><div class="m-empty__t">' + hdsNil("جارٍ القراءة", "unset") + "</div></div></section>";
   }
-  var series = act.buckets.map(function (b) { return { label: b.label, opened: b.out, closed: b.inb }; });
+  var series = act.buckets.map(function (b) { return { label: b.label, full: b.full, opened: b.out, closed: b.inb }; });
   var peak = Math.max.apply(null, series.map(function (s) { return Math.max(s.opened, s.closed); }).concat([1]));
   /* Rounded up to a multiple of four so the four gridlines carry whole numbers. At a peak of 6 the
      quarter marks were 4.5 and 1.5, printed as «5» and «2» — labels a pixel-reader would check the
@@ -497,7 +505,7 @@ function hdsFlowCard(f) {
   }
   h += '<div class="hx-flow" role="img" aria-label="' +
     esc("الرسائل: " + series.map(function (s) {
-      return s.label + " صادرة " + s.opened + " وواردة " + s.closed;
+      return (s.full || s.label) + " صادرة " + s.opened + " وواردة " + s.closed;
     }).join("، ")) + '">' +
     '<div class="hx-flow__y" aria-hidden="true">' + ticks.map(function (t) {
       return '<span class="m-n">' + fmtN(t) + "</span>";
@@ -511,9 +519,9 @@ function hdsFlowCard(f) {
             '<i class="is-open" style="--hx-h:' + Math.round((s.opened / max) * 100) + '%"></i>' +
             '<i class="is-closed" style="--hx-h:' + Math.round((s.closed / max) * 100) + '%"></i>' +
           "</span>" +
-          '<span class="hx-flow__x">' + esc(s.label) + "</span>" +
+          '<span class="hx-flow__x"><span class="m-n">' + esc(s.label) + "</span></span>" +
           /* The reference's dark card, over the period the pointer is on. */
-          '<span class="hx-tip"><b>' + esc(s.label) + "</b>" +
+          '<span class="hx-tip"><b>' + esc(s.full || s.label) + "</b>" +
             '<span><i class="is-open"></i>صادرة<b class="m-n">' + fmtN(s.opened) + "</b></span>" +
             '<span><i class="is-closed"></i>واردة<b class="m-n">' + fmtN(s.closed) + "</b></span></span>" +
           "</div>";
@@ -577,6 +585,7 @@ function hdsEventsCard() {
   else if (!out.length) body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا أحداث في هذه الفترة", "none") + "</div></div>";
   else {
     body = '<div class="hx-tblw"><table class="hx-tbl">' +
+      '<colgroup><col class="c-date"><col class="c-ev"><col class="c-who"><col class="c-ch"><col class="c-st"></colgroup>' +
       "<thead><tr><th>التاريخ</th><th>الحدث</th><th>الجهة</th><th>القناة</th><th>الحالة</th></tr></thead><tbody>" +
       out.slice(0, 4).map(function (e) {
         var k = HX_EV[e.kind] || [e.kind, "is-muted", "&#8226;"];
@@ -584,7 +593,7 @@ function hdsEventsCard() {
           "<td><span class='hx-ev'><i class='" + k[1] + "'>" + k[2] + "</i>" + esc(k[0]) + "</span></td>" +
           "<td class='hx-tbl__w'>" + esc(clip(e.who, 18)) + "</td>" +
           "<td class='hx-tbl__c'>" + esc(e.ch) + "</td>" +
-          "<td><span class='hx-tag " + k[1] + "'>" + esc(k[0]) + "</span></td></tr>";
+          "<td class='hx-tbl__s'><span class='hx-tag " + k[1] + "'>" + esc(k[0]) + "</span></td></tr>";
       }).join("") + "</tbody></table></div>";
   }
   return '<section class="hx-card">' +
@@ -646,7 +655,17 @@ function hdsDonutCard(lines) {
     if (!byName[k]) { byName[k] = { label: k === "__none" ? "بلا قطاع" : k, n: 0, none: k === "__none" }; order.push(k); }
     byName[k].n++;
   });
-  var parts = order.map(function (k) { return byName[k]; }).sort(function (a, b) { return b.n - a.n; });
+  var all = order.map(function (k) { return byName[k]; }).sort(function (a, b) { return b.n - a.n; });
+  /* FIVE SLICES AND A REMAINDER. The palette holds five tones; with six sectors the sixth reused the
+     first, so two different sectors were drawn in the same blue — colour naming two things at once
+     is the one thing it may never do. The tail is grouped and counted instead of recoloured. */
+  var parts = all;
+  if (all.length > 5) {
+    var tail = all.slice(4);
+    var rest = { label: "قطاعات أخرى", n: 0, rest: tail.length };
+    tail.forEach(function (x) { rest.n += x.n; });
+    parts = all.slice(0, 4).concat([rest]);
+  }
   var total = parts.reduce(function (n, x) { return n + x.n; }, 0);
   var body;
   if (!rows) {
@@ -672,7 +691,9 @@ function hdsDonutCard(lines) {
       '<ul class="hx-donut__l">' + parts.map(function (x, i) {
         /* The count as well as the share: «17٪» of six lines is one line, and the reader should not
            have to do that arithmetic to know it. */
-        return '<li><i class="t' + (i % 5) + '"></i><span>' + esc(x.label) + "</span>" +
+        var rest = x.rest ? hdsPl(x.rest, "قطاع", "قطاعان", "قطاعات", "قطاعًا") : "";
+        return "<li" + (rest ? ' title="' + esc(x.label + " — " + rest) + '"' : "") +
+          '><i class="t' + (i % 5) + '"></i><span>' + esc(x.label) + "</span>" +
           '<em>' + hdsPl(x.n, "حساب", "حسابان", "حسابات", "حسابًا") + "</em>" +
           '<b class="m-n">' + fmtN(Math.round((x.n / total) * 100)) + "٪</b></li>";
       }).join("") + "</ul></div>";
