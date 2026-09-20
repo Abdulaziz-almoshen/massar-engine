@@ -167,7 +167,11 @@ function vReportsStuck() {
   if (cur.empty) {
     h += '<div class="m-card m-empty"><p class="m-empty__t">' + esc(cur.empty.title) + "</p>" +
       '<p class="m-empty__d">' + esc(cur.empty.body) + "</p></div>";
-    return h;
+    /* THE ROLLUPS ARE NOT PART OF THE SELECTED REPORT. «أين تتعثّر الصفقات» and «الخسائر حسب
+       السبب» are page-level and answer their own questions; returning here hid both of them behind
+       an unrelated empty state, and on a book with no stalled deal that is EVERY load - two whole
+       report cards no reader could reach. */
+    return h + vReportRollups();
   }
 
   h += '<p class="rp-tot m-meta">' + mPl(cur.count, "فرصة واحدة", "فرصتان", "فرص", "فرصة") +
@@ -238,9 +242,28 @@ function vReportRollups() {
     var COLR = ["#D9534F", "#B37F00", "#1E5FCC", "#767D89", "#5B8DEF"];
     h += shStack(rpRoll.byReason.map(function (r, i) {
       return { n: r.label, v: r.value || 0, c: COLR[i % COLR.length] }; }));
+    /* THE SHARE AND THE RUNG, both in the reference and neither printed here. A count without its
+       share does not answer «which reason dominates», and a reason without the stage it happened
+       at does not say WHERE the deal was lost - «اعتراض سعري» at «عرض السعر» and at «التفاوض»
+       are different failures. The rung is DERIVED from the outcome itself, because an outcome is
+       only recordable on its own stage (outcomeForStage enforces that on the write), so no second
+       source can disagree with it. A loss reason picked from the close dialog is not a stage
+       outcome and has no rung - and says so rather than borrowing one. */
+    var lossTotal = 0;
+    rpRoll.byReason.forEach(function (r) { lossTotal += r.count; });
     rpRoll.byReason.forEach(function (r) {
+      var share = lossTotal > 0 ? Math.round((r.count / lossTotal) * 100) : null;
+      var at = null;
+      if (typeof STAGE_OUTCOMES !== "undefined" && STAGE_OUTCOMES) {
+        for (var si = 0; si < STAGE_OUTCOMES.length; si++) {
+          if (STAGE_OUTCOMES[si].key === r.outcomeKey) { at = STAGE_OUTCOMES[si].stage; break; }
+        }
+      }
+      var sub = mPl(r.count, "صفقة واحدة", "صفقتان", "صفقات", "صفقة") +
+        (share === null ? "" : " · " + mPct(share)) +
+        " · " + (at ? "عند " + esc(opStage(at).label) : mNil("المرحلة غير مسجّلة", "unset"));
       h += '<div class="m-item"><span class="m-item__b"><span class="m-item__n">' + esc(r.label) + "</span>" +
-        '<span class="m-item__s">' + mPl(r.count, "صفقة واحدة", "صفقتان", "صفقات", "صفقة") + "</span></span>" +
+        '<span class="m-item__s">' + sub + "</span></span>" +
         '<span class="m-item__v">' + mMoney(r.value) + "</span></div>";
     });
   }
