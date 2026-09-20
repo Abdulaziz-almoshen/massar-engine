@@ -4349,9 +4349,9 @@ export async function productReferences(name: string): Promise<{ total: number; 
  * an exception on collision — the drawer shows it inline.
  */
 export async function createProduct(p: {
-  name: string; sectorId: number | null; owner: string | null; pricingNote: string | null;
+  name: string; sectorId: number | null; divisionId: number | null; owner: string | null; pricingNote: string | null;
   firstPackage: { name: string; listPrice: number; years: number; scope: string | null } | null;
-}, by: string): Promise<"ok" | "exists" | "unknown_sector"> {
+}, by: string): Promise<"ok" | "exists" | "unknown_sector" | "unknown_division"> {
   if (!pool || !connected) throw new Error("db not connected");
   const client = await pool.connect();
   try {
@@ -4365,14 +4365,19 @@ export async function createProduct(p: {
       const s = await client.query(`SELECT 1 FROM sectors WHERE id = $1`, [p.sectorId]);
       if (!s.rowCount) { await client.query("ROLLBACK"); return "unknown_sector"; }
     }
+    if (p.divisionId != null) {
+      const d = await client.query(`SELECT 1 FROM divisions WHERE id = $1`, [p.divisionId]);
+      if (!d.rowCount) { await client.query("ROLLBACK"); return "unknown_division"; }
+    }
     // A metadata row can predate the tag (a deleted product re-created, or a seed row); the
     // drawer's values win, and a chosen sector is a fact rather than a guess.
     await client.query(
-      `INSERT INTO product_meta (product, sector_id, owner, pricing_note, sector_assumed, archived_at, updated_at)
-       VALUES ($1,$2,$3,$4,false,NULL,$5)
-       ON CONFLICT (product) DO UPDATE SET sector_id = EXCLUDED.sector_id, owner = EXCLUDED.owner,
-         pricing_note = EXCLUDED.pricing_note, sector_assumed = false, archived_at = NULL, updated_at = EXCLUDED.updated_at`,
-      [p.name, p.sectorId, p.owner, p.pricingNote, now]);
+      `INSERT INTO product_meta (product, sector_id, division_id, owner, pricing_note, sector_assumed, archived_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,false,NULL,$6)
+       ON CONFLICT (product) DO UPDATE SET sector_id = EXCLUDED.sector_id, division_id = EXCLUDED.division_id,
+         owner = EXCLUDED.owner, pricing_note = EXCLUDED.pricing_note, sector_assumed = false,
+         archived_at = NULL, updated_at = EXCLUDED.updated_at`,
+      [p.name, p.sectorId, p.divisionId, p.owner, p.pricingNote, now]);
     if (p.firstPackage) {
       await client.query(
         `INSERT INTO packages (product, name, list_price, years, scope, created_at) VALUES ($1,$2,$3,$4,$5,$6)`,

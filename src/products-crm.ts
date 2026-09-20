@@ -1082,6 +1082,9 @@ function pxSheetHtml() {
   h += '<div class="m-dlg__h"><div><h2 class="m-dlg__t" id="pxdrt" tabindex="-1">إضافة منتج</h2>' +
     '<p class="m-meta">يولد المنتج غير جاهز للمساعد، وسجلّه يوضح ما يلزم</p></div>' +
     '<button type="button" class="m-x" data-px="sheetclose" aria-label="إغلاق">' + pxIco("x") + "</button></div>";
+  /* The division picker reads «إعدادات النظام»; without this it renders with «بلا قسم» alone and
+     silently offers no division at all - the same miss that left the ladder unread on الرئيسية. */
+  if (typeof cfLoad === "function") cfLoad(false);
   h += '<div class="m-dlg__b">';
   h += '<section><h3 class="m-label">المنتج</h3><div class="m-form">' +
     '<div class="full">' + fld("pxs_name", "اسم المنتج", "name", d.name, { max: 60, req: true }, "مثال: سجل التطعيمات الوطني", nameErr) + "</div>" +
@@ -1089,11 +1092,27 @@ function pxSheetHtml() {
     '<select class="m-select" id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
     "</select></div>" +
-    '<div class="m-field"><label class="m-label" for="pxs_owner">المسؤول</label>' +
-      mCombo({ id: "pxs_owner", value: d.owner, options: pxOwnerList(), placeholder: "بلا مسؤول",
-        label: "المسؤول", free: true, wide: true,
+    /* THE OWNING UNIT, at birth rather than on a return visit. */
+    '<div class="m-field"><label class="m-label" for="pxs_division">القسم</label>' +
+    '<select class="m-select" id="pxs_division" data-pxsheet="divisionId"><option value="">بلا قسم</option>' +
+    ((typeof cfDivs !== "undefined" && cfDivs) || []).map(function (v) {
+      return '<option value="' + v.id + '"' + (String(d.divisionId) === String(v.id) ? " selected" : "") + ">" + esc(v.name) + "</option>"; }).join("") +
+    "</select></div>" +
+    /* ONE NAME FOR ONE FIELD. This drawer said «المسؤول» and the record said «مدير المنتج» for
+       the same column, so the two screens read as though they held different people. */
+    '<div class="m-field"><label class="m-label" for="pxs_owner">مدير المنتج</label>' +
+      mCombo({ id: "pxs_owner", value: d.owner, options: pxOwnerList(), placeholder: "بلا مدير",
+        label: "مدير المنتج", free: true, wide: true,
         empty: "لا أسماء بعد — اكتب اسمًا، أو أضِف الفريق من «إعدادات النظام»",
         attrs: ' data-pxsheet="owner"' }) + "</div>" +
+    /* THE TARGET, AT BIRTH. Every product created here started with none, and «بلا مستهدف» is
+       handled in five places downstream because of it. The reference makes this field mandatory;
+       it stays optional here, because a product genuinely may not be sold this year - but the
+       split it performs is STATED, not hidden, and every quarter stays editable on the record. */
+    '<div class="m-field"><label class="m-label" for="pxs_target">المستهدف السنوي (ر.س)</label>' +
+      mNum({ id: "pxs_target", value: d.annualTarget, label: "المستهدف السنوي", min: 0, step: 1000,
+        mode: "numeric", attrs: ' placeholder="بلا مستهدف" data-pxsheet="annualTarget"' }) +
+      '<span class="m-hint">يُوزَّع بالتساوي على الأرباع الأربعة، ويُعدَّل ربعًا ربعًا من سجل المنتج.</span></div>' +
     '<div class="full">' + fld("pxs_note", "ملاحظة التسعير", "pricingNote", d.pricingNote, { max: 120 }, "مثال: اشتراك سنوي يحدده المختص وفق الحجم", "") + "</div>" +
     "</div></section>";
   h += '<section><h3 class="m-label">الباقة الأولى (اختياري)</h3><div class="m-form">' +
@@ -1125,6 +1144,7 @@ function pxSheetSubmit() {
   if (!nc.ok) { pxSheetErr = nc.reason; render(false); var f = document.getElementById("pxs_name"); if (f) f.focus(); return; }
   var body = { name: nc.name };
   if (d.sectorId) body.sectorId = Number(d.sectorId);
+  if (d.divisionId) body.divisionId = Number(d.divisionId);
   if (d.owner.trim()) body.owner = d.owner.trim();
   if (d.pricingNote.trim()) body.pricingNote = d.pricingNote.trim();
   if (d.pkgName.trim()) {
@@ -1141,10 +1161,19 @@ function pxSheetSubmit() {
       render(false); return;
     }
     var name = (r.j.product && r.j.product.product) || nc.name;
+    /* The four quarters are written with the SAME call the record's editor uses, rather than a
+       second server path that could drift from it. Read before the draft is cleared. */
+    var annual = String(d.annualTarget || "").trim();
+    var per = annual === "" ? null : Math.floor(Number(annual) / 4);
     pxSheet = null; pxDrShown = false;
     pcLoad(true); pcPerfLoad(pcPerfYear, true);
     pxTagsRefresh();
     location.hash = "product/" + pxEnc(name);
+    if (per !== null && isFinite(per) && per >= 0) {
+      /* pcPerfLoad above is in flight; the quarters this writes against arrive with it, so the
+         writes are queued behind one repaint rather than racing the read. */
+      setTimeout(function () { for (var q = 1; q <= 4; q++) pxSaveTarget(name, q, String(per), true); }, 600);
+    }
     pxToast("أُنشئ «" + name + "» — أضف ملف المعرفة ليبيعه المساعد", false);
   }).catch(function () { pxSheetBusy = false; pxSheetErr = "تعذّر الاتصال — لم يُنشأ المنتج."; render(false); });
 }
@@ -1988,7 +2017,7 @@ document.addEventListener("click", function (ev) {
   else if (a === "unmatched") { pcUnmatchedOpen = !pcUnmatchedOpen; render(false); }
   else if (a === "reconcile") { pxReconcile(Number(t.getAttribute("data-i"))); }
   else if (a === "umcreate") { pxUmCreate(Number(t.getAttribute("data-i"))); }
-  else if (a === "create") { pxOpener = t.id || "pxadd"; pxSheet = { name: "", sectorId: "", owner: "", pricingNote: "", pkgName: "", pkgScope: "", pkgPrice: "", pkgYears: "1", touched: false }; pxSheetErr = ""; pxDrShown = false; render(false); }
+  else if (a === "create") { pxOpener = t.id || "pxadd"; pxSheet = { name: "", sectorId: "", divisionId: "", owner: "", annualTarget: "", pricingNote: "", pkgName: "", pkgScope: "", pkgPrice: "", pkgYears: "1", touched: false }; pxSheetErr = ""; pxDrShown = false; render(false); }
   else if (a === "sheetclose") { pxSheet = null; pxSheetErr = ""; pxDrShown = false; render(false); var o = document.getElementById(pxOpener || "pxadd"); if (o) o.focus(); }
   else if (a === "sheetsubmit") { pxSheetSubmit(); }
   else if (a === "menu") { pxMenuOpen = !pxMenuOpen; render(false); }

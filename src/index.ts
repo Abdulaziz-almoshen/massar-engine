@@ -545,6 +545,13 @@ app.post("/admin/products", async (req, reply) => {
       return problem(reply, 400, "invalid_field", "قطاع غير معروف", "sectorId");
     }
   }
+  // THE OWNING UNIT, AT BIRTH. It was settable on the record and absent from the create drawer, so
+  // every new product started with no division and stayed that way until someone went back for it.
+  let divisionId: number | null = null;
+  if (b.divisionId != null && b.divisionId !== "") {
+    divisionId = Number(b.divisionId);
+    if (!Number.isInteger(divisionId)) return problem(reply, 400, "invalid_field", "قسم غير معروف", "divisionId");
+  }
   let firstPackage: { name: string; listPrice: number; years: number; scope: string | null } | null = null;
   if (b.firstPackage != null && typeof b.firstPackage === "object") {
     const pk = readPackageBody(b.firstPackage as Record<string, unknown>);
@@ -552,9 +559,10 @@ app.post("/admin/products", async (req, reply) => {
     firstPackage = pk;
   }
   if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const r = await db.createProduct({ name: named.name, sectorId, owner, pricingNote, firstPackage }, adminName(req));
+  const r = await db.createProduct({ name: named.name, sectorId, divisionId, owner, pricingNote, firstPackage }, adminName(req));
   if (r === "exists") return problem(reply, 409, "name_exists", "الاسم مستخدم لمنتج آخر", "name");
   if (r === "unknown_sector") return problem(reply, 400, "invalid_field", "قطاع غير معروف", "sectorId");
+  if (r === "unknown_division") return problem(reply, 400, "invalid_field", "قسم غير معروف", "divisionId");
   // A create can match files already uploaded under this name (spec F) — the assistant must see them.
   await agent.refreshKb();
   const row = await productRow(named.name);
