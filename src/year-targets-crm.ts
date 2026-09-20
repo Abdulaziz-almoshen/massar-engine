@@ -51,6 +51,9 @@ export const YEAR_TARGETS_CSS = `
    zero-progress track are different facts and they drew identically. */
 .ds6 .yt-qc.none .m-meter{background:repeating-linear-gradient(135deg,var(--m-sunk),
   var(--m-sunk) 4px,var(--m-paper) 4px,var(--m-paper) 8px)}
+/* Same rule, one size up, for the company's own four quarters. */
+.ds6 .m-seg-row__b.yt-q--none{background:repeating-linear-gradient(135deg,var(--m-sunk),
+  var(--m-sunk) 4px,var(--m-paper) 4px,var(--m-paper) 8px)}
 @media (max-width:900px){
   .ds6 .yt-tbl .m-table{min-inline-size:640px}
   .ds6 .yt-q{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -70,6 +73,10 @@ function ytDivisionOf(product) {
   return "";
 }
 function ytMoney(v) { return typeof opMoneyShort === "function" ? opMoneyShort(v) : fmtN(Math.round(v || 0)) + " ر.س"; }
+/* UNABBREVIATED, for a column whose whole purpose is comparison. opMoneyShort switches to «38 ألف»
+   past a threshold, so four quarters read «4,000 · 6,000 · 38 ألف · 6,000» and the one that
+   matters most is the one the eye cannot place on the same scale as its neighbours. */
+function ytMoneyFull(v) { return fmtN(Math.round(Number(v) || 0)) + " ر.س"; }
 /* The attainment pill's tone is a CLASSIFICATION of the figure beside it, which is the only reason
    it is allowed to be a colour at all. It reads from the m-* status tokens, never from a fourth
    palette of its own. */
@@ -167,6 +174,43 @@ function vYearTargets() {
   } else if (rows.length) {
     h += '<p class="m-meta">كل ' + mPl(rows.length, "منتج واحد", "منتجان", "منتجات", "منتجًا") +
       " يحمل مستهدفًا موجبًا مسجّلًا لهذه السنة.</p>";
+  }
+
+  /* ---- «الإنجاز الربعي الإجمالي» ----
+     THE YEAR'S SHAPE, for the company. Every quarter of every product is already on this screen,
+     one product per row — so the one thing nobody could read was the company's own four quarters:
+     whether the plan is back-loaded, and which quarter is carrying it. Summed from the same
+     rows array the table below renders, so a quarter here and one down there cannot disagree.
+
+     This lives on the YEAR screen and not on الرئيسية on purpose: home already prints the target
+     and the gap, and a third cut of the same figure is the redundancy that was cleared off it. */
+  var qAll = [1, 2, 3, 4].map(function (q) { return { q: q, target: null, achieved: 0 }; });
+  rows.forEach(function (r) {
+    (r.quarters || []).forEach(function (x) {
+      var slot = qAll[Number(x.quarter) - 1];
+      if (!slot) return;
+      /* null is NO TARGET RECORDED and must not become a zero: a quarter nobody planned for and a
+         quarter planned at zero are different facts, and only the second has a denominator. */
+      if (x.target !== null && x.target !== undefined) slot.target = (slot.target || 0) + Number(x.target);
+      slot.achieved += Number(x.achieved) || 0;
+    });
+  });
+  if (qAll.some(function (x) { return x.target !== null || x.achieved; })) {
+    var curQ = cur;
+    h += '<section class="m-card yt-sec"><div class="m-card__h">' +
+      '<h2 class="m-card__t">الإنجاز الربعي الإجمالي</h2>' +
+      '<span class="m-meta">مجموع الأرباع لكل المنتجات</span></div><div class="m-segs">' +
+      qAll.map(function (x) {
+        var has = x.target !== null && x.target > 0;
+        var pct = has ? Math.round((x.achieved / x.target) * 100) : 0;
+        return '<div class="m-seg-row m-seg-row--wide"><span class="m-seg-row__t">الربع ' + mN(x.q) +
+            (x.q === curQ ? " · الحالي" : "") + "</span>" +
+          '<span class="m-seg-row__b' + (has ? "" : " yt-q--none") + '"><i style="--m-pct:' +
+            Math.min(100, pct) + '%"></i></span>' +
+          '<span class="m-seg-row__v">' + (has
+            ? ytMoneyFull(x.achieved) + " من " + ytMoneyFull(x.target) + " · " + mPct(pct)
+            : mNil("بلا مستهدف", "owed")) + "</span></div>";
+      }).join("") + "</div></section>";
   }
 
   /* Grouped by sector, in the catalogue's order, with anything unmapped last and named as such. */

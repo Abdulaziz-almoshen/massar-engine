@@ -15,7 +15,7 @@
     "check:catalogue": "node scripts/check-catalogue.mjs",
     "check:numerals": "node scripts/check-numerals.mjs",
     "check:buttons": "npm run build && node scripts/check-buttons.mjs",
-    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts && npm run check:crmlit && npm run check:writers && npm run check:authz && npm run check:nav && npm run check:rename && npm run check:design && npm run check:crmparse && npm run check:globals && npm run check:rbac && npm run check:home",
+    "check": "npm run test && npm run check:catalogue && npm run check:numerals && npm run check:buttons && npm run check:campaigns && npm run check:optout && npm run check:ae && npm run check:productlock && npm run check:sendable && npm run check:btnforce && npm run check:voice && npm run check:contactwin && npm run check:outcomes && npm run check:props && npm run check:crm && npm run check:facts && npm run check:crmlit && npm run check:writers && npm run check:authz && npm run check:nav && npm run check:rename && npm run check:design && npm run check:crmparse && npm run check:globals && npm run check:rbac && npm run check:home && npm run check:csstwins",
     "check:crm": "npm run build && node scripts/check-crm.mjs",
     "check:optout": "npm run build && node scripts/check-optout.mjs",
     "check:campaigns": "npm run build && node scripts/check-campaign-scope.mjs",
@@ -42,7 +42,8 @@
     "check:crmparse": "node scripts/check-crm-parses.mjs",
     "check:rbac": "node scripts/check-rbac-routes.mjs",
     "check:home": "node scripts/check-home-renders.mjs",
-    "check:globals": "node scripts/check-browser-globals.mjs"
+    "check:globals": "node scripts/check-browser-globals.mjs",
+    "check:csstwins": "node scripts/check-css-twins.mjs"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.0",

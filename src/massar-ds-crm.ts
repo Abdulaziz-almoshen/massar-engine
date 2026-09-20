@@ -751,6 +751,13 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-seg-row__b i.low{background:var(--m-bad)}
 .ds6 .m-seg-row__b i.mid{background:var(--m-warn)}
 .ds6 .m-seg-row__v{font-weight:700;color:var(--m-ink);font-variant-numeric:tabular-nums;text-align:start}
+/* A ROW WHOSE VALUE IS A PHRASE, not a percentage. The base row gives the value 44px because it was
+   built to hold «0٪»; «بند واحد · 190,000 ر.س» in 44px stacks into four lines beside a 6px bar.
+   Here the value takes what it needs and never wraps, and the LABEL is what gives way. */.ds6 .m-seg-row--wide{grid-template-columns:minmax(72px,1fr) minmax(64px,92px) auto}
+.ds6 .m-seg-row--wide .m-seg-row__t{min-inline-size:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds6 .m-seg-row--wide .m-seg-row__v{white-space:nowrap;text-align:end}
+.ds6 .m-seg-row--wide .m-seg-row__v .m-nil--owed, .ds6 .m-seg-row--wide .m-seg-row__v .m-nil--unset, .ds6 .m-seg-row--wide .m-seg-row__v .m-nil--none{white-space:nowrap}
+@media (max-width:520px){.ds6 .m-seg-row--wide{grid-template-columns:minmax(0,1fr) auto}.ds6 .m-seg-row--wide .m-seg-row__b{grid-column:1 / -1;order:3}}
 .ds6 .m-view{position:relative}
 .ds6 .m-view__p{transition:opacity var(--m-swap) var(--m-ease),
                       transform var(--m-swap) var(--m-ease),
@@ -1472,8 +1479,13 @@ export const MASSAR_DS_CSS = `
    trigger on a soft grey ground with the value at the start and a chevron at the end; on open it turns
    to paper with a dark border and drops a white popup carrying a filter box above the list, the chosen
    row on a grey ground with a check at its end. Massar's height (44px) and tokens.
-   ============================================================================ */.ds6 .m-cb{ position: relative; display: inline-flex; min-inline-size: 0; }
-.ds6 .m-cb--wide{ display: flex; inline-size: 100%; }
+   ============================================================================ */
+/* .m-cbx, NOT .m-cb. The checkbox at the top of this file already owns .m-cb, and it sets
+   inline-size:16px, block-size:16px, appearance:none and a box-shadow. The combobox root was
+   inheriting all of it: the control rendered 16px tall, its trigger overflowed, and it landed on
+   top of the label above it («المسؤول», «مدير المنتج» were half covered). Two components under one
+   class name - the CSS twin of the coveragePct shadowing that check-browser-globals.mjs exists for. */.ds6 .m-cbx{ position: relative; display: inline-flex; min-inline-size: 0; }
+.ds6 .m-cbx--wide{ display: flex; inline-size: 100%; }
 .ds6 .m-cb__t{
   flex: 1 1 auto;
   display: flex;

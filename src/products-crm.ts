@@ -1205,7 +1205,7 @@ function pxSection(key, title, src, body, extra) {
 function pxQuarterRow(q) {
   var has = q.target !== null && q.target !== undefined && Number(q.target) > 0;
   var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
-  return '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">الربع ' + mN(q.quarter) + "</span>" +
+  return '<div class="m-seg-row m-seg-row--wide px-qrow"><span class="m-seg-row__t">الربع ' + mN(q.quarter) + "</span>" +
     '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + pct + '%"></i></span>' +
     /* ACHIEVED AND TARGET TOGETHER. The bar is drawn against the quarter's own target, and the
        figure beside it printed only the achieved - so the one number that makes the bar mean
@@ -1233,7 +1233,7 @@ function pxStageSplit(name) {
     rungs.map(function (st) {
       var c = by[st.key] || { n: 0, v: 0 };
       var pct = max > 0 ? Math.round((c.n / max) * 100) : 0;
-      return '<div class="m-seg-row"><span class="m-seg-row__t">' + esc(st.label) + "</span>" +
+      return '<div class="m-seg-row m-seg-row--wide"><span class="m-seg-row__t">' + esc(st.label) + "</span>" +
         '<span class="m-seg-row__b' + (c.n ? "" : " px-nott") + '"><i style="--m-pct:' + pct + '%"></i></span>' +
         '<span class="m-seg-row__v">' + (c.n
           ? pxNLineN(c.n) + (c.v ? '<small class="px-qof"> · ' + pxMoney(c.v) + "</small>" : "")
@@ -1256,7 +1256,7 @@ function pxOwnerSplit(name) {
   return '<div><p class="m-stat__k">النشاط حسب الموظف</p><div class="m-segs">' +
     rows.map(function (r) {
       var pct = max > 0 ? Math.round((r.n / max) * 100) : 0;
-      return '<div class="m-seg-row"><span class="m-seg-row__t">' +
+      return '<div class="m-seg-row m-seg-row--wide"><span class="m-seg-row__t">' +
           (r.owner ? esc(r.owner) : mNil("بلا مسؤول", "unset")) + "</span>" +
         '<span class="m-seg-row__b"><i style="--m-pct:' + pct + '%"></i></span>' +
         '<span class="m-seg-row__v">' + pxNLineN(r.n) +
@@ -1378,7 +1378,7 @@ function pxTargetsSection(p) {
       /* Steps of 1,000: a quarterly target is set in thousands of riyals. Empty stays «بلا مستهدف». */
       mNum({ id: "pxq_" + q.quarter, value: val, label: "مستهدف الربع", min: 0, step: 1000, mode: "numeric",
         attrs: ' placeholder="بلا مستهدف" data-pxtarget="' + q.quarter + '" aria-describedby="pxq_' + q.quarter + '_st"' + (st && st.s === "invalid" ? ' aria-invalid="true"' : "") }) +
-      '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">المحقق ' + pxMoney(q.achieved) + "</span>" +
+      '<div class="m-seg-row m-seg-row--wide px-qrow"><span class="m-seg-row__t">المحقق ' + pxMoney(q.achieved) + "</span>" +
       '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + (has ? Math.min(100, cov || 0) : 0) + '%"></i></span>' +
       /* No target is not a coverage of zero: there is no denominator for the percentage to be a
          percentage OF, so the cell says what is missing instead of printing a number. */

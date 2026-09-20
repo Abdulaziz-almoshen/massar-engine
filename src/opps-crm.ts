@@ -797,7 +797,15 @@ dsD("opStalled", function () { return opBaseRows().filter(opStalled).length; });
 dsD("opUnpriced", function () { return opBaseRows().filter(function (l) { return opIsOpen(l) && !opPriced(l); }).length; });
 dsD("opMatch", function () { return opLines().length; });
 /* The drawer's three tab counts, printed on the tab AND on the section heading inside it. */
+/* ONE KEY, ONE MEANING. «الأنشطة» was repurposed on 2026-09-17: the tab stopped listing activities
+   and now shows «نتائج المراحل», and its badge counts STAGE EVENTS - but the badge kept printing
+   under owActs, whose derivation still counted activities. So the drawer printed 13 over a
+   derivation that returned 0, and ds-verify outlined it on every paint. Caught by the mechanism
+   built for exactly this, not by reading.
+   owActs stays registered because owActivitiesSection still prints under it if it is ever put back;
+   the badge moves to the key that describes what it actually counts. */
 dsD("owActs", function () { var w = owWork[opOpen]; return w && w.data ? (w.data.activities || []).length : 0; });
+dsD("owStageEvents", function () { var w = owWork[opOpen]; return w && w.data ? (w.data.stageEvents || []).length : 0; });
 dsD("owQuotes", function () { var w = owWork[opOpen]; return w && w.data ? (w.data.quotes || []).length : 0; });
 dsD("owEsc", function () { return (opEscRows[opOpen] || []).filter(function (r) { return !r.resolvedAt; }).length; });
 function opNProd(n) { return opPl(n, "منتج واحد", "منتجان", "منتجات", "منتجًا"); }
@@ -1637,9 +1645,9 @@ window.opSetTab = function (t) { if (opTab === t) return; opTab = t; opDrScroll 
    tab drawn by its border rather than by a strip measured after paint — so the private .ox-dtabs and
    its sliding indicator are gone, and with them the moveInd call in opAfterRender.
    Each count is printed HERE and again on its section heading, so both sites carry the same bound
-   derivation (PORT-SPEC §6: owActs / owQuotes / owEsc, registered at the top of this module). */
+   derivation (PORT-SPEC §6: owStageEvents / owQuotes / owEsc, registered at the top of this module). */
 function opTabStrip(counts) {
-  var tabs = [["deal", "الفرصة", null, ""], ["acts", "الأنشطة", counts.acts, "owActs"],
+  var tabs = [["deal", "الفرصة", null, ""], ["acts", "الأنشطة", counts.acts, "owStageEvents"],
     ["quotes", "عروض الأسعار", counts.quotes, "owQuotes"], ["esc", "التصعيد والدعم", counts.esc, "owEsc"]];
   return '<div class="m-tabs" role="tablist" aria-label="أقسام الفرصة">' + tabs.map(function (t) {
     return '<button type="button" class="m-tab" role="tab" id="oxdt_' + t[0] + '" aria-selected="' + (opTab === t[0]) + '"' +

@@ -25,7 +25,7 @@ export const COMBOBOX_JS = `
 function mCombo(o) {
   var val = o.value === null || o.value === undefined ? "" : String(o.value);
   var opts = o.options || [];
-  return '<div class="m-cb' + (o.wide ? " m-cb--wide" : "") + '" data-cb-id="' + esc(o.id) + '"' +
+  return '<div class="m-cbx' + (o.wide ? " m-cbx--wide" : "") + '" data-cb-id="' + esc(o.id) + '"' +
     (o.free ? ' data-cb-free="1"' : "") +
     /* What to say when the list itself is empty, which is not the same as a query matching nothing.
        On this app's live data the team directory is empty, so the owner pickers opened on a blank
@@ -55,7 +55,7 @@ function mCombo(o) {
 
 if (!window.__mCb) {
   window.__mCb = 1;
-  var mCbOpen = null;   /* the open .m-cb, or null */
+  var mCbOpen = null;   /* the open .m-cbx, or null */
 
   var mCbRows = function (g) {
     return Array.prototype.filter.call(g.querySelectorAll(".m-cb__o"), function (li) { return !li.hidden; });
@@ -140,25 +140,25 @@ if (!window.__mCb) {
     var t = e.target;
     var trig = t && t.closest ? t.closest(".m-cb__t") : null;
     if (trig) {
-      var g = trig.closest(".m-cb");
+      var g = trig.closest(".m-cbx");
       if (mCbOpen === g) mCbClose(); else mCbOpenIt(g);
       return;
     }
     var row = t && t.closest ? t.closest(".m-cb__o") : null;
-    if (row) { mCbPick(row.closest(".m-cb"), row.getAttribute("data-v")); return; }
-    if (mCbOpen && (!t.closest || !t.closest(".m-cb"))) mCbClose();
+    if (row) { mCbPick(row.closest(".m-cbx"), row.getAttribute("data-v")); return; }
+    if (mCbOpen && (!t.closest || !t.closest(".m-cbx"))) mCbClose();
   });
 
   document.addEventListener("input", function (e) {
     var t = e.target;
-    if (t && t.classList && t.classList.contains("m-cb__f")) mCbFilter(t.closest(".m-cb"));
+    if (t && t.classList && t.classList.contains("m-cb__f")) mCbFilter(t.closest(".m-cbx"));
   });
 
   document.addEventListener("keydown", function (e) {
     var t = e.target;
     var trig = t && t.closest ? t.closest(".m-cb__t") : null;
     if (trig && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
-      e.preventDefault(); mCbOpenIt(trig.closest(".m-cb")); return;
+      e.preventDefault(); mCbOpenIt(trig.closest(".m-cbx")); return;
     }
     if (!mCbOpen) return;
     var g = mCbOpen, rows = mCbRows(g);
