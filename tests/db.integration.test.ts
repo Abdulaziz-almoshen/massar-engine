@@ -138,6 +138,40 @@ d("db integration", () => {
       expect(line?.wonCount).toBe(1);
     });
 
+    it("records the stage outcome the board picked, onto the transition it belongs to", async () => {
+      const id = await mkOpp("quote", 100000);
+      // «اعتراض سعري» belongs to `quote`, the rung being LEFT — not to `negotiate`, the one arrived at.
+      await db.updateOpp(id, { stage: "negotiate" } as never, "سارة", "price_objection");
+      const ev = await pool.query(
+        `SELECT from_stage, to_stage, outcome_key, outcome_reason FROM track_stage_events WHERE opp_id = $1`, [id]);
+      expect(ev.rows.length).toBe(1);
+      expect(ev.rows[0].from_stage).toBe("quote");
+      expect(ev.rows[0].to_stage).toBe("negotiate");
+      expect(ev.rows[0].outcome_key).toBe("price_objection");
+      // The REASON travels with the key, so the report never has to look the rule up again.
+      expect(ev.rows[0].outcome_reason).toBe("تكلفة عالية مدركة");
+    });
+
+    it("refuses an outcome that belongs to another rung, rather than writing it through", async () => {
+      const id = await mkOpp("quote", 100000);
+      // «فشل التكامل» is a `tech` outcome. Written against a quote-stage move it would make the loss
+      // report say an integration failed on a deal that never reached technical evaluation.
+      await db.updateOpp(id, { stage: "negotiate" } as never, "سارة", "integration_failed");
+      const ev = await pool.query(`SELECT outcome_key, outcome_reason FROM track_stage_events WHERE opp_id = $1`, [id]);
+      expect(ev.rows.length).toBe(1);
+      expect(ev.rows[0].outcome_key).toBe(null);
+      expect(ev.rows[0].outcome_reason).toBe(null);
+    });
+
+    it("lets the loss reason win when a close carries both", async () => {
+      const id = await mkOpp("quote", 100000);
+      await db.updateOpp(id, { stage: "lost", lost_reason: "price", lost_note: "تجاوز الميزانية" } as never,
+        "سارة", "price_objection");
+      const ev = await pool.query(`SELECT outcome_key, outcome_reason FROM track_stage_events WHERE opp_id = $1`, [id]);
+      expect(ev.rows[0].outcome_key).toBe("price");
+      expect(ev.rows[0].outcome_reason).toBe("تجاوز الميزانية");
+    });
+
     it("drops a reversed win out of achieved and returns it to open pipeline", async () => {
       const id = await mkOpp("negotiate", 500000);
       await db.recordEngagement({ idemKey: "w2", contactPhone: "966500000999", oppId: id, rep: "سارة",

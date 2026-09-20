@@ -53,6 +53,27 @@
 // block at the end of this stylesheet. They come out when those screens are ported in turn.
 
 export const OPPS_CRM_CSS = `
+  /* ===== نتيجة المرحلة — the ask that sits over the drawer ===== */
+  .ox-oc { position:fixed; inset-block-start:50%; inset-inline-start:50%; transform:translate(50%,-50%);
+    z-index:calc(var(--z-modal) + 1); inline-size:min(440px, calc(100vw - 32px));
+    max-block-size:calc(100vh - 64px); overflow:auto; background:var(--paper);
+    border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s4);
+    box-shadow:0 24px 60px rgba(16,24,40,.18); }
+  [dir="ltr"] .ox-oc { transform:translate(-50%,-50%); }
+  .ox-oc .m-meta { margin-block:var(--s1) var(--s3); }
+  .ox-ocl { display:grid; gap:var(--s2); }
+  .ox-oco { display:grid; gap:2px; text-align:start; cursor:pointer; padding:var(--s3);
+    background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md);
+    transition:border-color 180ms cubic-bezier(.16,1,.3,1), transform 100ms cubic-bezier(.16,1,.3,1); }
+  .ox-oco:active { transform:scale(.97); }
+  @media (hover:hover) and (pointer:fine) { .ox-oco:hover { border-color:var(--muted); } }
+  .ox-oco .k { display:flex; align-items:center; gap:var(--s2); font-weight:700; color:var(--ink); }
+  .ox-oco .r { font-size:12px; color:var(--ink-2); }
+  /* 12px, not 11: 11px is not on the type ladder (DESIGN.md 2). The action line is separated from
+     the reason above it by colour, not by a size the system does not have. */
+  .ox-oco .n { font-size:12px; color:var(--muted); }
+  .ox-ocb { display:flex; gap:var(--s2); margin-block-start:var(--s3); }
+
   /* ===== فرص البيع — V5 ===== */
   .ox { display:flex; flex-direction:column; gap:var(--s3); container-type:inline-size; container-name:oxw; }
   .ox :focus { outline:none; }
@@ -1686,8 +1707,56 @@ var opStepFocus = "";
 window.opStepTo = function (id, key) {
   var el = document.activeElement;
   opStepFocus = el && el.classList && el.classList.contains("ox-stb") ? "oxst_" + id + "_" + key : "";
+  /* ASK WHAT HAPPENED, BEFORE MOVING. A stage move with no outcome writes a ledger row with no
+     reason and no next action, and «نتائج المراحل» prints «انتقلت دون تسجيل نتيجة» for it — which
+     is what every move made from this board has said, because the 35-entry rule in sales-domain
+     was only ever reachable from the rep's own screen. A loss close is exempt: it has its own
+     mandatory reason dialog, and two competing answers to one question is worse than none. */
+  var l = (oppRows || []).find(function (o) { return o.id === id; });
+  if (l && typeof outcomesForStage === "function" && !opNeedsLossReason(id, key)) {
+    var opts = outcomesForStage(String(l.stage || ""));
+    if (opts.length) { opOutcome = { id: id, to: key, from: String(l.stage || "") }; opRender(); return Promise.resolve(); }
+  }
   return window.opSetStage(id, key);
 };
+/* The pending ask: which line, where it is going, and the rung it is leaving (the outcomes belong
+   to the rung being LEFT, so it is carried rather than re-read after the move). */
+var opOutcome = null;
+window.opOutcomeCancel = function () { opOutcome = null; opRender(); };
+window.opOutcomeSkip = function () {
+  var a = opOutcome; opOutcome = null; if (!a) return;
+  void window.opSetStage(a.id, a.to);
+};
+window.opOutcomePick = function (key) {
+  var a = opOutcome; opOutcome = null; if (!a) return;
+  /* The outcome rides in the SAME write as the move: a crash between two requests would leave the
+     deal on the new rung with the reason lost, which is the state this exists to prevent. */
+  void window.opSaveField(a.id, "stage", a.to, { outcomeKey: key });
+};
+function opOutcomeSheet() {
+  var a = opOutcome;
+  if (!a || typeof outcomesForStage !== "function") return "";
+  var opts = outcomesForStage(a.from);
+  if (!opts.length) return "";
+  var to = opStage(a.to), from = opStage(a.from);
+  return '<div class="ox-scrim in" onclick="opOutcomeCancel()"></div>' +
+    '<div class="ox-oc" role="dialog" aria-modal="true" aria-labelledby="oxoct">' +
+    '<h3 class="m-dlg__t" id="oxoct" tabindex="-1">نتيجة المرحلة — ' + esc(from.label) + "</h3>" +
+    '<p class="m-meta">اختر ما انتهت إليه المرحلة؛ يُسجَّل معها سببها وإجراؤها. الانتقال إلى «' +
+      esc(to.label) + "».</p>" +
+    '<div class="ox-ocl">' + opts.map(function (o) {
+      /* The TONE is in the data (advance / needs_action / lost) and saying it before the click is
+         the difference between a picklist and a decision: «غير مهتم» closes a deal. */
+      var tone = o.kind === "advance" ? "m-chip--ok" : o.kind === "lost" ? "m-chip--bad" : "m-chip--warn";
+      var toneTxt = o.kind === "advance" ? "تقدّم" : o.kind === "lost" ? "خسارة" : "يحتاج إجراء";
+      return '<button type="button" class="ox-oco" onclick="opOutcomePick(&quot;' + esc(o.key) + '&quot;)">' +
+        '<span class="k">' + esc(o.label) + '<span class="m-chip ' + tone + '">' + esc(toneTxt) + "</span></span>" +
+        '<span class="r">' + esc(o.reason) + "</span>" +
+        '<span class="n">الإجراء: ' + esc(o.nextAction) + (o.dept ? " · " + esc(o.dept) : "") + "</span></button>";
+    }).join("") + "</div>" +
+    '<div class="ox-ocb"><button type="button" class="m-btn" onclick="opOutcomeSkip()">نقل دون تسجيل نتيجة</button>' +
+    '<button type="button" class="m-btn" onclick="opOutcomeCancel()">إلغاء</button></div></div>';
+}
 /* The server's own bounds for a line's numbers (db.ts validateOppLine): years 1–20, quantity 1–10,000,
    discount 0–100, price from 0. Price steps by 100 because a step of one riyal on an annual licence is
    a button nobody would press. */
@@ -1888,7 +1957,9 @@ function opDetailDrawer(l) {
       ? '<button class="rv-hold" data-do="opDel" data-arg="' + l.id + '" data-idle="حذف البند" data-holding="استمر بالضغط للحذف…" data-armed="اضغط مرة أخرى للحذف"' +
         ' aria-pressed="false" title="اضغط مع الاستمرار للحذف"><span class="rv-fill"></span><span class="rv-lbl">حذف البند</span></button>'
       : "");
-  return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts), lead);
+  /* The ask sits OVER the drawer: it is a question about this line, and closing it must not close
+     the record behind it. */
+  return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts), lead) + opOutcomeSheet();
 }
 
 function opCreateDrawer() {

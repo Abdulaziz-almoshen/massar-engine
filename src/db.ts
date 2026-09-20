@@ -3533,7 +3533,16 @@ export async function createOppLines(head: {
  *  lost). The route answers 400 with the domain's sentence. */
 export class LossReasonRequired extends Error { constructor(public readonly kind: "missing" | "not_lost" = "missing") { super("lost_reason_required"); } }
 
-export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: string): Promise<OppRow | null> {
+/** A stage move may carry the OUTCOME that caused it. It is not a column on `opportunities` — it
+ *  annotates the transition — so it travels beside the patch rather than inside it.
+ *
+ *  Until now the only writer of a non-lost `outcome_key` was the rep's own screen
+ *  (`POST /rep/engagements`). Anyone working the board moved a deal with no outcome, no reason and
+ *  no next action, and «نتائج المراحل» printed «انتقلت دون تسجيل نتيجة» for every one of them — a
+ *  35-entry business rule that the surface most people use could not reach. */
+export async function updateOpp(
+  id: number, patch: Partial<OppRow>, actor?: string, outcomeKey?: string | null,
+): Promise<OppRow | null> {
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
   for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
@@ -3624,10 +3633,14 @@ export async function updateOpp(id: number, patch: Partial<OppRow>, actor?: stri
       // the board was lost for no recorded reason.
       const lostKey = toStage === "lost" ? ((q.rows[0].lost_reason as string) ?? null) : null;
       const lostNote = toStage === "lost" ? ((q.rows[0].lost_note as string) ?? null) : null;
+      // A lost close already carries its own reason onto the row; an outcome offered alongside it
+      // would be a second, competing answer to the same question, so the loss reason wins.
+      const chosen = lostKey ? null : sales.outcomeForStage(fromStage, outcomeKey ?? null);
       await client.query(
         `INSERT INTO track_stage_events (opp_id, from_stage, to_stage, outcome_key, outcome_reason, effective_at, recorded_at, actor)
          VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0), $6, $7)`,
-        [id, fromStage, toStage, lostKey, lostNote, Date.now(), actor || "اللوحة"]);
+        [id, fromStage, toStage, lostKey ?? (chosen ? chosen.key : null),
+         lostNote ?? (chosen ? chosen.reason : null), Date.now(), actor || "اللوحة"]);
       // Reopened: the old reason no longer describes the line. It stays on the ledger row that recorded it.
       if (fromStage === "lost") {
         const cleared = await client.query(`UPDATE opportunities SET lost_reason = NULL, lost_note = NULL WHERE id = $1 RETURNING *`, [id]);

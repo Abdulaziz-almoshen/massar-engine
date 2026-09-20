@@ -293,10 +293,45 @@ export function contactState(engagementCount: number, hasOwner: boolean): "untou
 // The seam that carries all of the above into the browser.
 // ---------------------------------------------------------------------------
 
+/**
+ * The outcome a stage may carry, or null. DEPENDENT ON THE STAGE, which is the whole point: an
+ * outcome from another rung is not a weaker answer, it is a wrong one — «فشل التكامل» recorded
+ * against «تواصل أولي» would make the loss report say a technical integration failed on a deal
+ * nobody had demonstrated yet. So a key that does not belong to `stage` returns null rather than
+ * being written through.
+ *
+ * Self-contained: reads only its parameters and the injected STAGE_OUTCOMES.
+ */
+export function outcomeForStage(
+  stage: string, key: string | null | undefined,
+): { key: string; label: string; reason: string; nextAction: string; kind: string; dept: string } | null {
+  if (!key) return null;
+  for (var i = 0; i < STAGE_OUTCOMES.length; i++) {
+    var o = STAGE_OUTCOMES[i];
+    if (o.stage === stage && o.key === key) {
+      return { key: o.key, label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept };
+    }
+  }
+  return null;
+}
+
+/** Every outcome this rung offers, in declaration order. */
+export function outcomesForStage(
+  stage: string,
+): { key: string; label: string; reason: string; nextAction: string; kind: string; dept: string }[] {
+  var out = [];
+  for (var i = 0; i < STAGE_OUTCOMES.length; i++) {
+    var o = STAGE_OUTCOMES[i];
+    if (o.stage === stage) out.push({ key: o.key, label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept });
+  }
+  return out;
+}
+
 const DOMAIN_FNS = [
   stageWeight, isTerminalStage, isStalled, weightedValue,
   riyadhFiscalPeriod, riyadhPeriodBounds, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
   offListPct, offListRollup,
+  outcomeForStage, outcomesForStage,
 ] as const;
 
 export const SALES_DOMAIN_JS: string = [

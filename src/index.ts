@@ -3070,7 +3070,21 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   if (b.stage !== undefined && typeof b.stage !== "string") return reply.code(400).send({ ok: false, error: "invalid_field", field: "stage" });
   const currentStage = await db.oppStageOf(id);
   const allowedStages = [...new Set([...(await db.activeStageKeys()), ...(currentStage ? [currentStage] : [])])];
-  const bad = db.validateOppLine({ product: b.product ?? "x", ...b }, allowedStages);
+  // The outcome annotates the TRANSITION, so it is validated against the rung the line is leaving,
+  // never the one it is arriving at. An outcome from another rung is not a weaker answer, it is a
+  // wrong one, and it would land in the loss and stage reports as fact.
+  let outcomeKey: string | null = null;
+  if (b.outcomeKey !== undefined && b.outcomeKey !== null && b.outcomeKey !== "") {
+    if (typeof b.outcomeKey !== "string") return problem(reply, 400, "invalid_field", "نتيجة المرحلة غير صالحة", "outcomeKey");
+    if (typeof b.stage !== "string" || !currentStage || b.stage === currentStage) {
+      return problem(reply, 400, "invalid_field", "نتيجة المرحلة تُسجَّل مع نقل البند فقط", "outcomeKey");
+    }
+    if (!sales.outcomeForStage(currentStage, b.outcomeKey)) {
+      return problem(reply, 400, "invalid_field", "هذه النتيجة لا تخص المرحلة الحالية", "outcomeKey");
+    }
+    outcomeKey = b.outcomeKey;
+  }
+  const bad = db.validateOppLine({ product: b.product ?? "x", ...b, outcomeKey: undefined }, allowedStages);
   if (bad && !(bad === "product" && b.product === undefined)) {
     return reply.code(400).send({ ok: false, error: "invalid_field", field: bad });
   }
@@ -3106,7 +3120,7 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   // recorded, and it clears the snapshot with it.
   if (b.package_id !== undefined) patch.package_id = b.package_id == null || b.package_id === "" ? null : Math.round(Number(b.package_id));
   let row: Awaited<ReturnType<typeof db.updateOpp>>;
-  try { row = await db.updateOpp(id, patch as never, adminName(req)); }
+  try { row = await db.updateOpp(id, patch as never, adminName(req), outcomeKey); }
   catch (e) {
     if (e instanceof db.LossReasonRequired) {
       return e.kind === "not_lost"
