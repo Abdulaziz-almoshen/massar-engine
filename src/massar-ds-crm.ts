@@ -1817,6 +1817,24 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-pipe__d.t4, .ds6 .hx-pipe__b i.t4{ background: var(--m-line-2); }
 .ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
 /* A figure's denominator rides with it, quieter than the figure: «11,101 ر.س من 54,000 ر.س». */.ds6 .px-qof{ font-size: var(--m-t-micro); font-weight: 400; color: var(--m-mut); }
+/* ---- «المنتجات حسب الإنجاز» ----
+   Four columns on one rail so the names, the tracks, the percentages and the money each line up
+   into a column; the money wraps under the name on a narrow card rather than squeezing the track. */.ds6 .hx-r4 > *{ grid-column: span 12; }
+.ds6 .hx-pr{ display: grid; gap: var(--m-3); }
+.ds6 .hx-pr__r{ display: grid; align-items: center; gap: var(--m-1) var(--m-3);
+  grid-template-columns: minmax(120px, 1.2fr) minmax(0, 2fr) 44px minmax(0, 1.4fr); }
+.ds6 .hx-pr__n{ font-weight: 650; color: var(--m-ink); min-inline-size: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds6 .hx-pr__b{ position: relative; block-size: 8px; border-radius: 999px; background: var(--m-sunk);
+  overflow: hidden; }
+.ds6 .hx-pr__b i{ position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: var(--m-pct, 0%);
+  border-radius: 999px; background: var(--m-ac); }
+.ds6 .hx-pr__b.is-ok i{ background: var(--m-ok); }
+.ds6 .hx-pr__b.is-warn i{ background: var(--m-warn); }
+.ds6 .hx-pr__p{ font-size: var(--m-t-cap); font-weight: 700; color: var(--m-ink); text-align: end; }
+.ds6 .hx-pr__v{ font-size: var(--m-t-cap); color: var(--m-mut); text-align: end; min-inline-size: 0; }
+.ds6 .hx-pr__rest{ margin: var(--m-3) 0 0; font-size: var(--m-t-micro); color: var(--m-mut); }
+@media (max-width: 760px){.ds6 .hx-pr__r{ grid-template-columns: minmax(0, 1fr) 44px; }.ds6 .hx-pr__b{ grid-column: 1 / -1; order: 3; }.ds6 .hx-pr__v{ grid-column: 1 / -1; order: 4; text-align: start; }}
 /* ---- the health band ----
    Four states on the same twelve-column rail as the indicators above: each tile is three columns,
    so a tile edge lands on an indicator edge. A tile is a button because each state opens exactly

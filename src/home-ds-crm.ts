@@ -656,6 +656,52 @@ function hdsEventsCard() {
     body + "</section>";
 }
 
+/* ---------- «المنتجات حسب الإنجاز» ----------
+   A NEW ENTITY ON THIS SCREEN, which is the only reason it belongs here. The reference ranks the
+   products on the executive board and Massar had the ranking written (products-crm vExecBand) with
+   no caller, while the live home counted accounts, lines, revenue and a target and never once named
+   a PRODUCT. Ranked highest first, as the reference does.
+
+   A product with no target is not at 0٪ — there is no denominator for a percentage to be a
+   percentage OF. Those collapse into one named line rather than a row of absences each. */
+function hdsProductsCard(f) {
+  var rows = (f.rows || []).slice();
+  var withT = rows.filter(function (p) { return p.annualTarget !== null && p.annualTarget !== undefined && Number(p.annualTarget) > 0; });
+  var without = rows.length - withT.length;
+
+  var body;
+  if (!withT.length) {
+    body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("لا مستهدف مسجّل على أي منتج", "owed") + "</div>" +
+      '<div class="m-empty__d">تُحدَّد المستهدفات من سجل المنتج أو «المستهدفات والأداء».</div></div>';
+  } else {
+    withT.forEach(function (p) {
+      p.__pct = Math.round((Number(p.achieved) || 0) / Number(p.annualTarget) * 100);
+    });
+    withT.sort(function (a, b) { return b.__pct - a.__pct; });
+    body = '<div class="hx-pr">' + withT.map(function (p) {
+      var pct = p.__pct;
+      var tone = pct >= 100 ? "is-ok" : pct >= 50 ? "is-ac" : "is-warn";
+      /* The bar is capped at 100 so an overshoot cannot draw past the track, but the FIGURE is
+         not: a product at 140٪ must read 140٪. */
+      return '<div class="hx-pr__r"><span class="hx-pr__n">' + esc(p.product) + "</span>" +
+        '<span class="hx-pr__b ' + tone + '"><i style="--m-pct:' + Math.min(100, Math.max(0, pct)) + '%"></i></span>' +
+        '<span class="hx-pr__p">' + hdsN(pct) + "٪</span>" +
+        '<span class="hx-pr__v">' + hdsMoney(p.achieved) + " من " + hdsMoney(p.annualTarget) +
+        (Number(p.targetQuarters) < 4
+          ? " · " + hdsPl(Number(p.targetQuarters), "ربع واحد", "ربعان", "أرباع", "ربعًا") + " من أربعة"
+          : "") + "</span></div>";
+    }).join("") + "</div>";
+  }
+  if (without) {
+    body += '<p class="hx-pr__rest">' +
+      hdsPl(without, "منتج واحد", "منتجان", "منتجات", "منتجًا") + " بلا مستهدف مسجّل — لا تُرتَّب هنا.</p>";
+  }
+  return '<section class="hx-card">' +
+    '<div class="hx-card__h"><h3 class="hx-card__t">المنتجات حسب الإنجاز</h3>' +
+      '<a class="hx-link" href="#perf">عرض التقرير <span aria-hidden="true">&#8592;</span></a></div>' +
+    body + "</section>";
+}
+
 /* ---------- row three, middle: the goal ---------- */
 function hdsGoalCard(f) {
   var body;
@@ -780,6 +826,7 @@ function vHomeDs() {
     '<div class="hx-r15">' + hdsHealthCard() + "</div>" +
     '<div class="hx-r2">' + hdsFlowCard(f) + hdsPipelineCard(lines) + "</div>" +
     '<div class="hx-r3">' + hdsEventsCard() + hdsGoalCard(f) + hdsDonutCard(lines) + "</div>" +
+    '<div class="hx-r4">' + hdsProductsCard(f) + "</div>" +
     "</div>";
 }
 `;
