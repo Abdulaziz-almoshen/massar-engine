@@ -199,7 +199,7 @@ function vYearTargets() {
     var curQ = cur;
     h += '<section class="m-card yt-sec"><div class="m-card__h">' +
       '<h2 class="m-card__t">الإنجاز الربعي الإجمالي</h2>' +
-      '<span class="m-meta">مجموع الأرباع لكل المنتجات</span></div><div class="m-segs">' +
+      '<span class="m-meta">مجموع الأرباع لكل المنتجات</span></div><div class="m-segs m-segs--split">' +
       qAll.map(function (x) {
         var has = x.target !== null && x.target > 0;
         var pct = has ? Math.round((x.achieved / x.target) * 100) : 0;

@@ -451,7 +451,12 @@ header.crumb .sep { color: var(--line); }
    The audit found «الكل ←» at 37x17 and a note title at 39x17. DESIGN.md 3.10's 24px applies to
    EVERY pointer, not just touch, and an inline link is still a target. Padding grows the hit area;
    the type is untouched. */
-a[href]:not(.btn):not(.rv-actionrow):not(.nv):not(.sub) {
+/* .m-item is excluded because it is not an inline text link — it is a full-width LIST ROW, already
+   far above the 24px floor this rule exists to enforce. The selector carries four :not() classes,
+   so it scores (0,5,1) and beat «.ds6 .m-item {display:flex}» at (0,2,0): every list row that
+   happened to be a link rendered shrink-to-fit, and two of them sat side by side on one line on
+   the product record. Excluding the component is the fix; winning a specificity war is not. */
+a[href]:not(.btn):not(.rv-actionrow):not(.nv):not(.sub):not(.m-item) {
   display: inline-flex; align-items: center; min-height: 24px;
 }
 

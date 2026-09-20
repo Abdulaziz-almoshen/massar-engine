@@ -1229,7 +1229,7 @@ function pxStageSplit(name) {
   if (!rungs.length) return "";
   var max = 0;
   rungs.forEach(function (st) { var c = by[st.key] ? by[st.key].n : 0; if (c > max) max = c; });
-  return '<div><p class="m-stat__k">فرص البيع حسب المرحلة</p><div class="m-segs">' +
+  return '<div><p class="m-stat__k">فرص البيع حسب المرحلة</p><div class="m-segs m-segs--split">' +
     rungs.map(function (st) {
       var c = by[st.key] || { n: 0, v: 0 };
       var pct = max > 0 ? Math.round((c.n / max) * 100) : 0;
@@ -1253,7 +1253,7 @@ function pxOwnerSplit(name) {
   });
   var rows = order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n; });
   var max = rows[0].n;
-  return '<div><p class="m-stat__k">النشاط حسب الموظف</p><div class="m-segs">' +
+  return '<div><p class="m-stat__k">النشاط حسب الموظف</p><div class="m-segs m-segs--split">' +
     rows.map(function (r) {
       var pct = max > 0 ? Math.round((r.n / max) * 100) : 0;
       return '<div class="m-seg-row m-seg-row--wide"><span class="m-seg-row__t">' +
@@ -1279,7 +1279,7 @@ function pxPerfSection(p) {
       ? mNil("بلا مستهدف سنوي", "owed")
       : "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + mPct(cov)) +
         (perf.targetQuarters < 4 ? " · مُدخل في " + pxNQtrN(perf.targetQuarters) + " من أربعة" : "")) + "</p></div>";
-  b += '<div class="m-segs">' + (perf.quarters || []).map(pxQuarterRow).join("") + "</div>";
+  b += '<div class="m-segs m-segs--split">' + (perf.quarters || []).map(pxQuarterRow).join("") + "</div>";
   b += '<div class="m-stats"><div><p class="m-stat__k">المفتوح الآن</p>' +
     '<p class="m-stat__v">' + (perf.openValue ? pxMoney(perf.openValue) : mNil("لم تُسعَّر", "owed")) + "</p>" +
     '<p class="m-stat__s">' + pxNLineN(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLineN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</p></div>" +

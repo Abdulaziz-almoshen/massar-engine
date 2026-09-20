@@ -753,7 +753,16 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-seg-row__v{font-weight:700;color:var(--m-ink);font-variant-numeric:tabular-nums;text-align:start}
 /* A ROW WHOSE VALUE IS A PHRASE, not a percentage. The base row gives the value 44px because it was
    built to hold «0٪»; «بند واحد · 190,000 ر.س» in 44px stacks into four lines beside a 6px bar.
-   Here the value takes what it needs and never wraps, and the LABEL is what gives way. */.ds6 .m-seg-row--wide{grid-template-columns:minmax(72px,1fr) minmax(64px,92px) auto}
+   Here the value takes what it needs and never wraps, and the LABEL is what gives way. */
+/* A MEASURE HAS A READABLE WIDTH. These rows sit in a 762px card and stretching each one edge to
+   edge put the stage name at one side and its figure at the other, with a 490px bar between them
+   reading as «full» when it only meant «the largest of four». Two columns of ~360px use the card's
+   width instead of spending it on gaps, and every bar shortens to a length the eye can compare. */.ds6 .m-segs--split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:var(--m-2) var(--m-5);align-items:start}
+/* THE BAR IS THE DATA, so the bar is what grows. Giving the label 1fr made it take 567px of a
+   762px card while the bar stayed at its 92px minimum — the stage name sat at one edge and its
+   measure at the other, with a quarter-metre of nothing between them. Label first and bounded,
+   bar filling, value at the end. */.ds6 .m-seg-row--wide{grid-template-columns:minmax(96px,168px) minmax(0,1fr) auto}
 .ds6 .m-seg-row--wide .m-seg-row__t{min-inline-size:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ds6 .m-seg-row--wide .m-seg-row__v{white-space:nowrap;text-align:end}
 .ds6 .m-seg-row--wide .m-seg-row__v .m-nil--owed, .ds6 .m-seg-row--wide .m-seg-row__v .m-nil--unset, .ds6 .m-seg-row--wide .m-seg-row__v .m-nil--none{white-space:nowrap}
