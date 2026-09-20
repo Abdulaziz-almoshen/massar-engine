@@ -472,7 +472,11 @@ function vAccount(idRaw) {
     var at = new Date(x.occurredOn + "T12:00:00").getTime() || x.createdAt;
     var kind = typeof ACTIVITY_KIND_LABELS !== "undefined" ? ACTIVITY_KIND_LABELS[x.kind] || x.kind : x.kind;
     evs.push({ at: at, cls: "warn", html: esc(kind) + (x.product ? " · " + esc(x.product) : "") + '<span class="m-tl__s">' + esc(clip(x.summary, 140)) +
-      (x.nextStep ? " · الخطوة التالية: " + esc(x.nextStep) : "") + (x.owner ? " · " + esc(x.owner) : "") + "</span>" });
+      /* The DUE DATE and the DEPARTMENT are recorded on every activity and neither was printed:
+         a next step with no date is a promise with no deadline, and «الإدارة المعنية» is the whole
+         point of writing down that a step is waiting on someone outside sales. */
+      (x.nextStep ? " · الخطوة التالية: " + esc(x.nextStep) + (x.nextOn ? " — " + (typeof owDay === "function" ? owDay(x.nextOn) : esc(String(x.nextOn))) : "") : "") +
+      (x.dept ? " · " + esc(x.dept) : "") + (x.owner ? " · " + esc(x.owner) : "") + "</span>" });
   });
   d.campaigns.forEach(function (c) { evs.push({ at: c.createdAt, cls: "ok", html: "حملة: " + esc(c.name) + '<span class="m-tl__s">' + esc(c.outcome ? AC_OUTCOME[c.outcome] || c.outcome : "أُدرج في الحملة") + "</span>" }); });
   evs.sort(function (x, y) { return y.at - x.at; });

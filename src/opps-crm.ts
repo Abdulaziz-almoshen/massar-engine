@@ -1631,6 +1631,30 @@ function opTabStrip(counts) {
    everything inside it is the vocabulary's: m-dlg__h / __b / __f and m-x for the close control.
    lead is the band between the header and the tabs (the deal's leading figure); it is its own slot
    because its padding is the drawer's, not the header row's. */
+/* WHAT THIS DEAL IS AS A WHOLE. The drawer opens on one LINE and led with that line's value, so a
+   reader negotiating a three-product deal saw one third of it and nothing saying so. The reference
+   states both on the record: how many products the opportunity spans, and what it is worth
+   together. Both are counted from THIS account's own lines - nothing is summed across accounts -
+   and the total obeys the one money rule, so a lost line is worth nothing. */
+function opDrawerSiblings(l) {
+  var rows = (typeof oppRows !== "undefined" && oppRows) ? oppRows : [];
+  var k = opKey(l);
+  return rows.filter(function (o) { return opKey(o) === k; });
+}
+function opDrawerGroupNote(l) {
+  var g = opDrawerSiblings(l);
+  if (g.length < 2) return "";
+  var st = (typeof groupStatusKey === "function") ? groupStatusKey(g) : "open";
+  return ' <span class="m-meta">· ضمن فرصة من ' + opNProdN(g.length) + "</span> " + opGroupChip(st);
+}
+function opDrawerGroupTotal(l) {
+  var g = opDrawerSiblings(l);
+  if (g.length < 2) return "";
+  var v = opSumLive(g);
+  return '<span class="sub">إجمالي الفرصة ' +
+    (v ? opMoneyShort(v) : opUnpricedNil()) + "</span>";
+}
+
 function opDrawerShell(labelId, head, body, foot, tabs, lead) {
   var cls = opDrShown ? " in" : "";
   return '<div class="ox-scrim' + cls + '" onclick="opCloseDrawer()"></div>' +
@@ -1742,7 +1766,7 @@ function opDetailDrawer(l) {
   var idx = -1; open.forEach(function (s, i) { if (s.key === l.stage) idx = i; });
   var head = '<div class="ox-hd"><span class="m-av m-av--sq" aria-hidden="true">' + esc(String(l.account_name || "؟").trim().charAt(0)) + "</span>" +
     '<div class="tt"><h2 class="m-dlg__t" id="oxdrt" tabindex="-1">' + esc(l.account_name) + "</h2>" +
-    '<div class="m-meta">' + esc(l.product) +
+    '<div class="m-meta">' + esc(l.product) + opDrawerGroupNote(l) +
     (l.created_by === "المساعد" ? ' <span class="m-chip m-chip--ac">تلقائي</span>' : "") + "</div></div></div>";
   /* The three facts a reader opens this drawer for, before any scrolling: what it is worth, where it
      stands, and whether it is late. An unpriced line is a number someone OWES, drawn as that
@@ -1751,7 +1775,8 @@ function opDetailDrawer(l) {
     '<span class="fig">' + (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</span>" +
     '<span class="sub">' + (opIsOpen(l) ? opAgoN(l) : opIsWon(l) ? "أُغلقت ربحًا" : "أُغلقت خسارة") + "</span>" +
     (opStalled(l) ? '<span class="m-chip m-chip--warn">متأخرة</span>' : "") +
-    '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span></div>";
+    '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>" +
+    opDrawerGroupTotal(l) + "</div>";
   var b = "";
   /* المرحلة */
   var ssk = l.id + ":stage";
