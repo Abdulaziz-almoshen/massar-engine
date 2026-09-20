@@ -1816,6 +1816,7 @@ export const MASSAR_DS_CSS = `
 .ds6 .hx-pipe__d.t3, .ds6 .hx-pipe__b i.t3{ background: var(--m-warn); }
 .ds6 .hx-pipe__d.t4, .ds6 .hx-pipe__b i.t4{ background: var(--m-line-2); }
 .ds6 .hx-pipe__r.is-empty .hx-pipe__d{ background: var(--m-line-2); }
+/* A figure's denominator rides with it, quieter than the figure: «11,101 ر.س من 54,000 ر.س». */.ds6 .px-qof{ font-size: var(--m-t-micro); font-weight: 400; color: var(--m-mut); }
 /* ---- the health band ----
    Four states on the same twelve-column rail as the indicators above: each tile is three columns,
    so a tile edge lands on an indicator edge. A tile is a button because each state opens exactly

@@ -1178,7 +1178,61 @@ function pxQuarterRow(q) {
   var pct = has ? Math.min(100, Math.round((Number(q.achieved) || 0) / Number(q.target) * 100)) : 0;
   return '<div class="m-seg-row px-qrow"><span class="m-seg-row__t">الربع ' + mN(q.quarter) + "</span>" +
     '<span class="m-seg-row__b' + (has ? "" : " px-nott") + '"><i style="--m-pct:' + pct + '%"></i></span>' +
-    '<span class="m-seg-row__v">' + (has ? pxMoney(q.achieved) : mNil("بلا مستهدف", "owed")) + "</span></div>";
+    /* ACHIEVED AND TARGET TOGETHER. The bar is drawn against the quarter's own target, and the
+       figure beside it printed only the achieved - so the one number that makes the bar mean
+       anything lived in another tab. The reference prints both here and it is right to. */
+    '<span class="m-seg-row__v">' + (has
+      ? pxMoney(q.achieved) + '<small class="px-qof"> من ' + pxMoney(q.target) + "</small>"
+      : mNil("بلا مستهدف", "owed")) + "</span></div>";
+}
+/* WHERE THIS PRODUCT'S DEALS STAND, and WHO IS CARRYING THEM. Both are in the founder's reference
+   on the product dashboard and neither existed here: the record printed three totals (open / won /
+   lost) and no distribution, so a product manager could not see where the lines pile up or who is
+   holding them. Both read the same oppRows the rest of the record reads. */
+function pxStageSplit(name) {
+  var open = pxOpenLines(name);
+  if (!open.length) return "";
+  var by = {};
+  open.forEach(function (o) { var k = String(o.stage || ""); by[k] = by[k] || { n: 0, v: 0 }; by[k].n++; by[k].v += opValue(o); });
+  /* The LADDER's order, not the data's: a stage with no lines is part of the answer - it is where
+     nothing is standing - so every open rung prints, and the empty ones say «لا بنود». */
+  var rungs = (typeof opOpenStages === "function" ? opOpenStages() : []);
+  if (!rungs.length) return "";
+  var max = 0;
+  rungs.forEach(function (st) { var c = by[st.key] ? by[st.key].n : 0; if (c > max) max = c; });
+  return '<div><p class="m-stat__k">فرص البيع حسب المرحلة</p><div class="m-segs">' +
+    rungs.map(function (st) {
+      var c = by[st.key] || { n: 0, v: 0 };
+      var pct = max > 0 ? Math.round((c.n / max) * 100) : 0;
+      return '<div class="m-seg-row"><span class="m-seg-row__t">' + esc(st.label) + "</span>" +
+        '<span class="m-seg-row__b' + (c.n ? "" : " px-nott") + '"><i style="--m-pct:' + pct + '%"></i></span>' +
+        '<span class="m-seg-row__v">' + (c.n
+          ? pxNLineN(c.n) + (c.v ? '<small class="px-qof"> · ' + pxMoney(c.v) + "</small>" : "")
+          : mNil("لا بنود", "none")) + "</span></div>";
+    }).join("") + "</div></div>";
+}
+function pxOwnerSplit(name) {
+  var open = pxOpenLines(name);
+  if (!open.length) return "";
+  var by = {}, order = [];
+  open.forEach(function (o) {
+    /* A line nobody owns is a classification nobody made, and it is exactly the row a product
+       manager needs to see - so it is kept as its own bucket, not dropped. */
+    var k = String(o.owner || "");
+    if (!by[k]) { by[k] = { owner: k, n: 0, v: 0 }; order.push(k); }
+    by[k].n++; by[k].v += opValue(o);
+  });
+  var rows = order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n; });
+  var max = rows[0].n;
+  return '<div><p class="m-stat__k">النشاط حسب الموظف</p><div class="m-segs">' +
+    rows.map(function (r) {
+      var pct = max > 0 ? Math.round((r.n / max) * 100) : 0;
+      return '<div class="m-seg-row"><span class="m-seg-row__t">' +
+          (r.owner ? esc(r.owner) : mNil("بلا مسؤول", "unset")) + "</span>" +
+        '<span class="m-seg-row__b"><i style="--m-pct:' + pct + '%"></i></span>' +
+        '<span class="m-seg-row__v">' + pxNLineN(r.n) +
+          (r.v ? '<small class="px-qof"> · ' + pxMoney(r.v) + "</small>" : "") + "</span></div>";
+    }).join("") + "</div></div>";
 }
 function pxPerfSection(p) {
   var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
@@ -1204,6 +1258,8 @@ function pxPerfSection(p) {
       (perf.wonLines ? pxNLineN(perf.wonLines) : mNil("لا بنود", "none")) + "</p></div>" +
     '<div><p class="m-stat__k">خاسرة ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' +
       (perf.lostLines ? pxNLineN(perf.lostLines) : mNil("لا بنود", "none")) + "</p></div></div>";
+  b += pxStageSplit(name);
+  b += pxOwnerSplit(name);
   var open = pxOpenLines(name).slice().sort(function (a, b2) { return opValue(b2) - opValue(a); }).slice(0, 3);
   if (open.length) {
     b += '<div><p class="m-stat__k">أعلى الفرص المفتوحة</p>' + open.map(function (o) {
