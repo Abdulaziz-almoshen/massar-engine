@@ -95,9 +95,29 @@ ROUTES = [
 # blank-page guard cannot tell the two apart on a fresh database. It can, if the honest empty state
 # names itself: a page carrying one of these is passing DELIBERATELY, whatever its length. A truly
 # blank render carries neither this nor the landmark, so nothing is weakened.
+# WHAT «CORRECTLY EMPTY» LOOKS LIKE, per route.
+#
+# Every landmark above is a string that only exists once the screen HAS data — a table header, a
+# chart title, a tab. On a fresh install there is no data, so the assertion could not tell a screen
+# that rendered its empty state properly from one that rendered nothing at all. Both look like a
+# missing landmark, and the second is the only one that matters.
+#
+# These markers close that gap rather than loosening it. A route passes on EITHER its landmark or
+# its empty marker; with neither, it still fails. The marker is the empty state's own title, which
+# is specific enough that a broken screen cannot accidentally produce it — «لا عملاء بعد» is not a
+# string any partial render emits.
+#
+# Added for five routes on 2026-09-21, after the database was emptied and every one of them went
+# red while showing exactly the screen it should: a named empty state, an explanation of what will
+# fill it, and the action that starts.
 EMPTY_OK = {
     "#kmon": "لا حملات بعد",
     "#partners": "لا شركاء بعد",
+    "#accounts": "لا عملاء بعد",
+    "#customers": "لا جهات بعد",
+    "#targets": "لا جهات في قائمتك بعد",
+    "#pipeline": "لا أحداث بعد",
+    "#reports": "لا فرص بعد",
 }
 MIN_CHARS = 400
 
@@ -189,6 +209,15 @@ def main() -> int:
         probe.close()
 
         routes = ROUTES + ([detail_route] if detail_route else []) + ([customer_route] if customer_route else [])
+        # A SKIP IS A RESULT, AND IT SAYS SO. Both record screens are discovered from live data, so
+        # on an empty database they are silently dropped and the run still prints a green total —
+        # a smaller suite wearing the same badge as a full one. On a fresh install these are the
+        # two strongest screens in the product and NEITHER is exercised; the summary has to say it.
+        skipped = []
+        if not detail_route:
+            skipped.append("سجل الحملة (#kmon/<id>) — لا حملات بعد")
+        if not customer_route:
+            skipped.append("سجل العميل (#customer/<phone>) — لا محادثات بعد")
         for route, landmark in routes:
             before = len(failures)
             errors: list[str] = []
@@ -284,7 +313,11 @@ def main() -> int:
         for f in failures:
             print("  •", f, file=sys.stderr)
         return 1
-    print(f"\nsmoke: {len(ROUTES) + (1 if detail_route else 0)} routes render, 0 runtime errors")
+    # len(routes), not a hand-maintained sum: this counted ROUTES + detail_route and forgot
+    # customer_route entirely, so a full run reported one route fewer than it actually checked.
+    print(f"\nsmoke: {len(routes)} routes render, 0 runtime errors")
+    for note in skipped:
+        print(f"  skipped: {note}")
     return 0
 
 
