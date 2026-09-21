@@ -360,7 +360,10 @@ function hdsKpiRow(f, lines) {
   h += hdsKpi({
     icon: "wallet", tone: "is-ok", label: "الإيراد المحقق",
     value: '<span class="m-n">' + fmtN(f.achieved) + ' <small>ر.س</small></span>',
-    delta: f.achieved ? ("من الصفقات الرابحة في " + hdsYearTxt(year)) : "لا صفقة مغلقة ربحًا في " + hdsYearTxt(year),
+    /* No delta on a zero: «0 ر.س» already says it, and a sentence under it restating that nothing
+       closed is the kind of line this screen was cleared of (founder, 2026-09-21). The provenance
+       line stays where there IS revenue, because that one names a source the figure does not. */
+    delta: f.achieved ? ("من الصفقات الرابحة في " + hdsYearTxt(year)) : "",
     chart: hdsSpark(m.won, "is-flat")
   });
   h += hdsKpi({
