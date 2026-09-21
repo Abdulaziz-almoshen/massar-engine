@@ -437,9 +437,14 @@ function hdsHealthCard() {
   /* The open VALUE, which the reference prints beside the open count and this screen had nowhere:
      the indicator row carries the count alone. It is the sum of the three non-lost states, so it
      is stated here rather than computed a second time somewhere else. */
-  var sub = open
-    ? hdsPl(open, "بند مفتوح", "بندان مفتوحان", "بنود مفتوحة", "بندًا مفتوحًا") + " · " + hdsMoney(h.openValue)
-    : "لا بنود مفتوحة";
+  /* THE HEADER MUST COVER THE TILES UNDER IT. It printed the OPEN count while a «مرفوضة» tile sat
+     below — and a lost line is not open, so «5 بنود مفتوحة» over 5+0+0+1 read as an arithmetic
+     failure. It now states the whole band, which is what the four tiles partition, and names the
+     open value separately. */
+  var sub = h.total
+    ? hdsPl(h.total, "بند", "بندان", "بنود", "بندًا") +
+      " · المفتوح منها " + fmtN(open) + (h.openValue ? " بقيمة " + hdsMoney(h.openValue) : "")
+    : "لا بنود";
 
   return '<section class="hx-card hx-health">' +
     '<div class="hx-card__h"><h3 class="hx-card__t">صحة خط البيع</h3>' +
@@ -762,6 +767,7 @@ function hdsDonutCard(lines) {
   /* FIVE SLICES AND A REMAINDER. The palette holds five tones; with six sectors the sixth reused the
      first, so two different sectors were drawn in the same blue — colour naming two things at once
      is the one thing it may never do. The tail is grouped and counted instead of recoloured. */
+  var nSectors = all.filter(function (x) { return !x.none; }).length;
   var parts = all;
   if (all.length > 5) {
     var tail = all.slice(4);
@@ -770,6 +776,19 @@ function hdsDonutCard(lines) {
     parts = all.slice(0, 4).concat([rest]);
   }
   var total = parts.reduce(function (n, x) { return n + x.n; }, 0);
+  /* LARGEST REMAINDER, because five independent Math.round calls do not add up: 44+19+13+13+13
+     printed 102٪ on the live screen. The floor of each share is handed out first, then the
+     leftover points go to the largest remainders — so the column always totals exactly 100. */
+  var shares = (function () {
+    if (!total) return parts.map(function () { return 0; });
+    var raw = parts.map(function (x) { return (x.n / total) * 100; });
+    var out = raw.map(function (v) { return Math.floor(v); });
+    var left = 100 - out.reduce(function (a, c) { return a + c; }, 0);
+    var order = raw.map(function (v, i) { return { i: i, r: v - Math.floor(v) }; })
+      .sort(function (a, b) { return b.r - a.r; });
+    for (var z = 0; z < left && z < order.length; z++) out[order[z].i]++;
+    return out;
+  })();
   var body;
   if (!rows) {
     body = '<div class="m-empty"><div class="m-empty__t">' + hdsNil("جارٍ القراءة", "unset") + "</div></div>";
@@ -789,8 +808,11 @@ function hdsDonutCard(lines) {
       '<div class="hx-donut__r" role="img" aria-label="' +
         esc("الحسابات حسب القطاع: " + parts.map(function (x) { return x.label + " " + x.n; }).join("، ")) + '">' +
         '<svg viewBox="0 0 42 42"><circle class="hx-donut__t" cx="21" cy="21" r="15.9" pathLength="100"></circle>' + ring + "</svg>" +
-        '<span class="hx-donut__c"><b class="m-n">' + fmtN(parts.length) + "</b><small>" +
-          (parts.length === 1 ? "قطاع" : parts.length === 2 ? "قطاعان" : "قطاعات") + "</small></span></div>" +
+        /* SECTORS, not slices. This printed parts.length, which counts «بلا قطاع» as a sector and
+           collapses the whole «قطاعات أخرى» tail into one — it matched the truth here only by
+           coincidence. The figure is the count of real, named sectors in the book. */
+        '<span class="hx-donut__c"><b class="m-n">' + fmtN(nSectors) + "</b><small>" +
+          (nSectors === 1 ? "قطاع" : nSectors === 2 ? "قطاعان" : "قطاعات") + "</small></span></div>" +
       '<ul class="hx-donut__l">' + parts.map(function (x, i) {
         /* The count as well as the share: «17٪» of six lines is one line, and the reader should not
            have to do that arithmetic to know it. */
@@ -798,7 +820,7 @@ function hdsDonutCard(lines) {
         return "<li" + (rest ? ' title="' + esc(x.label + " — " + rest) + '"' : "") +
           '><i class="t' + (i % 5) + '"></i><span>' + esc(x.label) + "</span>" +
           '<em>' + hdsPl(x.n, "حساب", "حسابان", "حسابات", "حسابًا") + "</em>" +
-          '<b class="m-n">' + fmtN(Math.round((x.n / total) * 100)) + "٪</b></li>";
+          '<b class="m-n">' + fmtN(shares[i]) + "٪</b></li>";
       }).join("") + "</ul></div>";
   }
   return '<section class="hx-card">' +
