@@ -6,6 +6,9 @@ import { REP_PAGE_HTML } from "./rep-page.js";
 import * as db from "./db.js";
 import * as gupshup from "./gupshup.js";
 import * as sales from "./sales-domain.js";
+import { configProblem, isBasicAuthOn, mayOpenDashboard, safeEqual } from "./basic-auth.js";
+import { LOGIN_ERROR, loginPage } from "./login-page.js";
+import { SESSION_COOKIE, clearCookie, cookieValue, mintSession, readSession, safeNext, sessionCookie } from "./session.js";
 import * as reports from "./reports-domain.js";
 import * as tracker from "./tracker.js";
 import * as agent from "./agent.js";
@@ -48,6 +51,21 @@ import multipart from "@fastify/multipart";
 
 const app = Fastify({ logger: false, bodyLimit: 26214400 });
 await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024, files: 1 } });
+
+/* THE LOGIN FORM'S BODY. An HTML form posts application/x-www-form-urlencoded, which Fastify does
+   not parse out of the box; without this the login POST arrives with an undefined body and every
+   correct password is rejected. Parsed here rather than by adding a dependency for one form, and
+   capped at 4KB because the only thing that may arrive this way is two short fields. */
+app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string", bodyLimit: 4096 },
+  (_req, body, done) => {
+    try {
+      const out: Record<string, string> = {};
+      for (const [k, v] of new URLSearchParams(String(body))) out[k] = v;
+      done(null, out);
+    } catch (e) {
+      done(e as Error, undefined);
+    }
+  });
 
 // ------------------------------ roles and the audit log (§22, NFR-001/002, S7) ------------------------------
 // ONE gate for every /admin route, before its handler: who is calling (authorize), and whether their role holds
@@ -230,8 +248,106 @@ app.post("/webhooks/gupshup", async (req, reply) => {
 
 // ------------------------------ dashboard (المنصة) ------------------------------
 
-app.get("/dashboard", async (_req, reply) => {
+/** The dashboard's own credentials. Absent in local dev and in CI, where the gate stays open. */
+function dashAuth() {
+  return { user: process.env.DASH_USER || null, pass: process.env.DASH_PASSWORD || null };
+}
+
+/**
+ * THE GATE IN FRONT OF THE PAGE. /dashboard used to answer an unauthenticated GET with the whole
+ * shell and client script; only the /admin/* fetches were gated, by a token the operator pasted
+ * into `?token=`. A URL token lives in browser history, proxy logs and the Referer of every
+ * outbound link — which is exactly how this project's admin credential ended up in a transcript.
+ */
+/** The signing key for session cookies. Derived from the password, so changing the password logs
+ *  everyone out — which is what «change the password» is expected to mean. */
+function sessionKey(): string {
+  return (process.env.DASH_PASSWORD || "") + "|" + (process.env.ADMIN_TOKEN || "");
+}
+function loggedInUser(req: any): string | null {
+  return readSession(cookieValue(req.headers["cookie"], SESSION_COOKIE), sessionKey(), Date.now());
+}
+/** Local http has no Secure cookie, or the browser drops it and login silently never sticks. */
+function cookieSecure(req: any): boolean {
+  return (req.headers["x-forwarded-proto"] || "https") !== "http";
+}
+
+function dashboardGate(req: any, reply: any): boolean {
+  const cfg = dashAuth();
+  if (!isBasicAuthOn(cfg)) return true;
+  if (loggedInUser(req)) return true;
+  const verdict = mayOpenDashboard(
+    cfg,
+    { authorization: req.headers["authorization"], adminToken: req.headers["x-admin-token"] },
+    process.env.ADMIN_TOKEN || null,
+  );
+  if (verdict.ok) return true;
+  /* A BROWSER GETS THE LOGIN PAGE; A SCRIPT GETS 401. Sending a human to a 401 body is a dead end,
+     and sending curl a 302 to an HTML form turns a clear failure into a confusing 200. The Accept
+     header is what separates them. */
+  const accept = String(req.headers["accept"] || "");
+  if (accept.includes("text/html")) {
+    const here = String(req.raw.url || "/dashboard");
+    reply.code(302).header("location", "/login?next=" + encodeURIComponent(here)).send();
+    return false;
+  }
+  reply.code(401)
+    .header("WWW-Authenticate", 'Basic realm="Massar", charset="UTF-8"')
+    // No page, no product name beyond the realm: an unauthenticated caller learns nothing.
+    .type("text/plain; charset=utf-8")
+    .send("مطلوب تسجيل الدخول");
+  return false;
+}
+
+app.get("/login", async (req, reply) => {
+  const q = (req.query ?? {}) as Record<string, unknown>;
+  // Already in? Do not show a form that cannot be needed.
+  if (!isBasicAuthOn(dashAuth()) || loggedInUser(req)) {
+    return reply.redirect(safeNext(q.next), 302);
+  }
   reply.type("text/html; charset=utf-8");
+  return loginPage({ next: safeNext(q.next) });
+});
+
+app.post("/login", async (req, reply) => {
+  const cfg = dashAuth();
+  if (!isBasicAuthOn(cfg)) return reply.redirect("/dashboard", 302);
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const user = typeof b.user === "string" ? b.user.trim() : "";
+  const pass = typeof b.pass === "string" ? b.pass : "";
+  const next = safeNext(b.next);
+  if (!safeEqual(user, cfg.user) || !safeEqual(pass, cfg.pass)) {
+    /* ONE message for every failure, and the username is echoed back so a typo in the password does
+       not cost the whole form. Never says WHICH field was wrong: that is account enumeration. */
+    reply.code(401).type("text/html; charset=utf-8");
+    return loginPage({ error: true, next, user });
+  }
+  reply.header("set-cookie", sessionCookie(mintSession(user, sessionKey(), Date.now()), undefined, cookieSecure(req)));
+  return reply.redirect(next, 302);
+});
+
+app.post("/logout", async (req, reply) => {
+  reply.header("set-cookie", clearCookie(cookieSecure(req)));
+  return reply.redirect("/login", 302);
+});
+app.get("/logout", async (req, reply) => {
+  reply.header("set-cookie", clearCookie(cookieSecure(req)));
+  return reply.redirect("/login", 302);
+});
+
+app.get("/dashboard", async (req, reply) => {
+  if (!dashboardGate(req, reply)) return reply;
+  reply.type("text/html; charset=utf-8");
+  /* THE TOKEN STOPS TRAVELLING IN THE URL. Once Basic Auth has passed, the server hands the page
+     its own credential in the body, so the operator never types ?token= again. Served only on an
+     authenticated response, and only when the gate is actually on — with the gate off (local dev)
+     nothing is injected and the existing paste-the-token flow still works. */
+  if (isBasicAuthOn(dashAuth()) && process.env.ADMIN_TOKEN) {
+    return DASHBOARD_HTML.replace(
+      "</head>",
+      "<script>window.__MASSAR_TOKEN=" + JSON.stringify(process.env.ADMIN_TOKEN) + ";</script></head>",
+    );
+  }
   return DASHBOARD_HTML;
 });
 
@@ -240,6 +356,7 @@ app.get("/dashboard", async (_req, reply) => {
 // Redirect instead, carrying any ?token= and the #hash (the fragment is preserved by the browser
 // across a 302, so #kmon survives). 302, not 301: the root is not permanently this page.
 app.get("/", async (req, reply) => {
+  if (!dashboardGate(req, reply)) return reply;
   const qs = (req.raw.url || "").split("?")[1];
   return reply.redirect("/dashboard" + (qs ? "?" + qs : ""), 302);
 });
@@ -253,6 +370,9 @@ app.get("/health", async () => ({
   // loop during a database outage is worse than a truthful body an operator can read.
   ok: !db.enabled() || db.isConnected(),
   service: "massar-engine",
+  /* WHO CAN OPEN THE DASHBOARD. A gate that is off must SAY it is off: «configured» and «safe» are
+     different claims, and an operator reading this should never have to infer which one holds. */
+  dashboardAuth: { on: isBasicAuthOn(dashAuth()), problem: configProblem(dashAuth()) },
   uptimeSec: Math.round((Date.now() - startedAt) / 1000),
   model: agent.currentModel(),
   gupshupAppName: gupshup.appName() || "(unknown — learned from first webhook)",

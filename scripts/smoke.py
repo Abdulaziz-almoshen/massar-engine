@@ -157,8 +157,12 @@ def main() -> int:
         browser = p.chromium.launch()
 
         # Pick a real campaign so the detail view is exercised with real data.
-        probe = browser.new_page()
-        probe.goto(f"{BASE}/dashboard?token={tok}#kmon")
+        # THE TOKEN TRAVELS AS A HEADER, not in the URL. /dashboard is behind Basic Auth now, and
+        # the x-admin-token header is the alternative credential scripts use. Keeping ?token= here
+        # would have kept the admin credential in every navigation this suite logs.
+        ctx = browser.new_context(extra_http_headers={"x-admin-token": tok})
+        probe = ctx.new_page()
+        probe.goto(f"{BASE}/dashboard#kmon")
         probe.wait_for_timeout(3500)
         try:
             campaigns = probe.evaluate("() => (typeof campaigns !== 'undefined' && campaigns.length) ? campaigns[0].id : null")
@@ -172,8 +176,8 @@ def main() -> int:
         # same reason, on every run of this session. Probed, it exercises real data everywhere and
         # skips honestly where there is none.
         try:
-            probe2 = browser.new_page()
-            probe2.goto(f"{BASE}/dashboard?token={tok}#customers")
+            probe2 = ctx.new_page()
+            probe2.goto(f"{BASE}/dashboard#customers")
             probe2.wait_for_timeout(3500)
             phone = probe2.evaluate(
                 "() => (cache && cache.contacts && cache.contacts.length) ? cache.contacts[0].phone : null")
@@ -188,7 +192,8 @@ def main() -> int:
         for route, landmark in routes:
             before = len(failures)
             errors: list[str] = []
-            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page = ctx.new_page()
+            page.set_viewport_size({"width": 1440, "height": 900})
             page.on("pageerror", lambda e, acc=errors: acc.append(f"pageerror: {e}"))
             # A third-party CDN 404 is not a broken deploy. Google's font CDN failed on 3 of 6 runs,
             # and a gate that fails half the time for a reason outside the repo teaches its operator
@@ -209,7 +214,7 @@ def main() -> int:
             page.on("console", lambda m, acc=errors: (
                 None if (m.type != "error" or _is_third_party(m))
                 else acc.append(f"console: {m.text[:120]} @ {((m.location or {}).get('url') or '')[:80]}")))
-            page.goto(f"{BASE}/dashboard?token={tok}{route}")
+            page.goto(f"{BASE}/dashboard{route}")
             page.wait_for_timeout(4000)
 
             body_len = page.evaluate("() => (document.getElementById('body') || {}).innerHTML?.length || 0")

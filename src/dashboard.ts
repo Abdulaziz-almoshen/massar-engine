@@ -894,7 +894,11 @@ ${DS_VERIFY_CSS}
 <script>
 const qs = new URLSearchParams(location.search);
 if (qs.get("token")) { localStorage.setItem("massar_admin_token", qs.get("token")); history.replaceState({}, "", "/dashboard" + location.hash); }
-let TOKEN = localStorage.getItem("massar_admin_token") || "";
+/* THE SERVER'S TOKEN WINS. When the Basic Auth gate is on, the server injects the credential into
+   this page on an already-authenticated response, so nobody has to paste one or carry it in a URL.
+   It is written to localStorage too, so an admin fetch made before this line still finds it. */
+if (window.__MASSAR_TOKEN) { try { localStorage.setItem("massar_admin_token", window.__MASSAR_TOKEN); } catch (e) {} }
+let TOKEN = (window.__MASSAR_TOKEN || localStorage.getItem("massar_admin_token") || "");
 const ic = (n, sz, col) => '<svg width="' + (sz || 20) + '" height="' + (sz || 20) + '" style="flex:none;color:' + (col || 'currentColor') + '"><use href="#i-' + n + '"/></svg>';
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let cache = null; let selProd = 0; let selProdName = "";
