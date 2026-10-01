@@ -208,12 +208,21 @@ export const ROUTE_PERMISSIONS: readonly { method: string; url: string; permissi
   { method: "POST", url: "/admin/config/stages", permission: "org.manage", label: "إضافة مرحلة بيع" },
   { method: "PATCH", url: "/admin/config/stages/:key", permission: "org.manage", label: "تعديل مرحلة بيع" },
   { method: "DELETE", url: "/admin/config/stages/:key", permission: "org.manage", label: "حذف مرحلة بيع" },
-  { method: "POST", url: "/admin/config/divisions", permission: "org.manage", label: "إضافة قسم" },
-  { method: "PATCH", url: "/admin/config/divisions/:id", permission: "org.manage", label: "تعديل قسم" },
-  { method: "DELETE", url: "/admin/config/divisions/:id", permission: "org.manage", label: "حذف قسم" },
-  { method: "POST", url: "/admin/config/team", permission: "org.manage", label: "إضافة عضو فريق" },
-  { method: "PATCH", url: "/admin/config/team/:id", permission: "org.manage", label: "تعديل عضو فريق" },
-  { method: "DELETE", url: "/admin/config/team/:id", permission: "org.manage", label: "حذف عضو فريق" },
+  { method: "POST", url: "/admin/config/divisions", permission: "org.manage", label: "إضافة إدارة" },
+  { method: "PATCH", url: "/admin/config/divisions/:id", permission: "org.manage", label: "تعديل إدارة" },
+  { method: "DELETE", url: "/admin/config/divisions/:id", permission: "org.manage", label: "حذف إدارة" },
+  { method: "POST", url: "/admin/config/team", permission: "org.manage", label: "إضافة موظف" },
+  { method: "PATCH", url: "/admin/config/team/:id", permission: "org.manage", label: "تعديل موظف" },
+  { method: "DELETE", url: "/admin/config/team/:id", permission: "org.manage", label: "حذف موظف" },
+  { method: "POST", url: "/admin/config/segments", permission: "org.manage", label: "إضافة شريحة" },
+  { method: "PATCH", url: "/admin/config/segments/:id", permission: "org.manage", label: "تعديل شريحة" },
+  { method: "DELETE", url: "/admin/config/segments/:id", permission: "org.manage", label: "حذف شريحة" },
+  { method: "POST", url: "/admin/config/sectors", permission: "org.manage", label: "إضافة قطاع" },
+  { method: "PATCH", url: "/admin/config/sectors/:id", permission: "org.manage", label: "تعديل قطاع" },
+  { method: "DELETE", url: "/admin/config/sectors/:id", permission: "org.manage", label: "حذف قطاع" },
+  { method: "POST", url: "/admin/config/roles", permission: "org.manage", label: "إضافة دور" },
+  { method: "PATCH", url: "/admin/config/roles/:key", permission: "org.manage", label: "تعديل دور" },
+  { method: "DELETE", url: "/admin/config/roles/:key", permission: "org.manage", label: "حذف دور" },
   { method: "GET", url: "/admin/users", permission: "org.manage", label: "" },
   { method: "POST", url: "/admin/users", permission: "org.manage", label: "إضافة مستخدم" },
   { method: "PATCH", url: "/admin/users/:id", permission: "org.manage", label: "تعديل مستخدم" },
@@ -249,11 +258,11 @@ export const DOOR_PERMISSIONS: Readonly<Record<string, Permission>> = {
   triage: "conversations.view", pipeline: "conversations.view", customer: "conversations.view", indicators: "indicators.view",
   indicator: "indicators.view", aimkt: "campaigns.create", kb: "knowledge.view", sector: "knowledge.view", targets: "customers.view", partners: "partners.view",
   perf: "dashboards.view",
-  // «الهيكل التنظيمي» only READS the sectors, departments and team; every write on it hands off to
-  // «الأقسام» / «الفريق», which stay org.manage. Gating the reading on org.manage would hide the
-  // company's own shape from the executive who is asked about it.
+  // «إعدادات المنظمة» opens on settings.view so an executive can read the company's shape; its write
+  // controls are drawn only for org.manage, and every write route is gated on org.manage regardless.
+  // team / divisions are old links that redirect to it.
   org: "settings.view", board: "opps.view", knowledge: "knowledge.view",
-  team: "org.manage", divisions: "org.manage", users: "org.manage", audit: "audit.view",
+  team: "settings.view", divisions: "settings.view", users: "org.manage", audit: "audit.view",
   accounts: "customers.view", account: "customers.view", tasks: "customers.view", notes: "customers.view", product: "knowledge.view",
 };
 export function canOpen(role: unknown, route: unknown): boolean {

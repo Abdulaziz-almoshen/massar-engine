@@ -1061,7 +1061,9 @@ const SUBS = {
   kmon:      [["kmon", "متابعة الحملات"], ["aimkt", "إنشاء حملة"], ["targets", "جهات الاستهداف"],
               ["partners", "شركاء المبيعات"]],
   reports:   [["reports", "التقارير"], ["perf", "المستهدفات والأداء"], ["knowledge", "جاهزية المعرفة"]],
-  settings:  [["settings", "مراحل البيع"], ["divisions", "الأقسام"], ["team", "الفريق"], ["org", "الهيكل التنظيمي"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
+  // «إعدادات المنظمة» (2026-10-01) owns segments, sectors, departments, employees and roles in one
+  // place; «الأقسام» and «الفريق» were two more editors over the same rows and are tabs inside it now.
+  settings:  [["settings", "مراحل البيع"], ["org", "إعدادات المنظمة"], ["users", "المستخدمون والصلاحيات"], ["audit", "سجل التدقيق"]],
 };
 
 // route -> door. DERIVED from SUBS rather than written out, because a hand-kept second copy is how
@@ -1092,15 +1094,13 @@ const TITLES = {
   pipeline: ["سجل الأحداث", "كل إرسال وتسليم وردّ، بالترتيب الزمني"],
   board: ["لوحة المتابعة", "أدر فرص البيع واسحبها بين المراحل"],
   tasks: ["المهام", "ما يجب فعله، ومتى يستحق"], notes: ["الملاحظات", "ما دوّنه الفريق عن العملاء"], products: ["المنتجات", "تعريف المنتجات وتجهيزها للمساعد ومتابعة أدائها"],
-  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["الهيكل التنظيمي", "القطاعات والإدارات والموظفون، وما يرتبط بكل منها"],
+  targets: ["جهات الاستهداف", "استورد جهات الاستهداف وأدرها للحملات"], reports: ["التقارير", "نظرة تنفيذية على الأنبوب، وأين تتعثّر الصفقات"], org: ["إعدادات المنظمة", "الشرائح والقطاعات والإدارات والموظفون والأدوار، والهيكل الذي تصنعه"],
   knowledge: ["معرفة المنتج", "ما يعرفه المساعد عن كل منتج، وما ينقصه ليبيعه"],
-  settings: ["إعدادات النظام", "مراحل البيع ومددها، وأقسام الشركة، وفريقها"],
+  settings: ["إعدادات النظام", "مراحل البيع، وأوزانها، ومدد الالتزام بها"],
   indicators: ["مؤشرات استخدام العملاء", "بيانات استخدام العملاء التي يبني عليها مسار فرص الاستهداف والحملات"],
   indicator: ["مؤشر استخدام", "عرّف المؤشر وزوّد مسار ببيانات عملائه"],
   accounts: ["الحسابات", "المنشآت التي تبيع لها Lean: جهات اتصالها، ومسؤولها، واعتمادها، وفرصها"],
   account: ["سجل العميل", "بيانات العميل وجهات اتصاله وفرصه وحملاته ومؤشراته في شاشة واحدة"],
-  divisions: ["إعدادات النظام", "أقسام الشركة — كل منتج يتبع قسمًا، وكل عضو يعمل داخل قسم"],
-  team: ["إعدادات النظام", "الفريق الذي يُصعَّد إليه ويُطلب منه الدعم"],
   users: ["المستخدمون والصلاحيات", "من يدخل مسار، وبأي دور، وماذا يفتح له دوره"],
   audit: ["سجل التدقيق", "كل عملية حفظ: من، وبأي دور، وماذا، ومتى"],
 };
@@ -4844,6 +4844,7 @@ function render(fetchNew) {
   nav();
   // #kb and #kb/<name> were «معرفة الخدمة»; it merged into المنتجات (V5). Rewrites the hash in place.
   pxRedirectLegacy();
+  ocRedirectLegacy();
   const af = document.activeElement;
   const afId = af && af.tagName === "INPUT" ? af.id || af.getAttribute("data-fid") : null;
   const afPos = afId && af.selectionStart != null ? af.selectionStart : null;
@@ -4882,7 +4883,7 @@ function render(fetchNew) {
     // #product/<encoded name>[/<section>] — pxParseProductRoute peels a reserved last segment.
     const pr = cur === "product" ? pxParseProductRoute() : null;
     b.innerHTML = cur === "product" ? vProductDrill(pr.name, pr.section) : vSectorDrill(nm);
-  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "divisions" || cur === "team" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit" || cur === "org" || cur === "board" || cur === "knowledge") {
+  } else if (cur === "aimkt" || cur === "kb" || cur === "customers" || cur === "targets" || cur === "perf" || cur === "pipeline" || cur === "tasks" || cur === "notes" || cur === "opps" || cur === "triage" || cur === "products" || cur === "reports" || cur === "settings" || cur === "indicators" || cur === "indicator" || cur === "accounts" || cur === "account" || cur === "partners" || cur === "users" || cur === "audit" || cur === "org" || cur === "board" || cur === "knowledge") {
     if (!TOKEN) return gate();
     const kbProd = cur === "kb" ? decodeURIComponent((location.hash || "").split("/").slice(1).join("/") || "") : "";
     // #customers is the العملاء LIST (customers-crm); the importer moved to #targets, whose title
@@ -4900,7 +4901,7 @@ function render(fetchNew) {
       : cur === "notes" ? vNotesCrm()
       : cur === "products" ? vProductsCrm()
       : cur === "reports" ? vReportsCrm()
-      : cur === "settings" || cur === "divisions" || cur === "team" ? vSettings(cur)
+      : cur === "settings" ? vSettings(cur)
       : cur === "indicators" ? vIndicators()
       : cur === "indicator" ? vIndicatorForm((location.hash || "").split("/").slice(1).join("/"))
       : cur === "accounts" ? vAccounts()

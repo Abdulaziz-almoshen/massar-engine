@@ -158,10 +158,13 @@ export function stageSlaState(
 // The team directory. Escalation points at a PERSON, so a person has to exist.
 // ---------------------------------------------------------------------------
 
-export type TeamRole = "sales" | "support" | "manager";
-export const TEAM_ROLES: readonly TeamRole[] = ["sales", "support", "manager"];
+// The roles code reads by KEY (escalation routes to support/manager; the product record offers
+// product managers). An admin may rename them and add more in «الأدوار», but these four are seeded
+// on every boot and cannot be deleted. The list is the fallback the page uses before org_roles loads.
+export type TeamRole = string;
+export const TEAM_ROLES: readonly string[] = ["sales", "support", "manager", "product_manager"];
 export const TEAM_ROLE_LABELS: Readonly<Record<string, string>> = {
-  sales: "مبيعات", support: "دعم فني", manager: "إدارة",
+  sales: "مبيعات", support: "دعم فني", manager: "إدارة", product_manager: "مدير منتج",
 };
 
 export type MemberInput = { name?: unknown; email?: unknown; role?: unknown; active?: unknown; divisionId?: unknown };
@@ -174,7 +177,8 @@ export function isEmailShaped(email: unknown): boolean {
   return s.length <= 120 && /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(s);
 }
 
-export function checkMember(input: MemberInput): MemberAccepted | Rejection {
+/** roleKeys is the LIVE role list (org_roles); without it the seeded four are the whole vocabulary. */
+export function checkMember(input: MemberInput, roleKeys?: readonly string[]): MemberAccepted | Rejection {
   const name = String(input.name ?? "").replace(/\s+/g, " ").trim();
   if (!name) return { ok: false, code: "invalid_name", reason: "الاسم مطلوب.", field: "name" };
   if (name.length > 60) return { ok: false, code: "invalid_name", reason: "الاسم 60 حرفًا كحدٍّ أقصى.", field: "name" };
@@ -182,8 +186,8 @@ export function checkMember(input: MemberInput): MemberAccepted | Rejection {
   if (!email) return { ok: false, code: "invalid_email", reason: "البريد مطلوب — التصعيد يُرسل إليه.", field: "email" };
   if (!isEmailShaped(email)) return { ok: false, code: "invalid_email", reason: "صيغة البريد غير صحيحة.", field: "email" };
   const role = String(input.role ?? "");
-  if ((TEAM_ROLES as readonly string[]).indexOf(role) === -1) {
-    return { ok: false, code: "invalid_role", reason: "الدور: مبيعات أو دعم فني أو إدارة.", field: "role" };
+  if ((roleKeys && roleKeys.length ? roleKeys : TEAM_ROLES).indexOf(role) === -1) {
+    return { ok: false, code: "invalid_role", reason: "الدور غير معروف — اختر دورًا من «الأدوار».", field: "role" };
   }
   let divisionId: number | null = null;
   if (input.divisionId !== null && input.divisionId !== undefined && String(input.divisionId) !== "") {
@@ -202,14 +206,17 @@ export function checkMember(input: MemberInput): MemberAccepted | Rejection {
 // screens keep the words apart deliberately; conflating them was the first thing to get wrong here.
 // ---------------------------------------------------------------------------
 
-export type DivisionInput = { name?: unknown; ownerMemberId?: unknown; active?: unknown };
-export type DivisionAccepted = { ok: true; value: { name: string; ownerMemberId: number | null; active: boolean } };
+export type DivisionInput = { name?: unknown; ownerMemberId?: unknown; active?: unknown; sectorId?: unknown };
+export type DivisionAccepted = { ok: true; value: { name: string; ownerMemberId: number | null; active: boolean; sectorId: number | null } };
 
+/** sector: the org sector the department sits under, as the caller found it. undefined = not looked
+ *  up (the id is only shape-checked); null = looked up and absent. */
 export function checkDivision(
   input: DivisionInput,
   takenNames: readonly string[],
   owner?: { id: number; active: boolean } | null,
   existingName?: string,
+  sector?: { id: number; active: boolean } | null,
 ): DivisionAccepted | Rejection {
   const name = String(input.name ?? "").replace(/\s+/g, " ").trim();
   if (!name) return { ok: false, code: "invalid_name", reason: "اسم القسم مطلوب.", field: "name" };
@@ -227,7 +234,14 @@ export function checkDivision(
     if (!owner.active) return { ok: false, code: "inactive_member", reason: "مسؤول القسم موقوف في سجل الفريق.", field: "ownerMemberId" };
     ownerMemberId = id;
   }
-  return { ok: true, value: { name, ownerMemberId, active: input.active === undefined ? true : Boolean(input.active) } };
+  let sectorId: number | null = null;
+  if (input.sectorId !== null && input.sectorId !== undefined && String(input.sectorId) !== "") {
+    const sid = Number(input.sectorId);
+    if (!Number.isInteger(sid) || sid <= 0) return { ok: false, code: "invalid_sector", reason: "القطاع غير معروف.", field: "sectorId" };
+    if (sector === null) return { ok: false, code: "unknown_sector", reason: "لا قطاع بهذا المعرّف.", field: "sectorId" };
+    sectorId = sid;
+  }
+  return { ok: true, value: { name, ownerMemberId, active: input.active === undefined ? true : Boolean(input.active), sectorId } };
 }
 
 /** A division that still owns products or people is not deleted — it is paused, or emptied first.
@@ -241,6 +255,163 @@ export function checkDivisionDelete(products: unknown, members: unknown): { ok: 
     };
   }
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// «إعدادات المنظمة» (founder, 2026-10-01): segments, sectors, departments, employees, roles.
+//
+// TWO WORDS, TWO THINGS. A SEGMENT («الشريحة») is the MARKET a product sells into — hospitals,
+// pharmacies, business. It is the old `sectors` table: the three seeded rows were always exactly
+// these three markets, so the segment list IS that table with a type, and every product keeps the
+// link it already had. A SECTOR («القطاع») is now the company's own top-level unit — business, sales
+// or support — with a manager, and departments sit under it:
+//   Sector → Sector manager → Department → Department manager → Members.
+// ---------------------------------------------------------------------------
+
+export const NAME_MAX = 60;
+export const SEGMENT_KINDS: readonly string[] = ["hospitals", "pharmacies", "business"];
+export const SEGMENT_KIND_LABELS: Readonly<Record<string, string>> = {
+  hospitals: "مستشفيات", pharmacies: "صيدليات", business: "قطاع الأعمال",
+};
+export const ORG_SECTOR_KINDS: readonly string[] = ["business", "sales", "support"];
+export const ORG_SECTOR_KIND_LABELS: Readonly<Record<string, string>> = {
+  business: "أعمال", sales: "مبيعات", support: "دعم",
+};
+/** The roles code depends on by key. Renamable, never deletable. */
+export const SYSTEM_ROLE_KEYS: readonly string[] = ["sales", "support", "manager", "product_manager"];
+
+export type SegmentInput = { name?: unknown; kind?: unknown; active?: unknown };
+export type SegmentAccepted = { ok: true; value: { name: string; kind: string; active: boolean } };
+
+/** One name rule for every row on the screen: collapsed whitespace, required, NAME_MAX long, unique. */
+export function checkOrgName(raw: unknown, takenNames: readonly string[], existingName: string | undefined, what: string): { ok: true; name: string } | Rejection {
+  const name = String(raw ?? "").replace(/\s+/g, " ").trim();
+  if (!name) return { ok: false, code: "invalid_name", reason: "اسم " + what + " مطلوب.", field: "name" };
+  if (name.length > NAME_MAX) return { ok: false, code: "invalid_name", reason: "اسم " + what + " " + NAME_MAX + " حرفًا كحدٍّ أقصى.", field: "name" };
+  if (name !== existingName && takenNames.indexOf(name) >= 0) return { ok: false, code: "name_exists", reason: "يوجد " + what + " بهذا الاسم.", field: "name" };
+  return { ok: true, name };
+}
+
+export function checkSegment(input: SegmentInput, takenNames: readonly string[], existingName?: string): SegmentAccepted | Rejection {
+  const n = checkOrgName(input.name, takenNames, existingName, "الشريحة");
+  if (!n.ok) return n;
+  const kind = String(input.kind ?? "");
+  if (SEGMENT_KINDS.indexOf(kind) === -1) {
+    return { ok: false, code: "invalid_kind", reason: "النوع: مستشفيات أو صيدليات أو قطاع الأعمال.", field: "kind" };
+  }
+  return { ok: true, value: { name: n.name, kind, active: input.active === undefined ? true : Boolean(input.active) } };
+}
+
+/** A segment products still point at is paused, not deleted: the product would lose its market. */
+export function checkSegmentDelete(products: unknown): { ok: true } | Rejection {
+  if ((Number(products) || 0) > 0) {
+    return { ok: false, code: "segment_in_use", field: "id", reason: "الشريحة مرتبطة بمنتجات — انقلها إلى شريحة أخرى أو أوقف الشريحة بدل حذفها." };
+  }
+  return { ok: true };
+}
+
+export type OrgSectorInput = { name?: unknown; kind?: unknown; managerMemberId?: unknown; active?: unknown };
+export type OrgSectorAccepted = { ok: true; value: { name: string; kind: string; managerMemberId: number | null; active: boolean } };
+
+export function checkOrgSector(
+  input: OrgSectorInput,
+  takenNames: readonly string[],
+  manager?: { id: number; active: boolean } | null,
+  existingName?: string,
+): OrgSectorAccepted | Rejection {
+  const n = checkOrgName(input.name, takenNames, existingName, "القطاع");
+  if (!n.ok) return n;
+  const kind = String(input.kind ?? "");
+  if (ORG_SECTOR_KINDS.indexOf(kind) === -1) {
+    return { ok: false, code: "invalid_kind", reason: "التصنيف: أعمال أو مبيعات أو دعم.", field: "kind" };
+  }
+  let managerMemberId: number | null = null;
+  if (input.managerMemberId !== null && input.managerMemberId !== undefined && String(input.managerMemberId) !== "") {
+    const id = Number(input.managerMemberId);
+    if (!Number.isInteger(id) || id <= 0) return { ok: false, code: "invalid_manager", reason: "مدير القطاع غير معروف.", field: "managerMemberId" };
+    if (manager === null) return { ok: false, code: "unknown_member", reason: "لا أحد بهذا المعرّف في الموظفين.", field: "managerMemberId" };
+    if (manager && !manager.active) return { ok: false, code: "inactive_member", reason: "مدير القطاع موقوف في سجل الموظفين.", field: "managerMemberId" };
+    managerMemberId = id;
+  }
+  return { ok: true, value: { name: n.name, kind, managerMemberId, active: input.active === undefined ? true : Boolean(input.active) } };
+}
+
+/** A sector with departments under it is emptied or paused first — deleting it would orphan them silently. */
+export function checkOrgSectorDelete(departments: unknown): { ok: true } | Rejection {
+  if ((Number(departments) || 0) > 0) {
+    return { ok: false, code: "sector_in_use", field: "id", reason: "تحت القطاع إدارات — انقلها إلى قطاع آخر أو أوقف القطاع بدل حذفه." };
+  }
+  return { ok: true };
+}
+
+export type RoleInput = { label?: unknown; active?: unknown };
+export type RoleAccepted = { ok: true; value: { label: string; active: boolean } };
+
+export function checkRole(input: RoleInput, takenLabels: readonly string[], existingLabel?: string, isSystem?: boolean): RoleAccepted | Rejection {
+  const label = String(input.label ?? "").replace(/\s+/g, " ").trim();
+  if (!label) return { ok: false, code: "invalid_label", reason: "اسم الدور مطلوب.", field: "label" };
+  if (label.length > 40) return { ok: false, code: "invalid_label", reason: "اسم الدور 40 حرفًا كحدٍّ أقصى.", field: "label" };
+  if (label !== existingLabel && takenLabels.indexOf(label) >= 0) return { ok: false, code: "label_exists", reason: "يوجد دور بهذا الاسم.", field: "label" };
+  const active = input.active === undefined ? true : Boolean(input.active);
+  if (isSystem && !active) return { ok: false, code: "system_role", reason: "دور أساسي في النظام — يُعاد تسميته ولا يُوقف.", field: "active" };
+  return { ok: true, value: { label, active } };
+}
+
+/** A custom role's key: ascii, stable, never typed by the admin. Arabic labels give «role», «role_2»… */
+export function roleKeyFrom(label: unknown, taken: readonly string[]): string {
+  const ascii = String(label ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const base = (/^[a-z]/.test(ascii) ? ascii : (ascii ? "role_" + ascii : "role")).slice(0, 24);
+  if (taken.indexOf(base) === -1) return base;
+  for (let i = 2; i < 500; i++) {
+    const candidate = (base + "_" + i).slice(0, 30);
+    if (taken.indexOf(candidate) === -1) return candidate;
+  }
+  return base + "_" + Date.now();
+}
+
+export function checkRoleDelete(key: unknown, members: unknown): { ok: true } | Rejection {
+  if (SYSTEM_ROLE_KEYS.indexOf(String(key ?? "")) >= 0) {
+    return { ok: false, code: "system_role", field: "key", reason: "دور أساسي في النظام — يُعاد تسميته ولا يُحذف." };
+  }
+  if ((Number(members) || 0) > 0) {
+    return { ok: false, code: "role_in_use", field: "key", reason: "موظفون يحملون هذا الدور — غيّر أدوارهم أو أوقف الدور بدل حذفه." };
+  }
+  return { ok: true };
+}
+
+/** THE HIERARCHY, derived — never stored a second time. Sector → manager → departments → manager →
+ *  members, plus the two places a row can fall out of it: a department under no sector, and a person
+ *  in no department. Both are SHOWN, because a hierarchy that silently drops rows reads as complete. */
+export function buildOrgTree(
+  sectors: readonly { id: number; name: string; kind: string; managerMemberId: number | null; active: boolean }[],
+  departments: readonly { id: number; name: string; sectorId: number | null; ownerMemberId: number | null; active: boolean }[],
+  members: readonly { id: number; name: string; role: string; divisionId: number | null; active: boolean }[],
+) {
+  const byId: Record<string, { id: number; name: string; role: string; divisionId: number | null; active: boolean }> = {};
+  members.forEach(function (m) { byId[String(m.id)] = m; });
+  const sectorIds: Record<string, boolean> = {};
+  sectors.forEach(function (s) { sectorIds[String(s.id)] = true; });
+  const deptIds: Record<string, boolean> = {};
+  departments.forEach(function (d) { deptIds[String(d.id)] = true; });
+  const dept = function (d: { id: number; name: string; sectorId: number | null; ownerMemberId: number | null; active: boolean }) {
+    const manager = d.ownerMemberId == null ? null : (byId[String(d.ownerMemberId)] || null);
+    return {
+      id: d.id, name: d.name, active: d.active, manager: manager,
+      // The manager is drawn in the department's header, so the member list does not repeat them.
+      members: members.filter(function (m) { return m.divisionId === d.id && (!manager || m.id !== manager.id); }),
+    };
+  };
+  return {
+    sectors: sectors.map(function (s) {
+      return {
+        id: s.id, name: s.name, kind: s.kind, active: s.active,
+        manager: s.managerMemberId == null ? null : (byId[String(s.managerMemberId)] || null),
+        departments: departments.filter(function (d) { return d.sectorId === s.id; }).map(dept),
+      };
+    }),
+    unsectored: departments.filter(function (d) { return d.sectorId == null || !sectorIds[String(d.sectorId)]; }).map(dept),
+    unplaced: members.filter(function (m) { return m.divisionId == null || !deptIds[String(m.divisionId)]; }),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +477,8 @@ export function checkEscalation(
 const DOMAIN_FNS = [
   isTerminalStageKey, stageKeyFrom, isValidStageKey, checkStage, checkStageDelete,
   isStageSelectable, stageSlaState, isEmailShaped, checkMember, checkDivision,
-  checkDivisionDelete, checkEscalation,
+  checkDivisionDelete, checkEscalation, checkOrgName, checkSegment, checkSegmentDelete,
+  checkOrgSector, checkOrgSectorDelete, checkRole, roleKeyFrom, checkRoleDelete, buildOrgTree,
 ] as const;
 
 export const CONFIG_DOMAIN_JS: string = [
@@ -321,6 +493,12 @@ export const CONFIG_DOMAIN_JS: string = [
   "var ESCALATION_LABELS = " + JSON.stringify(ESCALATION_LABELS) + ";",
   "var ESCALATION_ROLES = " + JSON.stringify(ESCALATION_ROLES) + ";",
   "var DELIVERY_LABELS = " + JSON.stringify(DELIVERY_LABELS) + ";",
+  "var NAME_MAX = " + NAME_MAX + ";",
+  "var SEGMENT_KINDS = " + JSON.stringify(SEGMENT_KINDS) + ";",
+  "var SEGMENT_KIND_LABELS = " + JSON.stringify(SEGMENT_KIND_LABELS) + ";",
+  "var ORG_SECTOR_KINDS = " + JSON.stringify(ORG_SECTOR_KINDS) + ";",
+  "var ORG_SECTOR_KIND_LABELS = " + JSON.stringify(ORG_SECTOR_KIND_LABELS) + ";",
+  "var SYSTEM_ROLE_KEYS = " + JSON.stringify(SYSTEM_ROLE_KEYS) + ";",
   ...DOMAIN_FNS.map((fn) => fn.toString()),
 ].join("\n");
 
@@ -331,6 +509,7 @@ export function checkConfigDomainClosure(): string[] {
   const injected = [
     "STAGE_LABEL_MAX", "STAGE_KEY_MAX", "SLA_DAYS_MAX", "TERMINAL_KEYS", "TEAM_ROLES",
     "TEAM_ROLE_LABELS", "ESCALATION_KINDS", "ESCALATION_LABELS", "ESCALATION_ROLES", "DELIVERY_LABELS",
+    "NAME_MAX", "SEGMENT_KINDS", "SEGMENT_KIND_LABELS", "ORG_SECTOR_KINDS", "ORG_SECTOR_KIND_LABELS", "SYSTEM_ROLE_KEYS",
   ];
   const names = DOMAIN_FNS.map((f) => f.name);
   const problems: string[] = [];

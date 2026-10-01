@@ -823,8 +823,9 @@ app.get("/admin/sectors", async (req, reply) => {
 app.get("/admin/config", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const [stages, divisions, team] = await Promise.all([db.listStages(), db.listDivisions(), db.listMembers()]);
-  return { ok: true, stages, divisions, team };
+  const [stages, divisions, team, segments, sectors, roles] = await Promise.all([
+    db.listStages(), db.listDivisions(), db.listMembers(), db.listSegments(), db.listOrgSectors(), db.listRoles()]);
+  return { ok: true, stages, divisions, team, segments, sectors, roles };
 });
 
 app.post("/admin/config/stages", async (req, reply) => {
@@ -880,11 +881,12 @@ app.delete("/admin/config/stages/:key", async (req, reply) => {
 app.post("/admin/config/divisions", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   const body = (req.body ?? {}) as sysCfg.DivisionInput;
-  const [divisions, owner] = await Promise.all([
+  const [divisions, owner, sectors] = await Promise.all([
     db.listDivisions(),
     body.ownerMemberId ? db.memberById(Number(body.ownerMemberId)) : Promise.resolve(null),
+    db.listOrgSectors(),
   ]);
-  const checked = sysCfg.checkDivision(body, divisions.map((d) => d.name), owner);
+  const checked = sysCfg.checkDivision(body, divisions.map((d) => d.name), owner, undefined, sectorFor(sectors, body.sectorId));
   if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
   const id = await db.createDivision(checked.value);
   if (id == null) return problem(reply, 409, "name_exists", "يوجد قسم بهذا الاسم", "name");
@@ -903,9 +905,11 @@ app.patch("/admin/config/divisions/:id", async (req, reply) => {
     name: "name" in body ? body.name : current.name,
     ownerMemberId: "ownerMemberId" in body ? body.ownerMemberId : current.ownerMemberId,
     active: "active" in body ? body.active : current.active,
+    sectorId: "sectorId" in body ? body.sectorId : current.sectorId,
   };
   const owner = merged.ownerMemberId ? await db.memberById(Number(merged.ownerMemberId)) : null;
-  const checked = sysCfg.checkDivision(merged, divisions.map((d) => d.name), owner, current.name);
+  const checked = sysCfg.checkDivision(merged, divisions.map((d) => d.name), owner, current.name,
+    sectorFor(await db.listOrgSectors(), merged.sectorId));
   if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
   const ok = await db.updateDivision(id, checked.value);
   if (!ok) return problem(reply, 404, "unknown_division", "لا قسم بهذا المعرّف", "id");
@@ -925,7 +929,7 @@ app.delete("/admin/config/divisions/:id", async (req, reply) => {
 
 app.post("/admin/config/team", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
-  const checked = sysCfg.checkMember((req.body ?? {}) as sysCfg.MemberInput);
+  const checked = sysCfg.checkMember((req.body ?? {}) as sysCfg.MemberInput, await liveRoleKeys());
   if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
   if (checked.value.divisionId != null && !(await db.listDivisions()).some((d) => d.id === checked.value.divisionId)) {
     return problem(reply, 400, "unknown_division", "لا قسم بهذا المعرّف", "divisionId");
@@ -949,8 +953,13 @@ app.patch("/admin/config/team/:id", async (req, reply) => {
     divisionId: "divisionId" in body ? body.divisionId : current.divisionId,
     active: "active" in body ? body.active : current.active,
   };
-  const checked = sysCfg.checkMember(merged);
+  // A role paused after this person was given it stays valid for them: pausing stops NEW assignments.
+  const checked = sysCfg.checkMember(merged, (await liveRoleKeys()).concat([current.role]));
   if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  if (checked.value.divisionId != null && checked.value.divisionId !== current.divisionId &&
+      !(await db.listDivisions()).some((d) => d.id === checked.value.divisionId)) {
+    return problem(reply, 400, "unknown_division", "لا إدارة بهذا المعرّف", "divisionId");
+  }
   const out = await db.updateMember(id, checked.value);
   if (out === "email_taken") return problem(reply, 409, "email_exists", "هذا البريد مسجّل لعضو آخر", "email");
   if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
@@ -965,6 +974,157 @@ app.delete("/admin/config/team/:id", async (req, reply) => {
   if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
   if (typeof out === "object") return problem(reply, 409, "member_owns_accounts", "مسؤول عن " + out.owns + " من العملاء — انقلهم إلى عضو آخر أو أوقفه بدل حذفه", "id");
   return { ok: true, id };
+});
+
+// ---- «إعدادات المنظمة»: segments, org sectors, roles -----------------------------------------
+// Same contract as the ladder: config-domain decides, the page runs the same rule first.
+
+function sectorFor(sectors: db.OrgSectorRow[], raw: unknown): { id: number; active: boolean } | null | undefined {
+  if (raw === null || raw === undefined || String(raw) === "") return undefined;
+  return sectors.find((x) => x.id === Number(raw)) ?? null;
+}
+async function liveRoleKeys(): Promise<string[]> {
+  const roles = await db.listRoles();
+  // An empty list means the table is unreadable, not that no role exists: fall back to the seeded four.
+  return roles.length ? roles.filter((r) => r.active).map((r) => r.key) : sysCfg.TEAM_ROLES.slice();
+}
+
+app.post("/admin/config/segments", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const segments = await db.listSegments();
+  const checked = sysCfg.checkSegment((req.body ?? {}) as sysCfg.SegmentInput, segments.map((x) => x.name));
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const id = await db.createSegment(checked.value);
+  if (id == null) return problem(reply, 409, "name_exists", "توجد شريحة بهذا الاسم", "name");
+  log({ at: "config", msg: "segment added", id, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/segments/" + id).send({ ok: true, id, segment: checked.value });
+});
+
+app.patch("/admin/config/segments/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const segments = await db.listSegments();
+  const current = segments.find((x) => x.id === id);
+  if (!current) return problem(reply, 404, "unknown_segment", "لا شريحة بهذا المعرّف", "id");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const checked = sysCfg.checkSegment({
+    name: "name" in body ? body.name : current.name,
+    kind: "kind" in body ? body.kind : current.kind,
+    active: "active" in body ? body.active : current.active,
+  }, segments.map((x) => x.name), current.name);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const out = await db.updateSegment(id, checked.value);
+  if (out === "name_taken") return problem(reply, 409, "name_exists", "توجد شريحة بهذا الاسم", "name");
+  if (out === "missing") return problem(reply, 404, "unknown_segment", "لا شريحة بهذا المعرّف", "id");
+  return { ok: true, id, segment: checked.value };
+});
+
+app.delete("/admin/config/segments/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const current = (await db.listSegments()).find((x) => x.id === id);
+  if (!current) return problem(reply, 404, "unknown_segment", "لا شريحة بهذا المعرّف", "id");
+  const checked = sysCfg.checkSegmentDelete(current.products);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  const out = await db.deleteSegment(id);
+  // Archived products still hold the FK even though the count above skips them.
+  if (out === "in_use") return problem(reply, 409, "segment_in_use", "منتجات مؤرشفة مرتبطة بالشريحة — أوقفها بدل حذفها", "id");
+  if (out === "missing") return problem(reply, 404, "unknown_segment", "لا شريحة بهذا المعرّف", "id");
+  return { ok: true, id };
+});
+
+app.post("/admin/config/sectors", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const body = (req.body ?? {}) as sysCfg.OrgSectorInput;
+  const [sectors, manager] = await Promise.all([
+    db.listOrgSectors(),
+    body.managerMemberId ? db.memberById(Number(body.managerMemberId)) : Promise.resolve(null),
+  ]);
+  const checked = sysCfg.checkOrgSector(body, sectors.map((x) => x.name), manager);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const id = await db.createOrgSector(checked.value);
+  if (id == null) return problem(reply, 409, "name_exists", "يوجد قطاع بهذا الاسم", "name");
+  log({ at: "config", msg: "org sector added", id, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/sectors/" + id).send({ ok: true, id, sector: checked.value });
+});
+
+app.patch("/admin/config/sectors/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const sectors = await db.listOrgSectors();
+  const current = sectors.find((x) => x.id === id);
+  if (!current) return problem(reply, 404, "unknown_sector", "لا قطاع بهذا المعرّف", "id");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const merged: sysCfg.OrgSectorInput = {
+    name: "name" in body ? body.name : current.name,
+    kind: "kind" in body ? body.kind : current.kind,
+    managerMemberId: "managerMemberId" in body ? body.managerMemberId : current.managerMemberId,
+    active: "active" in body ? body.active : current.active,
+  };
+  const manager = merged.managerMemberId ? await db.memberById(Number(merged.managerMemberId)) : null;
+  const checked = sysCfg.checkOrgSector(merged, sectors.map((x) => x.name), manager, current.name);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const out = await db.updateOrgSector(id, checked.value);
+  if (out === "name_taken") return problem(reply, 409, "name_exists", "يوجد قطاع بهذا الاسم", "name");
+  if (out === "missing") return problem(reply, 404, "unknown_sector", "لا قطاع بهذا المعرّف", "id");
+  return { ok: true, id, sector: checked.value };
+});
+
+app.delete("/admin/config/sectors/:id", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const id = Number((req.params as any).id);
+  const current = (await db.listOrgSectors()).find((x) => x.id === id);
+  if (!current) return problem(reply, 404, "unknown_sector", "لا قطاع بهذا المعرّف", "id");
+  const checked = sysCfg.checkOrgSectorDelete(current.departments);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  const out = await db.deleteOrgSector(id);
+  if (out === "in_use") return problem(reply, 409, "sector_in_use", "تحت القطاع إدارات", "id");
+  if (out === "missing") return problem(reply, 404, "unknown_sector", "لا قطاع بهذا المعرّف", "id");
+  return { ok: true, id };
+});
+
+app.post("/admin/config/roles", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const roles = await db.listRoles();
+  const body = (req.body ?? {}) as sysCfg.RoleInput;
+  const checked = sysCfg.checkRole(body, roles.map((r) => r.label));
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const key = sysCfg.roleKeyFrom(checked.value.label, roles.map((r) => r.key));
+  if (!(await db.createRole({ key, ...checked.value }))) return problem(reply, 409, "label_exists", "يوجد دور بهذا الاسم", "label");
+  log({ at: "config", msg: "role added", key, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/roles/" + encodeURIComponent(key)).send({ ok: true, key, role: checked.value });
+});
+
+app.patch("/admin/config/roles/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const roles = await db.listRoles();
+  const current = roles.find((r) => r.key === key);
+  if (!current) return problem(reply, 404, "unknown_role", "لا دور بهذا المعرّف", "key");
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const checked = sysCfg.checkRole({
+    label: "label" in body ? body.label : current.label,
+    active: "active" in body ? body.active : current.active,
+  }, roles.map((r) => r.label), current.label, current.system);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const out = await db.updateRole(key, checked.value);
+  if (out === "label_taken") return problem(reply, 409, "label_exists", "يوجد دور بهذا الاسم", "label");
+  if (out === "missing") return problem(reply, 404, "unknown_role", "لا دور بهذا المعرّف", "key");
+  return { ok: true, key, role: checked.value };
+});
+
+app.delete("/admin/config/roles/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const current = (await db.listRoles()).find((r) => r.key === key);
+  if (!current) return problem(reply, 404, "unknown_role", "لا دور بهذا المعرّف", "key");
+  const checked = sysCfg.checkRoleDelete(key, current.members);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  const out = await db.deleteRole(key);
+  if (out === "system") return problem(reply, 409, "system_role", "دور أساسي في النظام", "key");
+  if (out === "in_use") return problem(reply, 409, "role_in_use", "موظفون يحملون هذا الدور", "key");
+  if (out === "missing") return problem(reply, 404, "unknown_role", "لا دور بهذا المعرّف", "key");
+  return { ok: true, key };
 });
 
 // ---- escalation and «طلب دعم» ------------------------------------------------------------

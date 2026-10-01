@@ -1093,11 +1093,10 @@ function pxSheetHtml() {
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
     "</select></div>" +
     /* THE OWNING UNIT, at birth rather than on a return visit. */
-    '<div class="m-field"><label class="m-label" for="pxs_division">القسم</label>' +
-    '<select class="m-select" id="pxs_division" data-pxsheet="divisionId"><option value="">بلا قسم</option>' +
-    ((typeof cfDivs !== "undefined" && cfDivs) || []).map(function (v) {
-      return '<option value="' + v.id + '"' + (String(d.divisionId) === String(v.id) ? " selected" : "") + ">" + esc(v.name) + "</option>"; }).join("") +
-    "</select></div>" +
+    /* Grouped under each department's SECTOR (2026-10-01): the organisation comes from «إعدادات المنظمة». */
+    '<div class="m-field"><label class="m-label" for="pxs_division">الإدارة المسؤولة</label>' +
+    '<select class="m-select" id="pxs_division" data-pxsheet="divisionId"><option value="">بلا إدارة</option>' +
+    ocDivisionOptions(d.divisionId) + "</select></div>" +
     /* ONE NAME FOR ONE FIELD. This drawer said «المسؤول» and the record said «مدير المنتج» for
        the same column, so the two screens read as though they held different people. */
     '<div class="m-field"><label class="m-label" for="pxs_owner">مدير المنتج</label>' +
@@ -1684,10 +1683,14 @@ function pxMetaSection(p) {
     pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
     '<span class="px-acts">' + (p.sectorAssumed ? '<span class="m-chip m-chip--warn" title="القطاع مُستنتَج؛ اختيار قيمة يؤكده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
   if (typeof cfDivs !== "undefined" && cfDivs.length) {
-    b += '<div class="m-field"><label class="m-label" for="pxf_division">القسم</label>' +
-      '<select class="m-select" id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا قسم</option>' +
-      cfDivs.map(function (d) { return '<option value="' + d.id + '"' + (String(p.divisionId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; }).join("") +
-      '</select><span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span></div>";
+    /* Requirement 7 (2026-10-01): the product is assigned to a department picked under its sector, and
+       the record says who that makes responsible. The organisation is edited in «إعدادات المنظمة», never here. */
+    var resp = ocResponsibleFor(p.divisionId);
+    b += '<div class="m-field"><label class="m-label" for="pxf_division">الإدارة المسؤولة</label>' +
+      '<select class="m-select" id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا إدارة</option>' +
+      ocDivisionOptions(p.divisionId) +
+      '</select><span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span>" +
+      (resp ? '<span class="m-hint">' + esc(resp) + "</span>" : "") + "</div>";
   }
   var ov = pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "");
   /* A PERSON FIELD IS THE COMBOBOX (founder, 2026-09-17), the same control «المسؤول» on an

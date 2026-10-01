@@ -4,6 +4,7 @@ import * as facts from "./facts.js";
 import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
 import * as acct from "./account-domain.js";
+import * as sysCfgSeed from "./config-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -1065,6 +1066,46 @@ UPDATE entities SET size_tier = CASE btrim(size)
  WHERE size_tier IS NULL AND size IS NOT NULL AND btrim(size) <> '';
 `,
   },
+  {
+    version: "019-org-configuration",
+    sql: `
+-- «إعدادات المنظمة» (founder, 2026-10-01). See config-domain: a SEGMENT is the market (the old
+-- sectors table, which always held exactly hospitals / pharmacies / business), a SECTOR is now the
+-- company's own top-level unit with a manager, and departments (divisions) sit under one.
+ALTER TABLE sectors ADD COLUMN IF NOT EXISTS kind TEXT CHECK (kind IN ('hospitals','pharmacies','business'));
+ALTER TABLE sectors ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE sectors ADD COLUMN IF NOT EXISTS updated_at BIGINT;
+UPDATE sectors SET kind = CASE name
+    WHEN 'قطاع المستشفيات' THEN 'hospitals'
+    WHEN 'قطاع الصيدليات'  THEN 'pharmacies'
+    WHEN 'قطاع الأعمال'    THEN 'business' END
+ WHERE kind IS NULL;
+
+CREATE TABLE IF NOT EXISTS org_sectors (
+  id                BIGSERIAL PRIMARY KEY,
+  name              TEXT NOT NULL UNIQUE,
+  kind              TEXT NOT NULL CHECK (kind IN ('business','sales','support')),
+  manager_member_id BIGINT REFERENCES team_members(id) ON DELETE SET NULL,
+  active            BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at        BIGINT NOT NULL,
+  updated_at        BIGINT NOT NULL
+);
+ALTER TABLE divisions ADD COLUMN IF NOT EXISTS sector_id BIGINT REFERENCES org_sectors(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_divisions_sector ON divisions (sector_id);
+
+-- Roles become the admin's. The CHECK listed three compiled keys, so the first role an admin added
+-- would be refused by the database; validation moves into code against org_roles (as the ladder's did).
+CREATE TABLE IF NOT EXISTS org_roles (
+  key        TEXT PRIMARY KEY,
+  label      TEXT NOT NULL UNIQUE,
+  system     BOOLEAN NOT NULL DEFAULT FALSE,
+  active     BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+ALTER TABLE team_members DROP CONSTRAINT IF EXISTS team_members_role_check;
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1101,6 +1142,7 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     await assertSchemaShape(client);
     await seedDefaultPipeline(client);
     await seedSectors(client);
+    await seedOrgRoles(client);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
     client.release();
@@ -1121,12 +1163,14 @@ async function runMigrations(p: pg.Pool): Promise<void> {
 const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   pipelines: ["id", "name", "product", "created_at"],
   pipeline_stages: ["id", "pipeline_id", "key", "label", "weight_pct", "position", "sla_days", "active"],
-  divisions: ["id", "name", "owner_member_id", "active"],
+  divisions: ["id", "name", "owner_member_id", "active", "sector_id"],
+  org_sectors: ["id", "name", "kind", "manager_member_id", "active"],
+  org_roles: ["key", "label", "system", "active"],
   team_members: ["id", "name", "email", "role", "division_id", "active"],
   escalations: ["id", "opp_id", "kind", "to_member_id", "to_name", "to_email", "reason", "delivery", "created_at"],
   track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
   actions: ["id", "opp_id", "dept", "title", "state", "created_at"],
-  sectors: ["id", "name"],
+  sectors: ["id", "name", "kind", "active"],
   product_meta: ["product", "sector_id", "archived_at", "division_id"],
   product_kb: ["product", "md", "source_filename", "updated_at", "draft_md", "draft_source", "draft_by", "draft_at", "approved_by", "approved_at"],
   product_assets: ["product", "public_id", "filename", "content_type", "bytes", "updated_at", "size_bytes"],
@@ -1203,10 +1247,14 @@ async function assertSchemaShape(client: pg.PoolClient): Promise<void> {
  */
 async function seedSectors(client: pg.PoolClient): Promise<void> {
   const now = Date.now();
-  for (const name of SECTORS) {
+  // ONLY INTO AN EMPTY TABLE (2026-10-01). These rows are «الشرائح» now and the admin renames them;
+  // inserting by name on every boot would bring a renamed or deleted segment back at the next deploy.
+  const kinds: Record<string, string> = { "قطاع المستشفيات": "hospitals", "قطاع الصيدليات": "pharmacies", "قطاع الأعمال": "business" };
+  const empty = Number((await client.query("SELECT COUNT(*)::int AS n FROM sectors")).rows[0]?.n) === 0;
+  for (const name of empty ? SECTORS : []) {
     await client.query(
-      "INSERT INTO sectors (name, created_at) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING",
-      [name, now]);
+      "INSERT INTO sectors (name, kind, created_at) VALUES ($1,$2,$3) ON CONFLICT (name) DO NOTHING",
+      [name, kinds[name] ?? null, now]);
   }
   const ids = new Map<string, number>();
   for (const r of (await client.query("SELECT id, name FROM sectors")).rows) {
@@ -1220,6 +1268,19 @@ async function seedSectors(client: pg.PoolClient): Promise<void> {
        VALUES ($1,$2,NULL,$3,$4,$5) ON CONFLICT (product) DO NOTHING`,
       [product, sectorId, now, assumed, note]);
   }
+}
+
+/** The four roles code reads by key. Insert-if-absent: the admin's label survives every deploy. */
+async function seedOrgRoles(client: pg.PoolClient): Promise<void> {
+  const now = Date.now();
+  for (const key of sysCfgSeed.SYSTEM_ROLE_KEYS) {
+    await client.query(
+      `INSERT INTO org_roles (key, label, system, active, created_at, updated_at)
+       VALUES ($1,$2,TRUE,TRUE,$3,$3) ON CONFLICT DO NOTHING`,
+      [key, sysCfgSeed.TEAM_ROLE_LABELS[key] ?? key, now]);
+  }
+  // A system role is never paused or demoted, whatever an older build wrote.
+  await client.query("UPDATE org_roles SET system = TRUE, active = TRUE WHERE key = ANY($1::text[])", [sysCfgSeed.SYSTEM_ROLE_KEYS]);
 }
 
 async function seedDefaultPipeline(client: pg.PoolClient): Promise<void> {
@@ -4576,15 +4637,18 @@ export async function deleteStage(key: string): Promise<boolean> {
 export type DivisionRow = {
   id: number; name: string; ownerMemberId: number | null; ownerName: string | null;
   ownerEmail: string | null; active: boolean; products: number; members: number;
+  sectorId: number | null; sector: string | null;
 };
 
 export async function listDivisions(): Promise<DivisionRow[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query(
     `SELECT d.id, d.name, d.owner_member_id, d.active, m.name AS owner_name, m.email AS owner_email,
+            d.sector_id, s.name AS sector_name,
             (SELECT COUNT(*) FROM product_meta pm WHERE pm.division_id = d.id) AS products,
             (SELECT COUNT(*) FROM team_members tm WHERE tm.division_id = d.id) AS members
        FROM divisions d LEFT JOIN team_members m ON m.id = d.owner_member_id
+                        LEFT JOIN org_sectors s ON s.id = d.sector_id
       ORDER BY d.name`);
   return r.rows.map((x: any) => ({
     id: Number(x.id), name: String(x.name),
@@ -4593,24 +4657,28 @@ export async function listDivisions(): Promise<DivisionRow[]> {
     ownerEmail: x.owner_email ? String(x.owner_email) : null,
     active: x.active !== false,
     products: Number(x.products) || 0, members: Number(x.members) || 0,
+    sectorId: x.sector_id == null ? null : Number(x.sector_id),
+    sector: x.sector_name ? String(x.sector_name) : null,
   }));
 }
 
-export async function createDivision(v: { name: string; ownerMemberId: number | null; active: boolean }): Promise<number | null> {
+type DivisionWrite = { name: string; ownerMemberId: number | null; active: boolean; sectorId: number | null };
+
+export async function createDivision(v: DivisionWrite): Promise<number | null> {
   if (!(await reprobe()) || !pool) return null;
   const now = Date.now();
   const r = await pool.query(
-    `INSERT INTO divisions (name, owner_member_id, active, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$4) ON CONFLICT (name) DO NOTHING RETURNING id`,
-    [v.name, v.ownerMemberId, v.active, now]);
+    `INSERT INTO divisions (name, owner_member_id, active, sector_id, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$5) ON CONFLICT (name) DO NOTHING RETURNING id`,
+    [v.name, v.ownerMemberId, v.active, v.sectorId, now]);
   return r.rowCount ? Number(r.rows[0].id) : null;
 }
 
-export async function updateDivision(id: number, v: { name: string; ownerMemberId: number | null; active: boolean }): Promise<boolean> {
+export async function updateDivision(id: number, v: DivisionWrite): Promise<boolean> {
   if (!(await reprobe()) || !pool) return false;
   const r = await pool.query(
-    `UPDATE divisions SET name = $2, owner_member_id = $3, active = $4, updated_at = $5 WHERE id = $1`,
-    [id, v.name, v.ownerMemberId, v.active, Date.now()]);
+    `UPDATE divisions SET name = $2, owner_member_id = $3, active = $4, sector_id = $5, updated_at = $6 WHERE id = $1`,
+    [id, v.name, v.ownerMemberId, v.active, v.sectorId, Date.now()]);
   return (r.rowCount ?? 0) > 0;
 }
 
@@ -4874,6 +4942,143 @@ export async function productPerformance(
 }
 
 /** The three sectors as stored, for a selector. Ordered as seeded. */
+// ---- «إعدادات المنظمة»: segments (the market), org sectors, roles ---------------------------
+
+export type SegmentRow = { id: number; name: string; kind: string | null; active: boolean; products: number };
+
+export async function listSegments(): Promise<SegmentRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT s.id, s.name, s.kind, s.active,
+            (SELECT COUNT(*) FROM product_meta pm WHERE pm.sector_id = s.id AND pm.archived_at IS NULL) AS products
+       FROM sectors s ORDER BY s.id`);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), name: String(x.name), kind: x.kind ? String(x.kind) : null,
+    active: x.active !== false, products: Number(x.products) || 0,
+  }));
+}
+
+export async function createSegment(v: { name: string; kind: string; active: boolean }): Promise<number | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO sectors (name, kind, active, created_at, updated_at) VALUES ($1,$2,$3,$4,$4)
+     ON CONFLICT (name) DO NOTHING RETURNING id`, [v.name, v.kind, v.active, now]);
+  return r.rowCount ? Number(r.rows[0].id) : null;
+}
+
+export async function updateSegment(id: number, v: { name: string; kind: string; active: boolean }): Promise<"ok" | "missing" | "name_taken"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const clash = await pool.query("SELECT 1 FROM sectors WHERE name = $1 AND id <> $2", [v.name, id]);
+  if (clash.rowCount) return "name_taken";
+  const r = await pool.query("UPDATE sectors SET name = $2, kind = $3, active = $4, updated_at = $5 WHERE id = $1",
+    [id, v.name, v.kind, v.active, Date.now()]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+/** Refused while ANY product row points at it, archived ones included: the FK has no ON DELETE. */
+export async function deleteSegment(id: number): Promise<"ok" | "missing" | "in_use"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const used = await pool.query("SELECT 1 FROM product_meta WHERE sector_id = $1 LIMIT 1", [id]);
+  if (used.rowCount) return "in_use";
+  const r = await pool.query("DELETE FROM sectors WHERE id = $1", [id]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+export type OrgSectorRow = {
+  id: number; name: string; kind: string; managerMemberId: number | null; managerName: string | null;
+  active: boolean; departments: number; members: number;
+};
+
+export async function listOrgSectors(): Promise<OrgSectorRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT s.id, s.name, s.kind, s.manager_member_id, s.active, m.name AS manager_name,
+            (SELECT COUNT(*) FROM divisions d WHERE d.sector_id = s.id) AS departments,
+            (SELECT COUNT(*) FROM team_members tm JOIN divisions d ON d.id = tm.division_id WHERE d.sector_id = s.id) AS members
+       FROM org_sectors s LEFT JOIN team_members m ON m.id = s.manager_member_id
+      ORDER BY s.name`);
+  return r.rows.map((x: any) => ({
+    id: Number(x.id), name: String(x.name), kind: String(x.kind),
+    managerMemberId: x.manager_member_id == null ? null : Number(x.manager_member_id),
+    managerName: x.manager_name ? String(x.manager_name) : null,
+    active: x.active !== false, departments: Number(x.departments) || 0, members: Number(x.members) || 0,
+  }));
+}
+
+type OrgSectorWrite = { name: string; kind: string; managerMemberId: number | null; active: boolean };
+
+export async function createOrgSector(v: OrgSectorWrite): Promise<number | null> {
+  if (!(await reprobe()) || !pool) return null;
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO org_sectors (name, kind, manager_member_id, active, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$5) ON CONFLICT (name) DO NOTHING RETURNING id`,
+    [v.name, v.kind, v.managerMemberId, v.active, now]);
+  return r.rowCount ? Number(r.rows[0].id) : null;
+}
+
+export async function updateOrgSector(id: number, v: OrgSectorWrite): Promise<"ok" | "missing" | "name_taken"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const clash = await pool.query("SELECT 1 FROM org_sectors WHERE name = $1 AND id <> $2", [v.name, id]);
+  if (clash.rowCount) return "name_taken";
+  const r = await pool.query(
+    "UPDATE org_sectors SET name = $2, kind = $3, manager_member_id = $4, active = $5, updated_at = $6 WHERE id = $1",
+    [id, v.name, v.kind, v.managerMemberId, v.active, Date.now()]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+export async function deleteOrgSector(id: number): Promise<"ok" | "missing" | "in_use"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const used = await pool.query("SELECT 1 FROM divisions WHERE sector_id = $1 LIMIT 1", [id]);
+  if (used.rowCount) return "in_use";
+  const r = await pool.query("DELETE FROM org_sectors WHERE id = $1", [id]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+export type RoleRow = { key: string; label: string; system: boolean; active: boolean; members: number };
+
+export async function listRoles(): Promise<RoleRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT r.key, r.label, r.system, r.active,
+            (SELECT COUNT(*) FROM team_members tm WHERE tm.role = r.key) AS members
+       FROM org_roles r ORDER BY r.system DESC, r.created_at, r.key`);
+  return r.rows.map((x: any) => ({
+    key: String(x.key), label: String(x.label), system: x.system === true,
+    active: x.active !== false, members: Number(x.members) || 0,
+  }));
+}
+
+export async function createRole(v: { key: string; label: string; active: boolean }): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const now = Date.now();
+  const r = await pool.query(
+    `INSERT INTO org_roles (key, label, system, active, created_at, updated_at)
+     VALUES ($1,$2,FALSE,$3,$4,$4) ON CONFLICT DO NOTHING`, [v.key, v.label, v.active, now]);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function updateRole(key: string, v: { label: string; active: boolean }): Promise<"ok" | "missing" | "label_taken"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const clash = await pool.query("SELECT 1 FROM org_roles WHERE label = $1 AND key <> $2", [v.label, key]);
+  if (clash.rowCount) return "label_taken";
+  const r = await pool.query("UPDATE org_roles SET label = $2, active = $3, updated_at = $4 WHERE key = $1",
+    [key, v.label, v.active, Date.now()]);
+  return (r.rowCount ?? 0) > 0 ? "ok" : "missing";
+}
+
+export async function deleteRole(key: string): Promise<"ok" | "missing" | "in_use" | "system"> {
+  if (!(await reprobe()) || !pool) return "missing";
+  const row = await pool.query("SELECT system FROM org_roles WHERE key = $1", [key]);
+  if (!row.rowCount) return "missing";
+  if (row.rows[0].system === true) return "system";
+  const used = await pool.query("SELECT 1 FROM team_members WHERE role = $1 LIMIT 1", [key]);
+  if (used.rowCount) return "in_use";
+  await pool.query("DELETE FROM org_roles WHERE key = $1", [key]);
+  return "ok";
+}
+
 export async function listSectors(): Promise<{ id: number; name: string }[]> {
   if (!(await reprobe()) || !pool) return [];
   const r = await pool.query("SELECT id, name FROM sectors ORDER BY id");
