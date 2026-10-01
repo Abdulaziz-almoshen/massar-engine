@@ -73,6 +73,7 @@ ROUTES = [
     # S7: the permissions matrix renders on the users screen whether or not any user exists.
     ("#users", "مصفوفة الصلاحيات"),
     ("#audit", "سجل التدقيق"),
+    ("#org", "الشرائح"),               # «إعدادات المنظمة»: the tab strip renders even with an empty org
     # Repointed after fd01976 redesigned the page and deleted the «خدمات المساعد» heading — the
     # stale landmark turned smoke red on a page that renders fine. The tfoot line below renders
     # unconditionally from vKb and appears nowhere else; the topbar head was rejected because the
