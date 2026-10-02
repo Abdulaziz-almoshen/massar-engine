@@ -1301,7 +1301,9 @@ function pxPerfSection(p) {
     tile(cov !== null && cov >= 100 ? "px-ind__i--ac" : "", "نسبة الإنجاز", cov === null ? mNil("بلا مستهدف", "owed") : mPct(cov),
       cov === null ? "لا نسبة بلا مستهدف" : "من المستهدف", cov) +
     tile("", "معدل الفوز", winPct === null ? mNil("لا صفقات مغلقة", "none") : mPct(winPct),
-      closed ? pxNLineN(won) + " من " + pxNLineN(closed) + " مغلقة" : "يُحسب من الرابحة والخاسرة", winPct) +
+      /* Counts as numerals with their noun on the right side of «من»: «0 بندًا من بند واحد مغلقة» was
+         the first draft, and it is not Arabic. */
+      closed ? "الرابحة " + mN(won) + " من " + mN(closed) + " مغلقة" : "يُحسب من الرابحة والخاسرة", winPct) +
     tile("", "متوسط الصفقة الرابحة", avgWon === null ? mNil("لا صفقات رابحة", "none") : pxMoney(avgWon), avgWon === null ? "" : "المحقق ÷ عدد الرابحة") +
     tile(stalled.length ? "px-ind__i--warn" : "", "متوقفة عن المهلة", stalled.length ? mN(stalled.length) : mNil("لا شيء متأخر", "none"),
       open.length ? "من " + pxNLineN(open.length) + " مفتوحة" : mNil("لا بنود مفتوحة", "none")) +
@@ -1738,7 +1740,7 @@ function vProductDrill(name, section) {
   h += '<header class="px-rh"><div class="px-rh__t"><h1 class="m-h1">' + esc(p.product) + "</h1>" +
     '<div class="px-acts px-meta">' + (p.archived ? '<span class="m-chip">مؤرشف</span>' : "") +
     chip("القطاع", sectorName + (sectorName && p.sectorAssumed ? " (مُستنتَج)" : ""), "pxf_sector") +
-    (typeof cfDivs !== "undefined" && cfDivs.length ? chip("القسم", divName, "pxf_division") : "") +
+    (typeof cfDivs !== "undefined" && cfDivs.length ? chip("الإدارة", divName, "pxf_division") : "") +
     chip("مدير المنتج", p.owner || "", "pxf_owner") +
     (p.embedded ? '<span class="m-chip m-chip--ac">كتالوج المساعد: مضمَّن</span>' : "") + "</div></div>";
   h += '<div class="px-acts px-acts--end px-rel">';
