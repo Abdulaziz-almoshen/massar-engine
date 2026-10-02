@@ -235,7 +235,7 @@ function ocTreeView() {
   if (!tree.sectors.length) {
     h += '<section class="m-card"><div class="m-empty"><p class="m-empty__t">لا قطاعات بعد</p>' +
       '<p class="m-empty__d">ابدأ بالقطاع، ثم أضف تحته إداراته وموظفيها.</p>' +
-      (ocCanEdit() ? '<p class="m-empty__a"><button class="m-btn m-btn--primary" data-oc="goadd" data-k="sector">' + cfIco("plus") + "أضف قطاعًا</button></p>" : "") +
+      (ocCanEdit() ? '<p class="m-empty__a"><button class="m-btn m-btn--primary" data-oc="goadd" data-k="osector">' + cfIco("plus") + "أضف قطاعًا</button></p>" : "") +
       "</div></section>";
   }
   tree.sectors.forEach(function (s) {
@@ -249,7 +249,7 @@ function ocTreeView() {
       "</summary><div class=\\"oc-body\\">";
     if (!s.departments.length) h += '<p class="m-meta">لا إدارات تحت هذا القطاع بعد.</p>';
     s.departments.forEach(function (d) { h += ocDeptHtml(d); });
-    if (ocCanEdit()) h += '<div><button class="m-btn" data-oc="addunder" data-k="department" data-i="' + s.id + '">' + cfIco("plus") + "إدارة تحت «" + esc(s.name) + "»</button></div>";
+    if (ocCanEdit()) h += '<div><button class="m-btn" data-oc="addunder" data-k="division" data-i="' + s.id + '">' + cfIco("plus") + "إدارة تحت «" + esc(s.name) + "»</button></div>";
     h += "</div></details>";
   });
   if (tree.unsectored.length) {
@@ -526,8 +526,10 @@ function ocBlank(kind, preset) {
   if (kind === "osector") return { name: "", kind: "business", managerMemberId: "", active: true };
   if (kind === "division") return { name: "", sectorId: p.sectorId || "", ownerMemberId: "", active: true };
   if (kind === "member") {
-    var first = (cfRoles || []).filter(function (r) { return r.active; })[0];
-    return { name: "", email: "", role: first ? first.key : "sales", divisionId: p.divisionId || "", active: true };
+    /* «مبيعات» is who gets added most; the list is ordered by key, so its first row is «إدارة». */
+    var live = (cfRoles || []).filter(function (r) { return r.active; });
+    var role = live.some(function (r) { return r.key === "sales"; }) || !live.length ? "sales" : live[0].key;
+    return { name: "", email: "", role: role, divisionId: p.divisionId || "", active: true };
   }
   return { label: "", active: true };
 }
@@ -545,6 +547,9 @@ document.addEventListener("click", function (ev) {
   var a = t.getAttribute("data-oc"), k = t.getAttribute("data-k"), i = t.getAttribute("data-i");
   if (a === "tab") { if (ocTab !== k) { ocTab = k; cfEdit = null; render(false); } return; }
   if (!ocCanEdit()) return;
+  /* Every kind a button names must be one the editors know. A name that is not (a button said
+     «sector» where the editor knows «osector») opened nothing and failed silently. */
+  if ((a === "add" || a === "goadd" || a === "addunder" || a === "edit") && !OC_TAB_OF[k]) { console.error("org: unknown kind " + k); return; }
   if (a === "add") { cfOpen(k, 0, ocBlank(k)); ocFocus(OC_FIRST[k]); return; }
   if (a === "goadd") { ocTab = OC_TAB_OF[k]; cfOpen(k, 0, ocBlank(k)); ocFocus(OC_FIRST[k]); return; }
   /* From the tree: a department under THIS sector, a person in THIS department. */
