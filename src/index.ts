@@ -823,9 +823,9 @@ app.get("/admin/sectors", async (req, reply) => {
 app.get("/admin/config", async (req, reply) => {
   if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
   if (!(await db.canRead())) return reply.code(503).send({ ok: false, error: "db_unavailable" });
-  const [stages, divisions, team, segments, sectors, roles] = await Promise.all([
-    db.listStages(), db.listDivisions(), db.listMembers(), db.listSegments(), db.listOrgSectors(), db.listRoles()]);
-  return { ok: true, stages, divisions, team, segments, sectors, roles };
+  const [stages, divisions, team, segments, sectors, roles, outcomes] = await Promise.all([
+    db.listStages(), db.listDivisions(), db.listMembers(), db.listSegments(), db.listOrgSectors(), db.listRoles(), db.listOutcomes()]);
+  return { ok: true, stages, divisions, team, segments, sectors, roles, outcomes, departments: sales.DEPARTMENTS };
 });
 
 app.post("/admin/config/stages", async (req, reply) => {
@@ -974,6 +974,53 @@ app.delete("/admin/config/team/:id", async (req, reply) => {
   if (out === "missing") return problem(reply, 404, "unknown_member", "لا عضو بهذا المعرّف", "id");
   if (typeof out === "object") return problem(reply, 409, "member_owns_accounts", "مسؤول عن " + out.owns + " من العملاء — انقلهم إلى عضو آخر أو أوقفه بدل حذفه", "id");
   return { ok: true, id };
+});
+
+// ---- «نتائج المراحل»: the outcomes each rung offers --------------------------------------------
+
+app.post("/admin/config/outcomes", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const stage = String(b.stage ?? "");
+  const [stages, outcomes] = await Promise.all([db.listStages(), db.listOutcomes()]);
+  if (!stages.some((s) => s.key === stage)) return problem(reply, 400, "unknown_stage", "لا مرحلة بهذا المعرّف", "stage");
+  const checked = sysCfg.checkOutcome(b as sysCfg.OutcomeInput, outcomes.filter((o) => o.stage === stage).map((o) => o.label), sales.DEPARTMENTS);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  const key = sysCfg.outcomeKeyFrom(stage, outcomes.map((o) => o.key));
+  if (!(await db.createOutcome(stage, key, checked.value))) return problem(reply, 409, "key_exists", "تعذّر إنشاء النتيجة", "key");
+  log({ at: "config", msg: "outcome added", key, stage, by: adminName(req) });
+  return reply.code(201).header("Location", "/admin/config/outcomes/" + encodeURIComponent(key)).send({ ok: true, key, outcome: { stage, ...checked.value } });
+});
+
+app.patch("/admin/config/outcomes/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const outcomes = await db.listOutcomes();
+  const cur = outcomes.find((o) => o.key === key);
+  if (!cur) return problem(reply, 404, "unknown_outcome", "لا نتيجة بهذا المعرّف", "key");
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const pick = (k: string, v: unknown) => (k in b ? b[k] : v);
+  const checked = sysCfg.checkOutcome({
+    label: pick("label", cur.label), reason: pick("reason", cur.reason), nextAction: pick("nextAction", cur.nextAction),
+    kind: pick("kind", cur.kind), dept: pick("dept", cur.dept), active: pick("active", cur.active),
+  }, outcomes.filter((o) => o.stage === cur.stage).map((o) => o.label), sales.DEPARTMENTS, cur.label);
+  if (!checked.ok) return problem(reply, 400, checked.code, checked.reason, checked.field);
+  // A loss reason must stay a loss: the «lost» rung's outcomes are the close dialog's reasons, and a
+  // reason there that is not kind:lost would close a deal the reports then count as something else.
+  if (cur.stage === "lost" && checked.value.kind !== "lost") return problem(reply, 400, "invalid_kind", "نتائج مرحلة الخسارة حالتها «خسارة» دائمًا", "kind");
+  if (!(await db.updateOutcome(key, checked.value))) return problem(reply, 404, "unknown_outcome", "لا نتيجة بهذا المعرّف", "key");
+  return { ok: true, key, outcome: { stage: cur.stage, ...checked.value } };
+});
+
+app.delete("/admin/config/outcomes/:key", async (req, reply) => {
+  if (!adminOk(req)) return problem(reply, 401, "unauthorized", "غير مصرّح");
+  const key = String((req.params as any).key || "");
+  const cur = (await db.listOutcomes()).find((o) => o.key === key);
+  if (!cur) return problem(reply, 404, "unknown_outcome", "لا نتيجة بهذا المعرّف", "key");
+  const checked = sysCfg.checkOutcomeDelete(cur.system, cur.uses);
+  if (!checked.ok) return problem(reply, 409, checked.code, checked.reason, checked.field);
+  await db.deleteOutcome(key);
+  return { ok: true, key };
 });
 
 // ---- «إعدادات المنظمة»: segments, org sectors, roles -----------------------------------------
@@ -3258,6 +3305,18 @@ app.get("/admin/opps", async (req, reply) => {
 app.post("/admin/opps", async (req, reply) => {
   if (!adminOk(req)) return reply.code(401).send({ status: "unauthorized" });
   const b = (req.body ?? {}) as Record<string, unknown>;
+  // THE CLIENT COMES FROM THE CLIENTS LIST (founder, 2026-10-02): an opportunity names an account that
+  // exists in «العملاء», never a typed name — a typed name opened a second, unlinked card for a client
+  // the book already held. The name and phone are the account's own, read here, not taken from the form.
+  const accountId = Number(b.account_id);
+  if (!Number.isInteger(accountId) || accountId <= 0) {
+    return problem(reply, 400, "account_required", "اختر العميل من قائمة العملاء", "account_id");
+  }
+  const acct = await db.accountById(accountId);
+  if (!acct) return problem(reply, 400, "unknown_account", "لا عميل بهذا المعرّف — اختره من قائمة العملاء", "account_id");
+  if (acct.approval === "rejected") return problem(reply, 400, "account_rejected", "هذا العميل مرفوض — لا تُفتح له فرص", "account_id");
+  b.account_name = acct.name;
+  b.phone = acct.phone || "";
   const name = String(b.account_name ?? "").trim().slice(0, 120);
   if (!name) return reply.code(400).send({ ok: false, error: "invalid_field", field: "account_name" });
   const rawPhone = String(b.phone ?? "").trim();
@@ -3371,6 +3430,15 @@ app.patch("/admin/opps/:id", async (req, reply) => {
       return problem(reply, 400, "invalid_field", "هذه النتيجة لا تخص المرحلة الحالية", "outcomeKey");
     }
     outcomeKey = b.outcomeKey;
+  }
+  // NO MOVE WITHOUT AN OUTCOME (founder, 2026-10-02). Every path that moves a line — the stepper, the
+  // «المرحلة التالية» button, the board drop, bulk — reaches this route, so the rule lives here once.
+  // The outcome's kind must agree with the direction (sales-domain.checkMoveOutcome); a loss close is
+  // judged by the loss-reason rule below, and reopening a closed deal is a correction, not a stage.
+  if (typeof b.stage === "string" && currentStage && b.stage !== currentStage) {
+    const ladder = (await db.listStages()).map((s) => ({ key: s.key, position: s.position, terminal: s.terminal }));
+    const mv = sales.checkMoveOutcome(currentStage, b.stage, outcomeKey, ladder);
+    if (!mv.ok) return problem(reply, 400, mv.code, mv.message, "outcomeKey");
   }
   const bad = db.validateOppLine({ product: b.product ?? "x", ...b, outcomeKey: undefined }, allowedStages);
   if (bad && !(bad === "product" && b.product === undefined)) {

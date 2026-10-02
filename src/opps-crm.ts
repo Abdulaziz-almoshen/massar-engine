@@ -714,6 +714,16 @@ export const OPPS_CRM_CSS = `
   }
   .ds6 .ox-stb:focus-visible { outline:none; box-shadow:var(--m-focus); }
   .ds6 .ox-hs-cur { background:var(--m-page); box-shadow:inset 0 0 0 1px var(--m-line); }
+  /* «المرحلة التالية»: the primary action names its destination; the Select beside it covers the rest. */
+  /* The question's heading takes focus so a screen reader starts there; it is not a control, so no ring. */
+  .ds6 .ox-oc .m-dlg__t:focus, .ds6 .ox-oc .m-dlg__t:focus-visible { outline:none; box-shadow:none; }
+  .ds6 .ox-next { display:grid; grid-template-columns:auto minmax(200px, 1fr); gap:var(--m-2); align-items:center; margin-block-start:var(--m-3); }
+  .ds6 .ox-next__go { min-block-size:44px; gap:var(--m-2); }
+  .ds6 .ox-next__go .k { font-weight:500; opacity:.85; }
+  .ds6 .ox-next__go .v { font-weight:700; }
+  .ds6 .ox-next__go svg { inline-size:16px; block-size:16px; }
+  .ds6 .ox-next__h { margin:var(--m-1) 0 0; }
+  @media (max-width: 560px) { .ds6 .ox-next { grid-template-columns:1fr; } }
   .ds6 .ox-hs-cur .nm { font-size:var(--m-t-body); font-weight:600; color:var(--m-ink); }
   .ds6 .ox-hs-cur .ex { font-size:var(--m-t-cap); color:var(--m-ink-2); }
   .ds6 .ox-hs-cur .ex .m-label { font-size:var(--m-t-cap); font-weight:600; color:var(--m-mut); }
@@ -927,6 +937,8 @@ function opAgoN(o) {
 
 /* ---- icons: 16px, stroke 1.5, currentColor (DESIGN.md §5 Icon) ---- */
 var OPP_ICO = {
+  /* Points LEFT: in RTL that is forward along the ladder. */
+  arrow: '<path d="M19 12H5"/><path d="m11 6-6 6 6 6"/>',
   whatsapp: '<path d="M4 5h16v11H9l-5 4z"/>',
   call: '<path d="M6 3h3l2 5-2 1.5a11 11 0 0 0 5.5 5.5L16 13l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/>',
   visit: '<path d="M12 21s-7-6-7-11a7 7 0 0 1 14 0c0 5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
@@ -1431,7 +1443,7 @@ function opKanbanView() {
     var unp = cards.filter(function (l) { return !opPriced(l); }).length;
     var cap = opKCap[st.key] || OPP_KCAP;
     h += '<div class="m-col" role="listitem" style="' + opToneVars(st.key) + ";--m-tone:" + opColor(st.key) + '" data-col="' + esc(st.key) + '"' +
-      (opMayEdit() ? ' ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)"' : "") + ">";
+      (opMayEdit() ? ' ondragover="opDragOver(event,this)" ondragleave="opDragLeave(this,event)" ondrop="opDrop(event,&quot;' + st.key + '&quot;,this)"' : "") + ">";
     h += '<div class="m-col__t"><i class="m-col__dot"></i><span class="m-col__n">' + esc(st.label) + "</span>" +
       '<span class="m-col__c ox-tone">' + opN(cards.length) + "</span></div>" +
       '<div class="m-col__v">' + (val ? opMoneyShort(val) + (unp ? "، " + opNLineN(unp) + " بلا تسعير" : "")
@@ -1446,13 +1458,18 @@ function opKanbanView() {
         '<span class="m-deal__n">' + esc(l.account_name) +
         (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac">تلقائي</span>' : "") + "</span>" +
         '<span class="m-deal__p">' + esc(l.product) + "</span>" +
+        (String(l.next_step || "").trim() ? '<span class="m-deal__s"><b>التالي:</b> ' + esc(l.next_step) + "</span>" : "") +
         '<span class="m-deal__f"><span class="' + (opPriced(l) ? "m-deal__v" : "m-deal__v--nil") + '">' +
         (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</span>" +
         '<span class="m-deal__o">' + opIco(l.source in OPP_ICO ? l.source : "other") + " " +
         (String(l.owner || "").trim() ? esc(l.owner) : opNil("بلا مسؤول", "unset")) + "</span></span>" +
-        (opStalled(l) ? '<span class="m-deal__age m-deal__age--old">متوقفة منذ ' + opNDayN(opDays(l)) + "</span>" : "") + "</div>";
+        /* How long it has stood here, always — not only once it is late: «منذ يومين» is what a manager
+           scans a column for. Late is the same fact in the warning colour. */
+        '<span class="m-deal__x"><span class="m-deal__age' + (opStalled(l) ? " m-deal__age--old" : "") + '">' +
+          (opStalled(l) ? "متوقفة منذ " + opNDayN(opDays(l)) : "على المرحلة " + opAgoN(l)) + "</span></span>" + "</div>";
     });
     if (!cards.length) h += '<div class="m-empty-col">' + opNil("لا بنود في هذه المرحلة", "none") + "</div>";
+    if (opMayEdit()) h += '<div class="m-col__drop" aria-hidden="true">أفلت هنا للنقل إلى «' + esc(st.label) + "»</div>";
     if (cards.length > cap) {
       h += '<button class="ox-kmore" onclick="opKMore(&quot;' + st.key + '&quot;)">تُعرض ' + opN(cap) + " من " + opN(cards.length) + " — عرض " + opN(Math.min(OPP_KCAP, cards.length - cap)) + " أخرى</button>";
     }
@@ -1720,38 +1737,72 @@ window.opStepTo = function (id, key) {
      is what every move made from this board has said, because the 35-entry rule in sales-domain
      was only ever reachable from the rep's own screen. A loss close is exempt: it has its own
      mandatory reason dialog, and two competing answers to one question is worse than none. */
-  var l = (oppRows || []).find(function (o) { return o.id === id; });
-  if (l && typeof outcomesForStage === "function" && !opNeedsLossReason(id, key)) {
-    var opts = outcomesForStage(String(l.stage || ""));
-    if (opts.length) { opOutcome = { id: id, to: key, from: String(l.stage || "") }; opRender(); return Promise.resolve(); }
-  }
-  return window.opSetStage(id, key);
+  return opRequestMove([id], key);
 };
+/* EVERY MOVE ASKS WHAT HAPPENED (founder, 2026-10-02: «remove the option to move an opportunity
+   without recording an outcome»). The stepper, «المرحلة التالية», the stage dropdown, a board drop,
+   the close buttons and bulk all come here. sales-domain decides what the move must carry:
+     · to the lost rung         -> the loss-reason dialog (owLossOpen), which already insists;
+     · forward / back           -> an outcome of the rung being LEFT whose kind fits the direction;
+     · out of a closed rung     -> nothing: reopening is a correction, not a stage of selling.
+   The server applies the same rule (checkMoveOutcome), so no path can skip it. */
+function opLadder() {
+  return (OPP_ST || []).map(function (s) { return { key: s.key, position: Number(s.position) || 0, terminal: s.terminal || null }; });
+}
+function opRequestMove(ids, to) {
+  ids = (ids || []).filter(function (id) { var l = (oppRows || []).find(function (o) { return o.id === id; }); return l && l.stage !== to; });
+  if (!ids.length) return Promise.resolve();
+  var lines = ids.map(function (id) { return (oppRows || []).find(function (o) { return o.id === id; }); });
+  var from = String(lines[0].stage || "");
+  if (opNeedsLossReason(ids[0], to)) {
+    var closing = ids.filter(function (id) { return opNeedsLossReason(id, to); });
+    owLossOpen(closing, closing.length > 1 ? "bulk" : "close", to); return Promise.resolve();
+  }
+  if (lines.some(function (l) { return String(l.stage || "") !== from; })) {
+    opToast("لكل مرحلة نتائجها — حدّد بنودًا من مرحلة واحدة لنقلها معًا", true);
+    return Promise.resolve();
+  }
+  var kind = typeof moveOutcomeKind === "function" ? moveOutcomeKind(from, to, opLadder()) : null;
+  if (!kind) {
+    if (ids.length === 1) return window.opSaveField(ids[0], "stage", to);
+    return opPatchMany(ids, { stage: to }, "نُقلت إلى «" + opStage(to).label + "»");
+  }
+  opOutcome = { ids: ids, to: to, from: from, kind: kind };
+  opRender();
+  setTimeout(function () { var t = document.getElementById("oxoct"); if (t) t.focus(); }, 0);
+  return Promise.resolve();
+}
 /* The pending ask: which line, where it is going, and the rung it is leaving (the outcomes belong
    to the rung being LEFT, so it is carried rather than re-read after the move). */
 var opOutcome = null;
 window.opOutcomeCancel = function () { opOutcome = null; opRender(); };
-window.opOutcomeSkip = function () {
-  var a = opOutcome; opOutcome = null; if (!a) return;
-  void window.opSetStage(a.id, a.to);
-};
 window.opOutcomePick = function (key) {
   var a = opOutcome; opOutcome = null; if (!a) return;
   /* The outcome rides in the SAME write as the move: a crash between two requests would leave the
      deal on the new rung with the reason lost, which is the state this exists to prevent. */
-  void window.opSaveField(a.id, "stage", a.to, { outcomeKey: key });
+  if (a.ids.length === 1) { void window.opSaveField(a.ids[0], "stage", a.to, { outcomeKey: key }); return; }
+  void opPatchMany(a.ids, { stage: a.to, outcomeKey: key }, "نُقلت إلى «" + opStage(a.to).label + "»");
 };
 function opOutcomeSheet() {
   var a = opOutcome;
-  if (!a || typeof outcomesForStage !== "function") return "";
-  var opts = outcomesForStage(a.from);
-  if (!opts.length) return "";
+  if (!a || typeof outcomesForMove !== "function") return "";
+  var opts = outcomesForMove(a.from, a.to, opLadder());
   var to = opStage(a.to), from = opStage(a.from);
-  return '<div class="ox-scrim in" onclick="opOutcomeCancel()"></div>' +
+  var dir = a.kind === "advance" ? "تقدّم الفرصة" : "إعادة الفرصة أو إبقاؤها";
+  var head = '<div class="ox-scrim in" onclick="opOutcomeCancel()"></div>' +
     '<div class="ox-oc" role="dialog" aria-modal="true" aria-labelledby="oxoct">' +
-    '<h3 class="m-dlg__t" id="oxoct" tabindex="-1">نتيجة المرحلة — ' + esc(from.label) + "</h3>" +
-    '<p class="m-meta">اختر ما انتهت إليه المرحلة؛ يُسجَّل معها سببها وإجراؤها. الانتقال إلى «' +
-      esc(to.label) + "».</p>" +
+    '<h3 class="m-dlg__t" id="oxoct" tabindex="-1">ما نتيجة مرحلة «' + esc(from.label) + "»؟</h3>" +
+    '<p class="m-meta">' + (a.ids.length > 1 ? opNLine(a.ids.length) + " · " : "") + "النقل إلى «" + esc(to.label) +
+      "» — " + dir + ". اختر النتيجة؛ يُسجَّل معها سببها والإجراء التالي، ولا يتم النقل دونها.</p>";
+  if (!opts.length) {
+    /* No outcome of the kind this move needs: the move is refused here exactly as the server would
+       refuse it, and the person is told where the list is made. */
+    return head + '<div class="m-empty"><p class="m-empty__t">لا نتيجة «' + esc(a.kind === "advance" ? "تقدّم" : "يحتاج إجراء") +
+      "» معرّفة لهذه المرحلة</p>" + '<p class="m-empty__d">تُضاف النتائج من الإعدادات ← مراحل البيع ← النتائج.</p>' +
+      (typeof meCan === "function" && meCan("org.manage") ? '<p class="m-empty__a"><a class="m-link" href="#settings" onclick="opOutcomeCancel()">افتح مراحل البيع ←</a></p>' : "") +
+      '</div><div class="ox-ocb"><button type="button" class="m-btn" onclick="opOutcomeCancel()">إلغاء</button></div></div>';
+  }
+  return head +
     '<div class="ox-ocl">' + opts.map(function (o) {
       /* The TONE is in the data (advance / needs_action / lost) and saying it before the click is
          the difference between a picklist and a decision: «غير مهتم» closes a deal. */
@@ -1762,8 +1813,7 @@ function opOutcomeSheet() {
         '<span class="r">' + esc(o.reason) + "</span>" +
         '<span class="n">الإجراء: ' + esc(o.nextAction) + (o.dept ? " · " + esc(o.dept) : "") + "</span></button>";
     }).join("") + "</div>" +
-    '<div class="ox-ocb"><button type="button" class="m-btn" onclick="opOutcomeSkip()">نقل دون تسجيل نتيجة</button>' +
-    '<button type="button" class="m-btn" onclick="opOutcomeCancel()">إلغاء</button></div></div>';
+    '<div class="ox-ocb"><button type="button" class="m-btn" onclick="opOutcomeCancel()">إلغاء — لا تنقل</button></div></div>';
 }
 /* The server's own bounds for a line's numbers (db.ts validateOppLine): years 1–20, quantity 1–10,000,
    discount 0–100, price from 0. Price steps by 100 because a step of one riyal on an annual licence is
@@ -1837,6 +1887,35 @@ function opStepper(l, open, idx) {
   }
   return h + "</div>";
 }
+/* «المرحلة التالية» (founder, 2026-10-02: the update flow «is not clear enough»). One primary button
+   that names the rung it moves to, and beside it the design system's Select for any other rung. Both
+   open the same outcome question as every other move (opRequestMove), so what a click does is never a
+   surprise: it asks, then moves. */
+function opNextStage(l) {
+  var cur = opStage(l.stage);
+  return OPP_ST.filter(function (s) {
+    return s.active !== false && s.terminal !== "lost" && Number(s.position) > Number(cur.position);
+  }).sort(function (a, b) { return a.position - b.position; })[0] || null;
+}
+function opNextAction(l) {
+  var nx = opNextStage(l);
+  var others = opSelectableStages(l.stage).filter(function (s) { return s.key !== l.stage && (!nx || s.key !== nx.key); });
+  return '<div class="ox-next">' +
+    (nx ? '<button type="button" class="m-btn m-btn--primary ox-next__go" onclick="opSetStage(' + l.id + ',&quot;' + esc(nx.key) + '&quot;)"' + (oppBusy ? " disabled" : "") + ">" +
+      '<span class="k">المرحلة التالية</span><span class="v">' + esc(nx.label) + "</span>" + opIco("arrow") + "</button>" : "") +
+    '<div class="ox-next__or">' +
+      mCombo({ id: "oxmv_" + l.id, value: "", placeholder: nx ? "أو انقل إلى مرحلة أخرى…" : "انقل إلى مرحلة…", label: "نقل إلى مرحلة", wide: true,
+        options: others.map(function (s) { return { v: s.key, l: s.label, s: isLostStage(s.key) ? "يطلب سبب الخسارة" : Number(s.position) < Number(opStage(l.stage).position) ? "رجوع" : "" }; }),
+        attrs: ' data-opmove="' + l.id + '"' }) +
+    "</div></div>" +
+    '<p class="m-meta ox-next__h">كل نقل يطلب نتيجة المرحلة الحالية قبل أن يتم.</p>';
+}
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var id = t.getAttribute("data-opmove"); if (!id || !t.value) return;
+  var to = t.value; t.value = "";
+  void opRequestMove([Number(id)], to);
+});
 function opDetailDrawer(l) {
   var st = opStage(l.stage);
   var open = opOpenStages();
@@ -1859,6 +1938,7 @@ function opDetailDrawer(l) {
   var ssk = l.id + ":stage";
   b += '<section class="ox-sec" aria-labelledby="oxsec_st"><div class="ox-lr"><div class="ox-sech" id="oxsec_st">المرحلة</div>' + opFieldStatus(ssk, "oxd_stage_" + l.id) + "</div>";
   b += opStepper(l, open, idx);
+  if (opIsOpen(l) && opMayEdit()) b += opNextAction(l);
   if (opIsOpen(l)) {
     /* The two closing actions moved to the drawer's footer (founder, 2026-09-17: «move these buttons
        below»): they end the deal, so they sit with the drawer's other terminal action and stay in reach
@@ -1970,6 +2050,28 @@ function opDetailDrawer(l) {
   return opDrawerShell("oxdrt", head, b, foot, opTabStrip(counts), lead) + opOutcomeSheet();
 }
 
+/* «العملاء», as Select / Combobox options: approved and proposed accounts (a rejected one may not carry
+   opportunities), the city and phone on the second line so two branches with one name can be told apart. */
+function opAccountRows() {
+  if (typeof acLoad === "function") acLoad(false);
+  var rows = (typeof acRows !== "undefined" && acRows) ? acRows : (typeof entities !== "undefined" ? entities : []);
+  return (rows || []).filter(function (a) { return a.approval !== "rejected"; });
+}
+function opAccountById(id) { return opAccountRows().filter(function (a) { return String(a.id) === String(id); })[0] || null; }
+function opAccountChoices() {
+  return opAccountRows().map(function (a) {
+    return { v: String(a.id), l: a.name, s: [a.city || "", a.phone || ""].filter(Boolean).join(" · ") };
+  }).sort(function (x, y) { return x.l.localeCompare(y.l, "ar"); });
+}
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute || !opSheet) return;
+  if (t.getAttribute("data-opacct")) {
+    var a = opAccountById(t.value);
+    opSheet.account_id = a ? a.id : ""; opSheet.name = a ? a.name : ""; opSheet.phone = a ? (a.phone || "") : "";
+    opErr = ""; opErrFld = ""; opRender(); return;
+  }
+  if (t.getAttribute("data-opowner")) { opSheet.owner = t.value; return; }
+});
 function opCreateDrawer() {
   var d = opSheet;
   // Archived products are not offered for new work; the server refuses them too (400), but a picker
@@ -1979,16 +2081,20 @@ function opCreateDrawer() {
     '<div class="m-meta">جهة واحدة، ومنتج أو أكثر، والمصدر</div></div></div>';
   var errOf = function (f) { return opErrFld === f ? ' aria-invalid="true"' : ""; };
   var b = '<section class="ox-sec"><div class="ox-sech">الجهة</div>';
-  b += '<div class="m-field"><label class="m-label m-req" for="opd_name">اسم الجهة</label>' +
-    '<input class="m-input" id="opd_name" list="opaccts" value="' + esc(d.name) + '" placeholder="مجمع الرعاية الطبي" aria-required="true"' + errOf("name") +
-    ' oninput="opDraft(&quot;name&quot;,this.value)"></div>';
-  var accts = entities.slice(0, 400);
-  b += '<datalist id="opaccts">' + accts.map(function (e) { return '<option value="' + esc(e.name) + '"></option>'; }).join("") + "</datalist>";
-  b += '<div class="m-form"><div class="m-field"><label class="m-label" for="opd_phone">الجوال (اختياري)</label>' +
-    '<input class="m-input" id="opd_phone" value="' + esc(d.phone) + '" placeholder="9665…" dir="ltr"' + errOf("phone") + ' oninput="opDraft(&quot;phone&quot;,this.value)"></div>' +
-    '<div class="m-field"><label class="m-label" for="opd_owner">مسؤول المبيعات (اختياري)</label>' +
-    '<input class="m-input" id="opd_owner" list="oxowners2" value="' + esc(d.owner || "") + '" placeholder="بلا مسؤول" oninput="opDraft(&quot;owner&quot;,this.value)"></div></div>' +
-    '<datalist id="oxowners2">' + opOwners().map(function (o) { return '<option value="' + esc(o) + '"></option>'; }).join("") + "</datalist>";
+  /* THE CLIENT IS PICKED, NEVER TYPED (founder, 2026-10-02). A typed name opened a second, unlinked
+     card for a client the book already held. The list is «العملاء» itself; a client that is not on it
+     is added there first. The server refuses anything but an existing account (POST /admin/opps). */
+  var accts = opAccountChoices();
+  var picked = d.account_id ? opAccountById(d.account_id) : null;
+  b += '<div class="m-field"><label class="m-label m-req" for="opd_acct_t">العميل</label>' +
+    mCombo({ id: "opd_acct", value: d.account_id ? String(d.account_id) : "", placeholder: "اختر العميل من قائمة العملاء", label: "العميل",
+      wide: true, search: true, options: accts, empty: "لا عملاء بعد — أضف العميل من «العملاء» أولًا",
+      attrs: ' data-opacct="1"' + errOf("name") }) +
+    '<span class="m-hint">' + (picked && picked.phone ? 'الجوال: <bdi dir="ltr">' + esc(picked.phone) + "</bdi> · " : "") +
+      'عميل غير موجود؟ <a class="m-link" href="#accounts">أضفه من «العملاء»</a></span></div>';
+  b += '<div class="m-field"><label class="m-label" for="opd_owner_t">مسؤول المبيعات (اختياري)</label>' +
+    mCombo({ id: "opd_owner", value: d.owner || "", placeholder: "بلا مسؤول", label: "مسؤول المبيعات", wide: true, search: true, free: true,
+      options: opOwners(), attrs: ' data-opowner="1"' }) + "</div>";
   b += "</section>";
   b += '<section class="ox-sec"><div class="ox-sech" id="opd_srcl">مصدر الفرصة</div><div class="ox-srcs" role="radiogroup" aria-labelledby="opd_srcl">' +
     Object.keys(OPP_SRC).filter(function (k) { return k !== "other"; }).map(function (k) {
@@ -2098,7 +2204,7 @@ function opAfterRender() {
     requestAnimationFrame(function () {
       var s = document.querySelector(".ox-scrim"), d = document.querySelector(".ox-dr");
       if (s) s.classList.add("in"); if (d) d.classList.add("in");
-      var h = document.getElementById(opSheet ? "opd_name" : "oxdrt");
+      var h = document.getElementById(opSheet ? "opd_acct_t" : "oxdrt");
       if (h) h.focus();
     });
   }
@@ -2182,7 +2288,11 @@ function vOppsCrm() {
   else if (opOpen && oppRows) {
     var l = oppRows.find(function (x) { return x.id === opOpen; });
     if (l) h += opDetailDrawer(l);
+    else h += opOutcomeSheet();
   }
+  /* A board drop or a bulk move asks its outcome with no drawer open — the sheet must render here too,
+     or the question is set and nothing shows (measured: a drop did nothing at all). */
+  else h += opOutcomeSheet();
   /* The lost-reason dialog belongs to this screen, so it lives INSIDE the .ds6 subtree — outside it,
      it would render in the old system on top of a ported board. */
   if (typeof owLossModal === "function") h += owLossModal();
@@ -2321,11 +2431,8 @@ function opNeedsLossReason(id, stage) {
   var l = (oppRows || []).find(function (o) { return o.id === id; });
   return !!l && typeof isLossClose === "function" && isLossClose(l.stage, stage);
 }
-window.opSetStage = function (id, stage) {
-  if (opNeedsLossReason(id, stage)) { owLossOpen([id], "close", stage); return Promise.resolve(); }
-  return window.opSaveField(id, "stage", stage);
-};
-window.opSetStageSel = function (v) { if (!opOpen) return; if (opNeedsLossReason(opOpen, v)) { owLossOpen([opOpen], "close", v); return; } void window.opSaveField(opOpen, "stage", v); };
+window.opSetStage = function (id, stage) { return opRequestMove([id], stage); };
+window.opSetStageSel = function (v) { if (!opOpen || !v) return; void opRequestMove([opOpen], v); };
 
 /* The escalation controls are delegated rather than inline-onclick: they live inside a drawer that
    re-renders on every keystroke, and an inline handler would be re-parsed on each paint. */
@@ -2366,8 +2473,8 @@ window.opDel = async function (id) {
 };
 
 /* ---- bulk: N single writes through the ONE endpoint; failures stay selected ---- */
-async function opBulkPatch(patch, label) {
-  var ids = opSelIds();
+async function opBulkPatch(patch, label) { return opPatchMany(opSelIds(), patch, label); }
+async function opPatchMany(ids, patch, label) {
   if (!ids.length || oppBusy) return;
   oppBusy = true; opRender();
   var ok = 0, bad = [];
@@ -2396,7 +2503,7 @@ window.opBulkStage = function (el) {
     if (!toClose.length) { opToast("البنود المحدّدة مغلقة خسارة بالفعل", false); return; }
     owLossOpen(toClose, "bulk", v); return;
   }
-  void opBulkPatch({ stage: v }, "نُقلت إلى «" + opStage(v).label + "»");
+  void opRequestMove(opSelIds(), v);
 };
 window.opBulkOwner = function (el) {
   var v = String(el.value || "").trim(); el.value = "";
@@ -2405,31 +2512,49 @@ window.opBulkOwner = function (el) {
 };
 
 /* ---- kanban drag: the column KEY is the payload, never its rendered label ---- */
-window.opDragStart = function (e, id) { opDragId = id; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; };
-window.opDragEnd = function () { opDragId = null; };
-window.opDragOver = function (e, el) { e.preventDefault(); if (el) el.classList.add("over"); };
-window.opDragLeave = function (el) { if (el) el.classList.remove("over"); };
+function opDragBoard(on) {
+  var b = document.querySelector(".m-board"); if (b) b.classList.toggle("is-dragging", !!on);
+  if (!on) Array.prototype.forEach.call(document.querySelectorAll(".m-col.over"), function (c) { c.classList.remove("over"); });
+}
+window.opDragStart = function (e, id) {
+  opDragId = id;
+  if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(id)); } catch (x) {} }
+  setTimeout(function () { opDragBoard(true); }, 0);
+};
+window.opDragEnd = function () { opDragId = null; opDragBoard(false); };
+window.opDragOver = function (e, el) {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  if (el && !el.classList.contains("over")) {
+    Array.prototype.forEach.call(document.querySelectorAll(".m-col.over"), function (c) { if (c !== el) c.classList.remove("over"); });
+    el.classList.add("over");
+  }
+};
+/* dragleave fires every time the pointer crosses onto a CARD inside the column; only leaving the column
+   itself clears it, or the highlight flickers under the pointer the whole way down. */
+window.opDragLeave = function (el, e) {
+  if (!el) return;
+  var to = e && e.relatedTarget;
+  if (to && el.contains(to)) return;
+  el.classList.remove("over");
+};
 window.opDrop = async function (e, stage, el) {
   e.preventDefault();
   if (el) el.classList.remove("over");
+  opDragBoard(false);
   var id = opDragId; opDragId = null;
   if (id === null) return;
   var l = (oppRows || []).find(function (x) { return x.id === id; });
   if (!l || l.stage === stage) return;
-  if (opNeedsLossReason(id, stage)) { owLossOpen([id], "close", stage); return; }
-  await window.opSaveField(id, "stage", stage);
-  var st = opFState[id + ":stage"];
-  if (st && st.s === "failed") {
-    delete opFState[id + ":stage"]; opRender();
-    opToast("تعذّر نقل «" + l.account_name + "»", true, "أعد المحاولة", function () { void window.opSaveField(id, "stage", stage); });
-  }
+  /* A drop is a move like any other: it asks for the outcome before anything is written. */
+  await opRequestMove([id], stage);
 };
 
 /* ---- create ---- */
 function opBlankLine() { return { product: "", package_id: "", sale_price: "", years: 1, qty: 1, discount: 0 }; }
 window.opOpenSheet = function (opener) {
   if (!opMayEdit()) return;  // the button is hidden; this closes the keyboard/console path too
-  opSheet = { name: "", phone: "", source: "call", source_ref: "", owner: "", lines: [opBlankLine()] };
+  opSheet = { account_id: "", name: "", phone: "", source: "call", source_ref: "", owner: "", lines: [opBlankLine()] };
   opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opOpener = opener || "oxadd";
   opRender();
 };
@@ -2528,19 +2653,20 @@ window.opFromContact = function (phone, opener) {
    board that will hold it. One candidate tag prefills the service; two prefill nothing. */
 window.opFromEntity = function (id) {
   if (!opMayEdit()) return;  // «فرصة +» on an account or a target row — same write, same gate
-  var e = entities.find(function (x) { return x.id === id; });
+  /* The account record and a target row both open this; either list may be the one loaded. */
+  var e = (typeof entities !== "undefined" ? entities : []).find(function (x) { return x.id === id; }) || opAccountById(id);
   if (!e) return;
   var line = opBlankLine();
   var tags = e.productTags || [];
   if (tags.length === 1) line.product = tags[0];
-  opSheet = { name: e.name, phone: e.phone, source: "call", source_ref: "", owner: "", lines: [line] };
+  opSheet = { account_id: e.id, name: e.name, phone: e.phone, source: "call", source_ref: "", owner: "", lines: [line] };
   opOpen = 0; opErr = ""; opErrFld = ""; opDrShown = false; opDrScroll = 0; opView = "board";
   if ((location.hash || "").slice(1).split("/")[0] === "opps") opRender();
   else location.hash = "#opps";
 };
 function opCreateInvalid(f, msg) {
   opErr = msg; opErrFld = f; opRender();
-  var idMap = { name: "opd_name", phone: "opd_phone", source_ref: "opd_partner" };
+  var idMap = { name: "opd_acct_t", source_ref: "opd_partner" };
   var p = f.split("_"); var idx = p.pop();
   var el = document.getElementById(idMap[f] || ("opd_" + p.join("_") + "_" + idx));
   if (el) el.focus();
@@ -2549,7 +2675,7 @@ window.opSubmit = async function () {
   if (oppBusy) return;
   var d = opSheet;
   if (!d) return;
-  if (!String(d.name || "").trim()) return opCreateInvalid("name", "اسم الجهة مطلوب.");
+  if (!d.account_id) return opCreateInvalid("name", "اختر العميل من قائمة العملاء.");
   var lines = d.lines.filter(function (l) { return String(l.product || "").trim(); });
   if (!lines.length) return opCreateInvalid("product_0", "اختر منتجًا واحدًا على الأقل.");
   for (var i = 0; i < d.lines.length; i++) {
@@ -2566,7 +2692,7 @@ window.opSubmit = async function () {
       method: "POST",
       headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
       body: JSON.stringify({
-        account_name: String(d.name).trim(), phone: String(d.phone || "").trim(),
+        account_id: Number(d.account_id), account_name: String(d.name || "").trim(), phone: String(d.phone || "").trim(),
         source: d.source, source_ref: d.source === "whatsapp" || d.source === "partner" ? String(d.source_ref || "").trim() : "",
         lines: lines.map(function (l) {
           return { product: l.product, sale_price: Number(l.sale_price || 0), years: Number(l.years || 1),
@@ -2581,7 +2707,8 @@ window.opSubmit = async function () {
     oppBusy = false;
     if (!r.ok || !j.ok) {
       /* The server names the field it rejected; repeating that name is what makes it fixable. */
-      if (j.error === "invalid_field" && j.field === "phone") return opCreateInvalid("phone", "رقم الجوال غير صالح.");
+      if (j.field === "account_id") return opCreateInvalid("name", j.detail || "اختر العميل من قائمة العملاء.");
+      if (j.error === "invalid_field" && j.field === "phone") return opCreateInvalid("name", "جوال هذا العميل غير صالح — صحّحه في «العملاء».");
       if (j.error === "invalid_field" && j.field === "account_name") return opCreateInvalid("name", "اسم الجهة مطلوب.");
       if (j.error === "invalid_field" && j.field === "source_ref") return opCreateInvalid("source_ref", "اكتب اسم الشريك.");
       opErr = j.error === "unknown_product" ? "خدمة غير معروفة: " + String(j.product || "")

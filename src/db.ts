@@ -5,6 +5,7 @@ import { SALES_STAGES, SECTORS, PRODUCT_SECTOR } from "./sales-domain.js";
 import * as sales from "./sales-domain.js";
 import * as acct from "./account-domain.js";
 import * as sysCfgSeed from "./config-domain.js";
+import * as work from "./opp-work-domain.js";
 
 // ---------------------------------------------------------------------------
 // Shadow ledger (architecture §5, first slice): Postgres persistence for the
@@ -1106,6 +1107,29 @@ CREATE TABLE IF NOT EXISTS org_roles (
 ALTER TABLE team_members DROP CONSTRAINT IF EXISTS team_members_role_check;
 `,
   },
+  {
+    version: "020-stage-outcomes",
+    sql: `
+-- «نتائج المراحل» become the admin's (founder, 2026-10-02). Until now STAGE_OUTCOMES was a constant in
+-- sales-domain. The key is global because opportunities.lost_reason and the ledger store it alone.
+-- Seeded insert-if-absent from the constant on every boot (seedStageOutcomes), so edits survive deploys.
+CREATE TABLE IF NOT EXISTS stage_outcomes (
+  key         TEXT PRIMARY KEY,
+  stage       TEXT NOT NULL,
+  label       TEXT NOT NULL,
+  reason      TEXT NOT NULL DEFAULT '',
+  next_action TEXT NOT NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('advance','needs_action','lost')),
+  dept        TEXT NOT NULL DEFAULT '',
+  position    INT  NOT NULL DEFAULT 0,
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  system      BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  BIGINT NOT NULL,
+  updated_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_stage_outcomes_stage ON stage_outcomes (stage, position);
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -1143,6 +1167,7 @@ async function runMigrations(p: pg.Pool): Promise<void> {
     await seedDefaultPipeline(client);
     await seedSectors(client);
     await seedOrgRoles(client);
+    await seedStageOutcomes(client);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]).catch(() => {});
     client.release();
@@ -1166,6 +1191,7 @@ const REQUIRED_SHAPE: Readonly<Record<string, readonly string[]>> = {
   divisions: ["id", "name", "owner_member_id", "active", "sector_id"],
   org_sectors: ["id", "name", "kind", "manager_member_id", "active"],
   org_roles: ["key", "label", "system", "active"],
+  stage_outcomes: ["key", "stage", "label", "reason", "next_action", "kind", "dept", "position", "active", "system"],
   team_members: ["id", "name", "email", "role", "division_id", "active"],
   escalations: ["id", "opp_id", "kind", "to_member_id", "to_name", "to_email", "reason", "delivery", "created_at"],
   track_stage_events: ["id", "opp_id", "from_stage", "to_stage", "outcome_key", "effective_at", "recorded_at"],
@@ -1268,6 +1294,34 @@ async function seedSectors(client: pg.PoolClient): Promise<void> {
        VALUES ($1,$2,NULL,$3,$4,$5) ON CONFLICT (product) DO NOTHING`,
       [product, sectorId, now, assumed, note]);
   }
+}
+
+/** The archive's outcomes, insert-if-absent: the admin's edits survive every deploy. A row deleted by the
+ *  admin cannot come back either, because only non-system rows can be deleted and these are system. */
+async function seedStageOutcomes(client: pg.PoolClient): Promise<void> {
+  const now = Date.now();
+  let pos = 0;
+  for (const o of sales.SEED_OUTCOMES) {
+    pos++;
+    await client.query(
+      `INSERT INTO stage_outcomes (key, stage, label, reason, next_action, kind, dept, position, active, system, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,TRUE,TRUE,$9,$9) ON CONFLICT (key) DO NOTHING`,
+      [o.key, o.stage, o.label, o.reason, o.nextAction, o.kind, o.dept, pos, now]);
+  }
+  await loadLiveOutcomes(client);
+}
+
+/** Read the table into sales-domain's live list (and the loss reasons built from it). Called at boot
+ *  and after every outcome write. */
+async function loadLiveOutcomes(q: { query: pg.Pool["query"] } | pg.PoolClient): Promise<void> {
+  const r = await (q as pg.Pool).query(
+    "SELECT key, stage, label, reason, next_action, kind, dept, active, system FROM stage_outcomes ORDER BY position, key");
+  sales.setLiveOutcomes(r.rows.map((x: any) => ({
+    key: String(x.key), stage: String(x.stage), label: String(x.label), reason: String(x.reason ?? ""),
+    nextAction: String(x.next_action), kind: String(x.kind) as sales.OutcomeKind, dept: String(x.dept ?? ""),
+    active: x.active !== false, system: x.system === true,
+  })));
+  work.refreshLossReasons();
 }
 
 /** The four roles code reads by key. Insert-if-absent: the admin's label survives every deploy. */
@@ -4942,6 +4996,57 @@ export async function productPerformance(
 }
 
 /** The three sectors as stored, for a selector. Ordered as seeded. */
+// ---- «نتائج المراحل» -----------------------------------------------------------------------
+
+export type OutcomeRow = sales.StageOutcome & { uses: number };
+
+/** Every outcome with how many times it has been recorded — on the ledger, on a rep's engagement, or as
+ *  a loss reason — because «can this be deleted» and «what will pausing hide» are the admin's questions. */
+export async function listOutcomes(): Promise<OutcomeRow[]> {
+  if (!(await reprobe()) || !pool) return [];
+  const r = await pool.query(
+    `SELECT o.key, o.stage, o.label, o.reason, o.next_action, o.kind, o.dept, o.active, o.system,
+            (SELECT COUNT(*) FROM track_stage_events t WHERE t.outcome_key = o.key)
+          + (SELECT COUNT(*) FROM engagements e WHERE e.outcome_key = o.key)
+          + (SELECT COUNT(*) FROM opportunities op WHERE op.lost_reason = o.key) AS uses
+       FROM stage_outcomes o ORDER BY o.position, o.key`);
+  return r.rows.map((x: any) => ({
+    key: String(x.key), stage: String(x.stage), label: String(x.label), reason: String(x.reason ?? ""),
+    nextAction: String(x.next_action), kind: String(x.kind) as sales.OutcomeKind, dept: String(x.dept ?? ""),
+    active: x.active !== false, system: x.system === true, uses: Number(x.uses) || 0,
+  }));
+}
+
+type OutcomeWrite = { label: string; reason: string; nextAction: string; kind: string; dept: string; active: boolean };
+
+export async function createOutcome(stage: string, key: string, v: OutcomeWrite): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const now = Date.now();
+  const pos = await pool.query("SELECT COALESCE(MAX(position), 0) + 1 AS p FROM stage_outcomes");
+  const r = await pool.query(
+    `INSERT INTO stage_outcomes (key, stage, label, reason, next_action, kind, dept, position, active, system, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,FALSE,$10,$10) ON CONFLICT (key) DO NOTHING`,
+    [key, stage, v.label, v.reason, v.nextAction, v.kind, v.dept, Number(pos.rows[0].p), v.active, now]);
+  if (r.rowCount) await loadLiveOutcomes(pool);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function updateOutcome(key: string, v: OutcomeWrite): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query(
+    `UPDATE stage_outcomes SET label=$2, reason=$3, next_action=$4, kind=$5, dept=$6, active=$7, updated_at=$8 WHERE key=$1`,
+    [key, v.label, v.reason, v.nextAction, v.kind, v.dept, v.active, Date.now()]);
+  if (r.rowCount) await loadLiveOutcomes(pool);
+  return (r.rowCount ?? 0) > 0;
+}
+
+export async function deleteOutcome(key: string): Promise<boolean> {
+  if (!(await reprobe()) || !pool) return false;
+  const r = await pool.query("DELETE FROM stage_outcomes WHERE key = $1 AND system = FALSE", [key]);
+  if (r.rowCount) await loadLiveOutcomes(pool);
+  return (r.rowCount ?? 0) > 0;
+}
+
 // ---- «إعدادات المنظمة»: segments (the market), org sectors, roles ---------------------------
 
 export type SegmentRow = { id: number; name: string; kind: string | null; active: boolean; products: number };

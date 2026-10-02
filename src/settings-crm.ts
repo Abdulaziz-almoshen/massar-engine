@@ -71,13 +71,23 @@ export const SETTINGS_CRM_CSS = `
 .ds6 .cf-row-acts .m-btn, .ds6 .cf-row-acts .rv-hold { min-block-size:36px; padding-inline:12px; font-size:var(--m-t-cap); }
 .ds6 .cf-row-acts .rv-hold:not(.holding):not(.armed) { background:var(--m-paper); color:var(--m-bad); }
 .ds6 tr.is-off td { color:var(--m-mut); }
+/* «النتائج»: a rung's outcomes unfold under its row, inside the table, so they read as the rung's own. */
+.ds6 .cf-ocbtn { min-block-size:36px; padding-inline:12px; font-size:var(--m-t-cap); gap:6px; }
+.ds6 .cf-ocbtn svg { inline-size:14px; block-size:14px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.ds6 .cf-ocbtn[aria-expanded="true"] svg { transform:rotate(180deg); }
+.ds6 .cf-oc { background:var(--m-page); padding:var(--m-4); display:flex; flex-direction:column; gap:var(--m-3);
+  box-shadow:inset 0 1px 0 var(--m-line), inset 0 -1px 0 var(--m-line); }
+.ds6 .cf-oc__h { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--m-3); flex-wrap:wrap; }
+.ds6 .cf-oc__h p { margin:2px 0 0; }
+.ds6 .cf-octbl { background:var(--m-paper); border-radius:var(--m-r-ctl); box-shadow:0 0 0 1px var(--m-line); }
 /* A numeric field aligns to the end of its box; the vocabulary's m-input does not say so. */
 .ds6 .m-input.num { text-align:end; }
 `;
 
 export const SETTINGS_CRM_JS = `
 /* ================= «إعدادات النظام» ================= */
-var cfStages = null, cfDivs = [], cfTeam = [], cfSegs = [], cfOrgSecs = [], cfRoles = [], cfLoading = false, cfFailed = false;
+var cfStages = null, cfDivs = [], cfTeam = [], cfSegs = [], cfOrgSecs = [], cfRoles = [], cfOutcomes = [], cfDepts = [], cfLoading = false, cfFailed = false;
+var cfOcOpen = {};   /* stage keys whose «النتائج» panel is unfolded */
 var cfEdit = null;      /* { kind:"stage" | (org-crm) "segment"|"osector"|"division"|"member"|"move"|"role", id, d:{}, err, field, busy } */
 var cfShowOff = false;  /* paused rows are hidden by default: the ladder people work is the live one */
 
@@ -117,6 +127,24 @@ function cfLoad(force) {
   }).then(function (j) {
     cfStages = j.stages || []; cfDivs = j.divisions || []; cfTeam = j.team || []; cfFailed = false;
     cfSegs = j.segments || []; cfOrgSecs = j.sectors || []; cfRoles = j.roles || [];
+    cfOutcomes = j.outcomes || []; cfDepts = j.departments || [];
+    /* THE LIVE OUTCOMES replace the compiled seed IN PLACE: the move sheet, the loss dialog and every
+       report label read STAGE_OUTCOMES / LOSS_REASONS by name, so an outcome the admin adds or pauses
+       reaches all of them without a reload. Same rebuild as opp-work-domain.refreshLossReasons. */
+    if (cfOutcomes.length && typeof STAGE_OUTCOMES !== "undefined") {
+      STAGE_OUTCOMES.length = 0;
+      cfOutcomes.forEach(function (o) { STAGE_OUTCOMES.push(o); });
+      if (typeof LOSS_REASONS !== "undefined") {
+        LOSS_REASONS.length = 0;
+        Object.keys(LOSS_REASON_LABELS).forEach(function (k) { delete LOSS_REASON_LABELS[k]; });
+        cfOutcomes.forEach(function (o) {
+          if (o.kind !== "lost") return;
+          var lb = String(o.label).replace(/^خسارة\\s*[–-]\\s*/, "");
+          LOSS_REASON_LABELS[o.key] = lb;
+          if (o.stage === "lost" && o.active !== false) LOSS_REASONS.push({ key: o.key, label: lb, hint: o.reason });
+        });
+      }
+    }
     /* The board, the drawer and every stage select read the LIVE ladder from here on: an admin who
        adds a rung sees it on the board without a reload, and a paused rung stops being offered. */
     if (typeof OPP_ST !== "undefined") {
@@ -222,10 +250,10 @@ function cfStagesView() {
   if (cfEdit && cfEdit.kind === "stage" && !cfEdit.id) h += cfStageEditor();
   var rows = (cfStages || []).filter(function (s) { return cfShowOff || s.active || s.openLines; });
   h += '<div class="m-tablewrap"><table class="m-table cf-tbl"><thead><tr>' +
-    '<th class="num">#</th><th>المرحلة</th><th class="num">الوزن</th><th>مدة الالتزام</th><th>الحالة</th><th>الفرص عليها</th><th></th>' +
+    '<th class="num">#</th><th>المرحلة</th><th class="num">الوزن</th><th>مدة الالتزام</th><th>الحالة</th><th>الفرص عليها</th><th>النتائج</th><th></th>' +
     "</tr></thead><tbody>";
   if (!rows.length) {
-    h += '<tr class="m-table__empty"><td colspan="7"><div class="m-empty"><p class="m-empty__t">لا مراحل مطابقة</p>' +
+    h += '<tr class="m-table__empty"><td colspan="8"><div class="m-empty"><p class="m-empty__t">لا مراحل مطابقة</p>' +
       '<p class="m-empty__d">إظهار الموقوفة يعرض المراحل الموقوفة.</p></div></td></tr>';
   }
   rows.forEach(function (s) {
@@ -240,19 +268,96 @@ function cfStagesView() {
     h += "<td>" + (terminal ? '<span class="m-chip m-chip--ac">أساسية</span>'
       : s.active ? '<span class="m-chip m-chip--ok">مفعّلة</span>' : '<span class="m-chip">موقوفة</span>') + "</td>";
     h += "<td>" + (s.openLines ? cfNOpp(s.openLines) : cfNil("لا فرص", "none")) + "</td>";
+    var ocs = cfOutcomes.filter(function (o) { return o.stage === s.key; });
+    var ocLive = ocs.filter(function (o) { return o.active !== false; }).length;
+    h += '<td><button type="button" class="m-btn cf-ocbtn" data-cf="octoggle" data-k="' + esc(s.key) + '" aria-expanded="' + !!cfOcOpen[s.key] + '"' +
+      ' aria-controls="cfoc_' + esc(s.key) + '">' + (ocs.length ? cfPl(ocLive, "نتيجة واحدة", "نتيجتان", "نتائج", "نتيجة") : "لا نتائج") +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></td>';
     h += '<td><span class="cf-row-acts">' +
       '<button class="m-btn" data-cf="editstage" data-k="' + esc(s.key) + '">تعديل</button>' +
       (terminal || cfSeeded(s.key) ? '<span class="m-meta" title="مرحلة أساسية في المحرك — أوقفها بدل حذفها">أساسية</span>'
         : s.openLines ? '<span class="m-meta" title="أوقفها بدل حذفها">لها فرص</span>'
         : cfHold("cfDeleteStage", s.key, "حذف")) + "</span></td>";
     h += "</tr>";
-    if (editing) h += cfEditorRow(7, cfStageEditor());
+    if (editing) h += cfEditorRow(8, cfStageEditor());
+    if (cfOcOpen[s.key]) h += cfEditorRow(8, cfOutcomesPanel(s));
   });
   h += "</tbody></table></div>";
   h += '<p class="m-meta" style="padding:var(--m-4) var(--m-5)">مفتاح المرحلة (' + esc((cfStages || []).map(function (s) { return s.key; }).slice(0, 3).join(" · ")) +
     " …) لا يتغيّر بعد إنشائها: الفرص المسجّلة وسجل التحركات تشير إليه. الاسم والوزن والترتيب والمدة والحالة تُعدَّل متى شئت.</p>";
   return h + "</section>";
 }
+
+/* ================= «نتائج المراحل» =================
+   Each rung's outcomes, under the rung (founder, 2026-10-02: outcomes «configurable from Settings»).
+   An outcome's STATUS is its kind — تقدّم moves a deal forward, يحتاج إجراء holds it or sends it back,
+   خسارة closes it — and every move on the board must record one (sales-domain.checkMoveOutcome). */
+function cfOcKindChip(k) {
+  var cls = k === "advance" ? "m-chip--ok" : k === "lost" ? "m-chip--bad" : "m-chip--warn";
+  return '<span class="m-chip ' + cls + '">' + esc(OUTCOME_KIND_LABELS[k] || k) + "</span>";
+}
+function cfOutcomeEditor(stageKey) {
+  var d = cfEdit.d, isLost = stageKey === "lost";
+  var kinds = (isLost ? ["lost"] : OUTCOME_KINDS).map(function (k) { return [k, OUTCOME_KIND_LABELS[k]]; });
+  var depts = [["", "تبقى مع المبيعات"]].concat((cfDepts || []).map(function (x) { return [x, x]; }));
+  return '<div class="cf-ed"><div class="m-form">' +
+    cfInput("cf_oclabel", "النتيجة", d.label, { k: "label", max: 40, ph: "مثال: طلب عرضًا تجريبيًا" }) +
+    cfSelect("cf_ockind", "الحالة", "kind", d.kind, kinds, isLost ? "نتائج مرحلة الخسارة هي أسباب الخسارة" : "تقدّم = تُقدِّم الفرصة · يحتاج إجراء = تبقيها أو تعيدها · خسارة = تغلقها") +
+    cfInput("cf_ocreason", "السبب", d.reason, { k: "reason", max: 120, ph: "ما الذي يجعل الفرصة تنتهي هنا" }) +
+    cfInput("cf_ocnext", "الإجراء التالي", d.nextAction, { k: "nextAction", max: 120, ph: "مثال: جدولة عرض تجريبي" }) +
+    cfSelect("cf_ocdept", "الإدارة المسؤولة عن الإجراء", "dept", d.dept, depts) +
+    cfSelect("cf_ocactive", "الحالة في القوائم", "active", d.active ? "1" : "", [["1", "مفعّلة"], ["", "موقوفة"]], "الموقوفة لا تُعرض عند النقل، وتبقى في السجل") +
+    "</div>" + cfEditorActions(cfEdit.id ? "احفظ النتيجة" : "أضف النتيجة") + "</div>";
+}
+function cfOutcomesPanel(s) {
+  var rows = cfOutcomes.filter(function (o) { return o.stage === s.key; });
+  var may = typeof meCan !== "function" || meCan("org.manage");
+  var h = '<div class="cf-oc" id="cfoc_' + esc(s.key) + '"><div class="cf-oc__h"><div><b>نتائج «' + esc(s.label) + '»</b>' +
+    '<p class="m-meta">ما يختاره المستخدم قبل نقل فرصة من هذه المرحلة' + (isTerminalStageKey(s.key) && s.key === "lost" ? " — وهي أسباب الخسارة" : "") + "</p></div>" +
+    (may && !(cfEdit && cfEdit.kind === "outcome" && !cfEdit.id && cfEdit.stage === s.key)
+      ? '<button class="m-btn m-btn--primary" data-cf="ocadd" data-k="' + esc(s.key) + '">' + cfIco("plus") + "إضافة نتيجة</button>" : "") + "</div>";
+  if (cfEdit && cfEdit.kind === "outcome" && !cfEdit.id && cfEdit.stage === s.key) h += cfOutcomeEditor(s.key);
+  h += '<table class="m-table cf-octbl"><thead><tr><th>النتيجة</th><th>الحالة</th><th>السبب</th><th>الإجراء التالي</th><th>سُجّلت</th><th></th></tr></thead><tbody>';
+  if (!rows.length) h += '<tr class="m-table__empty"><td colspan="6"><div class="m-empty"><p class="m-empty__t">لا نتائج لهذه المرحلة</p>' +
+    '<p class="m-empty__d">لا يمكن نقل فرصة من مرحلة بلا نتائج — أضف نتيجة «تقدّم» على الأقل.</p></div></td></tr>';
+  rows.forEach(function (o) {
+    h += '<tr class="' + (o.active === false ? "is-off" : "") + '"><td class="m-td-n">' + esc(o.label) + (o.active === false ? ' <span class="m-chip">موقوفة</span>' : "") + "</td>" +
+      "<td>" + cfOcKindChip(o.kind) + "</td>" +
+      "<td>" + (o.reason ? esc(o.reason) : cfNil("بلا سبب", "none")) + "</td>" +
+      "<td>" + esc(o.nextAction) + (o.dept ? '<span class="m-meta"> · ' + esc(o.dept) + "</span>" : "") + "</td>" +
+      "<td>" + (o.uses ? cfPl(o.uses, "مرة واحدة", "مرتان", "مرات", "مرة") : cfNil("لم تُسجَّل", "none")) + "</td>" +
+      '<td><span class="cf-row-acts">' + (may ? '<button class="m-btn" data-cf="ocedit" data-k="' + esc(o.key) + '">تعديل</button>' +
+        (o.system ? '<span class="m-meta" title="نتيجة أساسية — تُعدَّل أو تُوقف">أساسية</span>'
+          : o.uses ? '<span class="m-meta" title="سُجّلت على فرص — أوقفها بدل حذفها">مستخدمة</span>'
+          : cfHold("cfDeleteOutcome", o.key, "حذف")) : "") + "</span></td></tr>";
+    if (cfEdit && cfEdit.kind === "outcome" && cfEdit.id === o.key) h += cfEditorRow(6, cfOutcomeEditor(s.key));
+  });
+  return h + "</tbody></table></div>";
+}
+function cfSaveOutcome() {
+  var e = cfEdit, d = e.d;
+  var stage = e.id ? ((cfOutcomes.filter(function (o) { return o.key === e.id; })[0]) || {}).stage : e.stage;
+  var cur = e.id ? cfOutcomes.filter(function (o) { return o.key === e.id; })[0] : null;
+  var checked = checkOutcome({ label: d.label, reason: d.reason, nextAction: d.nextAction, kind: d.kind, dept: d.dept, active: !!d.active },
+    cfOutcomes.filter(function (o) { return o.stage === stage; }).map(function (o) { return o.label; }), cfDepts, cur ? cur.label : undefined);
+  if (!checked.ok) { e.err = checked.reason; e.field = checked.field; render(false); return; }
+  e.busy = true; render(false);
+  var body = e.id ? checked.value : Object.assign({ stage: stage }, checked.value);
+  cfJson(e.id ? "PATCH" : "POST", "/admin/config/outcomes" + (e.id ? "/" + encodeURIComponent(e.id) : ""), body).then(function (r) {
+    e.busy = false;
+    if (!r.ok) { e.err = r.j.detail || "تعذّر الحفظ (" + fmtN(r.status) + ")"; e.field = r.j.field || ""; render(false); return; }
+    cfEdit = null; cfLoad(true);
+    cfToast(e.id ? "حُفظت النتيجة" : "أُضيفت النتيجة «" + checked.value.label + "»", false);
+  }).catch(function () { e.busy = false; e.err = "تعذّر الاتصال — لم يُحفظ شيء."; render(false); });
+}
+window.cfDeleteOutcome = function (key) {
+  var o = cfOutcomes.filter(function (x) { return x.key === key; })[0]; if (!o) return;
+  var c = checkOutcomeDelete(o.system, o.uses); if (!c.ok) { cfToast(c.reason, true); return; }
+  cfJson("DELETE", "/admin/config/outcomes/" + encodeURIComponent(key)).then(function (r) {
+    if (!r.ok) { cfToast(r.j.detail || "تعذّر الحذف", true); return; }
+    cfLoad(true); cfToast("حُذفت النتيجة «" + o.label + "»", false);
+  }).catch(function () { cfToast("تعذّر الاتصال — لم يُحذف شيء.", true); });
+};
 
 /* Departments and employees moved to «إعدادات المنظمة» (org-crm.ts), with sectors, segments and roles. */
 
@@ -339,10 +444,25 @@ document.addEventListener("click", function (ev) {
     setTimeout(function () { var f = document.getElementById("cf_label"); if (f) f.focus(); }, 0); return;
   }
 
+  if (a === "octoggle") { var sk = t.getAttribute("data-k"); cfOcOpen[sk] = !cfOcOpen[sk]; render(false); return; }
+  if (a === "ocadd") {
+    var st = t.getAttribute("data-k");
+    /* The rung rides on the editor BEFORE it renders: cfOpen renders at once, and a stage set after it
+       left the panel looking for an editor that named no rung — «إضافة نتيجة» opened nothing. */
+    cfEdit = { kind: "outcome", id: "", stage: st, d: { label: "", reason: "", nextAction: "", kind: st === "lost" ? "lost" : "advance", dept: "", active: true }, err: "", field: "", busy: false };
+    render(false);
+    setTimeout(function () { var f = document.getElementById("cf_oclabel"); if (f) f.focus(); }, 0); return;
+  }
+  if (a === "ocedit") {
+    var o = cfOutcomes.filter(function (x) { return x.key === t.getAttribute("data-k"); })[0]; if (!o) return;
+    cfOpen("outcome", o.key, { label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept, active: o.active !== false });
+    setTimeout(function () { var f = document.getElementById("cf_oclabel"); if (f) f.focus(); }, 0); return;
+  }
   if (a === "cancel") { cfClose(); return; }
   if (a === "save") {
     if (!cfEdit) return;
     if (cfEdit.kind === "stage") cfSaveStage();
+    else if (cfEdit.kind === "outcome") cfSaveOutcome();
     else if (typeof ocSave === "function") ocSave();
   }
 });
@@ -361,7 +481,7 @@ document.addEventListener("keydown", function (ev) {
   if (ev.key === "Escape") { ev.preventDefault(); cfClose(); return; }
   if (ev.key === "Enter" && ev.target && ev.target.getAttribute && ev.target.getAttribute("data-cfset")) {
     ev.preventDefault();
-    if (cfEdit.kind === "stage") cfSaveStage(); else if (typeof ocSave === "function") ocSave();
+    if (cfEdit.kind === "stage") cfSaveStage(); else if (cfEdit.kind === "outcome") cfSaveOutcome(); else if (typeof ocSave === "function") ocSave();
   }
 });
 `;

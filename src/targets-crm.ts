@@ -546,7 +546,7 @@ window.tgtBulkOpp = async function () {
       try {
         var r = await fetch("/admin/opps", { method: "POST",
           headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
-          body: JSON.stringify({ account_name: e.name, phone: e.phone, source: "call",
+          body: JSON.stringify({ account_id: e.id, account_name: e.name, phone: e.phone, source: "call",
             lines: [{ product: product, sale_price: 0, years: 1, qty: 1 }] }) });
         var j = await r.json();
         if (r.ok && j.ok) { made++; fresh = fresh.concat(j.opps || []); }

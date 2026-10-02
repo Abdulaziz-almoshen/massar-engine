@@ -97,12 +97,17 @@ export type StageOutcome = {
   readonly kind: OutcomeKind;
   /** Which department the next action lands on. Empty means it stays with sales. */
   readonly dept: string;
+  /** Paused by the admin (2026-10-02, «نتائج المراحل» in Settings): no longer offered or accepted on a
+   *  write, still resolvable so a report can print what was recorded under it. Absent = active. */
+  readonly active?: boolean;
+  /** Seeded from this file; the admin edits it but cannot delete it. */
+  readonly system?: boolean;
 };
 
 /** نتيجة المرحلة + سبب النتيجة + الإجراء, recovered from the archive. Dependent on stage: the list a
  *  rep sees changes with the rung they are on, which is the difference between a picklist that
  *  guides the conversation and one that is ignored. */
-export const STAGE_OUTCOMES: readonly StageOutcome[] = [
+export const STAGE_OUTCOMES: StageOutcome[] = [
   { stage: "contact", key: "interested", label: "مهتم", reason: "رأى قيمة أولية", nextAction: "انتقال للاكتشاف", kind: "advance", dept: "" },
   { stage: "contact", key: "deferred", label: "مؤجّل", reason: "مشغول أو ليست أولوية", nextAction: "إعادة جدولة تواصل", kind: "needs_action", dept: "المبيعات" },
   { stage: "contact", key: "gatekeeper", label: "لم نصل لصاحب القرار", reason: "البوابة موظف غير مخوّل", nextAction: "تحديد صاحب القرار", kind: "needs_action", dept: "المبيعات" },
@@ -146,6 +151,19 @@ export const STAGE_OUTCOMES: readonly StageOutcome[] = [
   { stage: "lost", key: "lost_budget", label: "خسارة – الميزانية", reason: "لا ميزانية معتمدة", nextAction: "إعادة تفعيل مع دورة الميزانية", kind: "lost", dept: "" },
   { stage: "lost", key: "lost_other", label: "خسارة – سبب آخر", reason: "سبب يُكتب في الملاحظة", nextAction: "تسجيل", kind: "lost", dept: "" },
 ];
+
+/** THE SEED, frozen. Since 2026-10-02 the live list is the admin's (table stage_outcomes); this is what
+ *  the table is seeded from, insert-if-absent, so an edit made in Settings survives every deploy. */
+export const SEED_OUTCOMES: readonly StageOutcome[] = STAGE_OUTCOMES.slice();
+
+/** Replace the live list IN PLACE. Every reader — outcomeForStage, outcomesForStage, the report label
+ *  lookups, the browser copy — reads STAGE_OUTCOMES by name, so swapping the contents of the one array
+ *  is what makes an admin's edit reach all of them at once. */
+export function setLiveOutcomes(rows: readonly StageOutcome[]): void {
+  if (!rows.length) return;   // an unreadable table is not "no outcomes": keep what we have
+  STAGE_OUTCOMES.length = 0;
+  for (const r of rows) STAGE_OUTCOMES.push(r);
+}
 
 /** Riyadh is UTC+3 and Saudi Arabia has never observed daylight saving, so a fixed offset is not an
  *  approximation here — it is exact. That is why this file needs no timezone database. */
@@ -308,7 +326,7 @@ export function outcomeForStage(
   if (!key) return null;
   for (var i = 0; i < STAGE_OUTCOMES.length; i++) {
     var o = STAGE_OUTCOMES[i];
-    if (o.stage === stage && o.key === key) {
+    if (o.stage === stage && o.key === key && o.active !== false) {
       return { key: o.key, label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept };
     }
   }
@@ -322,16 +340,73 @@ export function outcomesForStage(
   var out = [];
   for (var i = 0; i < STAGE_OUTCOMES.length; i++) {
     var o = STAGE_OUTCOMES[i];
-    if (o.stage === stage) out.push({ key: o.key, label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept });
+    if (o.stage === stage && o.active !== false) out.push({ key: o.key, label: o.label, reason: o.reason, nextAction: o.nextAction, kind: o.kind, dept: o.dept });
   }
   return out;
+}
+
+/**
+ * WHAT A MOVE MUST RECORD (founder, 2026-10-02: «remove the option to move an opportunity without
+ * recording an outcome»). The outcome belongs to the rung being LEFT, and its kind must agree with the
+ * direction — otherwise a deal dragged forward could carry «غير مهتم», and the stage report would print
+ * it as the reason the deal advanced:
+ *   · to the lost rung              -> "lost"         (the loss-reason dialog, which already insists)
+ *   · forward (a later position)    -> "advance"
+ *   · back, or sideways             -> "needs_action"
+ *   · OUT of a closed rung (reopen) -> null: a correction to a closed deal, not a stage of selling
+ * stages: [{ key, position, terminal }] — the live ladder.
+ */
+export function moveOutcomeKind(
+  fromStage: string, toStage: string,
+  stages: readonly { key: string; position: number; terminal?: string | null }[],
+): "advance" | "needs_action" | "lost" | null {
+  var from = null, to = null;
+  for (var i = 0; i < stages.length; i++) {
+    if (stages[i].key === fromStage) from = stages[i];
+    if (stages[i].key === toStage) to = stages[i];
+  }
+  if (!from || !to || fromStage === toStage) return null;
+  if (from.terminal) return null;
+  if (to.terminal === "lost") return "lost";
+  return to.position > from.position ? "advance" : "needs_action";
+}
+
+/** The outcomes a person may pick for this move: the rung being left, the kind the direction needs. */
+export function outcomesForMove(
+  fromStage: string, toStage: string,
+  stages: readonly { key: string; position: number; terminal?: string | null }[],
+): { key: string; label: string; reason: string; nextAction: string; kind: string; dept: string }[] {
+  var kind = moveOutcomeKind(fromStage, toStage, stages);
+  if (!kind) return [];
+  return outcomesForStage(fromStage).filter(function (o) { return o.kind === kind; });
+}
+
+/** The server's gate and the screen's: ok, or why not, in the words the screen shows. A loss close is
+ *  judged by the loss-reason rule (opp-work-domain.checkLossReason), not here. */
+export function checkMoveOutcome(
+  fromStage: string, toStage: string, outcomeKey: string | null | undefined,
+  stages: readonly { key: string; position: number; terminal?: string | null }[],
+): { ok: true; required: boolean } | { ok: false; code: string; message: string } {
+  var kind = moveOutcomeKind(fromStage, toStage, stages);
+  if (kind === null || kind === "lost") return { ok: true, required: false };
+  var offered = outcomesForMove(fromStage, toStage, stages);
+  if (!offered.length) {
+    return { ok: false, code: "no_outcomes_configured", message: kind === "advance"
+      ? "لا نتيجة «تقدّم» معرّفة لهذه المرحلة — أضفها من الإعدادات ← مراحل البيع ← النتائج"
+      : "لا نتيجة «يحتاج إجراء» معرّفة لهذه المرحلة — أضفها من الإعدادات ← مراحل البيع ← النتائج" };
+  }
+  if (!outcomeKey) return { ok: false, code: "outcome_required", message: "اختر نتيجة المرحلة قبل نقل الفرصة" };
+  for (var i = 0; i < offered.length; i++) if (offered[i].key === outcomeKey) return { ok: true, required: true };
+  return { ok: false, code: "outcome_not_for_move", message: kind === "advance"
+    ? "هذه النتيجة لا تُقدِّم الفرصة — اختر نتيجة «تقدّم» من المرحلة الحالية"
+    : "النقل إلى مرحلة سابقة يحتاج نتيجة «يحتاج إجراء» من المرحلة الحالية" };
 }
 
 const DOMAIN_FNS = [
   stageWeight, isTerminalStage, isStalled, weightedValue,
   riyadhFiscalPeriod, riyadhPeriodBounds, attainmentPct, coveragePct, periodElapsedFraction, ragKey, contactState,
   offListPct, offListRollup,
-  outcomeForStage, outcomesForStage,
+  outcomeForStage, outcomesForStage, moveOutcomeKind, outcomesForMove, checkMoveOutcome,
 ] as const;
 
 export const SALES_DOMAIN_JS: string = [

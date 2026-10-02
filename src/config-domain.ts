@@ -415,6 +415,54 @@ export function buildOrgTree(
 }
 
 // ---------------------------------------------------------------------------
+// «نتائج المراحل» — the outcomes each rung offers, configured by the admin (founder, 2026-10-02).
+// The KIND is the outcome's status: it decides whether a move forward (تقدّم), a move back or a hold
+// (يحتاج إجراء), or a close (خسارة) may carry it. The rung is fixed at creation — moving an outcome to
+// another rung would re-label history recorded under it.
+// ---------------------------------------------------------------------------
+
+export const OUTCOME_KINDS: readonly string[] = ["advance", "needs_action", "lost"];
+export const OUTCOME_KIND_LABELS: Readonly<Record<string, string>> = { advance: "تقدّم", needs_action: "يحتاج إجراء", lost: "خسارة" };
+
+export type OutcomeInput = { label?: unknown; reason?: unknown; nextAction?: unknown; kind?: unknown; dept?: unknown; active?: unknown };
+export type OutcomeAccepted = { ok: true; value: { label: string; reason: string; nextAction: string; kind: string; dept: string; active: boolean } };
+
+/** takenLabels: the labels already on THIS rung (two «مقبول» on one rung could not be told apart in a
+ *  picker; the same word on two rungs is fine). departments: the live list a next action may land on. */
+export function checkOutcome(input: OutcomeInput, takenLabels: readonly string[], departments: readonly string[], existingLabel?: string): OutcomeAccepted | Rejection {
+  const clean = function (v: unknown) { return String(v == null ? "" : v).replace(/\s+/g, " ").trim(); };
+  const label = clean(input.label), reason = clean(input.reason), nextAction = clean(input.nextAction), dept = clean(input.dept);
+  if (!label) return { ok: false, code: "invalid_label", reason: "اسم النتيجة مطلوب.", field: "label" };
+  if (label.length > 40) return { ok: false, code: "invalid_label", reason: "اسم النتيجة 40 حرفًا كحدٍّ أقصى.", field: "label" };
+  if (label !== existingLabel && takenLabels.indexOf(label) >= 0) return { ok: false, code: "label_exists", reason: "توجد نتيجة بهذا الاسم في المرحلة نفسها.", field: "label" };
+  const kind = String(input.kind == null ? "" : input.kind);
+  if (OUTCOME_KINDS.indexOf(kind) === -1) return { ok: false, code: "invalid_kind", reason: "الحالة: تقدّم أو يحتاج إجراء أو خسارة.", field: "kind" };
+  if (reason.length > 120) return { ok: false, code: "invalid_reason", reason: "السبب 120 حرفًا كحدٍّ أقصى.", field: "reason" };
+  if (!nextAction) return { ok: false, code: "invalid_next", reason: "الإجراء التالي مطلوب — هو ما يُطلب بعد هذه النتيجة.", field: "nextAction" };
+  if (nextAction.length > 120) return { ok: false, code: "invalid_next", reason: "الإجراء 120 حرفًا كحدٍّ أقصى.", field: "nextAction" };
+  if (dept && departments.indexOf(dept) === -1) return { ok: false, code: "invalid_dept", reason: "الإدارة المسؤولة غير معروفة.", field: "dept" };
+  return { ok: true, value: { label, reason, nextAction, kind, dept, active: input.active === undefined ? true : Boolean(input.active) } };
+}
+
+/** A seeded outcome is renamed or paused, never deleted; one already recorded on a deal is paused, so
+ *  the reports keep a label for what was recorded. */
+export function checkOutcomeDelete(isSystem: unknown, uses: unknown): { ok: true } | Rejection {
+  if (isSystem) return { ok: false, code: "system_outcome", field: "key", reason: "نتيجة أساسية — تُعدَّل أو تُوقف ولا تُحذف." };
+  if ((Number(uses) || 0) > 0) return { ok: false, code: "outcome_in_use", field: "key", reason: "سُجّلت هذه النتيجة على فرص — أوقفها بدل حذفها." };
+  return { ok: true };
+}
+
+/** A new outcome's key: ascii, global (lost_reason stores the key alone), never typed. */
+export function outcomeKeyFrom(stage: unknown, taken: readonly string[]): string {
+  const base = ("oc_" + String(stage == null ? "" : stage).toLowerCase().replace(/[^a-z0-9]+/g, "_")).slice(0, 24);
+  for (let i = 1; i < 1000; i++) {
+    const k = base + "_" + i;
+    if (taken.indexOf(k) === -1) return k;
+  }
+  return base + "_" + Date.now();
+}
+
+// ---------------------------------------------------------------------------
 // Escalation and support requests.
 // ---------------------------------------------------------------------------
 
@@ -479,6 +527,7 @@ const DOMAIN_FNS = [
   isStageSelectable, stageSlaState, isEmailShaped, checkMember, checkDivision,
   checkDivisionDelete, checkEscalation, checkOrgName, checkSegment, checkSegmentDelete,
   checkOrgSector, checkOrgSectorDelete, checkRole, roleKeyFrom, checkRoleDelete, buildOrgTree,
+  checkOutcome, checkOutcomeDelete,
 ] as const;
 
 export const CONFIG_DOMAIN_JS: string = [
@@ -499,6 +548,8 @@ export const CONFIG_DOMAIN_JS: string = [
   "var ORG_SECTOR_KINDS = " + JSON.stringify(ORG_SECTOR_KINDS) + ";",
   "var ORG_SECTOR_KIND_LABELS = " + JSON.stringify(ORG_SECTOR_KIND_LABELS) + ";",
   "var SYSTEM_ROLE_KEYS = " + JSON.stringify(SYSTEM_ROLE_KEYS) + ";",
+  "var OUTCOME_KINDS = " + JSON.stringify(OUTCOME_KINDS) + ";",
+  "var OUTCOME_KIND_LABELS = " + JSON.stringify(OUTCOME_KIND_LABELS) + ";",
   ...DOMAIN_FNS.map((fn) => fn.toString()),
 ].join("\n");
 
@@ -510,6 +561,7 @@ export function checkConfigDomainClosure(): string[] {
     "STAGE_LABEL_MAX", "STAGE_KEY_MAX", "SLA_DAYS_MAX", "TERMINAL_KEYS", "TEAM_ROLES",
     "TEAM_ROLE_LABELS", "ESCALATION_KINDS", "ESCALATION_LABELS", "ESCALATION_ROLES", "DELIVERY_LABELS",
     "NAME_MAX", "SEGMENT_KINDS", "SEGMENT_KIND_LABELS", "ORG_SECTOR_KINDS", "ORG_SECTOR_KIND_LABELS", "SYSTEM_ROLE_KEYS",
+    "OUTCOME_KINDS", "OUTCOME_KIND_LABELS",
   ];
   const names = DOMAIN_FNS.map((f) => f.name);
   const problems: string[] = [];

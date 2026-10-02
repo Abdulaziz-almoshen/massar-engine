@@ -408,6 +408,10 @@ export const PRODUCTS_CRM_CSS = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ds6 .px-ind .m-meter { block-size: 6px; margin-block-start: var(--m-1); }
 .ds6 .px-ind__i--ac .px-ind__v { color: var(--m-ac-deep); }
+.ds6 .px-ind__i--warn .px-ind__v { color: var(--m-warn); }
+/* Inside the «المؤشرات» tab: six tiles on three columns, so each figure gets room to read. */
+.ds6 .px-ind--tab { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 700px) { .ds6 .px-ind--tab { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .ds6 .px-ind { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .ds6 .px-ind { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* The list's summary: the strip sits flush inside a padding-less card, so the card's own border is
@@ -1263,44 +1267,72 @@ function pxOwnerSplit(name) {
           (r.v ? '<small class="px-qof"> · ' + pxMoney(r.v) + "</small>" : "") + "</span></div>";
     }).join("") + "</div></div>";
 }
+/* «المؤشرات» (founder, 2026-10-02: «Overview should have the indicators», and «نظرة عامة» repeated what
+   the record already showed — the five figures above the tabs and the open deals in the side panel).
+   This tab is now the ONE home of the product's indicators: the target and attainment figures moved
+   in from above the tabs, and what no other place shows was added — the win rate WITH its denominator,
+   the average won deal, the deals standing past their stage's commitment, and why this product loses.
+   Every figure is read from the same rows the board and «المستهدفات» use; none is computed a second way. */
 function pxPerfSection(p) {
   var name = p.product, perf = (pcPerf[pcPerfYear] || {})[name];
   if (!perf) {
-    return pxSection("performance", "الأداء", "من سجل الفرص", pcPerfFailed[pcPerfYear]
-      ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل الأداء.</span>' +
+    return pxSection("performance", "المؤشرات", "من سجل الفرص", pcPerfFailed[pcPerfYear]
+      ? '<div class="m-alert" role="alert"><span class="m-alert__d">تعذّر تحميل المؤشرات.</span>' +
         '<button type="button" class="m-btn" data-px="perfretry">أعد المحاولة</button></div>'
       : moSkeleton(3, ["w60", "w80", "w40"]));
   }
+  var lines = pxOppLines(name);
+  var open = lines.filter(function (o) { return isOpenStage(o.stage); });
+  var stalled = open.filter(function (o) { return typeof opStalled === "function" && opStalled(o); });
+  var won = Number(perf.wonLines) || 0, lost = Number(perf.lostLines) || 0, closed = won + lost;
+  var winPct = closed ? Math.round(won * 100 / closed) : null;
+  var avgWon = won ? Math.round((Number(perf.achieved) || 0) / won) : null;
   var cov = targetCoveragePct(perf.achieved, perf.annualTarget);
-  /* annualTarget is number|null and null means NO TARGET RECORDED, not a target of zero. The
-     sub-line says which, and no percentage is drawn over a denominator that does not exist. */
-  var b = '<div><p class="m-stat__k">المحقق ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' + pxMoney(perf.achieved) + "</p>" +
-    '<p class="m-stat__s">' + (perf.annualTarget === null || perf.annualTarget === undefined
-      ? mNil("بلا مستهدف سنوي", "owed")
-      : "من مستهدف " + pxMoney(perf.annualTarget) + (cov === null ? "" : " · " + mPct(cov)) +
-        (perf.targetQuarters < 4 ? " · مُدخل في " + pxNQtrN(perf.targetQuarters) + " من أربعة" : "")) + "</p></div>";
-  b += '<div class="m-segs m-segs--split">' + (perf.quarters || []).map(pxQuarterRow).join("") + "</div>";
-  b += '<div class="m-stats"><div><p class="m-stat__k">المفتوح الآن</p>' +
-    '<p class="m-stat__v">' + (perf.openValue ? pxMoney(perf.openValue) : mNil("لم تُسعَّر", "owed")) + "</p>" +
-    '<p class="m-stat__s">' + pxNLineN(perf.openLines) + (perf.unpricedOpenLines ? " · " + pxNLineN(perf.unpricedOpenLines) + " بلا تسعير" : "") + "</p></div>" +
-    '<div><p class="m-stat__k">مربوحة ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' +
-      (perf.wonLines ? pxNLineN(perf.wonLines) : mNil("لا بنود", "none")) + "</p></div>" +
-    '<div><p class="m-stat__k">خاسرة ' + pxYear(pcPerfYear) + '</p><p class="m-stat__v">' +
-      (perf.lostLines ? pxNLineN(perf.lostLines) : mNil("لا بنود", "none")) + "</p></div></div>";
+  var hasTarget = perf.annualTarget !== null && perf.annualTarget !== undefined;
+  var tile = function (cls, label, value, sub, meterPct) {
+    return '<div class="px-ind__i' + (cls ? " " + cls : "") + '"><span class="px-ind__k">' + label + "</span>" +
+      '<span class="px-ind__v">' + value + "</span>" + (sub ? '<span class="px-ind__s">' + sub + "</span>" : "") +
+      (meterPct === null || meterPct === undefined ? "" : '<span class="m-meter" style="--m-pct:' + Math.max(0, Math.min(100, meterPct)) + '%"><i></i></span>') + "</div>";
+  };
+  var b = '<div class="px-ind px-ind--tab">' +
+    tile("", "المستهدف السنوي " + pxYear(pcPerfYear), hasTarget ? pxMoney(perf.annualTarget) : mNil("بلا مستهدف مسجّل", "owed"),
+      hasTarget ? (perf.targetQuarters < 4 ? "مُدخل في " + pxNQtrN(perf.targetQuarters) + " من أربعة" : "الأرباع الأربعة") : "يُحدَّد من «المستهدفات»") +
+    tile("", "المحقق", pxMoney(perf.achieved), won ? "من " + pxNLineN(won) + " رابحة" : mNil("لا صفقات رابحة بعد", "none")) +
+    tile(cov !== null && cov >= 100 ? "px-ind__i--ac" : "", "نسبة الإنجاز", cov === null ? mNil("بلا مستهدف", "owed") : mPct(cov),
+      cov === null ? "لا نسبة بلا مستهدف" : "من المستهدف", cov) +
+    tile("", "معدل الفوز", winPct === null ? mNil("لا صفقات مغلقة", "none") : mPct(winPct),
+      closed ? pxNLineN(won) + " من " + pxNLineN(closed) + " مغلقة" : "يُحسب من الرابحة والخاسرة", winPct) +
+    tile("", "متوسط الصفقة الرابحة", avgWon === null ? mNil("لا صفقات رابحة", "none") : pxMoney(avgWon), avgWon === null ? "" : "المحقق ÷ عدد الرابحة") +
+    tile(stalled.length ? "px-ind__i--warn" : "", "متوقفة عن المهلة", stalled.length ? mN(stalled.length) : mNil("لا شيء متأخر", "none"),
+      open.length ? "من " + pxNLineN(open.length) + " مفتوحة" : mNil("لا بنود مفتوحة", "none")) +
+    "</div>";
+  b += '<div><p class="m-stat__k">الإنجاز ربعًا بربع</p><div class="m-segs m-segs--split">' + (perf.quarters || []).map(pxQuarterRow).join("") + "</div></div>";
   b += pxStageSplit(name);
+  b += pxLossReasons(lines);
   b += pxOwnerSplit(name);
-  var open = pxOpenLines(name).slice().sort(function (a, b2) { return opValue(b2) - opValue(a); }).slice(0, 3);
-  if (open.length) {
-    b += '<div><p class="m-stat__k">أعلى الفرص المفتوحة</p>' + open.map(function (o) {
-      return '<a class="m-item" href="#opps/' + fmtId(o.id) + '"><span class="m-item__b">' +
-        '<span class="m-item__n">' + esc(o.account_name) + "</span>" +
-        '<span class="m-item__s">' + esc(opStage(o.stage).label) + "</span></span>" +
-        '<span class="m-item__v">' + (opPriced(o) ? pxMoney(opValue(o)) : mNil("لم تُسعَّر", "owed")) + "</span></a>";
-    }).join("") + "</div>" +
-      '<div class="px-acts"><button type="button" class="m-btn m-btn--quiet" data-px="goopps" data-nm="' + esc(name) + '">كل فرص المنتج &#8592;</button></div>';
-  }
-  b += '<p class="m-meta">القيمة الإجمالية للعقد — أساس المستهدف لم يُقَرّ بعد.</p>';
-  return pxSection("performance", "الأداء", "من سجل الفرص", b);
+  b += '<p class="m-meta">القيمة الإجمالية للعقد — أساس المستهدف لم يُقَرّ بعد. الفرص نفسها في «فرص البيع» والقائمة الجانبية.</p>';
+  return pxSection("performance", "المؤشرات", "من سجل الفرص", b);
+}
+/* Why this product loses: the reason recorded on each lost line, counted. A line closed before reasons
+   were mandatory has none, and says so rather than disappearing from the total. */
+function pxLossReasons(lines) {
+  var lostL = lines.filter(function (o) { return typeof isLostStage === "function" && isLostStage(o.stage); });
+  if (!lostL.length) return '<div><p class="m-stat__k">أسباب الخسارة</p><p class="m-meta">' + mNil("لا بنود خاسرة لهذا المنتج", "none") + "</p></div>";
+  var by = {}, order = [];
+  lostL.forEach(function (o) {
+    var k = o.lost_reason || "";
+    if (!(k in by)) { by[k] = 0; order.push(k); }
+    by[k]++;
+  });
+  order.sort(function (a, c) { return by[c] - by[a]; });
+  var max = by[order[0]];
+  return '<div><p class="m-stat__k">أسباب الخسارة <span class="m-meta">· ' + pxNLineN(lostL.length) + "</span></p>" +
+    order.map(function (k) {
+      var label = k ? ((typeof LOSS_REASON_LABELS !== "undefined" && LOSS_REASON_LABELS[k]) || k) : "بلا سبب مسجّل";
+      return '<div class="m-seg-row"><span class="m-seg-row__t">' + esc(label) + "</span>" +
+        '<span class="m-meter" style="--m-pct:' + Math.round(by[k] * 100 / max) + '%"><i></i></span>' +
+        '<span class="m-n">' + fmtN(by[k]) + "</span></div>";
+    }).join("") + "</div>";
 }
 function pxPricingSection(p) {
   var name = p.product, b = "";
@@ -1569,59 +1601,6 @@ function pxRenameModal() {
   return h + "</div></div></div>";
 }
 
-/* Every live product, current one held. Archived ones are left out: this rail is for moving between
-   the products someone is actually working. */
-function pxSwitcher(p) {
-  var live = (pcCat || []).filter(function (x) { return !x.archived; });
-  if (live.length < 2) return "";
-  return '<div class="px-sw" role="group" aria-label="التنقل بين المنتجات">' + live.map(function (x) {
-    var on = x.product === p.product;
-    return '<a class="m-btn" href="#product/' + pxEnc(x.product) + '"' + (on ? ' aria-current="page"' : "") + ">" + esc(x.product) + "</a>";
-  }).join("") + "</div>";
-}
-
-/* The four figures a product manager opens this record for. Target and achieved come from
-   /admin/sales/quarters (the same read «المستهدفات» uses), the open book from the board, and the
-   readiness from the knowledge score — no figure is computed a second way here. */
-function pxHero(p, rd) {
-  var q = null;
-  var rows = (typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.byProduct) || [];
-  for (var i = 0; i < rows.length; i++) if (rows[i].product === p.product) q = rows[i];
-  var target = q ? Number(q.annualTarget) || 0 : 0;
-  var achieved = q ? Number(q.achieved) || 0 : 0;
-  var pct = typeof wholePct === "function" ? wholePct(attainmentPct(achieved, target)) : null;
-  var lines = ((typeof oppRows !== "undefined" && oppRows) ? oppRows : []).filter(function (l) { return l.product === p.product; });
-  var open = lines.filter(function (l) { return typeof opIsOpen === "function" ? opIsOpen(l) : false; });
-  var openValue = typeof opSumLive === "function" ? opSumLive(open) : 0;
-  var ks = p.knowledgeScore || null;
-  var score = ks && typeof ks.score === "number" ? ks.score : null;
-  /* annualTarget is number|null. null means NO TARGET RECORDED, which is not a target of zero, so
-     the tile prints what is owed rather than «0 ر.س» — and the attainment tile beside it prints no
-     percentage at all, because there is no denominator for it to be a percentage OF. */
-  var hasTarget = !!q && q.annualTarget !== null && q.annualTarget !== undefined;
-  var tile = function (cls, label, value, sub, meter) {
-    return '<div class="px-ind__i' + (cls ? " " + cls : "") + '"><span class="px-ind__k">' + label + "</span>" +
-      '<span class="px-ind__v">' + value + "</span>" +
-      (sub ? '<span class="px-ind__s">' + sub + "</span>" : "") + (meter || "") + "</div>";
-  };
-  var meter = function (v) {
-    return '<span class="m-meter" style="--m-pct:' + Math.max(0, Math.min(100, v)) + '%"><i></i></span>';
-  };
-  return '<div class="px-ind">' +
-    tile("", "المستهدف السنوي", hasTarget ? pxMoney(target) : mNil("بلا مستهدف مسجّل", "owed"),
-      hasTarget ? pxYear((typeof pcQuarters !== "undefined" && pcQuarters && pcQuarters.year) || new Date().getFullYear())
-        : "يُحدَّد من «المستهدفات»", "") +
-    tile("", "المحقق", pxMoney(achieved), "من الصفقات الرابحة", "") +
-    tile(pct === null ? "" : pct >= 100 ? "px-ind__i--ac" : "", "نسبة الإنجاز",
-      pct === null ? mNil("بلا مستهدف", "owed") : mPct(pct),
-      pct === null ? "لا نسبة بلا مستهدف" : "من المستهدف", pct === null ? "" : meter(pct)) +
-    tile("", "الفرص المفتوحة", mN(open.length),
-      open.length ? pxMoney(openValue) : mNil("لا بنود مفتوحة", "none"), "") +
-    tile("", "جاهزية المساعد",
-      score === null ? mNil("لم تُقَس", "unset") : mPct(score),
-      esc(rd && rd.word ? rd.word : ""), score === null ? "" : meter(score)) +
-    "</div>";
-}
 
 /* ===================== the record's tabs ===================== */
 /* The deep-link segment a tab answers to. The four keys are RESERVED_SECTIONS, so an old link
@@ -1635,7 +1614,7 @@ function pxTabsFor(p) {
   var perf = (pcPerf[pcPerfYear] || {})[p.product];
   var blank = perf && typeof perf.targetQuarters === "number" ? 4 - perf.targetQuarters : 0;
   return [
-    { k: "overview", l: "نظرة عامة", n: "", warn: false },
+    { k: "overview", l: "المؤشرات", n: "", warn: false },
     /* The founder's note: «معرفة المنتج» belongs inside the record, not only in the door beside it. */
     { k: "knowledge", l: "معرفة المنتج", n: score === null ? "" : mPct(score), warn: !!(ks && !ks.ready) },
     { k: "pricing", l: "الأسعار والباقات", n: pkgs ? mN(pkgs) : "", warn: !pkgs && !(p.pricingNote || "") },
@@ -1776,7 +1755,10 @@ function vProductDrill(name, section) {
       : '<button type="button" role="menuitem" data-px="rename">إعادة تسمية</button>' + (p.archived ? '<button type="button" role="menuitem" data-px="restore">استعادة المنتج</button>' : '<button type="button" role="menuitem" data-px="archivejump">أرشفة المنتج</button>')) + "</div>";
   }
   h += "</div></header>";
-  h += pxSwitcher(p) + pxReadinessBandHtml(p) + pxHero(p, rd) + pxTabStrip(p);
+  /* No switcher across the other products (founder, 2026-10-02: «remove other products tabs when I'm
+     inside the product») — «← كل المنتجات» is the way out. And no figure row above the tabs: those
+     figures are the «المؤشرات» tab now, so they are said once. */
+  h += pxReadinessBandHtml(p) + pxTabStrip(p);
 
   /* One tab is painted at a time. Each pane is the tablist's panel, so a screen reader moving off
      the tab lands in the section it names. */

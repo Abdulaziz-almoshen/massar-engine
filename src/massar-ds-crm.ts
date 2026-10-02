@@ -512,10 +512,14 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-seg-bar i.on{background:var(--m-ac)}
 .ds6 .m-seg-bar b{inline-size:16px;block-size:16px;border-radius:50%;background:var(--m-paper);
              box-shadow:0 0 0 3px var(--m-ac),0 1px 3px rgba(16,24,40,.2);flex:0 0 auto}
-.ds6 .m-board{display:flex;gap:var(--m-3);align-items:flex-start;overflow-x:auto;
+/* THE WHOLE COLUMN IS THE DROP ZONE (founder, 2026-10-02). Columns used to align to the top and end
+   at their last card, so a drop in the empty space under them landed on the board, not the stage. They
+   stretch to the tallest column now, with a floor, and the body fills what is left. */.ds6 .m-board{display:flex;gap:var(--m-3);align-items:stretch;overflow-x:auto;
          padding-block-end:var(--m-2)}
-.ds6 .m-col{inline-size:252px;flex:0 0 auto;display:flex;flex-direction:column;
-       background:var(--m-page);border-radius:var(--m-r-ctl);padding:var(--m-3)}
+.ds6 .m-col{inline-size:300px;flex:0 0 auto;display:flex;flex-direction:column;
+       min-block-size:min(560px, 70vh);
+       background:var(--m-page);border-radius:var(--m-r-ctl);padding:var(--m-3);
+       transition:background-color var(--m-out) var(--m-ease),box-shadow var(--m-out) var(--m-ease)}
 .ds6 .m-col__t{display:flex;align-items:center;gap:var(--m-2);margin-block-end:var(--m-1)}
 .ds6 .m-col__dot{inline-size:8px;block-size:8px;border-radius:50%;flex:0 0 auto;
             background:var(--m-tone,var(--m-idle))}
@@ -525,14 +529,24 @@ export const MASSAR_DS_CSS = `
           box-shadow:var(--m-hair);font-variant-numeric:tabular-nums}
 .ds6 .m-col__v{font-size:var(--m-t-cap);color:var(--m-mut);padding-inline-start:16px;
           margin-block-end:var(--m-2);font-variant-numeric:tabular-nums}
-.ds6 .m-col__b{display:flex;flex-direction:column;gap:var(--m-2)}
+.ds6 .m-col__b{display:flex;flex-direction:column;gap:var(--m-3);flex:1 1 auto}
+/* While a card is being dragged every column says it can take it; the one under the pointer says so
+   loudest. A drop target nobody can see is the defect this replaced. */.ds6 .m-board.is-dragging .m-col{box-shadow:inset 0 0 0 1px var(--m-line-2)}
+.ds6 .m-board.is-dragging .m-col.over{background:var(--m-ac-dim);box-shadow:inset 0 0 0 2px var(--m-ac)}
+.ds6 .m-col__drop{display:none;margin-block-start:auto;padding:var(--m-3);border-radius:var(--m-r-ctl);
+             border:1.5px dashed var(--m-ac);color:var(--m-ac-deep);font-size:var(--m-t-cap);
+             font-weight:600;text-align:center}
+.ds6 .m-board.is-dragging .m-col.over .m-col__drop{display:block}
 .ds6 .m-col--rail{inline-size:44px;cursor:pointer;align-self:stretch}
 .ds6 .m-col--rail .m-col__b, .ds6 .m-col--rail .m-col__v{display:none}
 .ds6 .m-col--rail .m-col__t{flex-direction:column;gap:var(--m-3);margin:0}
 .ds6 .m-col--rail .m-col__n{writing-mode:vertical-rl;transform:rotate(180deg);
             white-space:nowrap;flex:0 0 auto;font-size:var(--m-t-cap);color:var(--m-mut)}
 @media (hover:hover) and (pointer:fine){.ds6 .m-col--rail:hover{background:var(--m-sunk)}}
-.ds6 .m-deal{background:var(--m-paper);border-radius:var(--m-r-ctl);padding:var(--m-3);
+/* A larger card (founder, 2026-10-02: «use more space and display the key information more clearly»):
+   300px columns, 16px padding, the account at 15/700, the value at 20/700, and two more facts — how
+   long the deal has stood on this stage, and its next step. */.ds6 .m-deal{background:var(--m-paper);border-radius:var(--m-r-ctl);padding:var(--m-4);
+        display:flex;flex-direction:column;gap:var(--m-2);
         box-shadow:var(--m-low);cursor:grab;
         transition:box-shadow var(--m-out) var(--m-ease),transform var(--m-press) var(--m-ease)}
 @media (hover:hover) and (pointer:fine){.ds6 .m-deal:hover{box-shadow:var(--m-lift)}}
@@ -540,11 +554,16 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-deal:focus-visible{outline:none;box-shadow:var(--m-focus),var(--m-low)}
 .ds6 .m-deal__n{font-size:var(--m-t-body);font-weight:700;color:var(--m-ink);
            display:flex;align-items:center;justify-content:space-between;gap:var(--m-2)}
-.ds6 .m-deal__p{font-size:var(--m-t-cap);color:var(--m-mut);margin-block-start:2px}
+.ds6 .m-deal__p{font-size:var(--m-t-cap);color:var(--m-mut)}
 .ds6 .m-deal__f{display:flex;align-items:center;justify-content:space-between;
-           gap:var(--m-2);margin-block-start:var(--m-2)}
-.ds6 .m-deal__v{font-size:var(--m-t-sub);font-weight:700;color:var(--m-ink);
+           gap:var(--m-2);padding-block-start:var(--m-2);border-block-start:1px solid var(--m-line)}
+.ds6 .m-deal__v{font-size:20px;line-height:28px;font-weight:700;color:var(--m-ink);
            font-variant-numeric:tabular-nums}
+.ds6 .m-deal__x{display:flex;align-items:center;justify-content:space-between;gap:var(--m-2);
+           font-size:var(--m-t-micro);color:var(--m-mut)}
+.ds6 .m-deal__s{font-size:var(--m-t-cap);color:var(--m-ink-2);line-height:20px;
+           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ds6 .m-deal__s b{font-weight:600;color:var(--m-mut)}
 .ds6 .m-deal__v--nil{font-size:var(--m-t-cap);font-weight:600;color:var(--m-warn)}
 .ds6 .m-deal__age{font-size:var(--m-t-micro);color:var(--m-faint);font-variant-numeric:tabular-nums}
 .ds6 .m-deal__age--old{color:var(--m-warn);font-weight:600}
@@ -813,8 +832,8 @@ export const MASSAR_DS_CSS = `
 .ds6 a.m-item:focus-visible{outline:none;box-shadow:var(--m-focus);border-radius:var(--m-r-ctl)}
 .ds6 .m-item__b{display:block}
 .ds6 .m-item__n, .ds6 .m-item__s{display:block}
-.ds6 .m-board{align-items:flex-start}
-.ds6 .m-col{align-self:flex-start}
+.ds6 .m-board{align-items:stretch}
+.ds6 .m-col{align-self:stretch}
 .ds6 .m-col--rail{align-self:stretch;min-block-size:150px}
 .ds6 .m-side__n, .ds6 .m-side__r{display:block}
 .ds6 .m-crumb a{color:inherit;text-decoration:none}

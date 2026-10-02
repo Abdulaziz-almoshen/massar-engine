@@ -14,14 +14,26 @@ import { STAGE_OUTCOMES } from "./sales-domain.js";
  *  vocabulary: «الخسائر حسب السبب» reads these keys from the stage ledger, whether a rep recorded the
  *  outcome from /rep or an admin closed the line on the board). The label drops the «خسارة – » prefix
  *  because the dialog's title already says it. */
-export const LOSS_REASONS: readonly { key: string; label: string; hint: string }[] = STAGE_OUTCOMES
-  .filter((o) => o.stage === "lost")
-  .map((o) => ({ key: o.key, label: o.label.replace(/^خسارة\s*[–-]\s*/, ""), hint: o.reason }));
+export const LOSS_REASONS: { key: string; label: string; hint: string }[] = [];
 
 /** Every key a stored lost_reason may carry and its label: the admin picker's set plus the lost-kind
  *  outcomes a rep records on earlier rungs («غير مهتم», «فشل التكامل»…), which also close a line. */
-export const LOSS_REASON_LABELS: Readonly<Record<string, string>> = Object.fromEntries(
-  STAGE_OUTCOMES.filter((o) => o.kind === "lost").map((o) => [o.key, o.label.replace(/^خسارة\s*[–-]\s*/, "")]));
+export const LOSS_REASON_LABELS: Record<string, string> = {};
+
+/** Rebuilt IN PLACE from the live outcome list (sales-domain.setLiveOutcomes) — the admin edits the
+ *  «lost» rung's outcomes in Settings, and the close dialog and the loss report must follow. Paused
+ *  reasons leave the picker but keep their label, so a deal lost under one still reads correctly. */
+export function refreshLossReasons(): void {
+  LOSS_REASONS.length = 0;
+  for (const k of Object.keys(LOSS_REASON_LABELS)) delete LOSS_REASON_LABELS[k];
+  for (const o of STAGE_OUTCOMES) {
+    if (o.kind !== "lost") continue;
+    const label = o.label.replace(/^خسارة\s*[–-]\s*/, "");
+    LOSS_REASON_LABELS[o.key] = label;
+    if (o.stage === "lost" && o.active !== false) LOSS_REASONS.push({ key: o.key, label, hint: o.reason });
+  }
+}
+refreshLossReasons();
 
 export const LOSS_OTHER_KEY = "lost_other";
 export const LOSS_NOTE_MAX = 300;
