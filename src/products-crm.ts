@@ -1088,15 +1088,16 @@ function pxSheetHtml() {
   h += '<div class="m-dlg__b">';
   h += '<section><h3 class="m-label">المنتج</h3><div class="m-form">' +
     '<div class="full">' + fld("pxs_name", "اسم المنتج", "name", d.name, { max: 60, req: true }, "مثال: سجل التطعيمات الوطني", nameErr) + "</div>" +
-    '<div class="m-field"><label class="m-label" for="pxs_sector">القطاع</label>' +
-    '<select class="m-select" id="pxs_sector" data-pxsheet="sectorId"><option value="">بلا قطاع</option>' +
-    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(d.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") +
-    "</select></div>" +
+    '<div class="m-field"><label class="m-label" for="pxs_sector_t">القطاع</label>' +
+    mCombo({ id: "pxs_sector", value: d.sectorId == null ? "" : String(d.sectorId), label: "القطاع", wide: true,
+      options: [{ v: "", l: "بلا قطاع" }].concat(pcSectorList.map(function (s) { return { v: String(s.id), l: s.name }; })),
+      attrs: ' data-pxsheet="sectorId"' }) + "</div>" +
     /* THE OWNING UNIT, at birth rather than on a return visit. */
     /* Grouped under each department's SECTOR (2026-10-01): the organisation comes from «إعدادات المنظمة». */
-    '<div class="m-field"><label class="m-label" for="pxs_division">الإدارة المسؤولة</label>' +
-    '<select class="m-select" id="pxs_division" data-pxsheet="divisionId"><option value="">بلا إدارة</option>' +
-    ocDivisionOptions(d.divisionId) + "</select></div>" +
+    '<div class="m-field"><label class="m-label" for="pxs_division_t">الإدارة المسؤولة</label>' +
+    mCombo({ id: "pxs_division", value: d.divisionId == null ? "" : String(d.divisionId), options: ocDivisionChoices("بلا إدارة"),
+      label: "الإدارة المسؤولة", wide: true, search: true, empty: "لا إدارات بعد — تُضاف من «إعدادات المنظمة»",
+      attrs: ' data-pxsheet="divisionId"' }) + "</div>" +
     /* ONE NAME FOR ONE FIELD. This drawer said «المسؤول» and the record said «مدير المنتج» for
        the same column, so the two screens read as though they held different people. */
     '<div class="m-field"><label class="m-label" for="pxs_owner">مدير المنتج</label>' +
@@ -1678,18 +1679,21 @@ function pxMetaSection(p) {
   var name = p.product, may = pxMayEditKb() && !p.archived;
   var dis = may ? "" : " disabled";
   var b = '<div class="m-form">';
-  b += '<div class="m-field"><label class="m-label" for="pxf_sector">القطاع</label>' +
-    '<select class="m-select" id="pxf_sector" aria-describedby="pxf_sector_st" data-pxfield="sectorId"' + dis + '><option value="">بلا قطاع</option>' +
-    pcSectorList.map(function (s) { return '<option value="' + s.id + '"' + (String(p.sectorId) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+  /* The design system's Select (combobox-crm.ts), like every dropdown on this record. */
+  b += '<div class="m-field"><label class="m-label" for="pxf_sector_t">القطاع</label>' +
+    mCombo({ id: "pxf_sector", value: p.sectorId == null ? "" : String(p.sectorId), label: "القطاع", wide: true, disabled: !!dis,
+      options: [{ v: "", l: "بلا قطاع" }].concat(pcSectorList.map(function (s) { return { v: String(s.id), l: s.name }; })),
+      attrs: ' aria-describedby="pxf_sector_st" data-pxfield="sectorId"' }) +
     '<span class="px-acts">' + (p.sectorAssumed ? '<span class="m-chip m-chip--warn" title="القطاع مُستنتَج؛ اختيار قيمة يؤكده">مُستنتَج</span>' : "") + pxStatusSlot(name + "|sectorId", "pxf_sector") + "</span></div>";
   if (typeof cfDivs !== "undefined" && cfDivs.length) {
     /* Requirement 7 (2026-10-01): the product is assigned to a department picked under its sector, and
        the record says who that makes responsible. The organisation is edited in «إعدادات المنظمة», never here. */
     var resp = ocResponsibleFor(p.divisionId);
-    b += '<div class="m-field"><label class="m-label" for="pxf_division">الإدارة المسؤولة</label>' +
-      '<select class="m-select" id="pxf_division" aria-describedby="pxf_division_st" data-pxfield="divisionId"' + dis + '><option value="">بلا إدارة</option>' +
-      ocDivisionOptions(p.divisionId) +
-      '</select><span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span>" +
+    b += '<div class="m-field"><label class="m-label" for="pxf_division_t">الإدارة المسؤولة</label>' +
+      mCombo({ id: "pxf_division", value: p.divisionId == null ? "" : String(p.divisionId), options: ocDivisionChoices("بلا إدارة"),
+        label: "الإدارة المسؤولة", wide: true, search: true, disabled: !!dis, empty: "لا إدارات بعد — تُضاف من «إعدادات المنظمة»",
+        attrs: ' aria-describedby="pxf_division_st" data-pxfield="divisionId"' }) +
+      '<span class="px-acts">' + pxStatusSlot(name + "|divisionId", "pxf_division") + "</span>" +
       (resp ? '<span class="m-hint">' + esc(resp) + "</span>" : "") + "</div>";
   }
   var ov = pxFState[name + "|owner"] && pxFState[name + "|owner"].s !== "saved" ? pxFState[name + "|owner"].v : (p.owner || "");

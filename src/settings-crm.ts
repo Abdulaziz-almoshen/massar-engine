@@ -162,10 +162,17 @@ function cfInput(id, label, value, extra, hint) {
     (extra && extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : "") + cfFieldErr(extra && extra.k) + ">" +
     (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
 }
-function cfSelect(id, label, k, value, opts, hint) {
-  return '<div class="m-field"><label class="m-label" for="' + id + '">' + label + '</label><select class="m-select" id="' + id + '" data-cfset="' + k + '">' +
-    opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (String(value) === String(o[0]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") +
-    "</select>" + (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
+/* Every dropdown on the settings screens is the design system's Select / Combobox (combobox-crm.ts,
+   after coss ui) — never the browser's native select, which looked like another product beside
+   .m-input and could not search, group or carry a second line. opts: [value, label, sub?, group?].
+   cfg: { empty (what an empty list says), search (force the mode) }. */
+function cfSelect(id, label, k, value, opts, hint, cfg) {
+  var c = cfg || {};
+  return '<div class="m-field"><label class="m-label" for="' + id + '_t">' + label + "</label>" +
+    mCombo({ id: id, value: value == null ? "" : String(value), label: label, wide: true, search: c.search, empty: c.empty,
+      options: opts.map(function (o) { return { v: o[0], l: o[1], s: o[2] || "", g: o[3] || "" }; }),
+      attrs: ' data-cfset="' + k + '"' + cfFieldErr(k) }) +
+    (hint ? '<span class="m-hint">' + hint + "</span>" : "") + "</div>";
 }
 /* DELETE IS A HOLD, like every other destructive control in this product (DESIGN.md 8.5): one
    click must not remove a stage, a division or a person. And it is only OFFERED where it would

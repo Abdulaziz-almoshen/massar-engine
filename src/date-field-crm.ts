@@ -206,7 +206,12 @@ if (!window.__mDp) {
     }
     if (t.closest("[data-dp-clear]")) { dpSet(dpOpen, "", ""); dpLabel(dpOpen); dpClose(); return; }
     /* A click inside the popover's own comboboxes is theirs, not a dismissal. */
-    if (!t.closest(".m-dp")) dpClose();
+    /* The combobox popup now lives in #m-cb-layer on <body> while open, so a click on a month row
+       is outside .m-dp in the DOM but inside the picker in the user's eyes. */
+    /* And a target a repaint already removed (picking a month repaints the grid under the click) is
+       no longer anywhere — it is not a click outside. */
+    if (!document.body.contains(t)) return;
+    if (!t.closest(".m-dp") && !t.closest("#m-cb-layer")) dpClose();
   });
 
   /* The month and the year come back as a change on the combobox's hidden input. */

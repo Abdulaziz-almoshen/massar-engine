@@ -21,48 +21,10 @@
 //
 // No backticks in this file (gate: check-crm-literals).
 
+/* The hierarchy's CSS is a design-system component now: massar-ds/massar.css («THE HIERARCHY»),
+   ported into massar-ds-crm.ts by scripts/port-ds.py. Nothing screen-private is left. */
 export const ORG_CRM_CSS = `
-.ds6 .oc { display:flex; flex-direction:column; gap:var(--m-4); }
-.ds6 .oc-tbl { min-inline-size: 720px; }
-.ds6 .oc-tbl th.num, .ds6 .oc-tbl td.num { text-align:end; }
-.ds6 .oc-sub { display:block; font-size:var(--m-t-cap); color:var(--m-mut); }
-.ds6 .oc-note { padding:var(--m-4) var(--m-5); margin:0; }
-
-/* ---- the hierarchy ----
-   A sector is a card; inside it, each level is indented on the inline-start side and hangs off a
-   1px rail, so parent → child reads as a line you can follow, not as nesting depth you count. */
-.ds6 .oc-tree { display:flex; flex-direction:column; gap:var(--m-3); }
-.ds6 .oc-sec { padding:0; overflow:hidden; }
-.ds6 .oc-sec > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--m-3);
-  flex-wrap:wrap; padding:var(--m-4) var(--m-5); }
-.ds6 .oc-sec > summary::-webkit-details-marker { display:none; }
-.ds6 .oc-sec > summary:focus-visible { outline:none; box-shadow:inset var(--m-focus); border-radius:var(--m-r-card); }
-/* The disclosure mark points at the content (down) when open and at the reading direction's start
-   when closed. In RTL «start» is the right, so a closed chevron points left — into the line. */
-.ds6 .oc-chev { inline-size:16px; block-size:16px; flex:none; color:var(--m-mut); }
-.ds6 .oc-chev svg { inline-size:16px; block-size:16px; stroke:currentColor; stroke-width:2; fill:none; display:block; }
-.ds6 .oc-sec:not([open]) .oc-chev svg { transform:rotate(90deg); }
-.ds6 .oc-lvl { font-size:var(--m-t-micro); color:var(--m-mut); font-weight:600; }
-.ds6 .oc-name { font-size:var(--m-t-sub); font-weight:700; color:var(--m-ink); }
-.ds6 .oc-mgr { display:inline-flex; align-items:center; gap:6px; font-size:var(--m-t-cap); color:var(--m-ink-2, var(--m-ink)); }
-.ds6 .oc-mgr i { font-style:normal; color:var(--m-mut); }
-.ds6 .oc-sp { flex:1; }
-.ds6 .oc-body { border-block-start:1px solid var(--m-line); padding:var(--m-3) var(--m-5) var(--m-4); display:flex; flex-direction:column; gap:var(--m-2); }
-.ds6 .oc-dept { position:relative; margin-inline-start:var(--m-4); padding-inline-start:var(--m-4);
-  border-inline-start:1px solid var(--m-line); padding-block:var(--m-2); }
-.ds6 .oc-dept__h { display:flex; align-items:center; gap:var(--m-3); flex-wrap:wrap; }
-.ds6 .oc-dept__h .oc-name { font-size:var(--m-t-body); }
-.ds6 .oc-mem { list-style:none; margin:var(--m-2) 0 0; padding:0; margin-inline-start:var(--m-4);
-  padding-inline-start:var(--m-4); border-inline-start:1px dashed var(--m-line);
-  display:flex; flex-direction:column; gap:2px; }
-.ds6 .oc-mem li { display:flex; align-items:baseline; gap:var(--m-2); font-size:var(--m-t-cap); color:var(--m-ink); min-block-size:28px; padding-block:3px; flex-wrap:wrap; }
-.ds6 .oc-mem li .oc-role { color:var(--m-mut); }
-.ds6 .oc-mem li.is-off { color:var(--m-mut); }
-.ds6 .oc-orphans .oc-body { border-block-start:0; }
-@media (max-width: 700px) {
-  .ds6 .oc-dept, .ds6 .oc-mem { margin-inline-start:var(--m-2); padding-inline-start:var(--m-3); }
-  .ds6 .oc-sec > summary, .ds6 .oc-body { padding-inline:var(--m-4); }
-}
+/* (empty — see massar.css «THE HIERARCHY») */
 `;
 
 export const ORG_CRM_JS = `
@@ -85,23 +47,31 @@ function ocSector(id) { return (cfOrgSecs || []).filter(function (s) { return St
 function ocSegment(id) { return (cfSegs || []).filter(function (s) { return String(s.id) === String(id); })[0] || null; }
 function ocRole(key) { return (cfRoles || []).filter(function (r) { return r.key === key; })[0] || null; }
 function ocChip(on, onT, offT) { return on ? '<span class="m-chip m-chip--ok">' + onT + "</span>" : '<span class="m-chip">' + offT + "</span>"; }
+/* People, with their role as the row's second line and grouped by department, so a long directory
+   is searched by name and scanned by unit. */
 function ocMemberOpts(emptyLabel) {
-  return [["", emptyLabel]].concat(cfTeam.filter(function (m) { return m.active; }).map(function (m) { return [String(m.id), m.name + " · " + cfRoleLabel(m.role)]; }));
+  return [["", emptyLabel]].concat(cfTeam.filter(function (m) { return m.active; }).map(function (m) {
+    return [String(m.id), m.name, cfRoleLabel(m.role), m.division || "بلا إدارة"];
+  }).sort(function (a, b) { return a[3] === b[3] ? 0 : a[3] === "بلا إدارة" ? 1 : b[3] === "بلا إدارة" ? -1 : a[3].localeCompare(b[3], "ar"); }));
 }
+/* A directory grows: people pickers are always the searchable Combobox, whatever today's count. */
+var OC_NO_PEOPLE = { empty: "لا موظفين مسجّلين بعد — أضفهم من «الموظفون»", search: true };
 
 /* ---- for the product record (requirement 7): a department picked UNDER its sector, and who that
    makes responsible. Read here, rendered there; the product screen never edits the organisation. */
-function ocDivisionOptions(selectedId) {
-  var sel = function (d) { return '<option value="' + d.id + '"' + (String(selectedId) === String(d.id) ? " selected" : "") + ">" + esc(d.name) + "</option>"; };
+/* Departments as Select / Combobox options, grouped under their sector. */
+function ocDivisionChoices(noneLabel) {
   var divs = (typeof cfDivs !== "undefined" && cfDivs) || [];
-  var h = "";
+  var out = [{ v: "", l: noneLabel || "بلا إدارة" }];
   (cfOrgSecs || []).forEach(function (s) {
-    var under = divs.filter(function (d) { return d.sectorId === s.id; });
-    if (under.length) h += '<optgroup label="' + esc(s.name) + '">' + under.map(sel).join("") + "</optgroup>";
+    divs.filter(function (d) { return d.sectorId === s.id; }).forEach(function (d) {
+      out.push({ v: String(d.id), l: d.name, s: d.ownerName ? "مديرها " + d.ownerName : "", g: s.name });
+    });
   });
-  var loose = divs.filter(function (d) { return d.sectorId == null || !ocSector(d.sectorId); });
-  if (loose.length) h += (h ? '<optgroup label="بلا قطاع">' : "") + loose.map(sel).join("") + (h ? "</optgroup>" : "");
-  return h;
+  divs.filter(function (d) { return d.sectorId == null || !ocSector(d.sectorId); }).forEach(function (d) {
+    out.push({ v: String(d.id), l: d.name, s: d.ownerName ? "مديرها " + d.ownerName : "", g: "بلا قطاع" });
+  });
+  return out;
 }
 function ocResponsibleFor(divisionId) {
   if (!divisionId) return "";
@@ -156,25 +126,22 @@ function ocSectorEditor() {
   return '<div class="cf-ed"><div class="m-form">' +
     cfInput("oc_scname", "اسم القطاع", d.name, { k: "name", max: NAME_MAX, ph: "مثال: قطاع الأعمال" }) +
     cfSelect("oc_sckind", "التصنيف", "kind", d.kind, ORG_SECTOR_KINDS.map(function (k) { return [k, ORG_SECTOR_KIND_LABELS[k]]; })) +
-    cfSelect("oc_scmgr", "مدير القطاع", "managerMemberId", d.managerMemberId == null ? "" : String(d.managerMemberId), ocMemberOpts("بلا مدير"), "من سجل الموظفين") +
+    cfSelect("oc_scmgr", "مدير القطاع", "managerMemberId", d.managerMemberId == null ? "" : String(d.managerMemberId), ocMemberOpts("بلا مدير"), "من سجل الموظفين", OC_NO_PEOPLE) +
     cfSelect("oc_scactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّل"], ["", "موقوف"]]) +
     "</div>" + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف القطاع") + "</div>";
 }
 function ocDeptEditor() {
   var d = cfEdit.d;
-  var secs = [["", "بلا قطاع"]].concat((cfOrgSecs || []).map(function (s) { return [String(s.id), s.name + " · " + (ORG_SECTOR_KIND_LABELS[s.kind] || s.kind)]; }));
+  var secs = [["", "بلا قطاع"]].concat((cfOrgSecs || []).map(function (s) { return [String(s.id), s.name, ORG_SECTOR_KIND_LABELS[s.kind] || s.kind]; }));
   return '<div class="cf-ed"><div class="m-form">' +
     cfInput("oc_dname", "اسم الإدارة", d.name, { k: "name", max: NAME_MAX, ph: "مثال: إدارة حلول المستشفيات" }) +
-    cfSelect("oc_dsec", "القطاع", "sectorId", d.sectorId == null ? "" : String(d.sectorId), secs, "الإدارة تتبع قطاعًا واحدًا") +
-    cfSelect("oc_downer", "مدير الإدارة", "ownerMemberId", d.ownerMemberId == null ? "" : String(d.ownerMemberId), ocMemberOpts("بلا مدير"), "من سجل الموظفين") +
+    cfSelect("oc_dsec", "القطاع", "sectorId", d.sectorId == null ? "" : String(d.sectorId), secs, "الإدارة تتبع قطاعًا واحدًا", { empty: "لا قطاعات بعد — أضفها من «القطاعات»" }) +
+    cfSelect("oc_downer", "مدير الإدارة", "ownerMemberId", d.ownerMemberId == null ? "" : String(d.ownerMemberId), ocMemberOpts("بلا مدير"), "من سجل الموظفين", OC_NO_PEOPLE) +
     cfSelect("oc_dactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّلة"], ["", "موقوفة"]]) +
     "</div>" + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف الإدارة") + "</div>";
 }
 function ocDeptChoices() {
-  return [["", "بلا إدارة"]].concat((cfDivs || []).map(function (x) {
-    var s = x.sectorId ? ocSector(x.sectorId) : null;
-    return [String(x.id), x.name + (s ? " · " + s.name : "")];
-  }));
+  return ocDivisionChoices("بلا إدارة").map(function (o) { return [o.v, o.l, o.s, o.g]; });
 }
 function ocRoleChoices(current) {
   var live = (cfRoles || []).filter(function (r) { return r.active || r.key === current; });
@@ -187,7 +154,7 @@ function ocMemberEditor() {
     cfInput("oc_mname", "الاسم", d.name, { k: "name", max: 60 }) +
     cfInput("oc_memail", "البريد", d.email, { k: "email", max: 120, type: "email", ph: "name@company.com" }, "إليه يذهب التصعيد وطلب الدعم") +
     cfSelect("oc_mrole", "الدور", "role", d.role, ocRoleChoices(d.role), "الدعم يستقبل طلبات الدعم · الإدارة تستقبل التصعيد") +
-    cfSelect("oc_mdiv", "الإدارة", "divisionId", d.divisionId == null ? "" : String(d.divisionId), ocDeptChoices()) +
+    cfSelect("oc_mdiv", "الإدارة", "divisionId", d.divisionId == null ? "" : String(d.divisionId), ocDeptChoices(), "", { empty: "لا إدارات بعد", search: true }) +
     cfSelect("oc_mactive", "الحالة", "active", d.active ? "1" : "", [["1", "مفعّل"], ["", "موقوف"]]) +
     "</div>" + cfEditorActions(cfEdit.id ? "احفظ التغييرات" : "أضف الموظف") + "</div>";
 }
@@ -196,7 +163,7 @@ function ocMoveEditor() {
   var d = cfEdit.d, m = cfMember(cfEdit.id);
   var from = m && m.division ? m.division : "بلا إدارة";
   return '<div class="cf-ed"><div class="m-form">' +
-    cfSelect("oc_mvdiv", "نقل إلى إدارة", "divisionId", d.divisionId == null ? "" : String(d.divisionId), ocDeptChoices(), "الإدارة الحالية: " + esc(from)) +
+    cfSelect("oc_mvdiv", "نقل إلى إدارة", "divisionId", d.divisionId == null ? "" : String(d.divisionId), ocDeptChoices(), "الإدارة الحالية: " + esc(from), { search: true }) +
     "</div>" + cfEditorActions("انقل") + "</div>";
 }
 function ocRoleEditor() {
@@ -330,11 +297,17 @@ function ocDepartmentsView() {
     ocAddBtn("division", "إضافة إدارة", "ocadddept"),
     ocTable(7, "<th>الإدارة</th><th>القطاع</th><th>مدير الإدارة</th><th>المنتجات</th><th>الموظفون</th><th>الحالة</th><th></th>", body));
 }
+var ocQ = "";
 function ocEmployeesView() {
-  var rows = cfTeam || [];
+  var all = cfTeam || [];
+  var q = ocQ.trim().toLowerCase();
+  var rows = !q ? all : all.filter(function (m) {
+    return [m.name, m.email, m.division || "", cfRoleLabel(m.role)].join(" ").toLowerCase().indexOf(q) >= 0;
+  });
   var body = "";
   if (cfEdit && cfEdit.kind === "member" && !cfEdit.id) body += cfEditorRow(6, ocMemberEditor());
-  if (!rows.length) body += ocEmptyRow(6, "لا موظفين بعد", "التصعيد وطلب الدعم وإسناد المنتجات تحتاج شخصًا مسجّلًا ببريده.");
+  if (!all.length) body += ocEmptyRow(6, "لا موظفين بعد", "التصعيد وطلب الدعم وإسناد المنتجات تحتاج شخصًا مسجّلًا ببريده.");
+  else if (!rows.length) body += ocEmptyRow(6, "لا أحد يطابق «" + esc(ocQ.trim()) + "»", "ابحث بالاسم أو البريد أو الإدارة أو الدور.");
   rows.forEach(function (m) {
     var d = m.divisionId ? cfDivision(m.divisionId) : null;
     body += '<tr class="' + (m.active ? "" : "is-off") + '"><td class="m-td-n">' + esc(m.name) + "</td>" +
@@ -350,7 +323,8 @@ function ocEmployeesView() {
       body += cfEditorRow(6, cfEdit.kind === "move" ? ocMoveEditor() : ocMemberEditor());
     }
   });
-  return ocCard("الموظفون", ocNEmp(rows.length) + " · الاسم والبريد والدور والإدارة",
+  return ocCard("الموظفون", (q ? ocNEmp(rows.length) + " من " + fmtN(all.length) : ocNEmp(all.length)) + " · الاسم والبريد والدور والإدارة",
+    mSearch({ id: "oc_q", value: ocQ, placeholder: "ابحث بالاسم أو البريد أو الإدارة", attrs: ' data-ocq="1"' }) +
     ocAddBtn("member", "إضافة موظف", "ocaddemp"),
     ocTable(6, "<th>الاسم</th><th>البريد</th><th>الدور</th><th>الإدارة</th><th>الحالة</th><th></th>", body));
 }
@@ -518,7 +492,7 @@ window.ocDeleteRole = function (key) {
 };
 
 function ocFocus(id) { setTimeout(function () { var f = document.getElementById(id); if (f) f.focus(); }, 0); }
-var OC_FIRST = { segment: "oc_sgname", osector: "oc_scname", division: "oc_dname", member: "oc_mname", role: "oc_rlabel", move: "oc_mvdiv" };
+var OC_FIRST = { segment: "oc_sgname", osector: "oc_scname", division: "oc_dname", member: "oc_mname", role: "oc_rlabel", move: "oc_mvdiv_t" };
 var OC_TAB_OF = { segment: "segments", osector: "sectors", division: "departments", member: "employees", role: "roles" };
 function ocBlank(kind, preset) {
   var p = preset || {};
@@ -562,7 +536,7 @@ document.addEventListener("click", function (ev) {
   if (a === "move") {
     var m = cfMember(Number(i)); if (!m) return;
     if (ocTab !== "employees") ocTab = "employees";
-    cfOpen("move", m.id, { divisionId: m.divisionId == null ? "" : m.divisionId }); ocFocus("oc_mvdiv"); return;
+    cfOpen("move", m.id, { divisionId: m.divisionId == null ? "" : m.divisionId }); ocFocus("oc_mvdiv_t"); return;
   }
 });
 /* Arrow keys move between tabs, as a tablist promises (WAI-ARIA). In RTL the next tab is to the LEFT. */
@@ -576,6 +550,13 @@ document.addEventListener("keydown", function (ev) {
   var next = ev.key === "Home" ? 0 : ev.key === "End" ? keys.length - 1
     : (at + (ev.key === "ArrowLeft" ? 1 : -1) + keys.length) % keys.length;
   ocTab = keys[next]; cfEdit = null; render(false); ocFocus("octab_" + ocTab);
+});
+/* The employees search filters as you type; the page re-renders after a short pause and render()
+   puts the caret back where it was. */
+document.addEventListener("input", function (ev) {
+  var t = ev.target;
+  if (!t || !t.getAttribute || t.getAttribute("data-ocq") !== "1") return;
+  ocQ = t.value; clearTimeout(window.__ocq); window.__ocq = setTimeout(function () { render(false); }, 200);
 });
 /* A folded sector stays folded across re-renders (every save re-renders the screen). */
 document.addEventListener("toggle", function (ev) {

@@ -1439,15 +1439,18 @@ export const MASSAR_DS_CSS = `
   gap: var(--m-2);
   min-block-size: 44px;
   min-inline-size: 0;
-  padding-inline: var(--m-3);
-  border-radius: 999px;
+  padding-inline: 11px;
+  /* coss ui Input Group, measured 2026-10-02: the search box IS the field — 10px radius, 1px ring,
+     0 1px 2px — with the icon inside at .8. It was a floating pill with a 24px shadow, a third
+     shape beside .m-input and the dropdown. */
+  border-radius: var(--m-r-ctl);
   background: var(--m-paper);
-  box-shadow: 0 0 0 1px var(--m-line), 0 8px 24px rgba(0, 0, 0, .06);
+  box-shadow: 0 0 0 1px var(--m-line-2), 0 1px 2px rgba(0, 0, 0, .05), inset 0 1px rgba(0, 0, 0, .04);
   transition: box-shadow var(--m-out) var(--m-ease);
 }
 .ds6 .m-sf--wide{ flex: 1 1 300px; min-inline-size: 240px; }
-.ds6 .m-sf:focus-within{ box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line), 0 8px 24px rgba(0, 0, 0, .06); }
-.ds6 .m-sf__i{ inline-size: 16px; block-size: 16px; flex: none; fill: none; stroke: var(--m-mut);
+.ds6 .m-sf:focus-within{ box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line); }
+.ds6 .m-sf__i{ inline-size: 16px; block-size: 16px; flex: none; fill: none; stroke: var(--m-ink); opacity: .8;
   stroke-width: 1.8; stroke-linecap: round; }
 /* The input gives up its own ring, ground and radius: the pill draws them, once. */.ds6 .m-sf .m-sf__in, .ds6 .m-sf .m-sf__in:focus, .ds6 .m-sf .m-sf__in:focus-visible{
   flex: 1 1 0;
@@ -1484,16 +1487,26 @@ export const MASSAR_DS_CSS = `
 @media (hover: hover) and (pointer: fine){.ds6 .m-sf__x:hover{ background: var(--m-line-2); color: var(--m-ink); }}
 /* The reference's shortcut chip is not drawn (founder: «remove the / sign in the search»). */.ds6 @media (prefers-reduced-motion: reduce){ .m-sf, .m-sf__x { transition: none; } }
 /* ============================================================================
-   THE COMBOBOX — after Select & Combobox at ui.halaska.com (combobox-crm.ts), measured there: a pill
-   trigger on a soft grey ground with the value at the start and a chevron at the end; on open it turns
-   to paper with a dark border and drops a white popup carrying a filter box above the list, the chosen
-   row on a grey ground with a check at its end. Massar's height (44px) and tokens.
+   SELECT and COMBOBOX — one component, two modes, after coss ui (coss.com/ui, on the founder's
+   reference list). MEASURED there with getComputedStyle on 2026-10-02, not recalled:
+     field    white, 1px ring oklab(0 0 0/.10), radius 10px, 0 1px 2px rgba(0,0,0,.05), padding 11px,
+              14px text, a 16px chevron at the end at .8 opacity — the SAME field as .m-input, which
+              is why a select and an input now sit in one form without looking like two products.
+     focus    a 3px ring around the field (Massar: the accent ring .m-input already uses).
+     popup    white, 1px ring oklab(0 0 0/.08), radius 10px, list padding 4px,
+              0 10px 15px -3px /5% + 0 4px 6px -4px /5%.
+     item     28px, padding 4px 16px 4px 8px, radius 6px, 14px; highlighted and selected rows take
+              oklab(0 0 0/.04); the check indicator sits at the end of the chosen row.
+     group    label 12px / 500 / muted, padding 6px 8px; separator 1px oklab(0 0 0/.08), 4px margin.
+   SELECT (.m-cbx): a short closed list, the trigger is a button.
+   COMBOBOX (.m-cbx.m-cbx--search): a list worth searching. As in coss, you TYPE IN THE FIELD ITSELF:
+     on open the field becomes the search input (caret where the value was) and the list filters.
+   Massar keeps its own height (44px, the touch floor every control here shares) and its tokens.
    ============================================================================ */
 /* .m-cbx, NOT .m-cb. The checkbox at the top of this file already owns .m-cb, and it sets
    inline-size:16px, block-size:16px, appearance:none and a box-shadow. The combobox root was
    inheriting all of it: the control rendered 16px tall, its trigger overflowed, and it landed on
-   top of the label above it («المسؤول», «مدير المنتج» were half covered). Two components under one
-   class name - the CSS twin of the coveragePct shadowing that check-browser-globals.mjs exists for. */.ds6 .m-cbx{ position: relative; display: inline-flex; min-inline-size: 0; }
+   top of the label above it. Two components under one class name. */.ds6 .m-cbx{ position: relative; display: inline-flex; min-inline-size: 0; }
 .ds6 .m-cbx--wide{ display: flex; inline-size: 100%; }
 .ds6 .m-cb__t{
   flex: 1 1 auto;
@@ -1502,63 +1515,121 @@ export const MASSAR_DS_CSS = `
   gap: var(--m-2);
   min-block-size: 44px;
   min-inline-size: 0;
-  padding-inline: var(--m-3);
-  border: 1px solid transparent;
+  padding-inline: 11px;
+  border: 0;
   border-radius: var(--m-r-ctl);
-  background: var(--m-sunk);
+  background: var(--m-paper);
+  box-shadow: 0 0 0 1px var(--m-line-2), 0 1px 2px rgba(0, 0, 0, .05), inset 0 1px rgba(0, 0, 0, .04);
   font: inherit;
-  font-size: var(--m-t-body);
+  font-size: 15px;
+  line-height: 24px;
   color: var(--m-ink);
   text-align: start;
   cursor: pointer;
-  transition: background-color var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease);
+  transition: box-shadow var(--m-out) var(--m-ease);
 }
-@media (hover: hover) and (pointer: fine){.ds6 .m-cb__t:hover{ background: var(--m-line); }}
-.ds6 .m-cb__t[aria-expanded="true"]{ background: var(--m-paper); border-color: var(--m-ink-2); }
-.ds6 .m-cb__t:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+.ds6 .m-cb__t:disabled{ cursor: not-allowed; opacity: .64; }
+.ds6 .m-cb__t[aria-expanded="true"], .ds6 .m-cb__t:focus-visible{
+  outline: none; box-shadow: 0 0 0 1px var(--m-ac), 0 0 0 3px var(--m-ac-line);
+}
 .ds6 .m-cb__v{ flex: 1 1 auto; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds6 .m-cb__v.is-ph{ color: var(--m-faint); }
-.ds6 .m-cb__c{ flex: none; inline-size: 16px; block-size: 16px; fill: none; stroke: var(--m-mut);
+.ds6 .m-cb__c{ flex: none; inline-size: 16px; block-size: 16px; fill: none; stroke: currentColor; opacity: .8;
   stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* The combobox's search input lives IN the field: hidden while closed, laid over the value when
+   open, so typing happens where the value was — the coss combobox, not a second box in the popup. */.ds6 .m-cb__f{
+  position: absolute; inset-block-start: 0; inset-inline: 0 36px;
+  inline-size: auto; min-block-size: 0; block-size: 44px;
+  padding-inline: 11px; margin: 0; border: 0; border-radius: var(--m-r-ctl);
+  background: transparent; box-shadow: none; font: inherit; font-size: 15px; color: var(--m-ink);
+}
+.ds6 .m-cb__f[hidden]{ display: none; }
+.ds6 .m-cb__f:focus, .ds6 .m-cb__f:focus-visible{ outline: none; box-shadow: none; }
+.ds6 .m-cbx.is-searching .m-cb__v{ visibility: hidden; }
 .ds6 .m-cb__p{
   position: absolute;
   inset-block-start: calc(100% + 4px);
   inset-inline: 0;
-  z-index: var(--z-overlay, 300);
+  /* Above a drawer or a sheet (--z-modal 310, +1 for a sheet over a drawer), under a toast (400):
+     while open the popup lives in the body-level layer, so it must outrank the panel it came from. */
+  z-index: calc(var(--z-modal, 310) + 10);
   min-inline-size: 220px;
-  padding: var(--m-1);
-  border-radius: var(--m-r-card);
+  padding: 4px;
+  border-radius: var(--m-r-ctl);
   background: var(--m-paper);
-  box-shadow: 0 0 0 1px var(--m-line), var(--m-lift);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .08), 0 10px 15px -3px rgba(0, 0, 0, .05), 0 4px 6px -4px rgba(0, 0, 0, .05);
 }
 .ds6 .m-cb__p[hidden]{ display: none; }
-.ds6 .m-cb__f{ inline-size: 100%; min-block-size: 38px; margin-block-end: var(--m-1); box-shadow: none;
-  border-block-end: 1px solid var(--m-line); border-radius: 0; background: transparent; }
-/* The popup's own filter row takes an underline, not the app's global 2px focus outline: inside a
-   220px popup that outline drew a box around the row and read as an error state. */.ds6 .m-cb__f:focus, .ds6 .m-cb__f:focus-visible{ box-shadow: none; outline: none;
-  border-block-end-color: var(--m-ac); }
-.ds6 .m-cb__l{ list-style: none; margin: 0; padding: 0; max-block-size: 240px; overflow-y: auto; }
+.ds6 .m-cb__l{ list-style: none; margin: 0; padding: 0; max-block-size: 280px; overflow-y: auto; overscroll-behavior: contain; }
 .ds6 .m-cb__o{
   display: flex;
   align-items: center;
   gap: var(--m-2);
-  min-block-size: 36px;
-  padding-inline: var(--m-2);
-  border-radius: var(--m-r-ctl);
-  font-size: var(--m-t-cap);
+  min-block-size: 32px;
+  padding-block: 4px;
+  padding-inline: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 20px;
   color: var(--m-ink);
   cursor: pointer;
 }
-.ds6 .m-cb__o[hidden]{ display: none; }
-.ds6 .m-cb__o.is-hi{ background: var(--m-page); }
-.ds6 .m-cb__o.is-on{ background: var(--m-sunk); font-weight: 600; }
+.ds6 .m-cb__o[hidden], .ds6 .m-cb__g[hidden]{ display: none; }
+.ds6 .m-cb__o.is-hi, .ds6 .m-cb__o.is-on{ background: rgba(0, 0, 0, .04); }
+.ds6 .m-cb__o.is-on{ font-weight: 600; }
+.ds6 .m-cb__ol{ min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A second line of context on a row — a department's sector, a person's role. */.ds6 .m-cb__s{ color: var(--m-mut); font-weight: 400; font-size: 12px; }
 .ds6 .m-cb__o--free{ color: var(--m-ac-deep); }
-.ds6 .m-cb__k{ margin-inline-start: auto; inline-size: 14px; block-size: 14px; fill: none;
-  stroke: currentColor; stroke-width: 2; stroke-linecap: round; opacity: 0; }
+.ds6 .m-cb__o--none .m-cb__ol{ color: var(--m-mut); }
+.ds6 .m-cb__k{ margin-inline-start: auto; flex: none; inline-size: 16px; block-size: 16px; fill: none;
+  stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
 .ds6 .m-cb__o.is-on .m-cb__k{ opacity: 1; }
-.ds6 .m-cb__e{ padding: var(--m-2); font-size: var(--m-t-cap); color: var(--m-mut); }
+.ds6 .m-cb__g{ padding: 6px 8px; font-size: 12px; font-weight: 500; color: var(--m-mut); }
+.ds6 .m-cb__g:not(:first-child){ border-block-start: 1px solid rgba(0, 0, 0, .08); margin-block-start: 4px; padding-block-start: 10px; }
+.ds6 .m-cb__g.is-first{ border-block-start: 0; margin-block-start: 0; padding-block-start: 6px; }
+.ds6 .m-cb__e{ padding: 8px; font-size: 14px; color: var(--m-mut); text-align: center; }
 .ds6 .m-cb__e[hidden]{ display: none; }
+@media (pointer: coarse){.ds6 .m-cb__o{ min-block-size: 44px; }.ds6 .m-cb__f, .ds6 .m-cb__t{ font-size: 16px; }}
 @media (prefers-reduced-motion: reduce){.ds6 .m-cb__t{ transition: none; }}
+/* ============================================================================
+   THE HIERARCHY (org-crm.ts, «إعدادات المنظمة»): Sector → manager → Department → manager → Members.
+   A sector is a card with a disclosure; each level below indents on the inline-start side and hangs
+   off a 1px rail, so parent → child reads as a line you can follow. The tables beside it use .oc-tbl.
+   ============================================================================ */.ds6 .oc{ display:flex; flex-direction:column; gap:var(--m-4); }
+.ds6 .oc-tbl{ min-inline-size: 720px; }
+.ds6 .oc-tbl th.num, .ds6 .oc-tbl td.num{ text-align:end; }
+.ds6 .oc-sub{ display:block; font-size:var(--m-t-cap); color:var(--m-mut); }
+.ds6 .oc-note{ padding:var(--m-4) var(--m-5); margin:0; }
+/* ---- the hierarchy ----
+   A sector is a card; inside it, each level is indented on the inline-start side and hangs off a
+   1px rail, so parent → child reads as a line you can follow, not as nesting depth you count. */.ds6 .oc-tree{ display:flex; flex-direction:column; gap:var(--m-3); }
+.ds6 .oc-sec{ padding:0; overflow:hidden; }
+.ds6 .oc-sec > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:var(--m-3);
+  flex-wrap:wrap; padding:var(--m-4) var(--m-5); }
+.ds6 .oc-sec > summary::-webkit-details-marker{ display:none; }
+.ds6 .oc-sec > summary:focus-visible{ outline:none; box-shadow:inset var(--m-focus); border-radius:var(--m-r-card); }
+/* The disclosure mark points at the content (down) when open and at the reading direction's start
+   when closed. In RTL «start» is the right, so a closed chevron points left — into the line. */.ds6 .oc-chev{ inline-size:16px; block-size:16px; flex:none; color:var(--m-mut); }
+.ds6 .oc-chev svg{ inline-size:16px; block-size:16px; stroke:currentColor; stroke-width:2; fill:none; display:block; }
+.ds6 .oc-sec:not([open]) .oc-chev svg{ transform:rotate(90deg); }
+.ds6 .oc-lvl{ font-size:var(--m-t-micro); color:var(--m-mut); font-weight:600; }
+.ds6 .oc-name{ font-size:var(--m-t-sub); font-weight:700; color:var(--m-ink); }
+.ds6 .oc-mgr{ display:inline-flex; align-items:center; gap:6px; font-size:var(--m-t-cap); color:var(--m-ink-2, var(--m-ink)); }
+.ds6 .oc-mgr i{ font-style:normal; color:var(--m-mut); }
+.ds6 .oc-sp{ flex:1; }
+.ds6 .oc-body{ border-block-start:1px solid var(--m-line); padding:var(--m-3) var(--m-5) var(--m-4); display:flex; flex-direction:column; gap:var(--m-2); }
+.ds6 .oc-dept{ position:relative; margin-inline-start:var(--m-4); padding-inline-start:var(--m-4);
+  border-inline-start:1px solid var(--m-line); padding-block:var(--m-2); }
+.ds6 .oc-dept__h{ display:flex; align-items:center; gap:var(--m-3); flex-wrap:wrap; }
+.ds6 .oc-dept__h .oc-name{ font-size:var(--m-t-body); }
+.ds6 .oc-mem{ list-style:none; margin:var(--m-2) 0 0; padding:0; margin-inline-start:var(--m-4);
+  padding-inline-start:var(--m-4); border-inline-start:1px dashed var(--m-line);
+  display:flex; flex-direction:column; gap:2px; }
+.ds6 .oc-mem li{ display:flex; align-items:baseline; gap:var(--m-2); font-size:var(--m-t-cap); color:var(--m-ink); min-block-size:28px; padding-block:3px; flex-wrap:wrap; }
+.ds6 .oc-mem li .oc-role{ color:var(--m-mut); }
+.ds6 .oc-mem li.is-off{ color:var(--m-mut); }
+.ds6 .oc-orphans .oc-body{ border-block-start:0; }
+@media (max-width: 700px){.ds6 .oc-dept, .ds6 .oc-mem{ margin-inline-start:var(--m-2); padding-inline-start:var(--m-3); }.ds6 .oc-sec > summary, .ds6 .oc-body{ padding-inline:var(--m-4); }}
 /* ============================================================================
    THE DATE PICKER and THE RANGE PICKER (date-field-crm.ts), after coss ui's p-date-picker-3 and
    p-date-picker-2: an outline trigger carrying a calendar glyph and the formatted date, opening a
