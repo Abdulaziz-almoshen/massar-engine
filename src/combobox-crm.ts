@@ -304,6 +304,68 @@ if (!window.__mCb) {
     }
   }, true);
 
+  /* EVERY NATIVE SELECT BECOMES THE DESIGN SYSTEM'S (founder, 2026-10-02: «the drop down … must come
+     from the references … keep this as a system design»; and a screenshot of «حجم المنشأة» still opening
+     the operating system's own dark menu). Forty-seven selects across thirteen screens each carry their
+     own handler — inline onchange, data-* listeners. Rewriting each was forty-seven chances to break a
+     save. Instead the native element stays in the page, hidden, as the VALUE SOURCE: the combobox is
+     drawn beside it, and a pick writes the select's value and dispatches change on the select itself,
+     so every screen's handler runs exactly as before. Smoke asserts no visible native select remains. */
+  var mCbSeq = 0;
+  var mCbUpgrade = function (sel) {
+    if (sel.getAttribute("data-cb-src") || sel.multiple) return;
+    sel.setAttribute("data-cb-src", "1");
+    var opts = [];
+    var add = function (o, g) {
+      if (o.disabled && !o.selected) return;
+      opts.push({ v: o.value, l: (o.textContent || "").trim(), g: g || "" });
+    };
+    Array.prototype.forEach.call(sel.children, function (c) {
+      if (c.tagName === "OPTGROUP") Array.prototype.forEach.call(c.children, function (o) { add(o, c.label); });
+      else if (c.tagName === "OPTION") add(c, "");
+    });
+    var id = (sel.id || ("mcbs" + (++mCbSeq))) + "__cb";
+    var lab = sel.id ? document.querySelector('label[for="' + sel.id + '"]') : null;
+    var label = sel.getAttribute("aria-label") || (lab ? (lab.textContent || "").trim() : "") || sel.getAttribute("title") || "اختر";
+    var none = opts.filter(function (o) { return o.v === ""; })[0];
+    var wide = !!(sel.closest && sel.closest(".m-field, .m-form"));
+    var html = mCombo({ id: id, value: sel.value, options: opts, label: label, placeholder: none ? none.l : "اختر…",
+      wide: wide, disabled: sel.disabled, attrs: ' data-cb-for="1"' });
+    var holder = document.createElement("span");
+    holder.innerHTML = html;
+    var root = holder.firstChild;
+    if (/(^|\\s)(is-on|in-on|px-on|on)(\\s|$)/.test(sel.className)) root.classList.add("is-on");
+    if (sel.getAttribute("aria-invalid") === "true") root.querySelector(".m-cb__t").setAttribute("aria-invalid", "true");
+    if (sel.getAttribute("title")) root.setAttribute("title", sel.getAttribute("title"));
+    root.__sel = sel;
+    sel.parentNode.insertBefore(root, sel.nextSibling);
+    if (lab) lab.setAttribute("for", id + "_t");
+    sel.setAttribute("aria-hidden", "true");
+    sel.tabIndex = -1;
+  };
+  var mCbUpgradeAll = function () {
+    Array.prototype.forEach.call(document.querySelectorAll(".ds6 select:not([data-cb-src])"), mCbUpgrade);
+  };
+  /* The picked value goes to the select, and the select announces it — the screen's own handler. */
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (!t || !t.getAttribute || t.getAttribute("data-cb-for") !== "1") return;
+    var root = t.closest(".m-cbx"), sel = root && root.__sel;
+    if (!sel) return;
+    sel.value = t.value;
+    sel.dispatchEvent(new Event("input", { bubbles: true }));
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  var mCbPending = false;
+  var mCbObs = new MutationObserver(function () {
+    if (mCbPending) return;
+    mCbPending = true;
+    /* Before the next paint, so a native select is never seen: one frame of it is a flash. */
+    Promise.resolve().then(function () { mCbPending = false; mCbUpgradeAll(); });
+  });
+  var mCbStart = function () { mCbObs.observe(document.body, { childList: true, subtree: true }); mCbUpgradeAll(); };
+  if (document.body) mCbStart(); else document.addEventListener("DOMContentLoaded", mCbStart);
+
   /* A repaint (a save, a poll) removes the open popup from the page; nothing should stay "open". */
   document.addEventListener("focusin", function (e) {
     if (mCbOpen && !document.body.contains(mCbOpen)) {

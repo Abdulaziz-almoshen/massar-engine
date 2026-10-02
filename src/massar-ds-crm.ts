@@ -1596,7 +1596,8 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-cb__o[hidden], .ds6 .m-cb__g[hidden]{ display: none; }
 .ds6 .m-cb__o.is-hi, .ds6 .m-cb__o.is-on{ background: rgba(0, 0, 0, .04); }
 .ds6 .m-cb__o.is-on{ font-weight: 600; }
-.ds6 .m-cb__ol{ min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* An option says all of itself in the open list — «متوسطة — 50–249 موظفًا · أكثر من 40 وحتى 200 مليون» was
+   cut at «…» exactly where the definition starts. The closed field keeps one line (.m-cb__v). */.ds6 .m-cb__ol{ min-inline-size: 0; white-space: normal; overflow-wrap: anywhere; }
 /* A second line of context on a row — a department's sector, a person's role. */.ds6 .m-cb__s{ color: var(--m-mut); font-weight: 400; font-size: 12px; }
 .ds6 .m-cb__o--free{ color: var(--m-ac-deep); }
 .ds6 .m-cb__o--none .m-cb__ol{ color: var(--m-mut); }
@@ -1607,6 +1608,8 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-cb__g:not(:first-child){ border-block-start: 1px solid rgba(0, 0, 0, .08); margin-block-start: 4px; padding-block-start: 10px; }
 .ds6 .m-cb__g.is-first{ border-block-start: 0; margin-block-start: 0; padding-block-start: 6px; }
 .ds6 .m-cb__e{ padding: 8px; font-size: 14px; color: var(--m-mut); text-align: center; }
+/* A select upgraded by the combobox stays in the page as its value source, never seen. */.ds6 select[data-cb-src]{ display: none !important; }
+/* A filter that is ON says so on the field itself, as the native filter selects did. */.ds6 .m-cbx.is-on .m-cb__t{ background: var(--m-ac-dim); box-shadow: 0 0 0 1px var(--m-ac-line); color: var(--m-ac-deep); }
 .ds6 .m-cb__e[hidden]{ display: none; }
 @media (pointer: coarse){.ds6 .m-cb__o{ min-block-size: 44px; }.ds6 .m-cb__f, .ds6 .m-cb__t{ font-size: 16px; }}
 @media (prefers-reduced-motion: reduce){.ds6 .m-cb__t{ transition: none; }}

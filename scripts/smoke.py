@@ -284,6 +284,15 @@ def main() -> int:
                 failures.append(f"{route}: landmark «{landmark}» missing from #body")
             if errors:
                 failures.append(f"{route}: {len(errors)} runtime error(s) — {errors[0]}")
+            # NO NATIVE DROPDOWN ON SCREEN (founder, 2026-10-02: every dropdown is the design
+            # system's, «keep this as a system design»). combobox-crm upgrades each <select> and keeps
+            # it hidden as the value source; one still VISIBLE is a screen the upgrade did not reach.
+            native = page.evaluate(
+                "() => Array.from(document.querySelectorAll('#body select'))"
+                ".filter(s => s.offsetParent !== null)"
+                ".map(s => s.id || s.getAttribute('aria-label') || s.className || 'select')")
+            if native:
+                failures.append(f"{route}: {len(native)} native dropdown(s) visible — {', '.join(native[:4])}")
             # HORIZONTAL OVERFLOW. Added 2026-09-16 after الرئيسية shipped scrolling sideways: the
             # deck escaped .body's gutter with a hardcoded -32px, and .body's real gutter is 4px
             # (revamp.ts §2 overrides the base rule), so every width was 56px too wide. tsc, the

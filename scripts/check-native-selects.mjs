@@ -3,8 +3,10 @@
 // references I gave you … keep this as a system design»). The browser's native <select> cannot search,
 // group or carry a second line, and it looks like another product beside .m-input.
 //
-// A RATCHET, not a ban: screens not converted yet still carry native selects. The count may only go
-// down. Converting a screen lowers BASELINE in the same commit; adding a native select fails the build.
+// Since 2026-10-02 combobox-crm UPGRADES every <select> inside .ds6 at render (the select stays hidden
+// as the value source) and smoke fails any route with a visible one. This count is a ratchet on top:
+// new screens are written with mCombo directly, so the number of selects relying on the upgrade may
+// only go down.
 import { readFileSync, readdirSync } from "node:fs";
 
 const BASELINE = 48;
