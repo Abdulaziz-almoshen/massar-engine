@@ -195,8 +195,12 @@ describe("enterprise size — the Saudi classification, not an invented one", ()
     expect([...ACCOUNT_SIZES]).toEqual(["micro", "small", "medium", "large"]);
     expect(ACCOUNT_SIZE_LABELS.micro).toBe("متناهية الصغر");
     expect(ACCOUNT_SIZE_LABELS.large).toBe("كبيرة");
-    // Every tier states where its line falls; a classification nobody can check is a guess.
-    for (const k of ACCOUNT_SIZES) expect(ACCOUNT_SIZE_BASIS[k].length).toBeGreaterThan(10);
+    // Every tier states where its line falls — by EMPLOYEES only (founder, 2026-10-04: «remove the
+    // money from the type of customers»); a classification nobody can check is a guess.
+    for (const k of ACCOUNT_SIZES) {
+      expect(ACCOUNT_SIZE_BASIS[k]).toMatch(/موظف/);
+      expect(ACCOUNT_SIZE_BASIS[k]).not.toMatch(/مليون|ريال|ر\.س/);
+    }
   });
 
   it("agrees in gender throughout, unlike the source page's own tabs", () => {
