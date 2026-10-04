@@ -645,7 +645,7 @@ function acModal() {
        can confirm it from their own «شهادة حجم المنشأة». */
     '<div class="m-field"><label class="m-label" for="acf_size">حجم المنشأة</label><select class="m-select" id="acf_size" data-acfld="sizeTier"' + acFld("sizeTier") + '><option value="">— غير محدد —</option>' +
       ACCOUNT_SIZES.map(function (k) { return '<option value="' + k + '"' + (d.sizeTier === k ? " selected" : "") + ">" + ACCOUNT_SIZE_LABELS[k] + " — " + ACCOUNT_SIZE_BASIS[k] + "</option>"; }).join("") + "</select>" +
-      '<span class="m-hint">تصنيف «منشآت»: عدد الموظفين والإيرادات معًا، ويُغلّب الأعلى.</span>' + acFerr("sizeTier") + "</div>" +
+      '<span class="m-hint">حسب عدد الموظفين، على تصنيف «منشآت».</span>' + acFerr("sizeTier") + "</div>" +
     '<div class="m-field"><label class="m-label" for="acf_owner">الموظف المسؤول</label><select class="m-select" id="acf_owner" data-acfld="ownerId"' + acFld("ownerId") + '><option value="">— بلا مسؤول —</option>' +
       members.map(function (m) { return '<option value="' + m.id + '"' + (String(m.id) === d.ownerId ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + "</select>" +
       (members.length ? "" : '<span class="m-hint">لا أعضاء نشطون؛ يضافون من <a class="m-link" href="#team">الفريق</a>.</span>') + acFerr("ownerId") + "</div>";

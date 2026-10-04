@@ -67,10 +67,10 @@ export const ACCOUNT_SIZE_LABELS: Readonly<Record<AccountSize, string>> = {
 };
 /** The basis, printed beside the choice so nobody has to remember where the line falls. */
 export const ACCOUNT_SIZE_BASIS: Readonly<Record<AccountSize, string>> = {
-  micro: "1–5 موظفين · حتى 3 مليون ريال",
-  small: "6–49 موظفًا · أكثر من 3 وحتى 40 مليون",
-  medium: "50–249 موظفًا · أكثر من 40 وحتى 200 مليون",
-  large: "250 موظفًا فأكثر · أكثر من 200 مليون",
+  micro: "1–5 موظفين",
+  small: "6–49 موظفًا",
+  medium: "50–249 موظفًا",
+  large: "250 موظفًا فأكثر",
 };
 
 /**
