@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  canMoveQuote, checkActivity, checkLossReason, checkOppWorkDomainClosure, checkQuote, isLossClose,
+  canMoveQuote, checkActivity, checkContractPeriod, checkLossReason, checkOppWorkDomainClosure, checkQuote, isLossClose,
   LOSS_REASON_LABELS, LOSS_REASONS, OPP_WORK_DOMAIN_JS, stageJourney, journeyPct } from "../src/opp-work-domain.js";
 import { DEPARTMENTS, STAGE_OUTCOMES } from "../src/sales-domain.js";
 
@@ -140,5 +140,31 @@ describe("stageJourney — «نتائج المراحل»", () => {
     expect(journeyPct(ladder, "won")).toBe(100);
     expect(journeyPct(ladder, "retired_rung")).toBeNull();
     expect(journeyPct([], "contact")).toBeNull();
+  });
+});
+
+describe("checkContractPeriod — a won close needs the contract start", () => {
+  it("refuses a won close with no start", () => {
+    const r = checkContractPeriod("", "", true);
+    expect(r.ok).toBe(false);
+    if (!r.ok) { expect(r.code).toBe("contract_start_required"); expect(r.field).toBe("contract_start"); }
+  });
+  it("accepts a start alone (open-ended contract)", () => {
+    expect(checkContractPeriod("2026-11-01", "", true)).toEqual({ ok: true, start: "2026-11-01", end: null });
+  });
+  it("accepts a full range", () => {
+    expect(checkContractPeriod("2026-11-01", "2027-10-31", true)).toEqual({ ok: true, start: "2026-11-01", end: "2027-10-31" });
+  });
+  it("refuses an end before the start", () => {
+    const r = checkContractPeriod("2026-11-01", "2026-10-01", false);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.field).toBe("contract_end");
+  });
+  it("refuses an end with no start, and a malformed date", () => {
+    expect(checkContractPeriod("", "2026-10-01", false).ok).toBe(false);
+    expect(checkContractPeriod("1/11/2026", "", false).ok).toBe(false);
+  });
+  it("lets an open deal clear both dates", () => {
+    expect(checkContractPeriod("", "", false)).toEqual({ ok: true, start: null, end: null });
   });
 });

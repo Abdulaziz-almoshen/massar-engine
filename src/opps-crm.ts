@@ -312,6 +312,7 @@ export const OPPS_CRM_CSS = `
   @media (hover:hover) and (pointer:fine) { .ox-cli:hover { background:var(--surface); } }
   .ox-cli:active { transform:scale(0.98); }
   .ox-cli .pn { font-weight:500; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ox-cli .ox-clc { display:block; font-weight:400; font-size:var(--t-xs); color:var(--muted); overflow:hidden; text-overflow:ellipsis; }
   .ox-cli .st { font-size:var(--t-xs); border-radius:var(--r-pill); padding:2px 9px; white-space:nowrap;
     background:var(--tn-soft); color:var(--tn-text); }
   .ox-cli .vl { font-size:var(--t-xs); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -717,6 +718,8 @@ export const OPPS_CRM_CSS = `
   /* «المرحلة التالية»: the primary action names its destination; the Select beside it covers the rest. */
   /* The question's heading takes focus so a screen reader starts there; it is not a control, so no ring. */
   .ds6 .ox-oc .m-dlg__t:focus, .ds6 .ox-oc .m-dlg__t:focus-visible { outline:none; box-shadow:none; }
+  .ds6 .ox-contract { margin-block-start:var(--m-3); }
+  .ds6 .ox-occ { margin-block:var(--m-3); }
   .ds6 .ox-next { display:grid; grid-template-columns:auto minmax(200px, 1fr); gap:var(--m-2); align-items:center; margin-block-start:var(--m-3); }
   .ds6 .ox-next__go { min-block-size:44px; gap:var(--m-2); }
   .ds6 .ox-next__go .k { font-weight:500; opacity:.85; }
@@ -1381,7 +1384,7 @@ function opCardsView() {
       var st = opStage(l.stage);
       return '<button type="button" class="ox-cli' + (opCardOpen[g.key] && i >= OP_CARD_LINES ? " mor" : "") + '" id="oxc_' + l.id + '"' +
         ' onclick="opOpenLine(' + l.id + ',this.id)" aria-label="' + esc(l.product) + " — " + esc(st.label) + '">' +
-        '<span class="pn">' + esc(l.product) + "</span>" +
+        '<span class="pn">' + esc(l.product) + (l.contract_start ? '<span class="ox-clc">يبدأ العقد <span class="m-n m-n--date">' + esc(formatArabicDate(l.contract_start)) + "</span></span>" : "") + "</span>" +
         '<span class="m-chip ox-tone" style="' + opToneVars(l.stage) + '">' + esc(st.label) + "</span>" +
         '<span class="m-td-v">' + (opPriced(l) ? opMoneyShort(opValue(l)) : opUnpricedNil()) + "</span></button>";
     }).join("") +
@@ -1459,6 +1462,7 @@ function opKanbanView() {
         (l.created_by === "المساعد" ? '<span class="m-chip m-chip--ac">تلقائي</span>' : "") + "</span>" +
         '<span class="m-deal__p">' + esc(l.product) + "</span>" +
         (String(l.next_step || "").trim() ? '<span class="m-deal__s"><b>التالي:</b> ' + esc(l.next_step) + "</span>" : "") +
+        (l.contract_start ? '<span class="m-deal__s"><b>العقد:</b> ' + opContractText(l) + "</span>" : "") +
         '<span class="m-deal__f"><span class="' + (opPriced(l) ? "m-deal__v" : "m-deal__v--nil") + '">' +
         (opPriced(l) ? opMoney(opValue(l)) : opUnpricedNil()) + "</span>" +
         '<span class="m-deal__o">' + opIco(l.source in OPP_ICO ? l.source : "other") + " " +
@@ -1763,11 +1767,16 @@ function opRequestMove(ids, to) {
     return Promise.resolve();
   }
   var kind = typeof moveOutcomeKind === "function" ? moveOutcomeKind(from, to, opLadder()) : null;
-  if (!kind) {
+  /* A WON close also asks for the contract period (founder, 2026-10-06): the start is required, and it
+     is asked in the same sheet as the outcome so the close is one decision, written in one request. */
+  var won = isWonStage(to);
+  if (!kind && !won) {
     if (ids.length === 1) return window.opSaveField(ids[0], "stage", to);
     return opPatchMany(ids, { stage: to }, "نُقلت إلى «" + opStage(to).label + "»");
   }
-  opOutcome = { ids: ids, to: to, from: from, kind: kind };
+  var l0 = lines[0];
+  opOutcome = { ids: ids, to: to, from: from, kind: kind, won: won, err: "",
+    cs: ids.length === 1 ? (l0.contract_start || "") : "", ce: ids.length === 1 ? (l0.contract_end || "") : "" };
   opRender();
   setTimeout(function () { var t = document.getElementById("oxoct"); if (t) t.focus(); }, 0);
   return Promise.resolve();
@@ -1777,23 +1786,53 @@ function opRequestMove(ids, to) {
 var opOutcome = null;
 window.opOutcomeCancel = function () { opOutcome = null; opRender(); };
 window.opOutcomePick = function (key) {
-  var a = opOutcome; opOutcome = null; if (!a) return;
+  var a = opOutcome; if (!a) return;
+  var extra = key ? { outcomeKey: key } : {};
+  if (a.won) {
+    var cp = checkContractPeriod(a.cs, a.ce, true);
+    if (!cp.ok) { a.err = cp.message; opRender(); setTimeout(function () { var t = document.getElementById("oxoc_contract_t"); if (t) t.focus(); }, 0); return; }
+    extra.contract_start = cp.start; extra.contract_end = cp.end || "";
+  }
+  opOutcome = null;
   /* The outcome rides in the SAME write as the move: a crash between two requests would leave the
      deal on the new rung with the reason lost, which is the state this exists to prevent. */
-  if (a.ids.length === 1) { void window.opSaveField(a.ids[0], "stage", a.to, { outcomeKey: key }); return; }
-  void opPatchMany(a.ids, { stage: a.to, outcomeKey: key }, "نُقلت إلى «" + opStage(a.to).label + "»");
+  if (a.ids.length === 1) { void window.opSaveField(a.ids[0], "stage", a.to, extra); return; }
+  void opPatchMany(a.ids, Object.assign({ stage: a.to }, extra), "نُقلت إلى «" + opStage(a.to).label + "»");
 };
+/* The contract period inside the close sheet: kept on the pending question until the close is sent. */
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute || !opOutcome) return;
+  if (t.getAttribute("data-occontract") !== "1") return;
+  var f = document.getElementById("oxoc_contract"), e = document.getElementById("oxoc_contract_to");
+  opOutcome.cs = f ? f.value : ""; opOutcome.ce = e ? e.value : ""; opOutcome.err = "";
+});
+function opContractBlock(a) {
+  return '<div class="ox-occ"><div class="m-field"><label class="m-label m-req" for="oxoc_contract_t">مدة العقد</label>' +
+    mDateRange({ id: "oxoc_contract", from: a.cs, to: a.ce, label: "مدة العقد", placeholder: "من — إلى", wide: true, attrs: ' data-occontract="1"' }) +
+    '<span class="m-hint">تاريخ بدء العقد مطلوب لإغلاق الفرصة ربحًا؛ النهاية اختيارية.</span>' +
+    (a.err ? '<span class="m-err" role="alert">' + esc(a.err) + "</span>" : "") + "</div></div>";
+}
 function opOutcomeSheet() {
   var a = opOutcome;
   if (!a || typeof outcomesForMove !== "function") return "";
   var opts = outcomesForMove(a.from, a.to, opLadder());
   var to = opStage(a.to), from = opStage(a.from);
+  /* Reopening a closed deal straight to WON has no outcome to record, only the contract. */
+  if (a.won && !a.kind) {
+    return '<div class="ox-scrim in" onclick="opOutcomeCancel()"></div>' +
+      '<div class="ox-oc" role="dialog" aria-modal="true" aria-labelledby="oxoct">' +
+      '<h3 class="m-dlg__t" id="oxoct" tabindex="-1">إغلاق الفرصة ربحًا</h3>' +
+      '<p class="m-meta">' + (a.ids.length > 1 ? opNLine(a.ids.length) + " · " : "") + "حدّد مدة العقد ثم أكّد الإغلاق.</p>" + opContractBlock(a) +
+      '<div class="ox-ocb"><button type="button" class="m-btn m-btn--primary" onclick="opOutcomePick(&quot;&quot;)">أغلق ربحًا</button>' +
+      '<button type="button" class="m-btn" onclick="opOutcomeCancel()">إلغاء</button></div></div>';
+  }
   var dir = a.kind === "advance" ? "تقدّم الفرصة" : "إعادة الفرصة أو إبقاؤها";
   var head = '<div class="ox-scrim in" onclick="opOutcomeCancel()"></div>' +
     '<div class="ox-oc" role="dialog" aria-modal="true" aria-labelledby="oxoct">' +
     '<h3 class="m-dlg__t" id="oxoct" tabindex="-1">ما نتيجة مرحلة «' + esc(from.label) + "»؟</h3>" +
     '<p class="m-meta">' + (a.ids.length > 1 ? opNLine(a.ids.length) + " · " : "") + "النقل إلى «" + esc(to.label) +
-      "» — " + dir + ". اختر النتيجة؛ يُسجَّل معها سببها والإجراء التالي، ولا يتم النقل دونها.</p>";
+      "» — " + dir + ". " + (a.won ? "حدّد مدة العقد، ثم اختر النتيجة." : "اختر النتيجة؛ يُسجَّل معها سببها والإجراء التالي، ولا يتم النقل دونها.") + "</p>" +
+    (a.won ? opContractBlock(a) : "");
   if (!opts.length) {
     /* No outcome of the kind this move needs: the move is refused here exactly as the server would
        refuse it, and the person is told where the list is made. */
@@ -1891,6 +1930,51 @@ function opStepper(l, open, idx) {
    that names the rung it moves to, and beside it the design system's Select for any other rung. Both
    open the same outcome question as every other move (opRequestMove), so what a click does is never a
    surprise: it asks, then moves. */
+/* «مدة العقد» on the record (founder, 2026-10-06), in the design system's from–to range picker. Editable
+   at any time; required — by the close sheet and by the server — the moment the line closes WON. */
+function opContractField(l) {
+  var won = opIsWon(l);
+  var id = "oxd_contract_" + l.id;
+  var miss = won && !l.contract_start;
+  return '<div class="m-field ox-contract"><label class="m-label' + (won ? " m-req" : "") + '" for="' + id + '_t">مدة العقد</label>' +
+    (opMayEdit()
+      ? mDateRange({ id: id, from: l.contract_start || "", to: l.contract_end || "", label: "مدة العقد", placeholder: "من — إلى", wide: true,
+          attrs: ' data-opcontract="' + l.id + '"' })
+      : '<div class="ox-ro">' + (l.contract_start ? opContractText(l) : opNil("لم تُحدَّد", "unset")) + "</div>") +
+    '<span class="m-hint">' + (miss ? "أُغلقت ربحًا قبل اشتراط التاريخ — حدّد بداية العقد." : won ? "بداية العقد مطلوبة للفرص الرابحة." : "تُطلب بداية العقد عند الإغلاق ربحًا.") + "</span>" +
+    opFieldStatus(l.id + ":contract", id) + "</div>";
+}
+function opContractText(l) {
+  if (!l.contract_start) return "";
+  return '<span class="m-n m-n--date">' + esc(formatArabicDate(l.contract_start)) + "</span>" +
+    (l.contract_end ? ' — <span class="m-n m-n--date">' + esc(formatArabicDate(l.contract_end)) + "</span>" : " — مفتوح");
+}
+var opCtrT = {};
+document.addEventListener("change", function (ev) {
+  var t = ev.target; if (!t || !t.getAttribute) return;
+  var id = t.getAttribute("data-opcontract"); if (!id) return;
+  /* The range writes FROM then TO, each with its own change: one save after both. */
+  clearTimeout(opCtrT[id]);
+  opCtrT[id] = setTimeout(function () { void opSaveContract(Number(id)); }, 0);
+});
+async function opSaveContract(id) {
+  var l = (oppRows || []).find(function (o) { return o.id === id; }); if (!l) return;
+  var f = document.getElementById("oxd_contract_" + id), e = document.getElementById("oxd_contract_" + id + "_to");
+  var cs = f ? f.value : "", ce = e ? e.value : "";
+  var sk = id + ":contract";
+  var cp = checkContractPeriod(cs, ce, opIsWon(l));
+  if (!cp.ok) { opFState[sk] = { s: "invalid", v: cs, m: cp.message }; opRender(); return; }
+  if ((l.contract_start || "") === (cp.start || "") && (l.contract_end || "") === (cp.end || "")) return;
+  opFState[sk] = { s: "pending", v: cs }; opRender();
+  try {
+    var r = await fetch("/admin/opps/" + fmtId(id), { method: "PATCH", headers: { "x-admin-token": TOKEN, "Content-Type": "application/json" },
+      body: JSON.stringify({ contract_start: cp.start || "", contract_end: cp.end || "" }) });
+    var j = await r.json().catch(function () { return {}; });
+    if (r.ok && j.ok) { oppRows = oppRows.map(function (o) { return o.id === j.opp.id ? j.opp : o; }); opFState[sk] = { s: "saved", v: cs }; }
+    else opFState[sk] = { s: "failed", v: cs, m: j.detail || "تعذّر الحفظ" };
+  } catch (x) { opFState[sk] = { s: "failed", v: cs, m: "تعذّر الاتصال" }; }
+  opRender();
+}
 function opNextStage(l) {
   var cur = opStage(l.stage);
   return OPP_ST.filter(function (s) {
@@ -1939,6 +2023,7 @@ function opDetailDrawer(l) {
   b += '<section class="ox-sec" aria-labelledby="oxsec_st"><div class="ox-lr"><div class="ox-sech" id="oxsec_st">المرحلة</div>' + opFieldStatus(ssk, "oxd_stage_" + l.id) + "</div>";
   b += opStepper(l, open, idx);
   if (opIsOpen(l) && opMayEdit()) b += opNextAction(l);
+  b += opContractField(l);
   if (opIsOpen(l)) {
     /* The two closing actions moved to the drawer's footer (founder, 2026-09-17: «move these buttons
        below»): they end the deal, so they sit with the drawer's other terminal action and stay in reach

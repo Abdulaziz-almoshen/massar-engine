@@ -1130,6 +1130,17 @@ CREATE TABLE IF NOT EXISTS stage_outcomes (
 CREATE INDEX IF NOT EXISTS idx_stage_outcomes_stage ON stage_outcomes (stage, position);
 `,
   },
+  {
+    version: "021-contract-period",
+    sql: `
+-- «مدة العقد» (founder, 2026-10-06): a won deal carries the date its contract starts, and may carry the
+-- date it ends. ISO text, as the range picker writes it. Required on the WON transition, enforced on the
+-- locked row in updateOpp (and on the rep path) — not here, because lines already won before this rule
+-- have no date and the migration must not refuse them.
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS contract_start TEXT CHECK (contract_start ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+ALTER TABLE opportunities ADD COLUMN IF NOT EXISTS contract_end   TEXT CHECK (contract_end   ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+`,
+  },
 ];
 
 /** Applied-version bookkeeping plus the seed that keeps the ladder in sync with sales-domain. */
@@ -3519,6 +3530,7 @@ export type OppRow = {
   source_ref: string | null;
   sale_price: number; years: number; qty: number; discount: number;
   owner: string | null; close_on: number | null; next_step: string | null; lost_reason: string | null; lost_note: string | null;
+  contract_start?: string | null; contract_end?: string | null;
   partner_id: number | null;
   /** The package this line is sold under, and the LIST PRICE AND TERM AS THEY WERE when it was
    *  linked. The snapshot is what makes a realised discount answerable a year later: the package's
@@ -3585,6 +3597,7 @@ function rowToOpp(r: Record<string, unknown>): OppRow {
     close_on: r.close_on == null ? null : Number(r.close_on),
     next_step: (r.next_step as string) ?? null, lost_reason: (r.lost_reason as string) ?? null,
     lost_note: (r.lost_note as string) ?? null,
+    contract_start: (r.contract_start as string) ?? null, contract_end: (r.contract_end as string) ?? null,
     partner_id: r.partner_id == null ? null : Number(r.partner_id),
     package_id: r.package_id == null ? null : Number(r.package_id),
     quoted_list_price: r.quoted_list_price == null ? null : Number(r.quoted_list_price),
@@ -3688,13 +3701,19 @@ export class LossReasonRequired extends Error { constructor(public readonly kind
  *  (`POST /rep/engagements`). Anyone working the board moved a deal with no outcome, no reason and
  *  no next action, and «نتائج المراحل» printed «انتقلت دون تسجيل نتيجة» for every one of them — a
  *  35-entry business rule that the surface most people use could not reach. */
+/** Thrown inside updateOpp: a line closing WON (or a won line losing its date) has no contract start. */
+export class ContractStartRequired extends Error {
+  constructor() { super("contract_start_required"); this.name = "ContractStartRequired"; }
+}
+
 export async function updateOpp(
   id: number, patch: Partial<OppRow>, actor?: string, outcomeKey?: string | null,
 ): Promise<OppRow | null> {
   if (!pool || !connected) return null;
   const sets: string[] = [], vals: unknown[] = []; let i = 1;
   for (const k of ["product", "stage", "sale_price", "years", "qty", "discount", "owner",
-    "close_on", "next_step", "lost_reason", "lost_note", "source", "source_ref", "account_name"] as const) {
+    "close_on", "next_step", "lost_reason", "lost_note", "source", "source_ref", "account_name",
+    "contract_start", "contract_end"] as const) {
     if (patch[k] !== undefined) { sets.push(`${k} = $${i++}`); vals.push(patch[k]); }
   }
   // A package-only edit is a real edit. package_id is not in the SET list above — it is resolved
@@ -3725,7 +3744,7 @@ export async function updateOpp(
   try {
     await client.query("BEGIN");
     const prev = await client.query(
-      "SELECT stage, product, package_id FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
+      "SELECT stage, product, package_id, contract_start FROM opportunities WHERE id = $1 FOR UPDATE", [id]);
     if (!prev.rows[0]) { await client.query("ROLLBACK"); return null; }
     const fromStage = String(prev.rows[0].stage);
     const prevProduct = String(prev.rows[0].product);
@@ -3745,6 +3764,13 @@ export async function updateOpp(
       if (r >= 0) sets[r] = "lost_reason = COALESCE(lost_reason, " + pr + "::text)";
     }
     if (patch.stage === "lost" && fromStage !== "lost" && !patch.lost_reason) { await client.query("ROLLBACK"); throw new LossReasonRequired(); }
+    // NO WON CLOSE WITHOUT A CONTRACT START (founder, 2026-10-06), decided on the locked row: the date may
+    // ride in this patch or already be on the line. Clearing it from a won line is refused too.
+    const startAfter = patch.contract_start !== undefined ? patch.contract_start : (prev.rows[0].contract_start ?? null);
+    const wonAfter = patch.stage !== undefined ? patch.stage === "won" : fromStage === "won";
+    if (wonAfter && !startAfter && (patch.stage === "won" || patch.contract_start !== undefined)) {
+      await client.query("ROLLBACK"); throw new ContractStartRequired();
+    }
     if ((patch.lost_reason !== undefined || patch.lost_note !== undefined) && !lostAfter) { await client.query("ROLLBACK"); throw new LossReasonRequired("not_lost"); }
     // THE PACKAGE LINK, in this transaction and under the same row lock, as its own statement: the
     // SET list above was built before the transaction opened and cannot see the locked row.
@@ -4212,6 +4238,15 @@ export async function recordEngagement(input: EngagementInput): Promise<Engageme
         if (toStage === fromStage && toStage === "lost" && outcomeIsLost) {
           // A reason recorded by a rep on a line that is already lost corrects the line too (review, S3).
           await client.query(`UPDATE opportunities SET lost_reason = $1, lost_note = NULL, updated_at = $2 WHERE id = $3`, [input.outcomeKey, now, input.oppId]);
+        }
+        // The rep's screen has no contract field: a WON close from it is refused rather than written without the
+        // contract start the board insists on (founder, 2026-10-06). The rep is told where to record it.
+        if (toStage === "won" && fromStage !== "won") {
+          const cs = await client.query("SELECT contract_start FROM opportunities WHERE id = $1", [input.oppId]);
+          if (!cs.rows[0]?.contract_start) {
+            await client.query("ROLLBACK");
+            return { ok: false, error: "contract_start_required", field: "contract_start" };
+          }
         }
         if (toStage !== fromStage) {
           // A rep's lost outcome is the line's lost reason too, so the board shows WHY without a second entry.

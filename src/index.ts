@@ -1882,6 +1882,10 @@ app.post("/rep/engagements", async (req, reply) => {
     occurredAt: b.occurredAt == null ? Date.now() : Number(b.occurredAt),
     note: b.note == null ? null : String(b.note).slice(0, 1000),
   });
+  // The rep screen prints `error` as the reason; this one names where to fix it, not a code.
+  if (!r.ok && r.error === "contract_start_required") {
+    return reply.code(400).send({ ...r, code: r.error, error: "حدّد تاريخ بدء العقد من «فرص البيع» أولًا — لا تُغلق فرصة رابحة دونه" });
+  }
   if (!r.ok) return reply.code(400).send(r);
   return r;
 });
@@ -3471,6 +3475,13 @@ app.patch("/admin/opps/:id", async (req, reply) => {
   for (const k of ["sale_price", "years", "qty", "discount"]) {
     if (b[k] !== undefined) patch[k] = Math.round(Number(b[k]));
   }
+  // «مدة العقد»: shape-checked here; whether a WON line may be without a start is decided on the locked row.
+  if (b.contract_start !== undefined || b.contract_end !== undefined) {
+    const cp = work.checkContractPeriod(b.contract_start ?? "", b.contract_end ?? "", false);
+    if (!cp.ok) return problem(reply, 400, cp.code, cp.message, cp.field);
+    if (b.contract_start !== undefined) patch.contract_start = cp.start;
+    if (b.contract_end !== undefined) patch.contract_end = cp.end;
+  }
   if (b.close_on !== undefined) patch.close_on = b.close_on == null || b.close_on === "" ? null : Number(b.close_on);
   // «بلا باقة» is a real answer, not a missing field: it is how a line priced from scratch is
   // recorded, and it clears the snapshot with it.
@@ -3482,6 +3493,9 @@ app.patch("/admin/opps/:id", async (req, reply) => {
       return e.kind === "not_lost"
         ? problem(reply, 400, "invalid_field", "سبب الخسارة يُسجَّل على بند مغلق خسارة فقط", "lost_reason")
         : problem(reply, 400, "lost_reason_required", "اختر سبب الخسارة — يُسجَّل في تقرير الخسائر", "lost_reason");
+    }
+    if (e instanceof db.ContractStartRequired) {
+      return problem(reply, 400, "contract_start_required", "حدّد تاريخ بدء العقد — لا تُغلق فرصة رابحة دونه", "contract_start");
     }
     if (e instanceof db.PackageNotForProduct) {
       return problem(reply, 400, "invalid_field", e.reason === "retired"

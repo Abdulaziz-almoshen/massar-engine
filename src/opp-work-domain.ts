@@ -230,9 +230,26 @@ export function journeyPct(ladder: readonly string[], currentStage: string): num
   return Math.round(((i + 1) / ladder.length) * 100);
 }
 
+// --------------------------------------------------------------------------------- the contract period
+/** «مدة العقد» (founder, 2026-10-06): a won deal must carry the date its contract starts — «no
+ *  opportunity can be closed without this date». The end is optional (an open-ended licence has none),
+ *  but when given it may not precede the start. Dates are «YYYY-MM-DD», as the range picker writes them. */
+export function checkContractPeriod(start: unknown, end: unknown, requireStart: boolean):
+  { ok: true; start: string | null; end: string | null } | { ok: false; field: string; code: string; message: string } {
+  var iso = /^\d{4}-\d{2}-\d{2}$/;
+  var s0 = typeof start === "string" ? start.trim() : "";
+  var e0 = typeof end === "string" ? end.trim() : "";
+  if (s0 && !iso.test(s0)) return { ok: false, field: "contract_start", code: "invalid_field", message: "تاريخ بدء العقد غير صالح" };
+  if (e0 && !iso.test(e0)) return { ok: false, field: "contract_end", code: "invalid_field", message: "تاريخ نهاية العقد غير صالح" };
+  if (!s0 && e0) return { ok: false, field: "contract_start", code: "invalid_field", message: "حدّد تاريخ بدء العقد قبل نهايته" };
+  if (requireStart && !s0) return { ok: false, field: "contract_start", code: "contract_start_required", message: "حدّد تاريخ بدء العقد — لا تُغلق فرصة رابحة دونه" };
+  if (s0 && e0 && e0 < s0) return { ok: false, field: "contract_end", code: "invalid_field", message: "نهاية العقد قبل بدايته" };
+  return { ok: true, start: s0 || null, end: e0 || null };
+}
+
 // ------------------------------------------------------------------------------------------ the seam
 
-const DOMAIN_FNS = [checkLossReason, isLossClose, checkActivity, checkQuote, canMoveQuote, stageJourney, journeyPct] as const;
+const DOMAIN_FNS = [checkLossReason, isLossClose, checkActivity, checkQuote, canMoveQuote, stageJourney, journeyPct, checkContractPeriod] as const;
 const INJECTED = ["LOSS_REASONS", "LOSS_REASON_LABELS", "LOSS_OTHER_KEY", "LOSS_NOTE_MAX", "ACTIVITY_KINDS", "ACTIVITY_KIND_LABELS",
   "ACTIVITY_SUMMARY_MAX", "ACTIVITY_NEXT_MAX", "ACTIVITY_OWNER_MAX", "QUOTE_STATUSES", "QUOTE_STATUS_LABELS", "QUOTE_NOTE_MAX"] as const;
 

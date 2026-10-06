@@ -34,7 +34,7 @@ function mDate(o) {
     '<button type="button" class="m-dp__t" id="' + esc(o.id) + '_t" aria-haspopup="dialog"' +
       ' aria-expanded="false" aria-label="' + esc(o.label || "اختر التاريخ") + '">' + DP_ICON +
       '<span class="m-dp__v' + (val ? "" : " is-ph") + '">' +
-      (val ? '<span class="m-n">' + esc(formatArabicDate(val)) + "</span>" : esc(o.placeholder || "اختر التاريخ")) +
+      (val ? '<span class="m-n m-n--date">' + esc(formatArabicDate(val)) + "</span>" : esc(o.placeholder || "اختر التاريخ")) +
       "</span></button>" +
     '<div class="m-dp__p" id="' + esc(o.id) + '_p" role="dialog" aria-modal="false" aria-label="' +
       esc(o.label || "التقويم") + '" hidden></div></div>';
@@ -56,8 +56,8 @@ function mDateRange(o) {
 }
 function dpRangeText(f, t, ph) {
   if (!f) return esc(ph || "اختر المدى");
-  if (!t) return '<span class="m-n">' + esc(formatArabicDate(f)) + "</span> — …";
-  return '<span class="m-n">' + esc(formatArabicDate(f)) + '</span> — <span class="m-n">' +
+  if (!t) return '<span class="m-n m-n--date">' + esc(formatArabicDate(f)) + "</span> — …";
+  return '<span class="m-n m-n--date">' + esc(formatArabicDate(f)) + '</span> — <span class="m-n m-n--date">' +
     esc(formatArabicDate(t)) + "</span>";
 }
 
@@ -95,7 +95,7 @@ if (!window.__mDp) {
       lab.innerHTML = dpRangeText(v.from, v.to, lab.getAttribute("data-ph") || "اختر المدى");
       lab.classList.toggle("is-ph", !v.from);
     } else {
-      lab.innerHTML = v.from ? '<span class="m-n">' + formatArabicDate(v.from) + "</span>"
+      lab.innerHTML = v.from ? '<span class="m-n m-n--date">' + formatArabicDate(v.from) + "</span>"
         : (lab.getAttribute("data-ph") || "اختر التاريخ");
       lab.classList.toggle("is-ph", !v.from);
     }

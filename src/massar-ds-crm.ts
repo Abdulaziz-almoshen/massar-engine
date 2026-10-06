@@ -117,6 +117,8 @@ export const MASSAR_DS_CSS = `
   unicode-bidi: isolate;
   display: inline-block;
 }
+/* A date carries an Arabic month name between its figures («15 أكتوبر 2026»): forced LTR, the run
+   reorders to «2026 أكتوبر 15». Keep the numerals' features, lay the date out right-to-left. */.ds6 .m-n--date{ direction: rtl; }
 .ds6 .m-shell{
   display:flex;
   min-block-size: 100dvh;
@@ -1698,6 +1700,10 @@ export const MASSAR_DS_CSS = `
   box-shadow: 0 0 0 1px var(--m-line), var(--m-lift);
 }
 .ds6 .m-dp__p[hidden]{ display: none; }
+/* Inside a modal that scrolls, an absolute calendar is clipped by the modal's own overflow; there it
+   opens IN FLOW, so the modal grows and scrolls to it instead of cutting it off. */.ds6 [aria-modal="true"] .m-dp{ flex-wrap: wrap; }
+.ds6 [aria-modal="true"] .m-dp__p{ position: relative; inset: auto; flex: 1 0 100%; inline-size: auto; margin-block-start: 4px;
+  box-shadow: 0 0 0 1px var(--m-line); }
 .ds6 .m-dp__h{ display: flex; align-items: center; gap: var(--m-1); margin-block-end: var(--m-2); }
 .ds6 .m-dp__sel{ display: flex; gap: var(--m-1); flex: 1 1 auto; min-inline-size: 0; }
 /* Inside the header the two comboboxes are compact: the popover is 296px wide and they share it. */.ds6 .m-dp__sel .m-cb{ flex: 1 1 0; min-inline-size: 0; }
