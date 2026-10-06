@@ -1808,7 +1808,8 @@ document.addEventListener("change", function (ev) {
 });
 function opContractBlock(a) {
   return '<div class="ox-occ"><div class="m-field"><label class="m-label m-req" for="oxoc_contract_t">مدة العقد</label>' +
-    mDateRange({ id: "oxoc_contract", from: a.cs, to: a.ce, label: "مدة العقد", placeholder: "من — إلى", wide: true, attrs: ' data-occontract="1"' }) +
+    mDateRange({ id: "oxoc_contract", from: a.cs, to: a.ce, label: "مدة العقد", fromLabel: "بداية العقد", toLabel: "نهاية العقد",
+      toOptional: true, presets: [12, 24, 36], wide: true, attrs: ' data-occontract="1"' }) +
     '<span class="m-hint">تاريخ بدء العقد مطلوب لإغلاق الفرصة ربحًا؛ النهاية اختيارية.</span>' +
     (a.err ? '<span class="m-err" role="alert">' + esc(a.err) + "</span>" : "") + "</div></div>";
 }
@@ -1938,10 +1939,12 @@ function opContractField(l) {
   var miss = won && !l.contract_start;
   return '<div class="m-field ox-contract"><label class="m-label' + (won ? " m-req" : "") + '" for="' + id + '_t">مدة العقد</label>' +
     (opMayEdit()
-      ? mDateRange({ id: id, from: l.contract_start || "", to: l.contract_end || "", label: "مدة العقد", placeholder: "من — إلى", wide: true,
+      ? mDateRange({ id: id, from: l.contract_start || "", to: l.contract_end || "", label: "مدة العقد", fromLabel: "بداية العقد",
+          toLabel: "نهاية العقد", toOptional: true, presets: [12, 24, 36], wide: true,
           attrs: ' data-opcontract="' + l.id + '"' })
       : '<div class="ox-ro">' + (l.contract_start ? opContractText(l) : opNil("لم تُحدَّد", "unset")) + "</div>") +
-    '<span class="m-hint">' + (miss ? "أُغلقت ربحًا قبل اشتراط التاريخ — حدّد بداية العقد." : won ? "بداية العقد مطلوبة للفرص الرابحة." : "تُطلب بداية العقد عند الإغلاق ربحًا.") + "</span>" +
+    '<span class="m-hint">' + (l.contract_start && l.contract_end ? "المدة: " + esc(rangeLengthLabel(l.contract_start, l.contract_end)) + " · " : "") +
+      (miss ? "أُغلقت ربحًا قبل اشتراط التاريخ — حدّد بداية العقد." : won ? "بداية العقد مطلوبة للفرص الرابحة." : "تُطلب بداية العقد عند الإغلاق ربحًا.") + "</span>" +
     opFieldStatus(l.id + ":contract", id) + "</div>";
 }
 function opContractText(l) {

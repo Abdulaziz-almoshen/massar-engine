@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseISODate, toISODate, formatArabicDate, isWithinISO, isDayAllowed, monthGrid,
   shiftMonth, shiftISODay, yearRange, pickRange, DATE_FIELD_DOMAIN_JS,
+  pickRangeEnd, termEndISO, monthsLabel, rangeLengthLabel,
 } from "../src/date-field-domain.js";
 
 describe("parse and format", () => {
@@ -101,5 +102,42 @@ describe("the browser bundle", () => {
     expect(f.monthGrid(2026, 8)).toHaveLength(42);
     expect(f.pickRange("2026-09-17", "", "2026-09-10")).toEqual({ from: "2026-09-10", to: "2026-09-17" });
     expect(f.shiftISODay("2026-09-30", 1)).toBe("2026-10-01");
+  });
+});
+
+describe("a range picker that knows which end it sets", () => {
+  it("picking the start moves to the end, and keeps an end still after it", () => {
+    expect(pickRangeEnd("", "", "2026-10-15", "from")).toEqual({ from: "2026-10-15", to: "", end: "to", done: false });
+    expect(pickRangeEnd("2026-10-01", "2026-12-31", "2026-10-15", "from")).toEqual({ from: "2026-10-15", to: "2026-12-31", end: "to", done: false });
+  });
+  it("a new start past the end clears the end", () => {
+    expect(pickRangeEnd("2026-10-01", "2026-10-20", "2026-11-01", "from").to).toBe("");
+  });
+  it("picking the end finishes; a day before the start becomes the start", () => {
+    expect(pickRangeEnd("2026-10-15", "", "2027-10-14", "to")).toEqual({ from: "2026-10-15", to: "2027-10-14", end: "to", done: true });
+    expect(pickRangeEnd("2026-10-15", "", "2026-10-01", "to")).toEqual({ from: "2026-10-01", to: "", end: "to", done: false });
+  });
+  it("picking the end with no start sets the start", () => {
+    expect(pickRangeEnd("", "", "2026-10-15", "to").from).toBe("2026-10-15");
+  });
+});
+
+describe("terms and their length", () => {
+  it("ends a term the day before its anniversary", () => {
+    expect(termEndISO("2026-10-15", 12)).toBe("2027-10-14");
+    expect(termEndISO("2026-01-01", 36)).toBe("2028-12-31");
+    expect(termEndISO("2026-01-31", 1)).toBe("2026-02-27");
+    expect(termEndISO("", 12)).toBe("");
+  });
+  it("counts months the way Arabic does", () => {
+    expect([1, 2, 3, 11, 12, 24, 36, 132].map(monthsLabel)).toEqual(
+      ["شهر واحد", "شهران", "3 أشهر", "11 شهرًا", "سنة واحدة", "سنتان", "3 سنوات", "11 سنة"]);
+  });
+  it("names a range by its largest whole unit", () => {
+    expect(rangeLengthLabel("2026-10-15", "2027-10-14")).toBe("سنة واحدة");
+    expect(rangeLengthLabel("2026-10-15", "2027-01-14")).toBe("3 أشهر");
+    expect(rangeLengthLabel("2026-10-15", "2026-10-31")).toBe("17 يومًا");
+    expect(rangeLengthLabel("2026-10-15", "2026-10-15")).toBe("يوم واحد");
+    expect(rangeLengthLabel("2026-10-15", "")).toBe("");
   });
 });

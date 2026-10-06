@@ -40,25 +40,38 @@ function mDate(o) {
       esc(o.label || "التقويم") + '" hidden></div></div>';
 }
 
-/* o: { id, from, to, min, max, label, placeholder, attrs (applied to BOTH hidden inputs), wide } */
+/* o: { id, from, to, min, max, label, attrs (applied to BOTH hidden inputs), wide,
+        fromLabel, toLabel, toOptional, presets: [months…] }
+   A range is TWO labelled halves, «البداية» → «النهاية», each its own button (founder, 2026-10-06: one
+   «من — إلى» field whose second click silently meant the other end was confusing). The open calendar
+   always says which end it is setting. The first half keeps the id «<id>_t», so a label's for= and
+   any focus() written for the old single trigger still land on it. */
+var DP_ARROW = '<svg class="m-dp__arr" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5m6-6-6 6 6 6"/></svg>';
 function mDateRange(o) {
   var f = o.from ? String(o.from) : "", t = o.to ? String(o.to) : "";
+  var fl = o.fromLabel || "البداية", tl = o.toLabel || "النهاية";
   return '<div class="m-dp m-dp--range' + (o.wide ? " m-dp--wide" : "") + '" data-dp="' + esc(o.id) + '"' +
     ' data-dp-mode="range"' + (o.min ? ' data-dp-min="' + esc(o.min) + '"' : "") +
-    (o.max ? ' data-dp-max="' + esc(o.max) + '"' : "") + ">" +
+    (o.max ? ' data-dp-max="' + esc(o.max) + '"' : "") +
+    (o.presets && o.presets.length ? ' data-dp-presets="' + esc(o.presets.join(",")) + '"' : "") +
+    (o.toOptional ? ' data-dp-toopt="1"' : "") +
+    ' data-dp-fl="' + esc(fl) + '" data-dp-tl="' + esc(tl) + '">' +
     '<input type="hidden" id="' + esc(o.id) + '" value="' + esc(f) + '"' + (o.attrs || "") + ">" +
     '<input type="hidden" id="' + esc(o.id) + '_to" value="' + esc(t) + '"' + (o.attrs || "") + ">" +
-    '<button type="button" class="m-dp__t" id="' + esc(o.id) + '_t" aria-haspopup="dialog"' +
-      ' aria-expanded="false" aria-label="' + esc(o.label || "اختر المدى") + '">' + DP_ICON +
-      '<span class="m-dp__v' + (f ? "" : " is-ph") + '">' + dpRangeText(f, t, o.placeholder) + "</span></button>" +
+    '<div class="m-dp__rt" role="group" aria-label="' + esc(o.label || "المدى") + '">' + DP_ICON +
+      dpSeg(o.id + "_t", "from", fl, f, "اختر") + DP_ARROW +
+      dpSeg(o.id + "_t2", "to", tl, t, o.toOptional ? "اختياري" : "اختر") + "</div>" +
     '<div class="m-dp__p" id="' + esc(o.id) + '_p" role="dialog" aria-modal="false" aria-label="' +
       esc(o.label || "التقويم") + '" hidden></div></div>';
 }
-function dpRangeText(f, t, ph) {
-  if (!f) return esc(ph || "اختر المدى");
-  if (!t) return '<span class="m-n m-n--date">' + esc(formatArabicDate(f)) + "</span> — …";
-  return '<span class="m-n m-n--date">' + esc(formatArabicDate(f)) + '</span> — <span class="m-n m-n--date">' +
-    esc(formatArabicDate(t)) + "</span>";
+function dpSeg(id, end, label, val, ph) {
+  return '<button type="button" class="m-dp__t m-dp__seg" id="' + esc(id) + '" data-dp-end="' + end + '"' +
+    ' aria-haspopup="dialog" aria-expanded="false" aria-label="' + esc(label) + '">' +
+    '<span class="m-dp__k">' + esc(label) + "</span>" + dpSegVal(val, ph) + "</button>";
+}
+function dpSegVal(val, ph) {
+  return '<span class="m-dp__v' + (val ? "" : " is-ph") + '" data-ph="' + esc(ph) + '">' +
+    (val ? '<span class="m-n m-n--date">' + esc(formatArabicDate(val)) + "</span>" : esc(ph)) + "</span>";
 }
 
 if (!window.__mDp) {
@@ -66,6 +79,7 @@ if (!window.__mDp) {
   var dpOpen = null;        /* the open .m-dp */
   var dpView = { y: 0, m: 0 };
   var dpFocus = "";         /* the day the grid's roving tabindex sits on */
+  var dpEnd = "from";       /* in a range: the end the open calendar is setting */
 
   var dpToday = function () { return toISODate(new Date()); };
   var dpVal = function (g) {
@@ -92,8 +106,10 @@ if (!window.__mDp) {
     var v = dpVal(g), lab = g.querySelector(".m-dp__v");
     if (!lab) return;
     if (g.getAttribute("data-dp-mode") === "range") {
-      lab.innerHTML = dpRangeText(v.from, v.to, lab.getAttribute("data-ph") || "اختر المدى");
-      lab.classList.toggle("is-ph", !v.from);
+      [["from", v.from], ["to", v.to]].forEach(function (x) {
+        var seg = g.querySelector('[data-dp-end="' + x[0] + '"] .m-dp__v');
+        if (seg) seg.outerHTML = dpSegVal(x[1], seg.getAttribute("data-ph") || "اختر");
+      });
     } else {
       lab.innerHTML = v.from ? '<span class="m-n m-n--date">' + formatArabicDate(v.from) + "</span>"
         : (lab.getAttribute("data-ph") || "اختر التاريخ");
@@ -107,7 +123,23 @@ if (!window.__mDp) {
     var cells = monthGrid(dpView.y, dpView.m);
     var years = yearRange(dpView.y, b.min, b.max);
     var id = g.getAttribute("data-dp");
-    var h = '<div class="m-dp__h">' +
+    var h = "";
+    if (range) {
+      var toOpt = g.getAttribute("data-dp-toopt") === "1";
+      var endName = dpEnd === "to" ? g.getAttribute("data-dp-tl") || "النهاية" : g.getAttribute("data-dp-fl") || "البداية";
+      h += '<p class="m-dp__step" aria-live="polite">اختر تاريخ ' + esc(endName) +
+        (dpEnd === "to" && toOpt ? " <small>(اختياري)</small>" : "") + "</p>";
+      var pre = (g.getAttribute("data-dp-presets") || "").split(",").map(Number).filter(function (n) { return n > 0; });
+      if (pre.length) {
+        h += '<div class="m-dp__pre" role="group" aria-label="مدة جاهزة">' + pre.map(function (n) {
+          var e = v.from ? termEndISO(v.from, n) : "";
+          return '<button type="button" class="m-dp__chip' + (e && e === v.to ? " is-on" : "") + '" data-dp-term="' + n + '"' +
+            (v.from && isDayAllowed(e, b.min, b.max) ? "" : " disabled") +
+            (v.from ? "" : ' title="اختر تاريخ البداية أولًا"') + ">" + esc(monthsLabel(n)) + "</button>";
+        }).join("") + "</div>";
+      }
+    }
+    h += '<div class="m-dp__h">' +
       '<button type="button" class="m-dp__nav" data-dp-step="-1" aria-label="الشهر السابق">' +
         '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>' +
       '<div class="m-dp__sel">' +
@@ -124,39 +156,64 @@ if (!window.__mDp) {
       var allowed = isDayAllowed(c.iso, b.min, b.max);
       var on = range ? (c.iso === v.from || c.iso === v.to) : c.iso === v.from;
       var mid = range && v.from && v.to && isWithinISO(c.iso, v.from, v.to) && !on;
+      var caps = range && v.from && v.to && v.from !== v.to
+        ? (c.iso === v.from ? " is-start" : c.iso === v.to ? " is-end" : "") : "";
       h += '<button type="button" class="m-dp__d' + (c.inMonth ? "" : " is-out") +
-        (on ? " is-on" : "") + (mid ? " is-mid" : "") + (c.iso === dpToday() ? " is-today" : "") +
+        (on ? " is-on" : "") + caps + (mid ? " is-mid" : "") + (c.iso === dpToday() ? " is-today" : "") +
         '" role="gridcell" data-dp-day="' + c.iso + '" tabindex="' + (c.iso === dpFocus ? "0" : "-1") + '"' +
         (allowed ? "" : " disabled") + ' aria-selected="' + (on ? "true" : "false") + '"' +
         ' aria-label="' + esc(formatArabicDate(c.iso)) + '"><span class="m-n">' + fmtN(c.day) + "</span></button>";
     });
     h += "</div>";
-    h += '<div class="m-dp__f">' +
-      '<button type="button" class="m-btn m-btn--quiet" data-dp-today="1">اليوم</button>' +
-      ((range ? v.from || v.to : v.from)
-        ? '<button type="button" class="m-btn m-btn--quiet" data-dp-clear="1">مسح</button>' : "") +
-      "</div>";
+    if (range) {
+      var len = rangeLengthLabel(v.from, v.to);
+      h += '<div class="m-dp__f"><span class="m-dp__sum">' +
+        (len ? "المدة: <b>" + esc(len) + "</b>" : v.from ? (g.getAttribute("data-dp-toopt") === "1" ? "بلا نهاية محدّدة" : "اختر النهاية") : "") + "</span>" +
+        (v.from || v.to ? '<button type="button" class="m-btn m-btn--quiet" data-dp-clear="1">مسح</button>' : "") +
+        '<button type="button" class="m-btn" data-dp-done="1">تم</button></div>';
+    } else {
+      h += '<div class="m-dp__f">' +
+        '<button type="button" class="m-btn m-btn--quiet" data-dp-today="1">اليوم</button>' +
+        (v.from ? '<button type="button" class="m-btn m-btn--quiet" data-dp-clear="1">مسح</button>' : "") +
+        "</div>";
+    }
     p.innerHTML = h;
   };
 
   var dpClose = function () {
     if (!dpOpen) return;
-    var g = dpOpen, p = g.querySelector(".m-dp__p"), t = g.querySelector(".m-dp__t");
+    var g = dpOpen, p = g.querySelector(".m-dp__p"), t = dpTrig(g);
     p.hidden = true; p.innerHTML = "";
-    t.setAttribute("aria-expanded", "false");
+    g.querySelectorAll(".m-dp__t").forEach(function (x) { x.setAttribute("aria-expanded", "false"); x.classList.remove("is-act"); });
     dpOpen = null;
     if (t) { try { t.focus({ preventScroll: true }); } catch (e) {} }
   };
-  var dpOpenIt = function (g) {
-    if (dpOpen === g) return;
-    dpClose();
-    var v = dpVal(g), anchor = parseISODate(v.from) || parseISODate(dpToday());
+  /* The trigger that owns the open calendar: in a range, the half for the end being set. */
+  var dpTrig = function (g) {
+    return g.querySelector('[data-dp-end="' + dpEnd + '"]') || g.querySelector(".m-dp__t");
+  };
+  var dpMark = function (g) {
+    g.querySelectorAll(".m-dp__t").forEach(function (x) {
+      var on = !x.hasAttribute("data-dp-end") || x.getAttribute("data-dp-end") === dpEnd;
+      x.setAttribute("aria-expanded", on ? "true" : "false");
+      x.classList.toggle("is-act", on && x.hasAttribute("data-dp-end"));
+    });
+  };
+  var dpOpenIt = function (g, end) {
+    var range = g.getAttribute("data-dp-mode") === "range";
+    var v = dpVal(g);
+    var want = range ? (end === "to" && v.from ? "to" : end === "to" ? "from" : "from") : "from";
+    if (dpOpen === g && dpEnd === want) return;
+    if (dpOpen !== g) dpClose();
+    dpEnd = want;
+    var at = dpEnd === "to" ? (v.to || v.from) : v.from;
+    var anchor = parseISODate(at) || parseISODate(dpToday());
     dpView = { y: anchor.getFullYear(), m: anchor.getMonth() };
-    dpFocus = v.from || dpToday();
+    dpFocus = at || dpToday();
     dpOpen = g;
     var p = g.querySelector(".m-dp__p");
     p.hidden = false;
-    g.querySelector(".m-dp__t").setAttribute("aria-expanded", "true");
+    dpMark(g);
     dpPaint(g);
     var f = p.querySelector('[data-dp-day="' + dpFocus + '"]') || p.querySelector(".m-dp__d:not([disabled])");
     if (f) { try { f.focus({ preventScroll: true }); } catch (e) {} }
@@ -179,18 +236,24 @@ if (!window.__mDp) {
   var dpPick = function (g, iso) {
     var range = g.getAttribute("data-dp-mode") === "range", v = dpVal(g);
     if (!range) { dpSet(g, iso, ""); dpLabel(g); dpClose(); return; }
-    var r = pickRange(v.from, v.to, iso);
+    var r = pickRangeEnd(v.from, v.to, iso, dpEnd);
     dpSet(g, r.from, r.to);
     dpLabel(g);
-    /* A range closes only once it HAS both ends; the first click leaves the calendar open for the
-       second, which is how the reference behaves. */
-    if (r.from && r.to) dpClose(); else { dpFocus = iso; dpPaint(g); }
+    /* Picking the start hands the calendar to the end and says so; picking the end finishes. */
+    if (r.done) { dpClose(); return; }
+    dpEnd = r.end; dpFocus = iso; dpMark(g); dpPaint(g);
+    var fd = g.querySelector('[data-dp-day="' + dpFocus + '"]');
+    if (fd) { try { fd.focus({ preventScroll: true }); } catch (e) {} }
   };
 
   document.addEventListener("click", function (e) {
     var t = e.target;
     var trig = t && t.closest ? t.closest(".m-dp__t") : null;
-    if (trig) { var g0 = trig.closest(".m-dp"); if (dpOpen === g0) dpClose(); else dpOpenIt(g0); return; }
+    if (trig) {
+      var g0 = trig.closest(".m-dp"), e0 = trig.getAttribute("data-dp-end");
+      if (dpOpen === g0 && (!e0 || e0 === dpEnd)) dpClose(); else dpOpenIt(g0, e0 || "from");
+      return;
+    }
     if (!dpOpen) {
       if (t && t.closest && t.closest(".m-dp")) return;
       return;
@@ -204,7 +267,18 @@ if (!window.__mDp) {
       if (isDayAllowed(dpToday(), b.min, b.max)) dpPick(dpOpen, dpToday());
       return;
     }
-    if (t.closest("[data-dp-clear]")) { dpSet(dpOpen, "", ""); dpLabel(dpOpen); dpClose(); return; }
+    if (t.closest("[data-dp-clear]")) {
+      dpSet(dpOpen, "", ""); dpLabel(dpOpen);
+      if (dpOpen.getAttribute("data-dp-mode") === "range") { dpEnd = "from"; dpMark(dpOpen); dpPaint(dpOpen); } else dpClose();
+      return;
+    }
+    if (t.closest("[data-dp-done]")) { dpClose(); return; }
+    var term = t.closest("[data-dp-term]");
+    if (term && !term.disabled) {
+      var tv = dpVal(dpOpen);
+      dpSet(dpOpen, tv.from, termEndISO(tv.from, Number(term.getAttribute("data-dp-term"))));
+      dpLabel(dpOpen); dpClose(); return;
+    }
     /* A click inside the popover's own comboboxes is theirs, not a dismissal. */
     /* The combobox popup now lives in #m-cb-layer on <body> while open, so a click on a month row
        is outside .m-dp in the DOM but inside the picker in the user's eyes. */
@@ -233,7 +307,7 @@ if (!window.__mDp) {
     var t = e.target;
     var trig = t && t.closest ? t.closest(".m-dp__t") : null;
     if (trig && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
-      e.preventDefault(); dpOpenIt(trig.closest(".m-dp")); return;
+      e.preventDefault(); dpOpenIt(trig.closest(".m-dp"), trig.getAttribute("data-dp-end") || "from"); return;
     }
     if (!dpOpen || !t.closest || !t.closest(".m-dp__g")) return;
     if (e.key === "ArrowRight") { e.preventDefault(); dpMoveFocus(-1); return; }   /* RTL: right is back */
@@ -255,6 +329,24 @@ if (!window.__mDp) {
     e.preventDefault(); e.stopImmediatePropagation();
     dpClose();
   }, true);
+  /* While the end is being chosen, the band follows the pointer: the range is drawn before it is picked. */
+  var dpPreview = function (iso) {
+    if (!dpOpen || dpOpen.getAttribute("data-dp-mode") !== "range" || dpEnd !== "to") return;
+    var v = dpVal(dpOpen);
+    dpOpen.querySelectorAll(".m-dp__d").forEach(function (d) {
+      var x = d.getAttribute("data-dp-day");
+      var on = !!(iso && v.from && iso > v.from && iso !== v.to);
+      d.classList.toggle("is-prev", on && x > v.from && x < iso);
+      d.classList.toggle("is-prev-end", on && x === iso);
+      if (x === v.from && !v.to) d.classList.toggle("is-start", on);
+    });
+  };
+  document.addEventListener("mouseover", function (e) {
+    if (!dpOpen) return;
+    var d = e.target && e.target.closest ? e.target.closest("[data-dp-day]") : null;
+    if (d && dpOpen.contains(d)) dpPreview(d.getAttribute("data-dp-day"));
+    else if (e.target && e.target.closest && e.target.closest(".m-dp__g") === null) dpPreview("");
+  });
   document.addEventListener("focusin", function () {
     if (dpOpen && !document.body.contains(dpOpen)) dpOpen = null;
   });

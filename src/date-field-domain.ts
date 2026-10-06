@@ -128,9 +128,58 @@ export function pickRange(from: string, to: string, day: string): { from: string
   return { from: from, to: day };
 }
 
+/**
+ * A pick in a range picker that knows WHICH end it is setting (founder, 2026-10-06: «the range selection
+ * is confusing» — one field whose second click silently meant something else). The picker shows the end
+ * it is on; picking the start moves it to the end; a day before the start, picked for the end, becomes
+ * the new start rather than an inverted range; an end that the new start passed is cleared.
+ */
+export function pickRangeEnd(from: string, to: string, day: string, end: string):
+  { from: string; to: string; end: "from" | "to"; done: boolean } {
+  if (end !== "to" || !from) return { from: day, to: to && to >= day ? to : "", end: "to", done: false };
+  if (day < from) return { from: day, to: to && to >= day ? to : "", end: "to", done: false };
+  return { from: from, to: day, end: "to", done: true };
+}
+
+/** The inclusive last day of a term of n months starting on «from»: 15 Oct 2026 + 12 → 14 Oct 2027.
+ *  A start on the 31st clamps to the target month's last day before stepping back one. */
+export function termEndISO(from: string, months: number): string {
+  const d = parseISODate(from);
+  if (!d || !(months > 0)) return "";
+  const t = d.getFullYear() * 12 + d.getMonth() + months;
+  const y = Math.floor(t / 12), m = t % 12;
+  const last = new Date(y, m + 1, 0, 12).getDate();
+  const day = Math.min(d.getDate(), last);
+  return toISODate(new Date(y, m, day - 1, 12, 0, 0, 0));
+}
+
+/** A count of months as Arabic says it: four forms (one, two, 3–10, 11+), whole years named as years. */
+export function monthsLabel(n: number): string {
+  if (n > 0 && n % 12 === 0) {
+    const y = n / 12;
+    return y === 1 ? "سنة واحدة" : y === 2 ? "سنتان" : y <= 10 ? y + " سنوات" : y + " سنة";
+  }
+  return n === 1 ? "شهر واحد" : n === 2 ? "شهران" : n <= 10 ? n + " أشهر" : n + " شهرًا";
+}
+
+/** The length of an inclusive range, in the largest whole unit it is: a term the presets made reads
+ *  «سنة واحدة», anything else its months or its days. "" when the range has no end. */
+export function rangeLengthLabel(from: string, to: string): string {
+  if (!from || !to || to < from) return "";
+  for (let n = 1; n <= 120; n++) {
+    const e = termEndISO(from, n);
+    if (e === to) return monthsLabel(n);
+    if (e > to) break;
+  }
+  const a = parseISODate(from), b = parseISODate(to);
+  if (!a || !b) return "";
+  const days = Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
+  return days === 1 ? "يوم واحد" : days === 2 ? "يومان" : days <= 10 ? days + " أيام" : days + " يومًا";
+}
+
 const DATE_FIELD_FNS = [
   parseISODate, toISODate, formatArabicDate, sameISODay, isWithinISO, isDayAllowed,
-  monthGrid, shiftMonth, shiftISODay, yearRange, pickRange,
+  monthGrid, shiftMonth, shiftISODay, yearRange, pickRange, pickRangeEnd, termEndISO, monthsLabel, rangeLengthLabel,
 ] as const;
 
 export const DATE_FIELD_DOMAIN_JS: string = [

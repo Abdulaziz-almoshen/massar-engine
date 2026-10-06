@@ -1754,7 +1754,75 @@ export const MASSAR_DS_CSS = `
 .ds6 .m-dp__d.is-on{ background: var(--m-ac); color: #FFFFFF; font-weight: 600; box-shadow: none; }
 .ds6 .m-dp__f{ display: flex; gap: var(--m-2); margin-block-start: var(--m-2);
   padding-block-start: var(--m-2); border-block-start: 1px solid var(--m-line); }
-@media (prefers-reduced-motion: reduce){.ds6 .m-dp__t, .ds6 .m-dp__nav{ transition: none; }}
+/* THE RANGE (founder, 2026-10-06: «the range selection is confusing»). Two labelled halves in one field,
+   «البداية» → «النهاية»; the half whose end the calendar is setting is marked, and the calendar says the
+   same thing in words. Inside the calendar the range is ONE band with a cap at each end, and while the
+   end is being chosen the band follows the pointer. */.ds6 .m-dp__rt{
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--m-1);
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding-inline: var(--m-3) 3px;
+  border: 1px solid var(--m-line-2);
+  border-radius: var(--m-r-ctl);
+  background: var(--m-paper);
+  transition: border-color var(--m-out) var(--m-ease);
+}
+.ds6 .m-dp__rt:has([aria-expanded="true"]){ border-color: var(--m-ac); }
+.ds6 .m-dp__t.m-dp__seg{
+  flex: 1 1 0;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  min-block-size: 36px;
+  padding-block: 2px;
+  padding-inline: var(--m-2);
+  border: 0;
+  border-radius: calc(var(--m-r-ctl) - 2px);
+  background: transparent;
+}
+.ds6 .m-dp__k{ font-size: var(--m-t-micro); color: var(--m-mut); line-height: 1.2; }
+.ds6 .m-dp__seg .m-dp__v{ font-size: var(--m-t-cap); line-height: 1.35; }
+@media (hover: hover) and (pointer: fine){.ds6 .m-dp__t.m-dp__seg:hover{ background: var(--m-page); }}
+.ds6 .m-dp__t.m-dp__seg.is-act{ background: var(--m-ac-dim); }
+.ds6 .m-dp__t.m-dp__seg.is-act .m-dp__k{ color: var(--m-ac); font-weight: 600; }
+.ds6 .m-dp__arr{ flex: none; inline-size: 16px; block-size: 16px; fill: none; stroke: var(--m-faint);
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.ds6 [dir="ltr"] .m-dp__arr{ transform: scaleX(-1); }
+.ds6 .m-dp--range .m-dp__p{ inline-size: 320px; }
+.ds6 .m-dp__step{ margin: 0 0 var(--m-2); font-size: var(--m-t-cap); font-weight: 600; color: var(--m-ink); }
+.ds6 .m-dp__step small{ font-size: inherit; font-weight: 400; color: var(--m-mut); }
+.ds6 .m-dp__pre{ display: flex; flex-wrap: wrap; gap: var(--m-1); margin-block-end: var(--m-2); }
+.ds6 .m-dp__chip{
+  min-block-size: 30px;
+  padding-inline: var(--m-3);
+  border: 1px solid var(--m-line-2);
+  border-radius: 999px;
+  background: var(--m-paper);
+  font: inherit;
+  font-size: var(--m-t-cap);
+  color: var(--m-ink-2);
+  cursor: pointer;
+  transition: background-color var(--m-out) var(--m-ease), border-color var(--m-out) var(--m-ease);
+}
+@media (hover: hover) and (pointer: fine){.ds6 .m-dp__chip:not(:disabled):hover{ background: var(--m-page); }}
+.ds6 .m-dp__chip:active:not(:disabled){ transform: scale(0.97); }
+.ds6 .m-dp__chip:focus-visible{ outline: none; box-shadow: var(--m-focus); }
+.ds6 .m-dp__chip.is-on{ border-color: var(--m-ac); background: var(--m-ac-dim); color: var(--m-ac); font-weight: 600; }
+.ds6 .m-dp__chip:disabled{ color: var(--m-faint); cursor: default; }
+/* One band: no gap between the days of a row, the caps square on the band's side. RTL: the start is
+   on the right, so its band side is inline-end. */.ds6 .m-dp--range .m-dp__g{ column-gap: 0; }
+.ds6 .m-dp__d.is-start{ border-start-end-radius: 0; border-end-end-radius: 0; }
+.ds6 .m-dp__d.is-end{ border-start-start-radius: 0; border-end-start-radius: 0; }
+.ds6 .m-dp__d.is-prev:not(.is-on){ background: var(--m-ac-dim); border-radius: 0; }
+.ds6 .m-dp__d.is-prev-end{ background: var(--m-ac-dim); box-shadow: inset 0 0 0 1.5px var(--m-ac);
+  border-start-end-radius: var(--m-r-ctl); border-end-end-radius: var(--m-r-ctl);
+  border-start-start-radius: 0; border-end-start-radius: 0; }
+.ds6 .m-dp__sum{ margin-inline-end: auto; align-self: center; font-size: var(--m-t-cap); color: var(--m-mut); }
+.ds6 .m-dp__sum b{ color: var(--m-ink); font-weight: 600; }
+@media (prefers-reduced-motion: reduce){.ds6 .m-dp__t, .ds6 .m-dp__nav, .ds6 .m-dp__rt, .ds6 .m-dp__chip{ transition: none; }}
 /* A person field a viewer may only read: the control still says what it holds, and says it is not
    theirs to change, rather than disappearing. */.ds6 .m-cb__t:disabled{ background: var(--m-page); color: var(--m-mut); cursor: default; }
 .ds6 .m-cb__t:disabled .m-cb__c{ stroke: var(--m-line-2); }
